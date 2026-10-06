@@ -74,3 +74,9 @@ void harness_sound_play(i32 i, i32 pan)
 {
     g_SoundManager.sound_buffers[i].play(pan);
 }
+
+// Like SoundManager::initialize (0x45d510), which loads every sound effect.
+i32 harness_sound_load(i32 i)
+{
+    return g_SoundManager.sound_buffers[i].load(g_sound_file_names[i]);
+}

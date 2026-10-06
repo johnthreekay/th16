@@ -110,7 +110,15 @@ struct SoundBufferEntry
 
     // Restarts the sound at a pan, at the configured volume.
     void play(i32 pan);
+    // Creates the buffer from the loaded .wav file (or duplicates the
+    // buffer of an earlier entry playing the same file), then frees the
+    // file. The name is only for the log.
+    i32 load(const char *name);
 };
+
+// Debug output; empty in release builds. Kept out of line because it is
+// variadic.
+void sound_debug_log(const char *fmt, ...);
 
 // A request to the sound thread (SoundManager::modify_bgm).
 struct BgmCommandEntry

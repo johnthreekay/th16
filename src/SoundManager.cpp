@@ -1,6 +1,7 @@
 #include <dsound.h>
 
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "CriticalSections.h"
@@ -482,4 +483,110 @@ void SoundManager::modify_bgm(i32 command, i32 arg, const char *name)
         }
     }
     LEAVE_CS(CS_SOUND);
+}
+
+#define SOUND_FILE_DATA(entry) (g_SoundManager.sound_file_data[(entry)->data->file_index])
+#define SAFE_FREE(p) \
+    if ((p) != NULL) \
+    { \
+        free(p); \
+        (p) = NULL; \
+    }
+
+// TODO: block layout differs (the original falls through into the failure paths and shares one log call).
+// FUNCTION: TH16 0x45e990
+i32 SoundBufferEntry::load(const char *name)
+{
+    if (g_SoundManager.manager == NULL)
+    {
+        return 0;
+    }
+    if (buffer != NULL)
+    {
+        buffer->Release();
+        buffer = NULL;
+    }
+    for (i32 i = 0; i < id; i++)
+    {
+        if (g_SoundManager.sound_buffers[i].data->file_index == data->file_index)
+        {
+            g_SoundManager.dsound->DuplicateSoundBuffer(g_SoundManager.sound_buffers[i].buffer, &buffer);
+            return 0;
+        }
+    }
+    while (SOUND_FILE_DATA(this) == NULL)
+    {
+        Sleep(10);
+        if (g_SoundManager.thread_state == SOUND_THREAD_QUIT)
+        {
+            return 0;
+        }
+    }
+    u8 *file = SOUND_FILE_DATA(this);
+    if (strncmp((char *)file, "RIFF", 4) != 0)
+    {
+        g_GameErrorContext.log("Wav \x83t\x83@\x83" "C\x83\x8b\x82\xb6\x82\xe1\x82\xc8\x82\xa2 %s\r\n", name);
+        SAFE_FREE(SOUND_FILE_DATA(this));
+        return -1;
+    }
+    file += 4;
+    i32 riff_size = *(i32 *)file;
+    file += 4;
+    if (strncmp((char *)file, "WAVE", 4) != 0)
+    {
+        g_GameErrorContext.log("Wav \x83t\x83@\x83" "C\x83\x8b\x82\xb6\x82\xe1\x82\xc8\x82\xa2? %s\r\n", name);
+        SAFE_FREE(SOUND_FILE_DATA(this));
+        return -1;
+    }
+    file += 4;
+    i32 chunk_size;
+    WAVEFORMATEX *fmt = get_wav_chunk(file, "fmt ", &chunk_size, riff_size - 12);
+    if (fmt == NULL)
+    {
+        g_GameErrorContext.log("Wav \x83t\x83@\x83" "C\x83\x8b\x82\xb6\x82\xe1\x82\xc8\x82\xa2? %s\r\n", name);
+        SAFE_FREE(SOUND_FILE_DATA(this));
+        return -1;
+    }
+    WAVEFORMATEX wfx = *fmt;
+    u8 *samples = (u8 *)get_wav_chunk(file, "data", &chunk_size, riff_size - 12);
+    if (samples == NULL)
+    {
+        g_GameErrorContext.log("Wav \x83t\x83@\x83" "C\x83\x8b\x82\xb6\x82\xe1\x82\xc8\x82\xa2? %s\r\n", name);
+        SAFE_FREE(SOUND_FILE_DATA(this));
+        return -1;
+    }
+    DSBUFFERDESC desc;
+    memset(&desc, 0, sizeof(desc));
+    desc.dwSize = sizeof(desc);
+    desc.dwFlags = DSBCAPS_GLOBALFOCUS | DSBCAPS_CTRLVOLUME | DSBCAPS_CTRLPAN | DSBCAPS_LOCSOFTWARE;
+    desc.dwBufferBytes = chunk_size;
+    desc.lpwfxFormat = &wfx;
+    if (FAILED(g_SoundManager.dsound->CreateSoundBuffer(&desc, &buffer, NULL)))
+    {
+        SAFE_FREE(SOUND_FILE_DATA(this));
+        return -1;
+    }
+    void *p1;
+    DWORD n1;
+    void *p2;
+    DWORD n2;
+    if (FAILED(buffer->Lock(0, chunk_size, &p1, &n1, &p2, &n2, 0)))
+    {
+        SAFE_FREE(SOUND_FILE_DATA(this));
+        return -1;
+    }
+    memcpy(p1, samples, n1);
+    if (n2 != 0)
+    {
+        memcpy(p2, samples + n1, n2);
+    }
+    buffer->Unlock(p1, n1, p2, n2);
+    SAFE_FREE(SOUND_FILE_DATA(this));
+    sound_debug_log("Create Sound Buffer %s\n", name);
+    return 0;
+}
+
+// FUNCTION: TH16 0x45eda0
+void sound_debug_log(const char *fmt, ...)
+{
 }
