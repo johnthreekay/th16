@@ -212,7 +212,14 @@ struct EnemyData
     i32 unk_452c;
 
     EnemyData();
+    i32 get_int_arg(int index);
+    i32 *get_int_arg_ptr(int index);
+    f32 get_float_arg(int index);
+    f32 *get_float_arg_ptr(int index);
 };
+
+// Damage hooks ECL can install (EnemyData::func_from_ecl_flag_ext_dmg).
+typedef int(__fastcall *EnemyExtDamageFunc)(EnemyData *enemy, int damage);
 
 // VTABLE: TH16 0x4921a8
 // An enemy: an ECL VM plus its state (ExpHP: zEnemy). The name is ZUN's,
@@ -228,6 +235,8 @@ class EnemyInf : public SptInf
 
     EnemyInf(const char *sub_name);
     int on_tick();
+    void set_interrupt(int index, int time, const char *sub);
+    void set_timeout(int index, const char *sub);
     virtual ~EnemyInf();
 };
 
@@ -274,6 +283,7 @@ struct EnemyManager
     static int __fastcall on_draw_callback(EnemyManager *mgr);
     BOOL is_enemy_alive(int id);
     EnemyInf *find_enemy_by_id(int id);
+    HARNESS_CALLED struct EnemyRef find_closest(D3DXVECTOR3 *pos, f32 max_dist);
 };
 
 // An enemy referred to by id; 0 means none.

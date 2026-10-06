@@ -291,5 +291,97 @@ EnemyInf *EnemyRef::get()
     return enemy;
 }
 
+// FUNCTION: TH16 0x424e40
+void EnemyInf::set_interrupt(int index, int time, const char *sub)
+{
+    enemy.interrupts[index].time = time;
+    if (sub != NULL)
+    {
+        strcpy(enemy.interrupts[index].sub_for_set_next, sub);
+        strcpy(enemy.interrupts[index].sub_for_set_timeout, sub);
+    }
+    else
+    {
+        enemy.interrupts[index].sub_for_set_next[0] = '\0';
+        enemy.interrupts[index].sub_for_set_timeout[0] = '\0';
+    }
+}
+
+// FUNCTION: TH16 0x424eb0
+void EnemyInf::set_timeout(int index, const char *sub)
+{
+    if (sub != NULL)
+    {
+        strcpy(enemy.interrupts[index].sub_for_set_timeout, sub);
+    }
+    else
+    {
+        enemy.interrupts[index].sub_for_set_timeout[0] = '\0';
+    }
+}
+
+// FUNCTION: TH16 0x4251d0
+i32 EnemyData::get_int_arg(int index)
+{
+    return full->context.current_context->get_int_arg(index);
+}
+
+// FUNCTION: TH16 0x4251f0
+i32 *EnemyData::get_int_arg_ptr(int index)
+{
+    return full->context.current_context->get_int_arg_ptr(index);
+}
+
+// FUNCTION: TH16 0x425200
+f32 EnemyData::get_float_arg(int index)
+{
+    return full->context.current_context->get_float_arg(index);
+}
+
+// FUNCTION: TH16 0x425220
+f32 *EnemyData::get_float_arg_ptr(int index)
+{
+    return full->context.current_context->get_float_arg_ptr(index);
+}
+
+// FUNCTION: TH16 0x425240
+HARNESS_CALLED EnemyRef EnemyManager::find_closest(D3DXVECTOR3 *pos, f32 max_dist)
+{
+    EnemyInf *closest = NULL;
+    f32 closest_dist_sq = max_dist * max_dist;
+    EnemyList *next;
+    for (EnemyList *node = g_EnemyManager->active_enemy_list_head; node != NULL; node = next)
+    {
+        next = node->next;
+        EnemyInf *enemy = node->entry;
+        if (enemy->enemy.flags_low & 0xc000021)
+        {
+            continue;
+        }
+        f32 dist_sq = (pos->x - enemy->enemy.final_pos.pos.x) * (pos->x - enemy->enemy.final_pos.pos.x) +
+                      (pos->y - enemy->enemy.final_pos.pos.y) * (pos->y - enemy->enemy.final_pos.pos.y);
+        if (dist_sq < closest_dist_sq)
+        {
+            closest_dist_sq = dist_sq;
+            closest = enemy;
+        }
+    }
+    EnemyRef ref;
+    ref.id = closest != NULL ? closest->enemy_id : 0;
+    return ref;
+}
+
+// FUNCTION: TH16 0x4253f0
+int __fastcall ecl_ext_damage_stored(EnemyData *enemy, int damage)
+{
+    if (enemy->ecl_int_vars[3] > 0)
+    {
+        int result = enemy->ecl_int_vars[3] + damage;
+        enemy->ecl_int_vars[3] = 0;
+        return result;
+    }
+    return damage;
+}
+
 // GLOBAL: TH16 0x4a6dc0
 EnemyManager *g_EnemyManager;

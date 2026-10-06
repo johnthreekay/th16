@@ -16,3 +16,9 @@ void harness_enemy_remove(EnemyInf *enemy)
 {
     g_EnemyManager->remove_from_active_list(enemy);
 }
+
+// Like the callers at 0x41072d and 0x445f36.
+int harness_enemy_find_closest(D3DXVECTOR3 *pos, f32 max_dist)
+{
+    return g_EnemyManager->find_closest(pos, max_dist).id;
+}
