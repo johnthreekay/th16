@@ -4,6 +4,7 @@
 #include "../CriticalSections.h"
 #include "../Supervisor.h"
 #include "../Interp.h"
+#include "../Rng.h"
 #include "../ZunMath.h"
 
 // ECL and the per-object updates write g_GameSpeed all the time. Without a
@@ -43,4 +44,10 @@ f32 *harness_screen_coord_scale_ptr()
 AsciiInf **harness_ascii_manager_ptr()
 {
     return &g_AsciiManager;
+}
+
+// Like the ECL movement code around 0x41ffed.
+f32 harness_rand_angle(Rng *rng)
+{
+    return rng->randf_neg_1_to_1_times_pi() / 3.0f;
 }

@@ -47,8 +47,29 @@ struct Timer
 
     // TH06 equivalent: ZunTimer::Tick
     void operator++(int);
+    // Advances by a number of frames at the timer's speed.
+    void operator+=(f32 frames);
     void set(i32 value);
 };
 
 // Speed of each timer kind, if it can be slowed down.
 extern f32 *const g_timer_speeds[1];
+
+inline void Timer::operator+=(f32 frames)
+{
+    if (speed_index >= 1)
+    {
+        speed_index = 0;
+    }
+    f32 *speed = g_timer_speeds[speed_index];
+    previous = current;
+    if (speed != 0 && !(*speed > 0.99f && *speed < 1.01f))
+    {
+        current_f += *speed * frames;
+    }
+    else
+    {
+        current_f += frames;
+    }
+    current = (i32)current_f;
+}

@@ -45,3 +45,9 @@ int __fastcall AsciiInf::on_draw_3_callback(void *arg)
 {
     return arg != 0;
 }
+
+// STUB: TH16 0x46efa0
+AnmVm *AnmManager::get_vm_with_id(AnmId id)
+{
+    return (AnmVm *)(unk_0 + id.id);
+}

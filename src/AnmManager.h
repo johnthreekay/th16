@@ -14,6 +14,8 @@ struct AnmManager
     // Loads an .anm file into a slot. Callers never pass this; LTCG
     // dropped it (the original reaches g_AnmManager directly).
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *name);
+    // NULL if the VM is gone.
+    AnmVm *get_vm_with_id(AnmId id);
 
     void release_preloaded(i32 slot)
     {
