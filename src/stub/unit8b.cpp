@@ -13,3 +13,6 @@ AnmId AnmLoaded::create_effect(i32 script, i32 layer, AnmVm **out_vm)
 void __stdcall camera_update_43c780(Camera *camera)
 {
 }
+
+// GLOBAL: TH16 0x491b58
+AnmVmFunc g_anm_on_destroy_funcs[4];

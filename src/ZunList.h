@@ -44,6 +44,21 @@ template <class T> struct ZunList
         last->insert_after(node);
     }
 
+    // unlink, written out where the original has its own copy of it.
+    void unlink_inline()
+    {
+        if (next != NULL)
+        {
+            next->prev = prev;
+        }
+        if (prev != NULL)
+        {
+            prev->next = next;
+        }
+        next = NULL;
+        prev = NULL;
+    }
+
     // Takes the node out of its list. Only ZunList<void> defines it
     // (ZunList.cpp): the original has one copy (0x405610) for every list,
     // and ZunList<void> stands for ExpHP's untyped zLinkedList.

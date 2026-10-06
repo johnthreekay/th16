@@ -204,6 +204,18 @@ struct AnmManager
     HARNESS_CALLED_INLINABLE void mark_tree_for_deletion(AnmVm *vm);
     // get_vm_with_id for snapshots.
     AnmVm *get_snapshot_vm_with_id(AnmId id);
+    // UpdateFunc callbacks that run the VMs of each list and rebuild the
+    // per-layer draw lists.
+    DECOMP_NOINLINE static i32 __fastcall tick_world(AnmManager *mgr);
+    DECOMP_NOINLINE static i32 __fastcall tick_ui(AnmManager *mgr);
+    static i32 __fastcall on_tick_21(AnmManager *mgr);
+    static i32 __fastcall on_tick_09(AnmManager *mgr);
+    // Moves the VM and its children onto delete_list, once each.
+    void remove_tree(AnmVm *vm, ZunList<AnmVm> *delete_list);
+    // 0x46eab0. Unlinks a VM and returns it to the pool or frees it.
+    i32 destroy_possibly_managed_vm(AnmVm *vm);
+    // 0x46ec90. The same for snapshots.
+    i32 destroy_possibly_managed_snapshot_vm(AnmVm *vm);
     // 0x46e750. Draws the VMs of one layer; returns 1 for the callbacks.
     i32 render_layer(i32 layer);
     // UpdateFunc callbacks that draw one layer each, named after their

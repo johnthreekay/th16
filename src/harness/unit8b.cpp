@@ -52,3 +52,21 @@ void harness_unit8b_ins_316(AnmVm *vm, i32 set)
         vm->clear_ins_316_flag_recursively();
     }
 }
+
+// VMs that did not come from the pool are deleted in several places
+// (0x43b900 has many callers), so LTCG keeps the scalar deleting
+// destructor out of line.
+void harness_unit8b_delete_vm_1(AnmVm *vm)
+{
+    delete vm;
+}
+
+void harness_unit8b_delete_vm_2(AnmVm *vm)
+{
+    delete vm;
+}
+
+void harness_unit8b_delete_vm_3(AnmVm *vm)
+{
+    delete vm;
+}

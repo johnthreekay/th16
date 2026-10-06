@@ -92,6 +92,8 @@ struct AnmVm;
 // Script callbacks, selected per VM by the index_of_* fields.
 typedef i32(__fastcall *AnmVmSwitchFunc)(AnmVm *vm, i32 interrupt);
 extern AnmVmSwitchFunc g_anm_on_switch_funcs[4];
+typedef i32(__fastcall *AnmVmFunc)(AnmVm *vm);
+extern AnmVmFunc g_anm_on_destroy_funcs[4];
 
 // One running ANM script (layout: ExpHP's zAnmVm, flattened, 0x5fc bytes).
 struct AnmVm
@@ -197,8 +199,8 @@ struct AnmVm
     void wipe();
     // 0x40e490. Position including entity_pos and every parent's.
     Float3 world_pos();
-    // 0x45f980
-    void run();
+    // 0x45f980. Nonzero once the script has ended and the VM can go.
+    i32 run();
     HARNESS_CALLED f32 get_slowdown_factor();
     void alloc_extra_data(u32 size);
     void set_layer(i32 layer);

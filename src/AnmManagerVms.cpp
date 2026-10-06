@@ -3,6 +3,8 @@
 #include <string.h>
 
 #include "AnmManager.h"
+#include "CriticalSections.h"
+#include "GameThread.h"
 
 static_assert(sizeof(AnmFastVm) == 0x614, "AnmFastVm size");
 static_assert(offsetof(AnmManager, fast_array) == 0xec, "AnmManager fast_array");
@@ -417,17 +419,7 @@ HARNESS_CALLED AnmVm *AnmManager::allocate_vm()
     if (freelist_head.next != NULL)
     {
         AnmFastVm *fast = freelist_head.next->entry;
-        ZunList<AnmFastVm> *node = &fast->freelist_node;
-        if (node->next != NULL)
-        {
-            node->next->prev = node->prev;
-        }
-        if (node->prev != NULL)
-        {
-            node->prev->next = node->next;
-        }
-        node->next = NULL;
-        node->prev = NULL;
+        fast->freelist_node.unlink_inline();
         fast->vm.fast_id = fast->fast_id;
         fast->is_alive = true;
         fast->vm.parent = NULL;
@@ -452,4 +444,229 @@ HARNESS_CALLED AnmVm *AnmManager::allocate_vm()
     vm->wipe();
     vm->fast_id = 0x1fff;
     return vm;
+}
+
+// FUNCTION: TH16 0x46e340
+i32 __fastcall AnmManager::tick_world(AnmManager *mgr)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    ZunList<AnmVm> delete_list;
+    delete_list.entry = NULL;
+    delete_list.next = NULL;
+    delete_list.prev = NULL;
+    delete_list.unk_c = NULL;
+    AnmVm *layer_tails[43];
+    for (i32 i = 0; i < 36; i++)
+    {
+        AnmVm *head = &mgr->layer_list_dummy_heads[i];
+        layer_tails[i] = head;
+        head->next_in_layer = NULL;
+    }
+    ZunList<AnmVm> *node = mgr->world_list_head;
+    while (node != NULL)
+    {
+        ZunList<AnmVm> *next = node->next;
+        AnmVm *vm = node->entry;
+        u32 deletion = vm->flags_hi & (ANM_VM_DELETE | ANM_VM_FLAG_HI_40);
+        if (deletion == ANM_VM_DELETE)
+        {
+            mgr->remove_tree(vm, &delete_list);
+        }
+        else if (deletion == 0)
+        {
+            if (vm->run())
+            {
+                mgr->remove_tree(vm, &delete_list);
+            }
+            else
+            {
+                // World VMs on the UI copies of layers 24-30 move back.
+                if (vm->layer >= 36 && vm->layer <= 42)
+                {
+                    vm->layer -= 12;
+                }
+                layer_tails[vm->layer]->next_in_layer = vm;
+                layer_tails[vm->layer] = vm;
+                vm->next_in_layer = NULL;
+                mgr->useless_count++;
+            }
+        }
+        node = next;
+    }
+    node = delete_list.next;
+    while (node != NULL)
+    {
+        ZunList<AnmVm> *next = node->next;
+        mgr->destroy_possibly_managed_vm(node->entry);
+        node = next;
+    }
+    LEAVE_CS(CS_ANM_MANAGER);
+    return 1;
+}
+
+// FUNCTION: TH16 0x46e490
+i32 __fastcall AnmManager::tick_ui(AnmManager *mgr)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    // The UI list only uses layers 36-42.
+    AnmVm *layer_tails[7];
+    for (i32 i = 0; i < 7; i++)
+    {
+        layer_tails[i] = &mgr->layer_list_dummy_heads[36 + i];
+        mgr->layer_list_dummy_heads[36 + i].next_in_layer = NULL;
+    }
+    mgr->useless_count = 0;
+    ZunList<AnmVm> delete_list;
+    delete_list.entry = NULL;
+    delete_list.next = NULL;
+    delete_list.prev = NULL;
+    delete_list.unk_c = NULL;
+    ZunList<AnmVm> *node = mgr->ui_list_head;
+    while (node != NULL)
+    {
+        ZunList<AnmVm> *next = node->next;
+        AnmVm *vm = node->entry;
+        u32 deletion = vm->flags_hi & (ANM_VM_DELETE | ANM_VM_FLAG_HI_40);
+        if (deletion == ANM_VM_DELETE)
+        {
+            mgr->remove_tree(vm, &delete_list);
+        }
+        else if (deletion == 0)
+        {
+            if (vm->run())
+            {
+                mgr->remove_tree(vm, &delete_list);
+            }
+            else
+            {
+                // UI VMs on layers 24-31 move to their UI copies.
+                if (vm->layer >= 24 && vm->layer <= 31)
+                {
+                    vm->layer += 12;
+                }
+                else if (vm->layer < 36 || vm->layer > 42)
+                {
+                    vm->layer = 38;
+                }
+                layer_tails[vm->layer - 36]->next_in_layer = vm;
+                layer_tails[vm->layer - 36] = vm;
+                vm->next_in_layer = NULL;
+                mgr->useless_count++;
+            }
+        }
+        node = next;
+    }
+    node = delete_list.next;
+    while (node != NULL)
+    {
+        ZunList<AnmVm> *next = node->next;
+        mgr->destroy_possibly_managed_vm(node->entry);
+        node = next;
+    }
+    LEAVE_CS(CS_ANM_MANAGER);
+    return 1;
+}
+
+// FUNCTION: TH16 0x46e660
+void AnmManager::remove_tree(AnmVm *vm, ZunList<AnmVm> *delete_list)
+{
+    ZunList<AnmVm> *node = vm->list_of_children.next;
+    while (node != NULL)
+    {
+        ZunList<AnmVm> *next = node->next;
+        remove_tree(node->entry, delete_list);
+        node = next;
+    }
+    if ((vm->flags_hi & (ANM_VM_DELETE | ANM_VM_FLAG_HI_40)) != ANM_VM_FLAG_HI_40)
+    {
+        vm->unk_list_598.init(vm);
+        delete_list->insert_after(&vm->unk_list_598);
+    }
+    vm->flags_hi &= ~ANM_VM_DELETE;
+    vm->flags_hi |= ANM_VM_FLAG_HI_40;
+    vm->parent = NULL;
+    vm->unk_5b0 = NULL;
+}
+
+// FUNCTION: TH16 0x46e710
+i32 __fastcall AnmManager::on_tick_21(AnmManager *mgr)
+{
+    if (g_GameThread != NULL && (g_GameThread->flags.flag_0 | g_GameThread->flags.paused) &&
+        g_GameThread->flags.flag_1)
+    {
+        return 1;
+    }
+    return tick_world(mgr);
+}
+
+// FUNCTION: TH16 0x46e740
+i32 __fastcall AnmManager::on_tick_09(AnmManager *mgr)
+{
+    return tick_ui(mgr);
+}
+
+// TODO: LTCG inlines the scalar deleting destructor here; the original calls 0x43b900.
+// FUNCTION: TH16 0x46eab0
+i32 AnmManager::destroy_possibly_managed_vm(AnmVm *vm)
+{
+    if (&vm->node_in_global_list == world_list_tail)
+    {
+        world_list_tail = vm->node_in_global_list.prev;
+    }
+    if (&vm->node_in_global_list == world_list_head)
+    {
+        world_list_head = vm->node_in_global_list.next;
+    }
+    if (&vm->node_in_global_list == ui_list_tail)
+    {
+        ui_list_tail = vm->node_in_global_list.prev;
+    }
+    if (&vm->node_in_global_list == ui_list_head)
+    {
+        ui_list_head = vm->node_in_global_list.next;
+    }
+    if (vm->index_of_on_destroy != 0)
+    {
+        g_anm_on_destroy_funcs[vm->index_of_on_destroy](vm);
+    }
+    vm->node_in_global_list.unlink_inline();
+    vm->unk_list_598.unlink_inline();
+    vm->node_as_child.unlink_inline();
+    vm->parent = NULL;
+    vm->unk_5b0 = NULL;
+    if (vm >= &fast_array[0].vm && vm < &fast_array[0x1fff].vm)
+    {
+        fast_array[vm->fast_id].is_alive = false;
+        freelist_head.insert_after(&fast_array[vm->fast_id].freelist_node);
+        if (vm->ins_508_extra_data != NULL)
+        {
+            free(vm->ins_508_extra_data);
+        }
+        vm->ins_508_extra_data = NULL;
+        vm->ins_508_extra_data_size = 0;
+        vm->instr_offset = -1;
+        vm->id.id = 0;
+        return 0;
+    }
+    delete vm;
+    return 0;
+}
+
+// TODO: LTCG inlines the scalar deleting destructor here; the original calls 0x43b900.
+// FUNCTION: TH16 0x46ec90
+i32 AnmManager::destroy_possibly_managed_snapshot_vm(AnmVm *vm)
+{
+    if (vm->index_of_on_destroy != 0)
+    {
+        g_anm_on_destroy_funcs[vm->index_of_on_destroy](vm);
+    }
+    vm->node_in_global_list.unlink_inline();
+    if (vm >= &snapshot_fast_array[0].vm && vm < &snapshot_fast_array[0x1fff].vm)
+    {
+        snapshot_fast_array[vm->fast_id].is_alive = false;
+        vm->~AnmVm();
+        return 0;
+    }
+    delete vm;
+    return 0;
 }
