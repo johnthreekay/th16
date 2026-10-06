@@ -1,0 +1,51 @@
+#include "CriticalSections.h"
+#include "Rng.h"
+#include "ZunMath.h"
+
+// FUNCTION: TH16 0x402b70
+u16 Rng::rand_u16()
+{
+    ENTER_CS(CS_RNG);
+    generation_count++;
+    u16 a = (seed ^ 0x9630) - 0x6553;
+    seed = (((a & 0xc000) >> 14) + a * 4) & 0xffff;
+    LEAVE_CS(CS_RNG);
+    return seed;
+}
+
+// FUNCTION: TH16 0x402be0
+u32 Rng::rand_u32()
+{
+    // Unlike TH06, the halves are the intermediate values before each
+    // rotation, not the new seeds.
+    ENTER_CS(CS_RNG);
+    generation_count++;
+    u16 a = (seed ^ 0x9630) - 0x6553;
+    seed = (((a & 0xc000) >> 14) + a * 4) & 0xffff;
+    generation_count++;
+    u16 b = (seed ^ 0x9630) - 0x6553;
+    seed = (((b & 0xc000) >> 14) + b * 4) & 0xffff;
+    LEAVE_CS(CS_RNG);
+    return a << 16 | b;
+}
+
+// FUNCTION: TH16 0x402c70
+f32 Rng::randf_0_to_1()
+{
+    __asm finit;
+    return (f32)rand_u32() / (f32)0xffffffff;
+}
+
+// FUNCTION: TH16 0x402cb0
+f32 Rng::randf_neg_1_to_1()
+{
+    __asm finit;
+    return (f32)rand_u32() / (f32)0x7fffffff - 1.0f;
+}
+
+// FUNCTION: TH16 0x402cf0
+f32 Rng::randf_neg_pi_to_pi()
+{
+    __asm finit;
+    return (f32)rand_u32() / ((f32)0xffffffff / ZUN_2PI) - ZUN_PI;
+}

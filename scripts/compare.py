@@ -12,6 +12,11 @@ Runs reccmp-reccmp in-process with two adjustments for this project:
   begins earlier with a stack cookie check (`mov edx,[esp+8];
   lea eax,[edx+N]; mov ecx,[edx-M]; xor ecx,eax; call
   __security_check_cookie`), and code refers to that start.
+- vtables stay vtables. VS2017 PDBs also list each vtable among the global
+  variables, and reccmp's handling of those retypes it as plain data, so it
+  never pairs with the // VTABLE: annotation. And a vtable is taken to end at
+  the first entry that does not point into .text: reccmp otherwise sizes it
+  by the distance to the next symbol and reads neighbouring data as slots.
 
 Arguments are passed through, e.g.:
 
@@ -67,6 +72,43 @@ def patch_reccmp():
             yield thunk_start(image, handler_addr), funcinfo
 
     analyze.find_eh_handlers = find_eh_handlers
+
+    import reccmp.cvdump.analysis as cvdump_analysis
+    from reccmp.types import EntityType, ImageId
+
+    def get_node_type(self):
+        return self.__dict__.get("_node_type")
+
+    def set_node_type(self, value):
+        if value == EntityType.DATA and self.__dict__.get("_node_type") == EntityType.VTABLE:
+            return
+        self.__dict__["_node_type"] = value
+
+    cvdump_analysis.CvdumpNode.node_type = property(get_node_type, set_node_type)
+
+    from reccmp.compare.core import Compare
+
+    original_compare_vtable = Compare._compare_vtable
+
+    def table_size(image, addr, limit):
+        text = next(s for s in image.sections if s.name == ".text")
+        lo, hi = image.imagebase + text.virtual_address, image.imagebase + text.virtual_address + text.virtual_size
+        n = 0
+        while n * 4 < limit:
+            entry = int.from_bytes(image.read(addr + 4 * n, 4), "little")
+            if not lo <= entry < hi:
+                break
+            n += 1
+        return 4 * n
+
+    def compare_vtable(self, match):
+        store = match._kvstore
+        guess = max(match.any_size(ImageId.ORIG), match.any_size(ImageId.RECOMP), 4)
+        store["orig_size"] = table_size(self.orig_bin, match.orig_addr, guess) or 4
+        store["recomp_size"] = table_size(self.recomp_bin, match.recomp_addr, guess) or 4
+        return original_compare_vtable(self, match)
+
+    Compare._compare_vtable = compare_vtable
 
 
 def main():

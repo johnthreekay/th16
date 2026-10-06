@@ -45,6 +45,67 @@ def parse_data_symbols(path):
     return out
 
 
+def parse_all_symbols(path):
+    """{address: symbol} for every public or static symbol in a map file."""
+    out = {}
+    for line in Path(path).read_text(errors="replace").splitlines():
+        m = re.match(r"\s*[0-9a-f]{4}:[0-9a-f]+\s+(\S+)\s+([0-9a-f]{8})\s", line)
+        if m:
+            out.setdefault(int(m.group(2), 16), m.group(1))
+    return out
+
+
+def disasm_function(pe, va, md):
+    base = pe.OPTIONAL_HEADER.ImageBase
+    data = pe.get_memory_mapped_image()[va - base:va - base + 0x4000]
+    max_target = va
+    for insn in md.disasm(data, va):
+        yield insn
+        if insn.group(capstone.CS_GRP_JUMP) and insn.operands and insn.operands[0].type == capstone.x86.X86_OP_IMM:
+            max_target = max(max_target, insn.operands[0].imm)
+        if insn.mnemonic == "ret" and insn.address >= max_target:
+            return
+
+
+def constant_size(symbol):
+    """Size in bytes of a compiler-generated constant, from its name."""
+    m = re.fullmatch(r"__(real|xmm)@([0-9a-f]+)", symbol)
+    return len(m.group(2)) // 2 if m else None
+
+
+def paired_constants(orig, ours, map_path, pairs_path, md):
+    """Original addresses of the constants (__real@..., __xmm@...) that our
+    annotated functions use.
+
+    Each (original, ours) pair from build/functions.txt is disassembled in
+    lockstep. Where an operand names a constant in our build, the original's
+    operand at the same place is accepted as the same constant only if the
+    bytes stored there are identical, so a wrong constant still shows up as
+    a difference."""
+    syms = parse_all_symbols(map_path)
+    obase, rbase = orig.OPTIONAL_HEADER.ImageBase, ours.OPTIONAL_HEADER.ImageBase
+    oimg, rimg = orig.get_memory_mapped_image(), ours.get_memory_mapped_image()
+    found = {}
+    for line in Path(pairs_path).read_text().splitlines():
+        o, r, _ = line.split()
+        a = list(disasm_function(orig, int(o, 16), md))
+        b = list(disasm_function(ours, int(r, 16), md))
+        for x, y in zip(a, b):
+            if x.mnemonic != y.mnemonic or x.size != y.size:
+                break
+            for xo, yo in zip(x.operands, y.operands):
+                if yo.type != capstone.x86.X86_OP_MEM or xo.type != capstone.x86.X86_OP_MEM:
+                    continue
+                ov, rv = xo.mem.disp & 0xFFFFFFFF, yo.mem.disp & 0xFFFFFFFF
+                name = syms.get(rv)
+                size = constant_size(name) if name else None
+                if size is None:
+                    continue
+                if oimg[ov - obase:ov - obase + size] == rimg[rv - rbase:rv - rbase + size]:
+                    found.setdefault(name, ov)
+    return found
+
+
 def text_section(pe):
     for s in pe.sections:
         if s.Name.rstrip(b"\0") == b".text":
@@ -109,6 +170,7 @@ def main():
     ap.add_argument("--orig", default=str(ROOT / "orig/th16.exe"))
     ap.add_argument("--csv", help="write unique matches as a reccmp data source (library functions)")
     ap.add_argument("--only-lib", action="store_true", help="only scan functions that come from .lib archives")
+    ap.add_argument("--pairs", help="build/functions.txt: also pair up the constants these functions use")
     ap.add_argument("--min-bytes", type=int, default=12, help="skip patterns with fewer fixed bytes")
     ap.add_argument("--min-small-bytes", type=int, default=6,
                     help="with --only-lib: smallest pattern accepted inside the library code range")
@@ -236,6 +298,10 @@ def main():
             w.writerow(["address", "symbol", "type"])
             rows = {(addr, name, "library") for name, _, addr in found}
             rows |= {(addr, name, "global") for name, addr in globals_found.items()}
+            if args.pairs:
+                consts = paired_constants(orig, ours, args.map, args.pairs, md)
+                rows |= {(addr, name, "float" if name.startswith("__real@") else "global")
+                         for name, addr in consts.items()}
             # The entry stub is too small to scan for, but both entry points
             # are the CRT's WinMainCRTStartup.
             rows.add((orig.OPTIONAL_HEADER.ImageBase + orig.OPTIONAL_HEADER.AddressOfEntryPoint, "_WinMainCRTStartup", "library"))

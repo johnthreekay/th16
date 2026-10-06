@@ -5,6 +5,7 @@
 enum
 {
     CS_UPDATE_FUNC_REGISTRY = 0,
+    CS_RNG = 10,
     CS_COUNT = 14,
 };
 

@@ -8,6 +8,7 @@ start. Use scripts/compare.py for the authoritative result.
 Usage: quickdiff.py [0x<orig addr> ...]   (default: every annotated function)
 """
 
+import difflib
 import re
 import sys
 from pathlib import Path
@@ -52,15 +53,20 @@ def main():
         if wanted and o not in wanted:
             continue
         a, b = disasm(orig, o), disasm(ours, r)
-        same = sum(x == y for x, y in zip(a, b))
-        status = "MATCH" if a == b else f"{same}/{max(len(a), len(b))} lines equal"
+        ratio = difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
+        status = "MATCH" if a == b else f"{ratio * 100:.1f}% similar ({len(a)} vs {len(b)} instructions)"
         print(f"{o:#x} {sym}: {status}")
         if a != b and wanted:
-            for k in range(max(len(a), len(b))):
-                x = a[k] if k < len(a) else ""
-                y = b[k] if k < len(b) else ""
-                print(f"  {'  ' if x == y else '!='} {x:42s} {y}")
-
+            sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
+            for tag, i1, i2, j1, j2 in sm.get_opcodes():
+                if tag == "equal":
+                    for x in a[i1:i2]:
+                        print(f"     {x}")
+                    continue
+                for k in range(max(i2 - i1, j2 - j1)):
+                    x = a[i1 + k] if i1 + k < i2 else ""
+                    y = b[j1 + k] if j1 + k < j2 else ""
+                    print(f"  != {x:42s} {y}")
 
 if __name__ == "__main__":
     main()

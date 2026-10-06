@@ -121,6 +121,13 @@ def undecorate(names):
         full = m.group(2)
         head = full.split("(", 1)[0].split()
         result[m.group(1)] = head[-1] if head else full
+    for name in names:
+        # This undname cannot decode some newer manglings (__vectorcall's
+        # "YQ"), so read plain ?name@scope@@... names directly.
+        m = re.match(r"\?([A-Za-z_]\w*)((?:@[A-Za-z_]\w*)*)@@", name)
+        if m and result.get(name, name) == name:
+            scopes = [p for p in m.group(2).split("@") if p]
+            result[name] = "::".join(list(reversed(scopes)) + [m.group(1)])
     return result
 
 
@@ -222,7 +229,7 @@ def main():
     # Locate the static library code we linked inside the original, so the
     # comparison can resolve calls into the CRT.
     subprocess.run([sys.executable, str(ROOT / "scripts/sigscan.py"), str(exe), str(exe.with_suffix(".map")),
-                    "--only-lib", "--csv", str(BUILD / "lib.csv")], check=True)
+                    "--only-lib", "--csv", str(BUILD / "lib.csv"), "--pairs", str(BUILD / "functions.txt")], check=True)
 
 
 if __name__ == "__main__":
