@@ -19,3 +19,11 @@
 // The same conversion for functions taking or returning floats: LTCG passes
 // them in xmm registers and returns in xmm0, which __vectorcall reproduces.
 #define LTCG_VECTORCALL __vectorcall
+
+// Marks a function kept alive by stand-in callers in src/harness/ rather
+// than by /INCLUDE. Only then does LTCG see every caller, and with every
+// caller known it picks a custom calling convention the same way it did in
+// ZUN's build (for example `this` in ecx and a float argument in xmm1, which
+// no declarable convention produces). The function must stay out of line
+// for that, hence noinline.
+#define HARNESS_CALLED __declspec(noinline)

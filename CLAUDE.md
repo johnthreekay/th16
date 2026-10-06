@@ -23,8 +23,10 @@ Matching decomp of TH16 1.00a. See README.md for the toolchain evidence and work
 - Callee pops stack args (`ret N`) but callers never set `ecx`: write it as a
   member function that ignores `this` (LTCG removes it). A `static` member
   gives `ret`, and `__stdcall`/cdecl statics get rewritten to register args.
-- Args in odd registers (`ebx`, ...): LTCG custom convention; match together
-  with the callers, since `/INCLUDE` keeps the standard convention.
+- Args in registers (ecx/edx, floats in xmm, `ebx`, ...): LTCG custom
+  convention, which only happens when LTCG sees every caller. Mark the
+  definition HARNESS_CALLED and call it from src/harness/ (see ZunAngle).
+- A class with a vtable must use the RTTI name from the binary.
 - Redundant stores kept, or flag updates not merged: something blocks MSVC's
   dead store elimination. Plain-int flags with `&=`/`|=` (not bitfields),
   then `volatile` (see create_func). Check every function that inlines the

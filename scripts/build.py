@@ -32,6 +32,8 @@ CFLAGS = [
     "/O2", "/Oy-", "/Zc:inline", "/fp:precise", "/Zc:forScope", "/Gd", "/Oi", "/MT",
     "/EHsc", "/FC", "/WX-",
     "/DWIN32", "/DNDEBUG", "/D_WINDOWS", "/D_USING_V110_SDK71_", "/D_MBCS",
+    # Only silences the CRT deprecation warnings; no effect on code.
+    "/D_CRT_SECURE_NO_WARNINGS",
 ]
 LFLAGS = [
     "/nologo", "/LTCG", "/INCREMENTAL:NO", "/NXCOMPAT", "/DYNAMICBASE:NO",
@@ -123,12 +125,47 @@ def undecorate(names):
         result[m.group(1)] = head[-1] if head else full
     for name in names:
         # This undname cannot decode some newer manglings (__vectorcall's
-        # "YQ"), so read plain ?name@scope@@... names directly.
-        m = re.match(r"\?([A-Za-z_]\w*)((?:@[A-Za-z_]\w*)*)@@", name)
-        if m and result.get(name, name) == name:
-            scopes = [p for p in m.group(2).split("@") if p]
-            result[name] = "::".join(list(reversed(scopes)) + [m.group(1)])
+        # "YQ"), so read the qualified name out of the decorated one.
+        if result.get(name, name) == name:
+            qualified = qualified_from_decorated(name)
+            if qualified:
+                result[name] = qualified
     return result
+
+
+# MSVC's codes for special member functions and operators: ??<code><scope>@@
+OPERATOR_CODES = {
+    "2": "operator new", "3": "operator delete", "4": "operator=", "5": "operator>>", "6": "operator<<",
+    "7": "operator!", "8": "operator==", "9": "operator!=", "A": "operator[]", "C": "operator->",
+    "D": "operator*", "E": "operator++", "F": "operator--", "G": "operator-", "H": "operator+",
+    "I": "operator&", "J": "operator->*", "K": "operator/", "L": "operator%", "M": "operator<",
+    "N": "operator<=", "O": "operator>", "P": "operator>=", "Q": "operator,", "R": "operator()",
+    "S": "operator~", "T": "operator^", "U": "operator|", "V": "operator&&", "W": "operator||",
+    "X": "operator*=", "Y": "operator+=", "Z": "operator-=", "_0": "operator/=", "_1": "operator%=",
+    "_2": "operator>>=", "_3": "operator<<=", "_4": "operator&=", "_5": "operator|=", "_6": "operator^=",
+}
+
+
+def qualified_from_decorated(name):
+    """Qualified name (no parameters) of a non-template decorated name."""
+    m = re.match(r"\?([A-Za-z_]\w*)((?:@[A-Za-z_]\w*)*)@@", name)
+    if m:
+        scopes = [p for p in m.group(2).split("@") if p]
+        return "::".join(list(reversed(scopes)) + [m.group(1)])
+    m = re.match(r"\?\?(_[0-9]|[0-9A-Z])([A-Za-z_]\w*(?:@[A-Za-z_]\w*)*)@@", name)
+    if m:
+        scopes = list(reversed(m.group(2).split("@")))
+        code = m.group(1)
+        if code == "0":
+            member = scopes[-1]
+        elif code == "1":
+            member = "~" + scopes[-1]
+        elif code in OPERATOR_CODES:
+            member = OPERATOR_CODES[code]
+        else:
+            return None
+        return "::".join(scopes + [member])
+    return None
 
 
 def annotated_functions():
@@ -146,7 +183,7 @@ def annotated_functions():
                 if "(" in decl:
                     break
             name = decl.split("(", 1)[0].split()[-1].lstrip("*&")
-            found.append((int(m.group(1), 16), name, rel(src)))
+            found.append((int(m.group(1), 16), name, rel(src), "HARNESS_CALLED" in decl))
     return found
 
 
@@ -160,11 +197,11 @@ def keepalive_symbols():
     for d in decorated:
         by_name.setdefault(qualified.get(d, d), []).append(d)
     include = []
-    for addr, name, src in annotated_functions():
+    for addr, name, src, harness_called in annotated_functions():
         matches = by_name.get(name, [])
         if len(matches) != 1:
             sys.exit(f"{src}: {addr:#x} {name}: {len(matches)} matching symbols {matches}")
-        include.append((addr, matches[0]))
+        include.append((addr, matches[0], harness_called))
     return include
 
 
@@ -195,7 +232,7 @@ def write_function_map(include, map_path, out_path):
         if m:
             ours[m.group(1)] = int(m.group(2), 16)
     with open(out_path, "w") as f:
-        for addr, sym in include:
+        for addr, sym, _ in include:
             if sym in ours:
                 f.write(f"{addr:#x} {ours[sym]:#x} {sym}\n")
         for addr, prefix in synthetic_functions():
@@ -210,7 +247,7 @@ def main():
     objs = compile_all(BUILD / "obj")
     include = keepalive_symbols()
     exe = BUILD / "th16.exe"
-    rc, out = tc.run("link", LFLAGS + [f"/INCLUDE:{s}" for _, s in include] + [
+    rc, out = tc.run("link", LFLAGS + [f"/INCLUDE:{s}" for _, s, harness in include if not harness] + [
         f"/OUT:{tc.winpath(exe)}", f"/PDB:{tc.winpath(exe.with_suffix('.pdb'))}",
         f"/MAP:{tc.winpath(exe.with_suffix('.map'))}",
         *[tc.winpath(o) for o in objs], *LIBS,

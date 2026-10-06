@@ -117,6 +117,12 @@ code the surroundings it had in the original:
 - `DECOMP_NOINLINE` (`src/decomp.h`) marks functions the original keeps out of
   line but our smaller program would inline. Remove it once enough callers
   exist.
+- `HARNESS_CALLED` marks functions kept alive by harness callers instead of
+  `/INCLUDE`. That lets LTCG see every caller and pick the same custom
+  calling convention it did in the original, including conventions no
+  keyword can request (`this` in `ecx` with a float in `xmm1`). Prefer it
+  over spelling out `LTCG_FASTCALL`/`LTCG_VECTORCALL`, which only cover the
+  simpler cases.
 
 ### Things learned so far
 
@@ -134,6 +140,13 @@ code the surroundings it had in the original:
   only matches when the loop loads `node->next` before `node->entry`, and the
   `run_all_*` loops only match as `while (f->active) { ... switch ... break; }`
   with `continue` for "execute again".
+- UCRT stdio and math helpers (`vsprintf`, `cosf`, `fabsf`, ...) are inline
+  functions in the SDK headers, so they are compiled with `/GL` as part of
+  the game and get LTCG conventions like ZUN's code. `_vsprintf_l` stays out
+  of line in the original but not yet in our build, which is why
+  `GameErrorContext::log`/`fatal` do not match yet.
+- Polymorphic classes must use ZUN's names: RTTI stores them in the
+  executable (`ThreadInf`, `EnemyInf`, ...).
 - The TH06 decomp's `Chain` code (`src/Global.cpp` there) is a close ancestor
   of TH16's `UpdateFuncRegistry`: same callback result codes, same case
   order in the switch, same search-then-cut structure in `unregister`.
