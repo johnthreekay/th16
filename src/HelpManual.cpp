@@ -45,6 +45,9 @@ void help_manual_read_file()
     g_Supervisor.thread.stop_requested = TRUE;
 }
 
+// TODO: our LTCG inlines create_func at both calls (the original inlines only
+// the second) and loads ecx for the registry calls, whose this the original
+// dropped. Natural code; should match once create_func has its real callers.
 // FUNCTION: TH16 0x42e810
 i32 HelpManual::initialize()
 {
@@ -100,7 +103,8 @@ void HelpManual::destroy()
     }
 }
 
-// Placeholder for 0x42eab0 (not decompiled yet).
+// Placeholder (not decompiled yet).
+// STUB: TH16 0x42eab0
 DECOMP_NOINLINE i32 HelpManual::on_tick_body()
 {
     return state;

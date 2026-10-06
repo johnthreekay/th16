@@ -89,19 +89,22 @@ void ConfigData::set_defaults()
     unk_30 = 0x80000000;
 }
 
-// Placeholder for 0x42cb60 (not decompiled yet).
+// Placeholder (not decompiled yet).
+// STUB: TH16 0x42cb60
 DECOMP_NOINLINE void GameThread::thread_start()
 {
     unit5_placeholder(g_GameThread);
 }
 
-// Placeholder for 0x42d200 (not decompiled yet).
+// Placeholder (not decompiled yet).
+// STUB: TH16 0x42d200
 DECOMP_NOINLINE GameThread::~GameThread()
 {
     unit5_placeholder(this);
 }
 
-// Placeholder for 0x42d7b0 (not decompiled yet).
+// Placeholder (not decompiled yet).
+// STUB: TH16 0x42d7b0
 DECOMP_NOINLINE i32 GameThread::on_tick_body()
 {
     return unit5_placeholder(this);

@@ -19,7 +19,9 @@ typedef D3DXVECTOR2 Float2;
 typedef D3DXVECTOR3 Float3;
 
 // out->x, out->y = radius * (cos angle, sin angle). TH06 equivalent:
-// sincosmul. TH16 keeps a separate out-of-line copy in many object files.
+// sincosmul. TH16 keeps a separate out-of-line copy in each object file
+// that uses it (0x430df0, 0x43ad00, ...), which static reproduces. Those
+// copies cannot be annotated yet: build.py only finds external symbols.
 static void __fastcall sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
     __asm {

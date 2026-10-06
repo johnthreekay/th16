@@ -45,7 +45,8 @@ void LaserBeamInf::run_ex()
 {
 }
 
-// Placeholder for 0x43a860 (not decompiled yet).
+// Placeholder (not decompiled yet).
+// STUB: TH16 0x43a860
 i32 LaserBeamInf::initialize(void *params)
 {
     return unit5_placeholder(this);

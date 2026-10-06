@@ -234,6 +234,8 @@ void LaserBeamInf::method_8(i32 arg)
     inner.flag_38 = arg;
 }
 
+// TODO: registry calls load ecx (the original dropped their this) and the
+// original reserves an unused stack slot (push ecx).
 // FUNCTION: TH16 0x431330
 i32 LaserManager::initialize()
 {
@@ -288,6 +290,8 @@ LaserManager *LaserManager::create()
     return mgr;
 }
 
+// TODO: in the inlined Timer::tick the original loads the speed pointer into
+// ecx before reading current into eax; ours swaps them.
 // FUNCTION: TH16 0x431510
 i32 LaserManager::on_tick_body()
 {
@@ -369,6 +373,8 @@ i32 __fastcall LaserManager::on_draw_callback(LaserManager *mgr)
     return 1;
 }
 
+// TODO: the original reserves an unused stack slot (push ecx) and keeps the
+// new laser in eax while linking it.
 // FUNCTION: TH16 0x431760
 i32 LaserManager::allocate_new_laser(i32 kind, void *params)
 {
@@ -421,6 +427,7 @@ LaserCurveInf::LaserCurveInf()
 {
 }
 
+// TODO: the original has an 8-byte frame (sub esp, 8) where ours has 4.
 // FUNCTION: TH16 0x431950
 HARNESS_CALLED i32 LaserManager::cancel_in_rectangle(Float3 *a, Float3 *b, f32 angle, i32 mode, i32 e)
 {
@@ -456,6 +463,7 @@ i32 LaserManager::cancel_all()
     return 0;
 }
 
+// TODO: the original has an 8-byte frame (sub esp, 8) where ours has 4.
 // FUNCTION: TH16 0x431a70
 HARNESS_CALLED i32 LaserManager::cancel_in_radius(Float3 *pos, f32 radius, i32 c, i32 d)
 {

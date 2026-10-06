@@ -29,6 +29,8 @@ Item::~Item()
 {
 }
 
+// TODO: create_func gets inlined and registry calls load ecx, as in
+// HelpManual::initialize.
 // FUNCTION: TH16 0x42f260
 i32 ItemManager::initialize()
 {
@@ -72,7 +74,8 @@ ItemManager *ItemManager::create()
     return mgr;
 }
 
-// Placeholder for 0x42f4e0 (not decompiled yet).
+// Placeholder (not decompiled yet).
+// STUB: TH16 0x42f4e0
 DECOMP_NOINLINE i32 ItemManager::on_tick_body()
 {
     return unit5_placeholder(this);

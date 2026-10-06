@@ -37,6 +37,7 @@ void harness_create_game_thread(i32 replay)
 // visible to LTCG: owners compile EH cleanup around it that LTCG removes
 // only once it can see the constructor does not throw, leaving the spilled
 // this behind as in the original.
+// STUB: TH16 0x4093f0
 DECOMP_NOINLINE AnmVm::AnmVm()
 {
     memset(this, 0, sizeof(AnmVm));
