@@ -265,6 +265,9 @@ struct AnmVm
     void set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
     // Advances every running interpolator and applies its value.
     void step_interpolators();
+    // Applies angular velocity, scale growth and UV scrolling for one frame
+    // (ExpHP: leaf_4630f0__flag_534_24_only).
+    void step_velocities();
     // Screen positions of the sprite's corners, by render mode.
     void write_sprite_corners(Float3 *corners);
     // 0x465c40, 0x4660b0

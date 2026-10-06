@@ -349,3 +349,57 @@ void AnmVm::step_interpolators()
         uv_scroll_vel.y = v_vel_i.step();
     }
 }
+
+// FUNCTION: TH16 0x4630f0
+void AnmVm::step_velocities()
+{
+    if (angular_velocity.x != 0.0f)
+    {
+        rotation.x = wrap_angle(rotation.x + angular_velocity.x * g_game_speed);
+        flags_lo |= ANM_VM_ROTATION_CHANGED;
+    }
+    if (angular_velocity.y != 0.0f)
+    {
+        rotation.y = wrap_angle(rotation.y + angular_velocity.y * g_game_speed);
+        flags_lo |= ANM_VM_ROTATION_CHANGED;
+    }
+    if (angular_velocity.z != 0.0f)
+    {
+        rotation.z = wrap_angle(rotation.z + angular_velocity.z * g_game_speed);
+        flags_lo |= ANM_VM_ROTATION_CHANGED;
+    }
+    if (scale_growth.y != 0.0f)
+    {
+        scale.y += scale_growth.y * g_game_speed;
+        flags_lo |= ANM_VM_SCALE_CHANGED;
+    }
+    if (scale_growth.x != 0.0f)
+    {
+        scale.x += scale_growth.x * g_game_speed;
+        flags_lo |= ANM_VM_SCALE_CHANGED;
+    }
+    if (uv_scroll_vel.x != 0.0f)
+    {
+        uv_scroll_pos.x += uv_scroll_vel.x * g_game_speed;
+        if (uv_scroll_pos.x >= 2.0f)
+        {
+            uv_scroll_pos.x -= 2.0f;
+        }
+        else if (uv_scroll_pos.x < 0.0f)
+        {
+            uv_scroll_pos.x += 2.0f;
+        }
+    }
+    if (uv_scroll_vel.y != 0.0f)
+    {
+        uv_scroll_pos.y += uv_scroll_vel.y * g_game_speed;
+        if (uv_scroll_pos.y >= 2.0f)
+        {
+            uv_scroll_pos.y -= 2.0f;
+        }
+        else if (uv_scroll_pos.y < 0.0f)
+        {
+            uv_scroll_pos.y += 2.0f;
+        }
+    }
+}
