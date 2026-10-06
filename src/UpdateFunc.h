@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include "CriticalSections.h"
 #include "decomp.h"
 
 struct UpdateFunc;
@@ -91,7 +92,7 @@ struct UpdateFuncRegistry
     ~UpdateFuncRegistry();
 
     // TH06 equivalent: Chain::CreateElem
-    UpdateFunc *create_func(UpdateFuncCallback function);
+    DECOMP_NOINLINE UpdateFunc *create_func(UpdateFuncCallback function);
     // TH06 equivalent: Chain::AddToCalcChain
     int register_on_tick(UpdateFunc *f, int priority);
     // TH06 equivalent: Chain::AddToDrawChain
@@ -103,6 +104,18 @@ struct UpdateFuncRegistry
     void unregister_all_in_list(UpdateFunc *head);
     // TH06 equivalent: Chain::Cut
     DECOMP_NOINLINE void unregister(UpdateFunc *f);
+
+    // How owners drop their functions when destroyed (inlined into every
+    // destructor). Does nothing for NULL.
+    void unregister_locked(UpdateFunc *f)
+    {
+        if (f != NULL)
+        {
+            ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
+            unregister(f);
+            LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
+        }
+    }
 };
 
 extern UpdateFuncRegistry *g_UpdateFuncRegistry;
