@@ -4,6 +4,8 @@
 // code touches. Only the fields used here are named; offsets follow
 // ExpHP's th-re-data. To be replaced by the real headers when merged.
 
+#include <d3dx9math.h>
+
 #include "../decomp.h"
 #include "../types.h"
 
@@ -14,10 +16,26 @@ struct GameThread
     u32 flag_0 : 1;
     u32 flag_1 : 1;
     u32 flag_2 : 1;
-    u32 unk_flags_3 : 7;
+    u32 flag_3 : 1;
+    u32 flag_4 : 1;
+    u32 flag_5 : 1;
+    u32 flag_6 : 1;
+    u32 flag_7 : 1;
+    u32 flag_8 : 1;
+    u32 flag_9 : 1;
     u32 flag_10 : 1;
     u32 unk_flags_11 : 21;
     u8 unk_8c[0xb4 - 0x8c];
+};
+
+// ExpHP: zAsciiManager.
+struct AsciiManager
+{
+    u8 unk_0[0x1920c];
+    D3DCOLOR color;
+    u8 unk_19210[0x19254 - 0x19210];
+
+    void drawf_debug(D3DXVECTOR3 *pos, const char *fmt, ...);
 };
 
 // ExpHP: zPlayer.
@@ -82,6 +100,7 @@ struct EffectManager
 u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size_out, i32 flag);
 
 extern GameThread *g_GameThread;
+extern AsciiManager *g_AsciiManager;
 extern Player *g_Player;
 extern AnmManager *g_AnmManager;
 extern BulletManager *g_BulletManager;

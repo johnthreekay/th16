@@ -1,6 +1,8 @@
 // Stand-in call sites for unit 4 functions whose shape depends on their
 // callers (link-time code generation sees every caller of these).
 #include "../Enemy.h"
+#include "../stub/unit4_extern.h"
+#include "../FpsCounter.h"
 
 // Every caller goes through g_EnemyManager, so LTCG replaces `this` with a
 // load of the global inside these and drops the parameter (the original
@@ -27,4 +29,29 @@ int harness_enemy_find_closest(D3DXVECTOR3 *pos, f32 max_dist)
 void harness_enemy_manager_create(const char *ecl_filename)
 {
     EnemyManager::create(ecl_filename);
+}
+
+// Like the main loop (0x45ac02, 0x45ae4e, 0x45b060).
+void harness_fps_counter_update()
+{
+    g_FpsCounter->update();
+}
+
+// Like the teardown at 0x43b6ad.
+void harness_fps_counter_delete()
+{
+    delete g_FpsCounter;
+}
+
+void unit4_opaque(void *p);
+
+// Placeholder for AsciiManager::drawf_debug (0x4084f0, another unit), built
+// with /GL on purpose: when the callee is opaque, LTCG gives callers that
+// pass it the address of a local a /GS cookie the original does not have.
+// Variadic, so it is never inlined.
+void AsciiManager::drawf_debug(D3DXVECTOR3 *pos, const char *fmt, ...)
+{
+    // Opaque, so callers still assume this may change any global.
+    unit4_opaque(this);
+    color = (D3DCOLOR)(pos->x + fmt[0]);
 }

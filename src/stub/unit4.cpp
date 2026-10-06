@@ -92,3 +92,17 @@ int SptResourceInf::load_ecl_data(void *data)
 void EnemyManager::destroy_all()
 {
 }
+
+// GLOBAL: TH16 0x4a6d98
+AsciiManager *g_AsciiManager;
+
+// Not a game function: lets placeholders in src/harness/ look opaque.
+void unit4_opaque(void *p)
+{
+}
+
+// STUB: TH16 0x45b130
+double LTCG_VECTORCALL get_runtime()
+{
+    return 0.0;
+}

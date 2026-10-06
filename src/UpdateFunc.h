@@ -103,6 +103,9 @@ struct UpdateFuncRegistry
     void unregister_all_in_list(UpdateFunc *head);
     // TH06 equivalent: Chain::Cut
     DECOMP_NOINLINE void unregister(UpdateFunc *f);
+    // Owners' teardown: unregister under the registry's critical section.
+    // Defined in UpdateFuncLocked.h (needs CriticalSections.h).
+    inline void unregister_locked(UpdateFunc *f);
 };
 
 extern UpdateFuncRegistry *g_UpdateFuncRegistry;

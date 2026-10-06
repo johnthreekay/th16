@@ -20,7 +20,10 @@ struct Config
     // Analog stick dead zones (DirectInput axis units).
     i16 deadzone_x;
     i16 deadzone_y;
-    u8 unk_20[0x68 - 0x20];
+    u8 unk_20[0x24 - 0x20];
+    // Frames skipped per drawn frame (FpsCounter counts them as drawn).
+    u8 frame_skip;
+    u8 unk_25[0x68 - 0x25];
 };
 
 // Owns the Direct3D/DirectInput objects and global game state. ZUN's name
@@ -35,7 +38,9 @@ struct Supervisor
     IDirectInputDevice8A *joystick;
     u8 unk_28[0x1d0 - 0x28];
     Config config;
-    u8 unk_238[0x730 - 0x238];
+    u8 unk_238[0x6f4 - 0x238];
+    i32 gamemode_to_switch_to;
+    u8 unk_6f8[0x730 - 0x6f8];
     u32 flags;
     u8 unk_734[0x998 - 0x734];
     ThreadInf thread;

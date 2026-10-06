@@ -1,5 +1,6 @@
 #include "Enemy.h"
 #include "CriticalSections.h"
+#include "UpdateFuncLocked.h"
 #include "stub/unit4_extern.h"
 
 static_assert(sizeof(PosVel) == 0x44, "PosVel size");
@@ -211,23 +212,12 @@ int EnemyManager::initialize(const char *ecl_filename)
     return 0;
 }
 
-// Probably an inline UpdateFuncRegistry member in ZUN's code.
-static inline void unregister_locked(UpdateFuncRegistry *registry, UpdateFunc *f)
-{
-    if (f != NULL)
-    {
-        ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
-        registry->unregister(f);
-        LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
-    }
-}
-
 // FUNCTION: TH16 0x41b1a0
 EnemyManager::~EnemyManager()
 {
     destroy_all();
-    unregister_locked(g_UpdateFuncRegistry, on_tick);
-    unregister_locked(g_UpdateFuncRegistry, on_draw);
+    g_UpdateFuncRegistry->unregister_locked(on_tick);
+    g_UpdateFuncRegistry->unregister_locked(on_draw);
     for (int i = 0; i < 0x20; i++)
     {
         if (file_manager->file_data_pointers[i] != NULL)
