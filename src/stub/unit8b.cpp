@@ -22,3 +22,9 @@ AnmLoaded *__stdcall AnmManager::load_next_entry(AnmLoaded *anm)
 {
     return anm;
 }
+
+// Opaque work for the /GL placeholders in src/placeholder/unit8b.cpp.
+int unit8b_placeholder_sink(void *object, int value)
+{
+    return value;
+}

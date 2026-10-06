@@ -1,6 +1,8 @@
 // Stand-in callers for unit 8b (0x469000-0x474c00) functions whose shape
 // depends on how the rest of the game calls them.
 #include "../AnmManager.h"
+#include "../Ecl.h"
+#include "../Enemy.h"
 
 // Like AnmLoaded::create_managed_child (0x46ed60), which picks the list by
 // its mode flags. Every caller goes through g_AnmManager.
@@ -69,4 +71,26 @@ void harness_unit8b_delete_vm_2(AnmVm *vm)
 void harness_unit8b_delete_vm_3(AnmVm *vm)
 {
     delete vm;
+}
+
+// ECL instruction handlers read their arguments through these. The pop
+// variants are only used for argument 0; the given-value ones get varied
+// arguments.
+f32 harness_unit8b_ecl_args(EclRunContext *ctx, i32 index, i32 i, f32 f)
+{
+    f32 result = (f32)ctx->pop_int_arg(0) + ctx->pop_float_arg(0);
+    result += (f32)ctx->get_int_arg_given_value(index, i);
+    result += ctx->get_float_arg_given_value(index, f);
+    result += (f32)ctx->pop_int_arg_given_value(index, i);
+    result += ctx->pop_float_arg_given_value(index, f);
+    return result;
+}
+
+// ECL instructions read float arguments through EnemyData (index varies);
+// the int pointer getter is only ever asked for argument 0.
+f32 harness_unit8b_enemy_args(EnemyData *enemy, EclRunContext *ctx, i32 index)
+{
+    *enemy->get_int_arg_ptr(0) = 1;
+    *ctx->get_int_arg_ptr(0) = 2;
+    return enemy->get_float_arg(index) + ctx->get_float_arg(index + 1);
 }

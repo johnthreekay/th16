@@ -22,6 +22,30 @@ union EclStackItem
     f32 f;
 };
 
+// What ECL code pushes: a type tag ('i' or 'f') and the value. Locals
+// below the frame base are plain values without a tag.
+struct EclStackEntry
+{
+    char type;
+    u8 unk_1[3];
+    EclStackItem value;
+};
+
+// One instruction (ExpHP: zEclRawInstructionHeader), arguments following.
+struct EclRawInstr
+{
+    i32 time;
+    u16 opcode;
+    u16 total_size;
+    // Bit n set: argument n names a variable rather than a constant.
+    u16 variable_mask;
+    u8 rank_mask;
+    u8 param_count;
+    u8 num_stack_refs;
+    u8 unk_d[3];
+    EclStackItem args[1];
+};
+
 // ExpHP: zEclStack.
 struct EclStack
 {
@@ -57,6 +81,18 @@ struct EclRunContext
     i32 *get_int_arg_ptr(int index);
     f32 get_float_arg(int index);
     f32 *get_float_arg_ptr(int index);
+
+    // The same for a value already read from the instruction.
+    i32 get_int_arg_given_value(int index, i32 value);
+    HARNESS_CALLED f32 get_float_arg_given_value(int index, f32 value);
+    // Like the getters above, but a stack reference pops the entry.
+    HARNESS_CALLED i32 pop_int_arg(int index);
+    HARNESS_CALLED f32 pop_float_arg(int index);
+    i32 pop_int_arg_given_value(int index, i32 value);
+    HARNESS_CALLED f32 pop_float_arg_given_value(int index, f32 value);
+
+    // The instruction at cur_location, NULL when there is none.
+    EclRawInstr *current_instr();
 };
 
 // Intrusive list of run contexts (ExpHP: zEclRunContextList).
@@ -163,3 +199,14 @@ class SptInf
     virtual f32 *get_float_global_ptr(int var);
     virtual ~SptInf();
 };
+
+inline EclRawInstr *EclRunContext::current_instr()
+{
+    if (cur_location.offset_from_first_instruction == -1 || cur_location.subroutine_index == -1)
+    {
+        return NULL;
+    }
+    // Instructions start after the subroutine's 0x10 byte header.
+    return (EclRawInstr *)((u8 *)vm->file_manager->subroutines[cur_location.subroutine_index].bytecode + 0x10 +
+                           cur_location.offset_from_first_instruction);
+}

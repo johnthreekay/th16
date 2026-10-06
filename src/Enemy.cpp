@@ -396,13 +396,13 @@ i32 EnemyData::get_int_arg(int index)
 }
 
 // FUNCTION: TH16 0x4251f0
-i32 *EnemyData::get_int_arg_ptr(int index)
+HARNESS_CALLED i32 *EnemyData::get_int_arg_ptr(int index)
 {
     return full->context.current_context->get_int_arg_ptr(index);
 }
 
 // FUNCTION: TH16 0x425200
-f32 EnemyData::get_float_arg(int index)
+HARNESS_CALLED f32 EnemyData::get_float_arg(int index)
 {
     return full->context.current_context->get_float_arg(index);
 }
