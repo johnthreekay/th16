@@ -43,3 +43,13 @@ HARNESS_CALLED void ZunTimer::set_value(i32 time)
 {
     set(time);
 }
+
+// FUNCTION: TH16 0x410100
+i32 ZunTimer::ticked_on_multiple_of(i32 n)
+{
+    if (current != previous && current % n == 0)
+    {
+        return 1;
+    }
+    return 0;
+}

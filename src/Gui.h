@@ -210,6 +210,8 @@ void __fastcall anm_vm_interrupt_3_run(AnmVm *vm);
 void __fastcall anm_vm_interrupt_4_run(AnmVm *vm);
 void __fastcall anm_vm_interrupt_4(AnmVm *vm);
 void __fastcall anm_vm_interrupt_5(AnmVm *vm);
+// 0x4173c0. GameThread::thread_start and Bullet::run_ex call it.
+void __fastcall anm_vm_interrupt_2(AnmVm *vm);
 
 // Debug logging, compiled out of the release build (0x42c9f0).
 void debug_log(const char *fmt, ...);

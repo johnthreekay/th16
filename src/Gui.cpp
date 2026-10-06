@@ -648,6 +648,12 @@ void __fastcall anm_vm_interrupt_5(AnmVm *vm)
     vm->interrupt(5);
 }
 
+// FUNCTION: TH16 0x4173c0
+void __fastcall anm_vm_interrupt_2(AnmVm *vm)
+{
+    vm->interrupt(2);
+}
+
 // TODO: same frame difference as create_vm (4 more bytes, esi saved
 // before the critical section).
 // FUNCTION: TH16 0x42c920
