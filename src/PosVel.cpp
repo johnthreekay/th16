@@ -30,8 +30,8 @@ void PosVel::update_secondary_fields()
     }
 }
 
-// FUNCTION: TH16 0x403110
 // TODO: ours aligns the frame for sinf/cosf, adds pos+velocity the other way round, misses a tail merge.
+// FUNCTION: TH16 0x403110
 void PosVel::step()
 {
     switch (flags & 0xf)

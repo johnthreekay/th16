@@ -1,5 +1,6 @@
 // Stand-in callers for unit 1 (0x402e70-0x409490).
 #include "../CriticalSections.h"
+#include "../Interp.h"
 #include "../ZunMath.h"
 
 // ECL and the per-object updates write g_GameSpeed all the time. Without a
@@ -14,4 +15,10 @@ void harness_leave_cs(int i)
 {
     g_CriticalSections.leave(CS_FILE);
     g_CriticalSections.leave(i);
+}
+
+// Like the interpolators' step functions (0x406e10 and others).
+f32 harness_interp_ratio(i32 mode, i32 time, i32 end_time)
+{
+    return interp_ratio(mode, (f32)time, (f32)end_time);
 }
