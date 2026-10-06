@@ -5,12 +5,16 @@
 #include "../AnmVm.h"
 #include "../BulletManager.h"
 #include "../Ending.h"
+#include "../EnemyManager.h"
 #include "../GameThread.h"
 #include "../Spellcard.h"
 #include "../Timer.h"
 
 // GLOBAL: TH16 0x4c0f48
 AnmManager *g_AnmManager;
+
+// GLOBAL: TH16 0x4a6dc0
+EnemyManager *g_EnemyManager;
 
 // GLOBAL: TH16 0x4a6dd4
 GameThread *g_GameThread;
