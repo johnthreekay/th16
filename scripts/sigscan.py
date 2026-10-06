@@ -15,6 +15,7 @@ Usage: sigscan.py build.exe build.map [--orig orig/th16.exe] [--csv out.csv]
 import argparse
 import csv
 import re
+import struct
 import sys
 from pathlib import Path
 
@@ -32,6 +33,16 @@ def parse_map(path):
         if m:
             funcs.append((int(m.group(2), 16), m.group(1), m.group(3)))
     return sorted(set(funcs))
+
+
+def parse_data_symbols(path):
+    """{address: symbol} for public symbols outside .text in a link.exe map."""
+    out = {}
+    for line in Path(path).read_text(errors="replace").splitlines():
+        m = re.match(r"\s*000([3-9]):[0-9a-f]+\s+(\S+)\s+([0-9a-f]{8})\s", line)
+        if m:
+            out.setdefault(int(m.group(3), 16), m.group(2))
+    return out
 
 
 def text_section(pe):
@@ -60,6 +71,8 @@ def build_pattern(code, va, relocs, md, image_lo, image_hi):
     are wildcarded too.
     """
     mask = bytearray(len(code))
+    branches = []
+    absolutes = []
 
     def wild(off, size=4):
         mask[off:off + size] = b"\1" * size
@@ -74,16 +87,19 @@ def build_pattern(code, va, relocs, md, image_lo, image_hi):
             if op is not None and op.type == capstone.x86.X86_OP_IMM and insn.size >= 5:
                 if not (va <= op.imm < va + len(code)):
                     wild(off + insn.size - 4)
+                    branches.append((off + insn.size - 4, op.imm))
                 continue
         for op in insn.operands:
             if op.type == capstone.x86.X86_OP_IMM and insn.imm_size == 4 and image_lo <= (op.imm & 0xFFFFFFFF) < image_hi:
                 wild(off + insn.imm_offset)
+                absolutes.append((off + insn.imm_offset, op.imm & 0xFFFFFFFF))
             elif op.type == capstone.x86.X86_OP_MEM and insn.disp_size == 4 and image_lo <= (op.mem.disp & 0xFFFFFFFF) < image_hi:
                 wild(off + insn.disp_offset)
+                absolutes.append((off + insn.disp_offset, op.mem.disp & 0xFFFFFFFF))
     parts = []
     for b, m in zip(code, mask):
         parts.append(b"." if m else re.escape(bytes([b])))
-    return re.compile(b"".join(parts), re.DOTALL), len(code) - sum(mask)
+    return re.compile(b"".join(parts), re.DOTALL), len(code) - sum(mask), branches, absolutes
 
 
 def main():
@@ -94,6 +110,8 @@ def main():
     ap.add_argument("--csv", help="write unique matches as a reccmp data source (library functions)")
     ap.add_argument("--only-lib", action="store_true", help="only scan functions that come from .lib archives")
     ap.add_argument("--min-bytes", type=int, default=12, help="skip patterns with fewer fixed bytes")
+    ap.add_argument("--min-small-bytes", type=int, default=6,
+                    help="with --only-lib: smallest pattern accepted inside the library code range")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -114,23 +132,88 @@ def main():
     md.detail = True
 
     funcs = parse_map(args.map)
-    found, missing, ambiguous, skipped = [], [], [], 0
+    candidates = []
     for k, (va, name, obj) in enumerate(funcs):
         end = funcs[k + 1][0] if k + 1 < len(funcs) else text_end
         if args.only_lib and ":" not in obj:
             continue
         code = text[va - text_va:end - text_va].rstrip(b"\xcc")
-        pat, fixed = build_pattern(code, va, relocs, md, image_lo, image_hi)
-        if fixed < args.min_bytes:
-            skipped += 1
-            continue
-        hits = [m.start() + otext_va for m in pat.finditer(otext)]
-        if len(hits) == 1:
-            found.append((name, obj, hits[0]))
-        elif hits:
-            ambiguous.append((name, obj, hits))
-        else:
-            missing.append((name, obj, len(code)))
+        pat, fixed, branches, absolutes = build_pattern(code, va, relocs, md, image_lo, image_hi)
+        candidates.append((name, obj, len(code), pat, fixed, branches, absolutes))
+    name_at = {va: name for va, name, _ in funcs}
+
+    def branches_agree(hit, branches, known):
+        """Do the hit's rel32 branches go where the known callees are?"""
+        for off, target in branches:
+            want = known.get(name_at.get(target))
+            if want is None:
+                continue
+            pos = hit - otext_va + off
+            got = hit + off + 4 + struct.unpack_from("<i", otext, pos)[0]
+            if got != want:
+                return False
+        return True
+
+    def scan(lo, min_fixed, max_fixed=None, known=None):
+        found, missing, ambiguous = [], [], []
+        for name, obj, size, pat, fixed, branches, _ in candidates:
+            if fixed < min_fixed or (max_fixed is not None and fixed >= max_fixed):
+                continue
+            hits = [m.start() + otext_va for m in pat.finditer(otext, lo - otext_va)]
+            if len(hits) > 1 and known:
+                hits = [h for h in hits if branches_agree(h, branches, known)]
+            if len(hits) == 1:
+                found.append((name, obj, hits[0]))
+            elif hits:
+                ambiguous.append((name, obj, hits))
+            else:
+                missing.append((name, obj, size))
+        return found, missing, ambiguous
+
+    found, missing, ambiguous = scan(otext_va, args.min_bytes)
+    skipped = sum(1 for c in candidates if c[4] < args.min_bytes)
+    if args.only_lib and found:
+        # Small library functions match too easily by chance, so only accept
+        # them inside the range where the larger ones were found, and only
+        # when the match is unique there.
+        lib_start = min(addr for _, _, addr in found)
+        small_found, _, _ = scan(lib_start, args.min_small_bytes, args.min_bytes)
+        found += small_found
+        skipped -= len(small_found)
+        # Grow the set until nothing changes: settle ambiguous matches by
+        # their call targets, and name callees through the calls of
+        # functions that matched.
+        branches_of = {c[0]: c[5] for c in candidates}
+        obj_of = {c[0]: c[1] for c in candidates}
+        while True:
+            known = {name: addr for name, _, addr in found}
+            more, _, _ = scan(lib_start, args.min_small_bytes, known=known)
+            more = [f for f in more if f[0] not in known]
+            for name, _, hit in found:
+                for off, target in branches_of.get(name, ()):
+                    callee = name_at.get(target)
+                    if callee is None or callee in known or callee not in obj_of:
+                        continue
+                    pos = hit - otext_va + off
+                    got = hit + off + 4 + struct.unpack_from("<i", otext, pos)[0]
+                    more.append((callee, obj_of[callee], got))
+                    known[callee] = got
+            if not more:
+                break
+            found += more
+
+    # Globals referenced by matched library code: our operand names a data
+    # symbol, the original's operand at the same offset is its address there.
+    data_syms = parse_data_symbols(args.map)
+    absolutes_of = {c[0]: c[6] for c in candidates}
+    globals_found = {}
+    for name, _, hit in found:
+        for off, value in absolutes_of.get(name, ()):
+            sym = data_syms.get(value)
+            if sym is None:
+                continue
+            orig_value = struct.unpack_from("<I", otext, hit - otext_va + off)[0]
+            globals_found.setdefault(sym, orig_value)
 
     total = len(found) + len(ambiguous) + len(missing)
     print(f"{len(found)} unique, {len(ambiguous)} ambiguous, {len(missing)} not found "
@@ -151,12 +234,13 @@ def main():
             w = csv.writer(f, delimiter="|", lineterminator="\n")
             f.write("# Generated by scripts/sigscan.py: library code located in the original.\n")
             w.writerow(["address", "symbol", "type"])
-            rows = {(addr, name) for name, _, addr in found}
+            rows = {(addr, name, "library") for name, _, addr in found}
+            rows |= {(addr, name, "global") for name, addr in globals_found.items()}
             # The entry stub is too small to scan for, but both entry points
             # are the CRT's WinMainCRTStartup.
-            rows.add((orig.OPTIONAL_HEADER.ImageBase + orig.OPTIONAL_HEADER.AddressOfEntryPoint, "_WinMainCRTStartup"))
-            for addr, name in sorted(rows):
-                w.writerow([f"{addr:#x}", name, "library"])
+            rows.add((orig.OPTIONAL_HEADER.ImageBase + orig.OPTIONAL_HEADER.AddressOfEntryPoint, "_WinMainCRTStartup", "library"))
+            for addr, name, kind in sorted(rows):
+                w.writerow([f"{addr:#x}", name, kind])
 
 
 if __name__ == "__main__":

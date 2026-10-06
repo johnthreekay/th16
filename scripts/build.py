@@ -35,7 +35,10 @@ CFLAGS = [
 ]
 LFLAGS = [
     "/nologo", "/LTCG", "/INCREMENTAL:NO", "/NXCOMPAT", "/DYNAMICBASE:NO",
-    "/MACHINE:X86", "/SAFESEH", "/OPT:REF", "/OPT:ICF",
+    # /OPT:NOICF: th16.exe keeps several sets of byte-identical functions
+    # (twelve copies of one fsincos helper) that identical COMDAT folding
+    # would have merged.
+    "/MACHINE:X86", "/SAFESEH", "/OPT:REF", "/OPT:NOICF",
     "/SUBSYSTEM:WINDOWS,5.01", "/DEBUG",
 ]
 LIBS = [
@@ -44,6 +47,7 @@ LIBS = [
 ]
 
 ANNOTATION = re.compile(r"//\s*FUNCTION:\s*TH16\s+(0x[0-9a-fA-F]+)")
+SYNTHETIC = re.compile(r"//\s*SYNTHETIC:\s*TH16\s+(0x[0-9a-fA-F]+)")
 
 
 def sources():
@@ -54,10 +58,18 @@ def rel(p):
     return p.relative_to(ROOT)
 
 
+def is_stub(src):
+    """src/stub/ holds placeholders for functions not decompiled yet. They are
+    compiled without /GL so link-time code generation cannot look inside them:
+    to the rest of the program they stay opaque external calls (which may
+    throw, and keep the standard calling convention), like the real thing."""
+    return SRC / "stub" in src.parents
+
+
 def compile_one(src, obj_dir, no_gl):
     obj = obj_dir / rel(src).with_suffix(".obj")
     obj.parent.mkdir(parents=True, exist_ok=True)
-    flags = [f for f in CFLAGS if not (no_gl and f == "/GL")]
+    flags = [f for f in CFLAGS if not ((no_gl or is_stub(src)) and f == "/GL")]
     rc, out = tc.run("cl", flags + [
         f"/Fo{tc.winpath(obj)}", f"/Fd{tc.winpath(obj.with_suffix('.pdb'))}", tc.winpath(src),
     ])
@@ -132,6 +144,7 @@ def annotated_functions():
 
 
 def keepalive_symbols():
+    """[(original address, decorated symbol)] for every annotated function."""
     sym_dir = BUILD / "sym"
     objs = compile_all(sym_dir, no_gl=True)
     decorated = sorted({n for o in objs for n in coff_functions(o)})
@@ -144,8 +157,44 @@ def keepalive_symbols():
         matches = by_name.get(name, [])
         if len(matches) != 1:
             sys.exit(f"{src}: {addr:#x} {name}: {len(matches)} matching symbols {matches}")
-        include.append(matches[0])
+        include.append((addr, matches[0]))
     return include
+
+
+def synthetic_functions():
+    """[(address, decorated symbol)] for // SYNTHETIC: annotations, whose next
+    line names a compiler-generated function. Only scalar deleting
+    destructors so far."""
+    found = []
+    for src in sources():
+        lines = src.read_text(errors="replace").splitlines()
+        for i, line in enumerate(lines):
+            m = SYNTHETIC.search(line)
+            if not m:
+                continue
+            name = lines[i + 1].strip().lstrip("/").strip()
+            sdd = re.fullmatch(r"(\w+)::`scalar deleting destructor'", name)
+            if not sdd:
+                sys.exit(f"{rel(src)}:{i + 2}: unsupported synthetic function {name!r}")
+            found.append((int(m.group(1), 16), f"??_G{sdd.group(1)}@@"))
+    return found
+
+
+def write_function_map(include, map_path, out_path):
+    """build/functions.txt: original address, our address, symbol."""
+    ours = {}
+    for line in map_path.read_text(errors="replace").splitlines():
+        m = re.match(r"\s*0001:[0-9a-f]+\s+(\S+)\s+([0-9a-f]{8})\s", line)
+        if m:
+            ours[m.group(1)] = int(m.group(2), 16)
+    with open(out_path, "w") as f:
+        for addr, sym in include:
+            if sym in ours:
+                f.write(f"{addr:#x} {ours[sym]:#x} {sym}\n")
+        for addr, prefix in synthetic_functions():
+            for sym, va in ours.items():
+                if sym.startswith(prefix):
+                    f.write(f"{addr:#x} {va:#x} {sym}\n")
 
 
 def main():
@@ -154,7 +203,7 @@ def main():
     objs = compile_all(BUILD / "obj")
     include = keepalive_symbols()
     exe = BUILD / "th16.exe"
-    rc, out = tc.run("link", LFLAGS + [f"/INCLUDE:{s}" for s in include] + [
+    rc, out = tc.run("link", LFLAGS + [f"/INCLUDE:{s}" for _, s in include] + [
         f"/OUT:{tc.winpath(exe)}", f"/PDB:{tc.winpath(exe.with_suffix('.pdb'))}",
         f"/MAP:{tc.winpath(exe.with_suffix('.map'))}",
         *[tc.winpath(o) for o in objs], *LIBS,
@@ -164,6 +213,7 @@ def main():
         print(out)
     if rc != 0:
         sys.exit("link failed")
+    write_function_map(include, exe.with_suffix(".map"), BUILD / "functions.txt")
     print(f"built {rel(exe)} ({len(include)} annotated functions)")
 
     (ROOT / "reccmp-build.yml").write_text(

@@ -14,7 +14,7 @@ Everything about ZUN's build that we could recover from the executable:
 | | | Evidence |
 |---|---|---|
 | Compiler | MSVC 19.10.25017 (Visual Studio 2017 15.0), x86 host | Rich header: 71 objects tagged `Utc1900_LTCG_CPP` build 25017 |
-| Linker | 14.10.25017, full `/LTCG`, no `/DEBUG` | POGO debug entry with `LTCG` signature; no ILTCG, CodeView or VC_FEATURE entries |
+| Linker | 14.10.25017, full `/LTCG`, `/OPT:NOICF`, no `/DEBUG` | POGO debug entry with `LTCG` signature; no ILTCG, CodeView or VC_FEATURE entries; byte-identical functions left unfolded (twelve copies of one `fsincos` helper) |
 | Platform toolset | `v141_xp` (Windows 7.1A SDK headers and import libs) | Subsystem and OS version 5.01 |
 | C runtime | static (`/MT`): VS2017 15.0 vcruntime/libcmt, UCRT 10.0.10240 | `scripts/check_toolchain.py` finds every CRT function of a test build in `th16.exe` |
 | DirectX | DirectX SDK (June 2010) | imports `d3dx9_43.dll` |
@@ -47,7 +47,12 @@ committed.
 .venv/bin/python scripts/build.py      # src/ -> build/th16.exe + .pdb + .map
 .venv/bin/python scripts/compare.py    # per-function match report (reccmp)
 .venv/bin/python scripts/compare.py -v 0x401300   # diff one function
+.venv/bin/python scripts/quickdiff.py 0x401300    # rough diff in seconds
 ```
+
+`quickdiff.py` skips reccmp's PDB parsing, which takes about 25 seconds under
+Wine, so it is the tool for trying source variants quickly. It treats every
+address as equal, so confirm with `compare.py`.
 
 Each decompiled function carries an annotation with its address in the
 original, in [reccmp](https://github.com/isledecomp/reccmp)'s format:
@@ -58,7 +63,9 @@ int UpdateFuncRegistry::register_on_tick(UpdateFunc *f, int priority)
 ```
 
 Globals referenced by decompiled code get `// GLOBAL: TH16 0x...` so the
-comparison can line up their addresses.
+comparison can line up their addresses. Compiler-generated functions use
+`// SYNTHETIC: TH16 0x...` with the name on the following comment line, e.g.
+``// UpdateFuncRegistry::`scalar deleting destructor'``.
 
 ### Whole-program optimization
 
@@ -83,13 +90,53 @@ program is linked. That has consequences for how we work:
     callers.
 - Library code (CRT, UCRT) is located in the original by `scripts/sigscan.py`
   after each build and fed to reccmp through `build/lib.csv`, so calls into
-  it compare by name.
+  it compare by name. Large functions are found by masked byte patterns;
+  small ones by unique matches inside the library's address range, by which
+  function their calls lead to, or through the calls of functions already
+  found. Globals they reference (`__security_cookie`) are named the same way.
+- `scripts/compare.py` runs reccmp with two fixes for VS2017 binaries: it
+  accepts the newer C++ EH FuncInfo magic (`0x19930522`), and it moves each
+  EH handler thunk's start back over the `/GS` cookie check that precedes
+  `mov eax, FuncInfo; jmp __CxxFrameHandler3`. Without them every function
+  with a C++ EH frame shows a spurious difference.
+
+### Placeholders and stand-in callers
+
+Two directories hold code that is not ZUN's, to give partially decompiled
+code the surroundings it had in the original:
+
+- `src/stub/` is compiled **without** `/GL`. It holds placeholder bodies for
+  functions we call but have not decompiled (and the temporary `WinMain`).
+  Link-time code generation cannot see inside them, so calls to them stay
+  opaque the way calls to real, non-trivial code are: they may throw, they
+  keep the standard calling convention, and nothing gets inlined.
+- `src/harness/` is compiled **with** `/GL`. It recreates call sites from code
+  that is not decompiled yet, when a function's shape depends on how it is
+  called (for example `delete g_UpdateFuncRegistry`, which is what makes the
+  compiler generate and specialize the scalar deleting destructor).
+- `DECOMP_NOINLINE` (`src/decomp.h`) marks functions the original keeps out of
+  line but our smaller program would inline. Remove it once enough callers
+  exist.
 
 ### Things learned so far
 
-- `UpdateFunc`'s flag bits are `volatile`. Without it MSVC merges the
-  constructor's stores with later ones; the original keeps every store
-  around the bit updates, as MSVC does for volatile accesses.
+- Function call shapes produced by LTCG are listed above. One more: when a
+  parameter turns out constant for every caller (the `flags` argument of a
+  scalar deleting destructor, always 1), LTCG folds it into the callee but
+  keeps the stack slot, and callers fill it with whatever register is
+  shortest to push (`push ecx`).
+- `UpdateFunc`'s flags are a plain `unsigned int` updated with `&=`/`|=`,
+  not bitfields. `create_func` keeps every constructor store and then
+  overwrites them; the only construct found that reproduces this is writing
+  through a `volatile UpdateFunc *`. Making a struct field `volatile` instead
+  fixes `create_func` but breaks the scalar deleting destructor's scheduling.
+- Register allocation follows source shape closely. `unregister_all_in_list`
+  only matches when the loop loads `node->next` before `node->entry`, and the
+  `run_all_*` loops only match as `while (f->active) { ... switch ... break; }`
+  with `continue` for "execute again".
+- The TH06 decomp's `Chain` code (`src/Global.cpp` there) is a close ancestor
+  of TH16's `UpdateFuncRegistry`: same callback result codes, same case
+  order in the switch, same search-then-cut structure in `unregister`.
 
 ## Credits
 
