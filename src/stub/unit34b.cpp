@@ -5,6 +5,7 @@
 #include "../AnmVm.h"
 #include "../BulletManager.h"
 #include "../EnemyManager.h"
+#include "../Fog.h"
 #include "../Gui.h"
 #include "../StageData.h"
 
@@ -78,5 +79,10 @@ void pause_menu_43f350()
 
 // STUB: TH16 0x42e150
 void stage_clear_42e150()
+{
+}
+
+// STUB: TH16 0x409550
+Fog::~Fog()
 {
 }
