@@ -4,6 +4,7 @@
 #include "../AnmManager.h"
 #include "../AnmVm.h"
 #include "../BulletManager.h"
+#include "../Ending.h"
 #include "../GameThread.h"
 #include "../Spellcard.h"
 #include "../Timer.h"
@@ -22,6 +23,15 @@ f32 *g_game_speed_ptrs[1] = {&g_game_speed};
 
 // GLOBAL: TH16 0x491b0c
 AnmVmSwitchFunc g_anm_on_switch_funcs[4];
+
+// GLOBAL: TH16 0x4c0f40
+i32 g_unk_4c0f40;
+
+// GLOBAL: TH16 0x4a50b0
+u32 g_hardware_input;
+
+// GLOBAL: TH16 0x4a51c4
+u32 g_hardware_input_held_4a51c4;
 
 // STUB: TH16 0x4033f0
 f32 LTCG_VECTORCALL interp_common_methods(i32 method, f32 t, f32 end_time)
@@ -95,6 +105,28 @@ i32 Bullet::on_tick()
 
 // STUB: TH16 0x4124b0
 i32 Bullet::sub_4124b0(i32 arg)
+{
+    return 0;
+}
+
+// STUB: TH16 0x4191f0
+i32 Ending::initialize()
+{
+    return 0;
+}
+
+// STUB: TH16 0x4197c0
+EndingChildF0::EndingChildF0(void *script)
+{
+}
+
+// STUB: TH16 0x4190b0
+EndingChildF0::~EndingChildF0()
+{
+}
+
+// STUB: TH16 0x4199f0
+i32 EndingChildF0::run()
 {
     return 0;
 }

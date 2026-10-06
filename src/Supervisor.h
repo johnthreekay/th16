@@ -35,7 +35,10 @@ struct Supervisor
     IDirectInputDevice8A *joystick;
     u8 unk_28[0x1d0 - 0x28];
     Config config;
-    u8 unk_238[0x730 - 0x238];
+    u8 unk_238[0x6f4 - 0x238];
+    // The game mode to switch to (TH06: wantedState).
+    i32 wanted_gamemode;
+    u8 unk_6f8[0x730 - 0x6f8];
     u32 flags;
     u8 unk_734[0x998 - 0x734];
     ThreadInf thread;
@@ -48,6 +51,8 @@ enum SupervisorFlags
 {
     // Read the pad through DirectInput rather than joyGetPosEx.
     SUPERVISOR_USE_DIRECTINPUT_PAD = 1 << 11,
+    // Picks the game mode after the ending (2 if set, else 16).
+    SUPERVISOR_FLAG_2000 = 1 << 13,
 };
 
 extern Supervisor g_Supervisor;

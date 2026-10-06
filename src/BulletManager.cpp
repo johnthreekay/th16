@@ -233,7 +233,7 @@ i32 BulletManager::on_tick_body()
             b->next_in_layer = NULL;
         }
         bullet_count++;
-        b->timer_144c.increment();
+        b->timer_144c++;
     }
     return 1;
 }

@@ -57,23 +57,28 @@ struct Timer
         previous = -1;
     }
 
-    void increment()
+    // TH06 equivalent: ZunTimer::operator++(int), which called Tick.
+    void operator++(int)
     {
         if (speed_index >= 1)
         {
             speed_index = 0;
         }
         f32 *speed = g_game_speed_ptrs[speed_index];
-        previous = current;
+        i32 cur = current;
+        f32 cur_f;
+        previous = cur;
         if (speed == NULL || (*speed > 0.99f && *speed < 1.01f))
         {
-            current_f += 1.0f;
-            current++;
+            cur++;
+            cur_f = current_f + 1.0f;
         }
         else
         {
-            current_f += *speed;
-            current = (i32)current_f;
+            cur_f = current_f + *speed;
+            cur = (i32)cur_f;
         }
+        current = cur;
+        current_f = cur_f;
     }
 };

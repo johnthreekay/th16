@@ -1,6 +1,7 @@
 // Stand-in callers for unit 3 (0x411860-0x41a3f0) and for shared functions
 // unit 3 needs called the way the original calls them.
 #include "../EffectManager.h"
+#include "../Ending.h"
 #include "../Spellcard.h"
 #include "../UpdateFunc.h"
 
@@ -25,6 +26,8 @@ void *harness_unit3_read_globals(int i)
         return g_Spellcard;
     case 1:
         return g_EffectManager;
+    case 2:
+        return g_Ending;
     }
     return NULL;
 }
