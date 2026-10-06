@@ -2,6 +2,7 @@
 // calls but has not decompiled, its own and other units'.
 #include "../AnmManager.h"
 #include "../Bomb.h"
+#include "../EffectManager.h"
 #include "../ScreenEffect.h"
 #include "../Stage.h"
 
@@ -104,18 +105,6 @@ int __fastcall ScreenEffect::on_cleanup(void *arg)
     return 1;
 }
 
-// STUB: TH16 0x40e9d0
-i32 BombAyaAInf::on_tick()
-{
-    return 0;
-}
-
-// STUB: TH16 0x40f240
-i32 BombCirnoAInf::on_tick()
-{
-    return 0;
-}
-
 // STUB: TH16 0x40fb00
 i32 BombMarisaAInf::on_tick()
 {
@@ -137,4 +126,11 @@ i32 BombReimuAInf::on_tick()
 // STUB: TH16 0x410bb0
 void BombReimuAOrbs::finish_all()
 {
+}
+
+// STUB: TH16 0x418af0
+AnmId EffectManager::create_effect(i32 effect, D3DXVECTOR3 *pos, i32 unk)
+{
+    AnmId id;
+    return id;
 }

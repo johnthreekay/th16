@@ -1,7 +1,9 @@
 // Stand-in callers for unit 12b (0x401000-0x411860, second pass) functions
 // whose shape depends on code not decompiled yet.
 #include "../BulletManager.h"
+#include "../EffectManager.h"
 #include "../Input.h"
+#include "../Player.h"
 #include "../Stage.h"
 
 // The menus (0x45108b, 0x452801) read the keyboard into global buffers.
@@ -34,4 +36,16 @@ CameraSky harness_camera_sky(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, CameraSky
 void harness_cancel_rectangle(D3DXVECTOR3 *pos, D3DXVECTOR3 *size, f32 angle, i32 mode)
 {
     g_BulletManager->cancel_rectangle_as_bomb(pos, size, angle, mode);
+}
+
+// ECL (0x41e464) creates tracked effects too.
+i32 harness_create_tracked_effect(i32 effect, D3DXVECTOR3 *pos)
+{
+    return g_EffectManager->create_tracked(effect, pos, 0);
+}
+
+// The player's own shots (around 0x442669) make other rectangles.
+void harness_rect_damage_source(D3DXVECTOR3 *pos, f32 w, f32 h, f32 angle, i32 a, i32 b)
+{
+    g_Player->create_rect_damage_source(pos, w, h, angle, a, b);
 }

@@ -20,3 +20,6 @@ struct Rng
     // randf_neg_1_to_1() * pi. Used by the ECL movement code.
     HARNESS_CALLED f32 randf_neg_1_to_1_times_pi();
 };
+
+// The generator whose sequence replays reproduce (ExpHP: REPLAY_SAFE_RNG).
+extern Rng g_ReplaySafeRng;

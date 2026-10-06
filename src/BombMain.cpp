@@ -7,9 +7,11 @@
 #include "Bomb.h"
 
 #include "BulletManager.h"
+#include "EffectManager.h"
 #include "EnemyManager.h"
 #include "Laser.h"
 #include "Player.h"
+#include "Rng.h"
 #include "ScreenEffect.h"
 #include "SoundManager.h"
 #include "Spellcard.h"
@@ -63,6 +65,39 @@ i32 BombAyaAInf::begin()
     return 0;
 }
 
+// The wind slides sideways across the screen, damaging and cancelling in a
+// rectangle, with sparkles all over.
+// FUNCTION: TH16 0x40e9d0
+i32 BombAyaAInf::on_tick()
+{
+    AnmVm *vm = get_vm_or_clear(anm_id);
+    g_Player->inner.iframes = 40;
+    if (vm == NULL)
+    {
+        AnmManager::interrupt_tree(anm_id_64, 1);
+        anm_id.id = 0;
+        return -1;
+    }
+    if (timer.current == 300)
+    {
+        AnmManager::interrupt_tree(anm_id, 1);
+    }
+    vm->entity_pos.x += speed;
+    pos.x += speed;
+    g_Player->create_rect_damage_source(&pos, 640.0f, 118.0f, angle, 1, 18);
+
+    D3DXVECTOR3 effect_pos;
+    effect_pos.x = g_ReplaySafeRng.randf_neg_1_to_1() * 192.0f;
+    effect_pos.y = g_ReplaySafeRng.randf_0_to_1() * 448.0f;
+    effect_pos.z = 0.0f;
+    EffectManager *effects = g_EffectManager;
+    AnmVm *effect = g_EffectManager->get_tracked_vm(effects->create_tracked_inline(3, &effect_pos));
+    effect->flags_lo &= ~0x1c0;
+    effect->flags_lo |= 0x20;
+    method_10();
+    return 0;
+}
+
 // FUNCTION: TH16 0x40f070
 i32 BombCirnoAInf::begin()
 {
@@ -78,6 +113,55 @@ i32 BombCirnoAInf::begin()
     g_Player->inner.iframes = 120;
     g_EnemyManager->inner.bomb_count++;
     ScreenEffect::create(SCREEN_EFFECT_SHAKE_2, 0, 8, 300, 30, 0);
+    return 0;
+}
+
+// Sparkles inside the growing circle for most of the bomb, then all over
+// the screen.
+// TODO: the first sparkle's x adds pos.x to the offset where the original
+// adds the offset to pos.x (operand order of one addss).
+// FUNCTION: TH16 0x40f240
+i32 BombCirnoAInf::on_tick()
+{
+    AnmVm *vm = get_vm_or_clear(anm_id);
+    g_Player->inner.iframes = 40;
+    if (vm == NULL)
+    {
+        AnmManager::interrupt_tree(anm_id_64, 1);
+        anm_id.id = 0;
+        return -1;
+    }
+    if (timer.current == 0)
+    {
+        g_Player->create_damage_source(&pos, 16.0f, 160.0f / 60.0f, 60, 15);
+    }
+    else if (timer.current == 60)
+    {
+        g_Player->create_damage_source(&pos, 176.0f, 32.0f / 290.0f, 290, 15);
+    }
+    if (timer.current < 250 && timer.current >= 30)
+    {
+        f32 scale = vm->scale.x;
+        f32 angle = g_ReplaySafeRng.randf_neg_1_to_1() * ZUN_PI;
+        D3DXVECTOR3 effect_pos;
+        sincosmul(&effect_pos, angle, g_ReplaySafeRng.randf_0_to_1() * scale);
+        effect_pos.z = 0.0f;
+        effect_pos += pos;
+        AnmVm *effect = g_EffectManager->get_tracked_vm(g_EffectManager->create_tracked(3, &effect_pos, 0));
+        effect->flags_lo &= ~0x1c0;
+        effect->flags_lo |= 0x20;
+    }
+    else if (timer.current >= 250)
+    {
+        D3DXVECTOR3 effect_pos;
+        effect_pos.x = g_ReplaySafeRng.randf_neg_1_to_1() * 192.0f;
+        effect_pos.y = g_ReplaySafeRng.randf_0_to_1() * 448.0f;
+        effect_pos.z = 0.0f;
+        AnmVm *effect = g_EffectManager->get_tracked_vm(g_EffectManager->create_tracked(3, &effect_pos, 0));
+        effect->flags_lo &= ~0x1c0;
+        effect->flags_lo |= 0x20;
+    }
+    method_10();
     return 0;
 }
 

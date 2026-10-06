@@ -2,6 +2,9 @@
 #include "Rng.h"
 #include "ZunMath.h"
 
+// GLOBAL: TH16 0x4a6d88
+Rng g_ReplaySafeRng;
+
 // FUNCTION: TH16 0x402b70
 u16 Rng::rand_u16()
 {

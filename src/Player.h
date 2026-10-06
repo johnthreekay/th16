@@ -42,6 +42,9 @@ struct Player
 
     // 0x4449b0. Returns the index of the new damage source plus one.
     HARNESS_CALLED i32 create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 unk_2, i32 damage);
+    // 0x444b20. The same for a rectangle (ExpHP:
+    // sub_444b20_prolly_creates_rectangular_damage_source).
+    HARNESS_CALLED i32 create_rect_damage_source(D3DXVECTOR3 *pos, f32 width, f32 height, f32 angle, i32 unk_2, i32 damage);
 };
 
 extern Player *g_Player;
