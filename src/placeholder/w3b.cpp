@@ -21,3 +21,4 @@ void AnmManager::draw_text(AnmVm *vm, D3DCOLOR color, i32 unk_10, i32 font, i32 
     volatile double d = x;
     w3b_placeholder_sink(vm, w3b_placeholder_sink(buf, color + unk_10 + font + (i32)d + y));
 }
+
