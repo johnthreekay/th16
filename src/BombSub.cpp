@@ -60,7 +60,7 @@ i32 BombAllSubInf::begin()
     vm->int_vars[3] = g_release_duration_doyou[g_Globals.season_level()];
 
     g_Player->inner.iframes = 10;
-    g_EnemyManager->season_releases_active++;
+    g_EnemyManager->inner.bomb_count++;
     return 0;
 }
 
@@ -132,7 +132,7 @@ i32 BombAyaSubInf::begin()
     vm->int_vars[3] = g_release_duration_fall[g_Globals.season_level()];
 
     g_Player->inner.iframes = 30;
-    g_EnemyManager->season_releases_active++;
+    g_EnemyManager->inner.bomb_count++;
     return 0;
 }
 
@@ -213,7 +213,7 @@ i32 BombCirnoSubInf::begin()
     vm->int_vars[3] = g_release_duration_summer[g_Globals.season_level()];
 
     g_Player->inner.iframes = 10;
-    g_EnemyManager->season_releases_active++;
+    g_EnemyManager->inner.bomb_count++;
     return 0;
 }
 
@@ -287,7 +287,7 @@ i32 BombMarisaSubInf::begin()
     vm->int_vars[3] = g_release_duration_winter[g_Globals.season_level()];
 
     g_Player->inner.iframes = 30;
-    g_EnemyManager->season_releases_active++;
+    g_EnemyManager->inner.bomb_count++;
     return 0;
 }
 
@@ -362,7 +362,7 @@ i32 BombReimuSubInf::begin()
     vm->int_vars[3] = g_release_duration_spring[g_Globals.season_level()];
 
     g_Player->inner.iframes = 10;
-    g_EnemyManager->season_releases_active++;
+    g_EnemyManager->inner.bomb_count++;
     return 0;
 }
 

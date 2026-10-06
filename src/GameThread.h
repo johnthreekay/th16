@@ -46,7 +46,14 @@ struct GameThreadFlags
     // Paused (also set while the stage loads): items and lasers neither
     // tick nor draw, and replays stop recording.
     u32 paused : 1;
-    u32 flag_3 : 7;
+    u32 flag_3 : 1;
+    // Excludes the current second from FpsCounter's totals.
+    u32 flag_4 : 1;
+    u32 flag_5 : 1;
+    u32 flag_6 : 1;
+    // Cleared by FpsCounter once a second.
+    u32 flag_7 : 1;
+    u32 flag_8 : 2;
     u32 flag_10 : 1;
     u32 flag_11 : 21;
 };

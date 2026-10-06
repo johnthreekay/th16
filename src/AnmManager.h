@@ -53,7 +53,7 @@ struct AnmManager
     Float2 camera_unk_fc;
     u8 unk_d8[0x184f4f0 - 0xd8];
     // Indexed by the slot given to preload_anm.
-    AnmLoaded *loaded_anms[0x20];
+    AnmLoaded *loaded_anms[0x1f];
 
     void flush_sprites();
     void draw_vm(AnmVm *vm);
@@ -72,6 +72,21 @@ struct AnmManager
     static AnmVm *allocate_vm();
     // 0x46e7d0. Reaches the manager through g_AnmManager.
     static AnmId __stdcall insert_in_world_list_back(AnmVm *vm);
+
+    // Frees the ANM file in a slot, if one is loaded there.
+    void unload_anm(i32 slot)
+    {
+        if (slot < 0 || slot >= sizeof(loaded_anms) / sizeof(loaded_anms[0]))
+        {
+            return;
+        }
+        if (loaded_anms[slot] != NULL)
+        {
+            loaded_anms[slot]->release();
+            delete loaded_anms[slot];
+            loaded_anms[slot] = NULL;
+        }
+    }
 };
 
 extern AnmManager *g_AnmManager;

@@ -22,7 +22,10 @@ struct Config
     // Analog stick dead zones (DirectInput axis units).
     i16 deadzone_x;
     i16 deadzone_y;
-    u8 unk_20[0x2c - 0x20];
+    u8 unk_20[0x24 - 0x20];
+    // Frames skipped per drawn frame (FpsCounter counts them as drawn).
+    u8 frame_skip;
+    u8 unk_25[0x2c - 0x25];
     // 0x8 skips DirectInput setup.
     u32 flags_2c;
     u8 unk_30[0x68 - 0x30];

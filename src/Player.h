@@ -14,7 +14,9 @@ struct PlayerInner
     D3DXVECTOR3 pos;
     u8 unk_c[0x16028 - 0xc];
     ZunTimer iframes;
-    u8 unk_1603c[0x16078 - 0x1603c];
+    // 0x20: damage is multiplied this frame (EnemyManager::update).
+    u32 flags;
+    u8 unk_16040[0x16078 - 0x16040];
     // Set every frame by the autumn release.
     f32 speed_multiplier;
     u8 unk_1607c[0x16090 - 0x1607c];

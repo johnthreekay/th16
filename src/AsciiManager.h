@@ -32,6 +32,8 @@ struct AsciiManager
 
     // 0x408260. Variadic, so __cdecl with this pushed first.
     void sprintf(Float3 *pos, const char *fmt, ...);
+    // 0x4084f0. Like sprintf, for debug text.
+    void drawf_debug(Float3 *pos, const char *fmt, ...);
 };
 
 extern AsciiManager *g_AsciiManager;

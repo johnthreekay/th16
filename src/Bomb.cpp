@@ -291,7 +291,7 @@ i32 BombInf::activate()
         Gui::update_season_gauge();
         return 0;
     }
-    g_EnemyManager->bomb_active = 0;
+    g_EnemyManager->inner.can_still_capture_spell = 0;
     return 0;
 }
 
@@ -342,7 +342,7 @@ i32 BombInf::can_activate()
     {
         return 0;
     }
-    if (g_EnemyManager == NULL || g_EnemyManager->enemy_count == 0)
+    if (g_EnemyManager == NULL || g_EnemyManager->enemy_count_real == 0)
     {
         return 0;
     }

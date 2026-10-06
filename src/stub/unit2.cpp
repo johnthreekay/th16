@@ -17,9 +17,6 @@ BulletManager *g_BulletManager;
 // GLOBAL: TH16 0x4a6db0
 Spellcard *g_Spellcard;
 
-// GLOBAL: TH16 0x4a6dc0
-EnemyManager *g_EnemyManager;
-
 // GLOBAL: TH16 0x4a6ef8
 Player *g_Player;
 
