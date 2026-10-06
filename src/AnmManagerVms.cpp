@@ -905,6 +905,7 @@ AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
     return id;
 }
 
+// TODO: identical code; reccmp only flags the unannotated AnmFastVm::~AnmFastVm (0x46b790).
 // FUNCTION: TH16 0x46b7d0
 AnmManager::~AnmManager()
 {
