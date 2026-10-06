@@ -9,12 +9,6 @@ EnemyInf::~EnemyInf()
 {
 }
 
-// STUB: TH16 0x474740
-int SptResourceInf::find_sub_by_name(const char *name) throw()
-{
-    return 0;
-}
-
 // STUB: TH16 0x41d1e0
 int EnemyInf::on_tick()
 {

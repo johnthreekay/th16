@@ -1,6 +1,8 @@
 // ECL argument decoding: an argument flagged in variable_mask names a local
 // (>= 0, a byte offset from the frame base), a stack entry (-1 to -100,
 // counted back from the top) or a global variable of the VM (the rest).
+#include <string.h>
+
 #include "Ecl.h"
 
 static_assert(sizeof(EclRunContext) == 0x11e8, "EclRunContext size");
@@ -275,4 +277,84 @@ f32 *EclRunContext::get_float_arg_ptr(int index)
         return vm->get_float_global_ptr((i32)value);
     }
     return NULL;
+}
+
+// FUNCTION: TH16 0x474740
+int SptResourceInf::find_sub_by_name(const char *name) throw()
+{
+    // The subroutine table is sorted by name.
+    i32 lo = 0;
+    i32 hi = subroutine_count - 1;
+    while (lo <= hi)
+    {
+        i32 mid = lo + (hi - lo) / 2;
+        i32 cmp = strcmp(name, subroutines[mid].name);
+        if (cmp == 0)
+        {
+            return mid;
+        }
+        if (cmp < 0)
+        {
+            hi = mid - 1;
+        }
+        else
+        {
+            lo = mid + 1;
+        }
+    }
+    return -1;
+}
+
+// FUNCTION: TH16 0x4747d0
+EclRawInstr *EclRunContext::get_subroutine_ptr()
+{
+    return current_instr();
+}
+
+// TODO: the original stores stack_offset before loading base_offset.
+// FUNCTION: TH16 0x474810
+i32 EclStack::enter(i32 size)
+{
+    i32 old_offset = stack_offset;
+    if (size + stack_offset >= 0x1000)
+    {
+        return -1;
+    }
+    stack_offset += size;
+    *(i32 *)((u8 *)data + stack_offset) = base_offset;
+    stack_offset += 4;
+    base_offset = old_offset;
+    return 0;
+}
+
+// FUNCTION: TH16 0x474860
+i32 EclStack::ecl_return()
+{
+    stack_offset -= 4;
+    i32 old_base = base_offset;
+    base_offset = *(i32 *)((u8 *)data + stack_offset);
+    stack_offset = old_base;
+    return 0;
+}
+
+// FUNCTION: TH16 0x4744e0
+EclRunContextList *SptInf::lookup_async(i32 id)
+{
+    for (EclRunContextList *node = &async_list_head; node != NULL; node = node->next)
+    {
+        if (node->entry->async_id == id)
+        {
+            return node;
+        }
+    }
+    return NULL;
+}
+
+// FUNCTION: TH16 0x474890
+int SptInf::load_sub_by_name(const char *name)
+{
+    context.current_context->cur_location.subroutine_index = file_manager->find_sub_by_name(name);
+    context.current_context->cur_location.offset_from_first_instruction = 0;
+    context.current_context->time = 0.0f;
+    return 0;
 }

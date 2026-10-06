@@ -58,6 +58,12 @@ struct EclStack
         stack_offset = 0;
         base_offset = 0;
     }
+
+    // 0x474810. Opens a call frame with size bytes of locals; -1 when the
+    // stack is full.
+    i32 enter(i32 size);
+    // 0x474860. Closes the frame enter opened.
+    i32 ecl_return();
 };
 
 // One thread of ECL execution (ExpHP: zEclRunContext).
@@ -93,6 +99,8 @@ struct EclRunContext
 
     // The instruction at cur_location, NULL when there is none.
     EclRawInstr *current_instr();
+    // 0x4747d0. current_instr, out of line (ExpHP: get_subroutine_ptr).
+    EclRawInstr *get_subroutine_ptr();
 };
 
 // Intrusive list of run contexts (ExpHP: zEclRunContextList).
@@ -191,6 +199,11 @@ class SptInf
     DECOMP_NOINLINE SptInf();
     void free_all_async();
     void reset_run_context();
+    // 0x4744e0. The async with the given id, NULL when there is none.
+    EclRunContextList *lookup_async(i32 id);
+    // 0x474890 (ExpHP: Enemy::load_sub_by_name). Restarts the current
+    // context at the start of the named subroutine.
+    int load_sub_by_name(const char *name);
 
     virtual int run_over_300();
     virtual int get_int_global(int var);
