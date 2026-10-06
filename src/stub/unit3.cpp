@@ -59,6 +59,17 @@ void AnmManager::disable_vms_from_anm_file(AnmLoaded *anm)
 {
 }
 
+// STUB: TH16 0x46efa0
+AnmVm *AnmManager::get_vm_with_id(AnmId id)
+{
+    return NULL;
+}
+
+// STUB: TH16 0x46d770
+void AnmLoaded::release()
+{
+}
+
 // STUB: TH16 0x468490
 void AnmManager::draw_vm(AnmVm *vm)
 {
