@@ -7,6 +7,7 @@
 #include "FileSystem.h"
 #include "GameErrorContext.h"
 #include "Globals.h"
+#include "ScreenEffect.h"
 #include "Supervisor.h"
 
 // GLOBAL: TH16 0x4a6da0
@@ -25,6 +26,8 @@ void StageInner::set_sky_interp(i32 end_time, i32 method, CameraSky *goal)
     camera_sky_i.time.reset();
 }
 
+// TODO: the original computes &vm_ids[i] after pushing it and loads the
+// child list only after storing flags_hi.
 // FUNCTION: TH16 0x409550
 Fog::~Fog()
 {
@@ -67,6 +70,8 @@ StageInner::~StageInner()
 {
 }
 
+// TODO: ours saves esi/edi after the load_std check (shrink-wrapped); the
+// original saves them in the prologue.
 // FUNCTION: TH16 0x4097c0
 HARNESS_CALLED i32 Stage::load_data(const char *path, i32 unused)
 {
@@ -187,6 +192,7 @@ Stage::~Stage()
     }
 }
 
+// TODO: the original reserves one more 4-byte stack slot (sub esp, 8).
 // FUNCTION: TH16 0x409db0
 HARNESS_CALLED Stage *Stage::create(const char *path)
 {
@@ -199,6 +205,8 @@ HARNESS_CALLED Stage *Stage::create(const char *path)
     return stage;
 }
 
+// TODO: the original aligns its frame to 8 bytes (LTCG, for a callee), and
+// saves esi/edi in the prologue.
 // FUNCTION: TH16 0x409e50
 i32 Stage::on_tick()
 {
@@ -243,6 +251,8 @@ int __fastcall Stage::on_draw_03_callback(void *arg)
     return ((Stage *)arg)->on_draw_03();
 }
 
+// TODO: the original pads the stack around the call (push ecx/pop ecx) and
+// returns on_draw_06's eax; needs on_draw_06 decompiled.
 // FUNCTION: TH16 0x40a7c0
 int __fastcall Stage::on_draw_06_callback(void *arg)
 {
@@ -250,6 +260,8 @@ int __fastcall Stage::on_draw_06_callback(void *arg)
     return 1;
 }
 
+// TODO: ours saves esi/edi late (shrink-wrapped) and merges the stack
+// cleanups of malloc/memcpy/memset.
 // FUNCTION: TH16 0x40ac30
 i32 Stage::load_std(const char *path)
 {
@@ -310,6 +322,7 @@ HARNESS_CALLED void Stage::start_std_vms()
 
 // Runs the VMs of objects still marked as running; unmarks objects whose
 // VMs have all finished.
+// TODO: ours saves ebx/edi after the loop guard (shrink-wrapped).
 // FUNCTION: TH16 0x40aed0
 i32 Stage::update_std_vms()
 {
@@ -353,6 +366,15 @@ HARNESS_CALLED void Stage::jump_to_label(i32 label)
             return;
         }
     }
+}
+
+// Fades the screen in over 30 frames while the stage starts.
+// FUNCTION: TH16 0x40c0d0
+HARNESS_CALLED void Stage::start_fade_in()
+{
+    ScreenEffect::create(SCREEN_EFFECT_FADE_IN, 30, 0, 0, 0, 10);
+    fade_timer = 30;
+    stage_flags |= STAGE_FADING_IN;
 }
 
 // FUNCTION: TH16 0x40c210

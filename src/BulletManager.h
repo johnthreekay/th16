@@ -165,6 +165,9 @@ struct BulletManager
     // 0x416d20. Reaches the manager through its global, so LTCG drops the
     // unused this; the radius arrives in xmm2.
     HARNESS_CALLED void cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode);
+    // 0x416e20. The same for a rectangle of the given size, rotated by
+    // angle (xmm3).
+    HARNESS_CALLED void cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3DXVECTOR3 *size, f32 angle, i32 mode);
 };
 
 extern BulletManager *g_BulletManager;

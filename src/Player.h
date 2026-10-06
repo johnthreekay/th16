@@ -16,7 +16,10 @@ struct PlayerInner
     ZunTimer iframes;
     // 0x20: damage is multiplied this frame (EnemyManager::update).
     u32 flags;
-    u8 unk_16040[0x16078 - 0x16040];
+    u8 unk_16040[0x16050 - 0x16040];
+    // Scaled by 1/128; aims and sizes Aya's bomb.
+    f32 unk_16050;
+    u8 unk_16054[0x16078 - 0x16054];
     // Set every frame by the autumn release.
     f32 speed_multiplier;
     u8 unk_1607c[0x16090 - 0x1607c];

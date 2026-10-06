@@ -1,5 +1,6 @@
 // Stand-in callers for unit 12b (0x401000-0x411860, second pass) functions
 // whose shape depends on code not decompiled yet.
+#include "../BulletManager.h"
 #include "../Input.h"
 #include "../Stage.h"
 
@@ -18,6 +19,7 @@ void harness_stage(const char *path, i32 n, CameraSky *sky)
     g_Stage->start_std_vms();
     g_Stage->jump_to_label(n);
     g_Stage->start_fade_out();
+    g_Stage2->start_fade_in();
     g_Stage->inner.set_sky_interp(n, n + 1, sky);
     delete g_Stage;
 }
@@ -26,4 +28,10 @@ void harness_stage(const char *path, i32 n, CameraSky *sky)
 CameraSky harness_camera_sky(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, CameraSky *other)
 {
     return CameraSky(a, b, c, d, e, f) + *other;
+}
+
+// Other bullet cancels (the player around 0x442669) use other modes.
+void harness_cancel_rectangle(D3DXVECTOR3 *pos, D3DXVECTOR3 *size, f32 angle, i32 mode)
+{
+    g_BulletManager->cancel_rectangle_as_bomb(pos, size, angle, mode);
 }
