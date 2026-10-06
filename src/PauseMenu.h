@@ -42,6 +42,8 @@ struct PauseMenu
 
     int on_tick();
     int on_draw();
+    static int __fastcall on_tick_thunk(void *arg);
+    static int __fastcall on_draw_thunk(void *arg);
 };
 
 extern PauseMenu *g_PauseMenu;

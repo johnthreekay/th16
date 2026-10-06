@@ -37,13 +37,13 @@ int PauseMenu::initialize()
 {
     UpdateFunc *f;
 
-    f = g_UpdateFuncRegistry->create_func([](void *arg) -> int { return ((PauseMenu *)arg)->on_tick(); });
+    f = g_UpdateFuncRegistry->create_func(on_tick_thunk);
     f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
     g_UpdateFuncRegistry->register_on_tick(f, 10);
     on_tick_func = f;
 
-    f = g_UpdateFuncRegistry->create_func([](void *arg) -> int { return ((PauseMenu *)arg)->on_draw(); });
+    f = g_UpdateFuncRegistry->create_func(on_draw_thunk);
     f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
     g_UpdateFuncRegistry->register_on_draw(f, 0x4a);
@@ -76,4 +76,20 @@ PauseMenu *PauseMenu::create()
         return NULL;
     }
     return menu;
+}
+
+// The original's callback is a jmp to the member function, most likely the
+// fastcall invoker of a capture-less lambda; a static thunk compiles the same.
+// FUNCTION: TH16 0x43e720
+int __fastcall PauseMenu::on_tick_thunk(void *arg)
+{
+    return ((PauseMenu *)arg)->on_tick();
+}
+
+// The original's callback is a jmp to the member function, most likely the
+// fastcall invoker of a capture-less lambda; a static thunk compiles the same.
+// FUNCTION: TH16 0x43ef10
+int __fastcall PauseMenu::on_draw_thunk(void *arg)
+{
+    return ((PauseMenu *)arg)->on_draw();
 }
