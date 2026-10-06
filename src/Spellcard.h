@@ -61,6 +61,10 @@ struct Spellcard
     static i32 __fastcall on_tick_callback(Spellcard *self);
     static i32 __fastcall on_draw_callback(Spellcard *self);
     i32 is_time_code_bad();
+    // Splits the capture time into seconds and hundredths (999 and 99 if
+    // it was tampered with). Only called through g_Spellcard, which LTCG
+    // put in place of this.
+    HARNESS_CALLED void decode_time_code(i32 *seconds, i32 *hundredths);
 };
 
 // Difficulty (0-3, 4 for Extra) of each spell card.

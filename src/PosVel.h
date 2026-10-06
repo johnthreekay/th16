@@ -39,4 +39,6 @@ struct PosVel
     void update_secondary_fields();
     void step();
     void step_from_center();
+    // 0x4260d0. LTCG passes the angle in xmm1.
+    HARNESS_CALLED void set_ellipse_angle(f32 angle);
 };

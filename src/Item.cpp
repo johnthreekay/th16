@@ -141,3 +141,40 @@ HARNESS_CALLED void Item::collect_piv(f32 value)
         g_Globals.piv = g_Globals.max_piv;
     }
 }
+
+// FUNCTION: TH16 0x4184a0
+void ItemManager::destroy_all()
+{
+    total_items_created = 0;
+    unk_1c972e8 = 0;
+    memset(inner.items, 0, sizeof(inner.items));
+    ItemList *list = &inner.normal_freelist;
+    list->head = NULL;
+    list->next = NULL;
+    list->prev = NULL;
+    list->unk_c = NULL;
+    for (i32 i = 0; i < 0x258; i++)
+    {
+        Item *item = &inner.items[i];
+        item->node.next = NULL;
+        item->node.head = list;
+        item->node.prev = NULL;
+        item->node.unk_c = NULL;
+        item->release_to(list);
+    }
+    list = &inner.cancel_freelist;
+    list->head = NULL;
+    list->next = NULL;
+    list->prev = NULL;
+    list->unk_c = NULL;
+    for (i32 i = 0x258; i < 0x1258; i++)
+    {
+        Item *item = &inner.items[i];
+        item->node.next = NULL;
+        item->node.head = list;
+        item->node.prev = NULL;
+        item->node.unk_c = NULL;
+        item->release_to(list);
+    }
+    inner.slowdown = 1.0f;
+}

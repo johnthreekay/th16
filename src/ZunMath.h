@@ -39,8 +39,9 @@ static void __fastcall sincosmul(Float3 *dst, f32 angle, f32 radius)
 // code calls. Unit 1 had it as Float3::from_polar.
 void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius);
 
-// The loop of normalize_angle, for the many places that inline it.
-inline f32 wrap_angle(f32 a)
+// The loop of normalize_angle, for the many places that inline it. The
+// original inlines it everywhere; ours would call it from PosVel::step.
+__forceinline f32 wrap_angle(f32 a)
 {
     i32 i = 0;
     while (a > ZUN_PI)

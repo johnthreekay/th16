@@ -1,4 +1,5 @@
 #include "Enemy.h"
+#include "Fog.h"
 #include "AnmManager.h"
 #include "BulletManager.h"
 #include "CriticalSections.h"
@@ -454,3 +455,28 @@ int __fastcall ecl_ext_damage_stored(EnemyData *enemy, int damage)
 
 // GLOBAL: TH16 0x4a6dc0
 EnemyManager *g_EnemyManager;
+
+// TODO: inlined delete_vm loads the child list before storing the flags.
+// FUNCTION: TH16 0x41ba10
+EnemyInf::~EnemyInf()
+{
+    g_EnemyManager->remove_from_active_list(this);
+    if (!(enemy.flags_high & 4))
+    {
+        if (enemy.flags_low & 0x800000)
+        {
+            g_EnemyManager->inner.boss_ids[enemy.own_boss_id] = 0;
+        }
+        AnmManager *anm = g_AnmManager;
+        for (i32 i = 0; i < 16; i++)
+        {
+            anm->delete_vm_inline(enemy.anm_ids[i]);
+            enemy.anm_ids[i].id = 0;
+        }
+    }
+    if (enemy.fog.fog_ptr != NULL)
+    {
+        delete (Fog *)enemy.fog.fog_ptr;
+    }
+    enemy.fog.fog_ptr = NULL;
+}

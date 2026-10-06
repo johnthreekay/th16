@@ -4,10 +4,6 @@
 #include "../EnemyManager.h"
 #include "../Input.h"
 
-// STUB: TH16 0x41ba10
-EnemyInf::~EnemyInf()
-{
-}
 
 // STUB: TH16 0x474740
 int SptResourceInf::find_sub_by_name(const char *name) throw()

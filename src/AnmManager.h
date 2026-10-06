@@ -53,6 +53,14 @@ struct AnmLoaded
     // 0x40e5c0. Creates a VM running the script at pos (entity_pos), with
     // the given z rotation, on the given layer unless negative.
     HARNESS_CALLED AnmId create_vm(i32 script, Float3 *pos, f32 rotation, i32 layer, i32 unused);
+    // 0x406380. Creates a VM running the script at the origin; also stores
+    // the VM in *out if out is not NULL.
+    AnmId create_effect(i32 script, i32 layer, AnmVm **out);
+    // 0x42c920. Like create_effect, for the UI list.
+    AnmId create_ui_effect(i32 script, i32 unused, AnmVm **out);
+    // 0x426160. Like create_vm at the origin, but inserted at the front of
+    // the world list.
+    AnmId create_vm_front(i32 script, i32 layer, i32 unused);
 
     void init_vm_with_sprite(AnmVm *vm, i32 sprite)
     {
@@ -107,11 +115,32 @@ struct AnmManager
     // manager through g_AnmManager, so LTCG drops the unused this (ExpHP:
     // anm_unload_46f1c0).
     HARNESS_CALLED void delete_vm(AnmId id);
+    // 0x46f220. Marks the VM and its descendants for deletion (ExpHP:
+    // AnmBehemoth::sub_46f220_recursive).
+    void mark_tree_for_delete(AnmVm *vm);
+
+    // delete_vm's body. LTCG inlined delete_vm into some callers, with the
+    // manager pointer loaded once for several of them.
+    void delete_vm_inline(AnmId id)
+    {
+        AnmVm *vm = get_vm_with_id(id);
+        if (vm != NULL && !(vm->flags_hi & ANM_VM_FLAG_HI_4000000))
+        {
+            vm->flags_hi = vm->flags_hi & ~ANM_VM_FLAG_HI_40 | ANM_VM_DELETE_PENDING;
+            for (ZunList<AnmVm> *node = vm->list_of_children.next; node != NULL; node = node->next)
+            {
+                mark_tree_for_delete(node->entry);
+            }
+        }
+    }
+
     // 0x46f270 (ExpHP: AnmBehemoth::disable_vms_from_anm_file).
     void disable_vms_from_anm_file(AnmLoaded *anm);
 
     // Members that do not use this; LTCG dropped it (ret N, no ecx).
     static void __stdcall interrupt_tree(AnmId id, i32 interrupt);
+    // 0x46f130. Like interrupt_tree, also running each VM once.
+    static void __stdcall interrupt_tree_and_run(AnmId id, i32 interrupt);
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *path);
     // Frees ANM files marked for unloading; nonzero while one is still busy.
     static i32 sub_46d690();
@@ -119,6 +148,10 @@ struct AnmManager
     static AnmVm *allocate_vm();
     // 0x46e7d0. Reaches the manager through g_AnmManager.
     static AnmId __stdcall insert_in_world_list_back(AnmVm *vm);
+    // 0x46e940. Reaches the manager through g_AnmManager.
+    static AnmId __stdcall insert_in_ui_list_back(AnmVm *vm);
+    // 0x46e890. Reaches the manager through g_AnmManager.
+    static AnmId __stdcall insert_in_world_list_front(AnmVm *vm);
 
     // Frees the ANM file in a slot, if one is loaded there.
     void unload_anm(i32 slot)
@@ -154,4 +187,15 @@ inline AnmVm *get_vm_or_clear(AnmId &id)
         id.id = 0;
     }
     return vm;
+}
+
+// The first descendant of the VM running the script, or NULL if the VM is
+// gone (forgetting the id then).
+inline AnmVm *find_child_of(AnmId &id, i32 script)
+{
+    if (get_vm_or_clear(id) == NULL)
+    {
+        return NULL;
+    }
+    return get_vm_or_clear(id)->search_children(script, 0);
 }

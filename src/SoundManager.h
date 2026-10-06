@@ -31,7 +31,10 @@ enum BgmCommand
 
 struct SoundManager
 {
-    u8 unk_0[0x5660];
+    u8 unk_0[0x22e0];
+    // File name of the BGM playing.
+    char bgm_name[0x100];
+    u8 unk_23e0[0x5660 - 0x23e0];
     BgmStream *bgm_stream;
     u8 unk_5664[0x5698 - 0x5664];
 

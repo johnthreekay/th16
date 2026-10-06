@@ -72,7 +72,10 @@ struct Supervisor
     i32 gamemode_to_switch_to;
     i32 gamemode_prev;
     i32 unk_6fc;
-    u8 unk_700[0x730 - 0x700];
+    u8 unk_700[0x728 - 0x700];
+    // text.anm: dialogue text and furigana lines.
+    struct AnmLoaded *text_anm;
+    u8 unk_72c[0x730 - 0x72c];
     u32 flags;
     u8 unk_734[0x998 - 0x734];
     ThreadInf thread;

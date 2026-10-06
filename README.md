@@ -141,8 +141,11 @@ decompiled code the surroundings it had in the original:
 - `UpdateFunc`'s flags are a plain `unsigned int` updated with `&=`/`|=`,
   not bitfields. `create_func` keeps every constructor store and then
   overwrites them; the only construct found that reproduces this is writing
-  through a `volatile UpdateFunc *`. Making a struct field `volatile` instead
-  fixes `create_func` but breaks the scalar deleting destructor's scheduling.
+  through a `volatile UpdateFunc *`. The constructor does that through a
+  volatile copy of `this`, so stores made after it (in `create_func` and
+  where LTCG inlines it, such as `EffectManager::initialize`) still merge.
+  Making a struct field `volatile` instead fixes `create_func` but breaks the
+  scalar deleting destructor's scheduling.
 - Register allocation follows source shape closely. `unregister_all_in_list`
   only matches when the loop loads `node->next` before `node->entry`, and the
   `run_all_*` loops only match as `while (f->active) { ... switch ... break; }`

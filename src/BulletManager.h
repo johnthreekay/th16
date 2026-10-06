@@ -140,6 +140,9 @@ struct BulletManager
     static BulletManager *create();
     i32 initialize();
     static void destroy_all();
+    // 0x416f40. Cancels every bullet without items. The argument is never
+    // read (LTCG folded it; callers push whatever is in ecx).
+    static void __stdcall clear_all(i32 unused);
     void reset_lists();
 
     // Walk the tick list with iter_current/iter_next, so that the bullet

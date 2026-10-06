@@ -39,19 +39,6 @@ i32 AnmManager::sub_46d690()
 
 #include "../Gui.h"
 
-// GLOBAL: TH16 0x4a6dcc
-Gui *g_Gui;
-
-// STUB: TH16 0x42c280
-void Gui::update_lives(i32 lives, i32 fragments)
-{
-}
-
-// STUB: TH16 0x42c390
-void Gui::update_bombs(i32 bombs, i32 fragments)
-{
-}
-
 // STUB: TH16 0x42bcf0
 void Gui::sub_42bcf0(i32 unk, i32 kind)
 {
