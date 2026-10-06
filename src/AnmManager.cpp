@@ -44,7 +44,7 @@ HARNESS_CALLED AnmId AnmLoaded::create_vm(i32 script, D3DXVECTOR3 *pos, f32 rota
 {
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;
-    AnmVm *vm = AnmManager::allocate_vm();
+    AnmVm *vm = g_AnmManager->allocate_vm();
     copy_vm(vm, script);
     vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
     if (layer >= 0)
@@ -68,7 +68,7 @@ HARNESS_CALLED AnmId AnmLoaded::create_vm(i32 script, D3DXVECTOR3 *pos, f32 rota
     vm->run();
     vm->mode_of_create_child = 0;
     AnmId id;
-    id = AnmManager::insert_in_world_list_back(vm);
+    id = g_AnmManager->insert_in_world_list_back(vm);
     LEAVE_CS(CS_ANM_MANAGER);
     return id;
 }
