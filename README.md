@@ -193,6 +193,26 @@ decompiled code the surroundings it had in the original:
   `harness_homing_angle` (src/harness/unit56b.cpp) stands in for the
   undecompiled atan2f users.
 
+- Whole-program effects show up in single functions:
+  - Giving a callee a visible /GL body can add a /GS cookie to callers that
+    pass a local's address elsewhere (get_vm_with_id stays an opaque stub
+    for that reason; its matching code is kept under `#if 0`). Check callers
+    for new cookies whenever a stub becomes real code.
+  - LTCG realigns frames (`and esp,-8`) for spilled doubles only once enough
+    of the program uses them; a harness function with a few inlined
+    `atan2f` calls keeps that threshold (harness_homing_angle).
+  - As the call graph grows, LTCG starts or stops inlining small helpers;
+    after a merge look for new out-of-line copies in build/th16.map and use
+    `__forceinline` or DECOMP_NOINLINE.
+  - A function that is inlined at some call sites and called at others
+    needs an explicit inline copy (`delete_vm_inline`, `create_inline`).
+- Speculative devirtualization (`cmp [obj], vftable; jne call [edx]`) appears
+  when LTCG cannot see the overrides; /GL placeholders for them remove it.
+- Large structs carry `static_assert(offsetof(...))` for known offsets; a
+  shifted layout once matched in the old quickdiff.
+- `D3DXMATRIX.m[i][j]` and `._ij` compile differently (the former reloads
+  the other floats); chained assignments store right to left.
+
 ### Known tooling gaps
 
 - Template members cannot be annotated: build.py's name parsing does not
