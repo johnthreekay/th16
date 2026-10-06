@@ -843,6 +843,7 @@ AnmId AnmManager::store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused)
     return result;
 }
 
+// TODO: the original keeps the critical section flag in bl across the lookup.
 // FUNCTION: TH16 0x46f8f0
 HARNESS_CALLED AnmId AnmManager::restore_snapshot(AnmId id)
 {
@@ -856,6 +857,7 @@ HARNESS_CALLED AnmId AnmManager::restore_snapshot(AnmId id)
     return restore_snapshot_vm(snapshot, NULL);
 }
 
+// TODO: the original stores unk_5b0 after loading the parent's parent.
 // FUNCTION: TH16 0x46f970
 AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
 {
@@ -891,9 +893,8 @@ AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
     }
     if (parent != NULL)
     {
-        AnmVm *root = parent->parent;
         vm->unk_5b0 = parent;
-        vm->parent = root != NULL ? root : parent;
+        vm->parent = parent->parent != NULL ? parent->parent : parent;
         parent->list_of_children.insert_after(&vm->node_as_child);
     }
     LEAVE_CS(CS_ANM_MANAGER);
