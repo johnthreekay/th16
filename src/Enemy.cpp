@@ -12,6 +12,7 @@
 #include "Laser.h"
 #include "Player.h"
 #include "Rng.h"
+#include "Supervisor.h"
 #include "UpdateFunc.h"
 
 static_assert(sizeof(PosVel) == 0x44, "PosVel size");
@@ -626,3 +627,121 @@ HARNESS_CALLED LaserDataInf *LaserManager::find_by_id(i32 id, i32 unused)
 
 // GLOBAL: TH16 0x4917b8
 EnemyFuncSetFunc const g_ecl_func_sets[3] = {NULL, ecl_funcset_cancel_near_player, ecl_funcset_zero_power};
+
+// FUNCTION: TH16 0x41d1e0
+int EnemyInf::on_tick()
+{
+    if (enemy.slowdown <= 0.0f)
+    {
+        if (enemy.flags_high & 1)
+        {
+            for (i32 i = 0; i < 16; i++)
+            {
+                AnmVm *vm = get_vm_or_clear(enemy.anm_ids[i]);
+                if (vm != NULL)
+                {
+                    vm->slowdown = 0.0f;
+                }
+            }
+        }
+        return enemy.on_tick();
+    }
+    f32 game_speed = g_game_speed;
+    f32 speed = game_speed - enemy.slowdown * game_speed;
+    speed = 0.0f > speed ? 0.0f : speed;
+    g_game_speed = 1.0f < speed ? 1.0f : speed;
+    for (i32 i = 0; i < 16; i++)
+    {
+        AnmVm *vm = get_vm_or_clear(enemy.anm_ids[i]);
+        if (vm != NULL)
+        {
+            vm->slowdown = enemy.slowdown;
+        }
+    }
+    int result = enemy.on_tick();
+    g_game_speed = game_speed;
+    enemy.flags_high |= 1;
+    return result;
+}
+
+// TODO: the original keeps the summed position in xmm1-3 across find_or_clear (LTCG knows the
+// stubbed get_vm_with_id leaves them alone) and saves ebx/edi up front.
+// FUNCTION: TH16 0x41d2e0
+int EnemyData::on_tick()
+{
+    if (flags_low & 0x40000)
+    {
+        return 0;
+    }
+    flags_low |= 0x40000;
+    if (step_interpolators() != 0)
+    {
+        return -1;
+    }
+    if (full->run_ecl(*g_timer_speed_ptrs[time_in_ecl.speed_index]) != 0)
+    {
+        return -1;
+    }
+    if (func_from_ecl_func_set != NULL && ((EnemyFuncSetFunc)func_from_ecl_func_set)(this) != 0)
+    {
+        return -1;
+    }
+    if (step_logic() != 0)
+    {
+        return -1;
+    }
+    update_fog();
+    if (!(flags_low & 0x4000000))
+    {
+        for (i32 i = 0; i < 14; i++)
+        {
+            AnmVm *vm = get_vm_or_clear(anm_ids[i]);
+            if (vm == NULL)
+            {
+                continue;
+            }
+            Float3 pos = anm_pos_array[i] + final_pos.pos;
+            if (unk_224[i] >= 0)
+            {
+                AnmVm *base = anm_ids[unk_224[i]].find_or_clear();
+                if (base != NULL)
+                {
+                    pos += base->pos;
+                }
+            }
+            vm->entity_pos = pos;
+            if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
+            {
+                vm->rotation.z = zun_atan2f(final_pos.velocity.y, final_pos.velocity.x);
+                vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
+                rotation = vm->rotation.z;
+            }
+        }
+    }
+    else
+    {
+        for (i32 i = 0; i < 14; i++)
+        {
+            AnmVm *vm = g_AnmManager->get_vm_with_id(anm_ids[i]);
+            if (vm != NULL)
+            {
+                vm->entity_pos = final_pos.pos;
+            }
+        }
+    }
+    if (set_invuln.current > 0)
+    {
+        set_invuln--;
+    }
+    if (no_hitbox_dur.current > 0)
+    {
+        no_hitbox_dur--;
+    }
+    time_alive++;
+    time_in_ecl++;
+    if (drop_season.bonus_timer.current > 0)
+    {
+        drop_season.bonus_timer--;
+    }
+    return 0;
+}

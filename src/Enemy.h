@@ -182,6 +182,13 @@ struct EnemyData
     i32 unk_452c;
 
     EnemyData();
+    // 0x41d2e0. One frame: interpolators, ECL, movement, fog and the
+    // attached VMs. Nonzero once the enemy is gone.
+    int on_tick();
+    // 0x41bb50, 0x41c330, 0x41cbd0: on_tick's steps.
+    int step_interpolators();
+    int step_logic();
+    void update_fog();
     i32 get_int_arg(int index);
     i32 *get_int_arg_ptr(int index);
     f32 get_float_arg(int index);

@@ -2,6 +2,7 @@
 // that are not decompiled yet. Compiled without /GL, so calls into them stay
 // opaque.
 #include "../AnmManager.h"
+#include "../Enemy.h"
 
 // Opaque work for the /GL placeholders in src/placeholder/w3b.cpp.
 int w3b_placeholder_sink(void *object, int value)
@@ -13,4 +14,21 @@ int w3b_placeholder_sink(void *object, int value)
 void AnmManager::unload_anm_46d720(i32 slot)
 {
     unload_anm(slot);
+}
+
+// STUB: TH16 0x41bb50
+int EnemyData::step_interpolators()
+{
+    return 0;
+}
+
+// STUB: TH16 0x41c330
+int EnemyData::step_logic()
+{
+    return 0;
+}
+
+// STUB: TH16 0x41cbd0
+void EnemyData::update_fog()
+{
 }
