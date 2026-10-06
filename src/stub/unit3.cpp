@@ -25,11 +25,6 @@ i8 g_spell_difficulty[0x78];
 // GLOBAL: TH16 0x4a51c4
 u32 g_hardware_input_held_4a51c4;
 
-// STUB: TH16 0x46f270
-void AnmManager::disable_vms_from_anm_file(AnmLoaded *anm)
-{
-}
-
 // STUB: TH16 0x417930
 i32 Spellcard::on_tick_body()
 {

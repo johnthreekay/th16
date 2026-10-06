@@ -655,7 +655,7 @@ AnmId AnmLoaded::create_ui_effect(i32 script, i32 unused, AnmVm **out)
 {
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;
-    AnmVm *vm = AnmManager::allocate_vm();
+    AnmVm *vm = g_AnmManager->allocate_vm();
     if (out != NULL)
     {
         *out = vm;
@@ -667,7 +667,7 @@ AnmId AnmLoaded::create_ui_effect(i32 script, i32 unused, AnmVm **out)
     vm->run();
     vm->mode_of_create_child = 4;
     AnmId id;
-    id = AnmManager::insert_in_ui_list_back(vm);
+    id = g_AnmManager->insert_in_ui_list_back(vm);
     vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
     LEAVE_CS(CS_ANM_MANAGER);
     return id;

@@ -11,6 +11,14 @@ template <class T> struct ZunList
     ZunList<T> *prev;
     ZunList<T> *unk_c;
 
+    void init(T *e)
+    {
+        entry = e;
+        next = NULL;
+        prev = NULL;
+        unk_c = NULL;
+    }
+
     void insert_after(ZunList<T> *node)
     {
         if (next != NULL)
@@ -36,6 +44,21 @@ template <class T> struct ZunList
         last->insert_after(node);
     }
 
+    // unlink, written out where the original has its own copy of it.
+    void unlink_inline()
+    {
+        if (next != NULL)
+        {
+            next->prev = prev;
+        }
+        if (prev != NULL)
+        {
+            prev->next = next;
+        }
+        next = NULL;
+        prev = NULL;
+    }
+
     // Takes the node out of its list. Only ZunList<void> defines it
     // (ZunList.cpp): the original has one copy (0x405610) for every list,
     // and ZunList<void> stands for ExpHP's untyped zLinkedList.
@@ -43,3 +66,5 @@ template <class T> struct ZunList
 };
 
 template <> void ZunList<void>::unlink();
+// 0x425d80. The out-of-line copy of append (most callers inline it).
+template <> void ZunList<void>::append(ZunList<void> *node);

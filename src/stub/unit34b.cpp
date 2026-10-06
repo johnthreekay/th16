@@ -8,22 +8,11 @@
 #include "../Gui.h"
 #include "../StageData.h"
 
-// STUB: TH16 0x46e890
-AnmId __stdcall AnmManager::insert_in_world_list_front(AnmVm *vm)
-{
-    return vm->id;
-}
-
 // STUB: TH16 0x406380
 AnmId AnmLoaded::create_effect(i32 script, i32 layer, AnmVm **out)
 {
     AnmId id;
     return id;
-}
-
-// STUB: TH16 0x46f130
-void __stdcall AnmManager::interrupt_tree_and_run(AnmId id, i32 interrupt)
-{
 }
 
 // GLOBAL: TH16 0x4a6f18
@@ -43,18 +32,6 @@ i32 Gui::on_tick_body()
     return 1;
 }
 
-
-// STUB: TH16 0x46f510
-AnmVm *AnmVm::search_children(i32 script, i32 nth)
-{
-    return NULL;
-}
-
-// STUB: TH16 0x46e940
-AnmId __stdcall AnmManager::insert_in_ui_list_back(AnmVm *vm)
-{
-    return vm->id;
-}
 
 // STUB: TH16 0x406c40
 void AnmVm::get_own_transformed_pos(Float3 *out)

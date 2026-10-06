@@ -207,5 +207,10 @@ class EnemyInf : public SptInf
     int on_tick();
     void set_interrupt(int index, int time, const char *sub);
     void set_timeout(int index, const char *sub);
+    virtual int run_over_300();
+    virtual int get_int_global(int var);
+    virtual int *get_int_global_ptr(int var);
+    virtual f32 get_float_global(int var);
+    virtual f32 *get_float_global_ptr(int var);
     virtual ~EnemyInf();
 };

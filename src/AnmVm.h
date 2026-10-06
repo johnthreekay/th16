@@ -12,6 +12,8 @@
 #include "decomp.h"
 #include "types.h"
 
+struct AnmVm;
+
 // Handle to a running VM, 0 when none. A class in ZUN's code: it is returned
 // through a hidden pointer and constructed to 0 before its owner's memset.
 struct AnmId
@@ -22,6 +24,20 @@ struct AnmId
     {
         id = 0;
     }
+
+    // 0x46f2e0 (ExpHP: anm_find_existing_or_clear_id). Looks the VM up and
+    // forgets the id if it is gone.
+    AnmVm *find_or_clear();
+    // 0x46f300 and 0x46f340. AnmVm::set/clear_flag_lo_2_tree.
+    void set_flag_lo_2_tree();
+    void clear_flag_lo_2_tree();
+    // 0x46f3e0
+    void set_entity_pos(D3DXVECTOR3 *pos);
+    // 0x46f440. Stops the VM and replaces it with a new effect VM running
+    // the given script of the same file.
+    void replace_with_effect(i32 script);
+    // 0x46f5a0. The id of a descendant found by AnmVm::search_children.
+    HARNESS_CALLED AnmId search_children(i32 script, i32 nth);
 };
 
 // A D3DCOLOR whose channels can be reached one by one.
@@ -89,7 +105,10 @@ enum AnmVmFlagsHi
     // Marked for deletion: the manager frees it on its next pass.
     ANM_VM_DELETE_PENDING = 1 << 5,
     ANM_VM_FLAG_HI_40 = 1 << 6,
-    // Already gone; deleting it again does nothing.
+    // Inherited from the parent by managed children.
+    ANM_VM_FLAG_HI_2000000 = 1 << 25,
+    // A copy kept by AnmManager::store_snapshot_of_vm, not a live VM;
+    // deleting it does nothing.
     ANM_VM_FLAG_HI_4000000 = 1 << 26,
 };
 
@@ -140,6 +159,12 @@ struct AnmVm;
 // Script callbacks, selected per VM by the index_of_* fields.
 typedef i32(__fastcall *AnmVmSwitchFunc)(AnmVm *vm, i32 interrupt);
 extern AnmVmSwitchFunc g_anm_on_switch_funcs[4];
+typedef i32(__fastcall *AnmVmFunc)(AnmVm *vm);
+extern AnmVmFunc g_anm_on_destroy_funcs[4];
+// Called with the copy, the original and an extra argument when a VM with
+// extra data is copied (ExpHP: ANM_ON_COPY_FUNC_2).
+typedef i32(__fastcall *AnmVmCopyFunc)(AnmVm *vm, const AnmVm *other, i32 arg);
+extern AnmVmCopyFunc g_anm_on_copy_funcs[2];
 
 // One running ANM script (layout: ExpHP's zAnmVm, flattened, 0x5fc bytes).
 struct AnmVm
@@ -270,11 +295,12 @@ struct AnmVm
     Float3 *transform_coords(Float3 *pos);
     // 0x406c40
     void get_own_transformed_pos(Float3 *out);
-    // 0x46f510. The nth descendant (depth first) running the given script.
+    // 0x46f510. The nth descendant (depth first) running the given script
+    // (unk_49c; -1 for any).
     AnmVm *search_children(i32 script, i32 nth);
     // 0x46f380 and 0x46f3b0 (ExpHP: set/clear_ins_316_flag_recursively).
-    void set_flag_lo_2_tree();
-    void clear_flag_lo_2_tree();
+    HARNESS_CALLED void set_flag_lo_2_tree();
+    HARNESS_CALLED void clear_flag_lo_2_tree();
 
     // The two above with their first level inlined, as LTCG did in some
     // callers.
@@ -333,6 +359,18 @@ struct AnmVm
         }
         pending_interrupt = n;
     }
+
+    void mark_for_deletion()
+    {
+        flags_hi &= ~ANM_VM_FLAG_HI_40;
+        flags_hi |= ANM_VM_DELETE_PENDING;
+    }
+
+    // 0x46f410. set_sprite through the file the VM came from.
+    void set_sprite(i32 sprite);
+    // 0x46fd50 (ExpHP: AnmVm::constructor(const AnmVm&, int)). Copies
+    // another VM's state, but not its place in any list.
+    void copy_from(const AnmVm &other, i32 arg);
 };
 
 // out = in / (640, 480), clamped at 0.

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <string.h>
+
 #include "AnmVm.h"
+#include "Thread.h"
 #include "ZunMath.h"
 #include "decomp.h"
 #include "types.h"
@@ -25,6 +28,43 @@ struct AnmLoadedSprite
     Float2 unk_3c;
 };
 
+// The texture of one entry of a loaded .anm file (ExpHP: zAnmLoadedD3D).
+struct AnmLoadedD3D
+{
+    IDirect3DTexture9 *texture;
+    void *src_data;
+    u32 src_data_size;
+    i32 bytes_per_pixel;
+    void *entry;
+    i32 flags;
+
+    // 0x46f490. Fills the top level of the texture with zeroes.
+    void clear_texture();
+};
+
+// The header of one entry of an .anm file (ExpHP: zAnmRawEntry); the
+// pointers are offsets from the header.
+struct AnmRawEntry
+{
+    u32 version;
+    u16 num_sprites;
+    u16 num_scripts;
+    u16 unk_8;
+    u16 width;
+    u16 height;
+    u16 format;
+    u32 image_path;
+    u16 offset_x;
+    u16 offset_y;
+    u32 memory_priority;
+    u32 texture;
+    u8 has_data;
+    u8 unk_21;
+    u16 low_res_scale;
+    u32 offset_to_next;
+    u32 unused[6];
+};
+
 // One loaded ANM file.
 struct AnmLoaded
 {
@@ -38,12 +78,22 @@ struct AnmLoaded
     i32 sprite_count;
     AnmLoadedSprite *sprites;
     u8 **scripts;
-    void *d3d;
+    // One per entry.
+    AnmLoadedD3D *d3d;
+    // Nonzero while the textures are still being created: the index (plus
+    // one) of the next entry to set up.
     i32 load_wait;
-    u8 unk_12c[0x134 - 0x12c];
+    // Set to have sub_46d690 unload the file.
+    i32 unload_requested;
+    u8 unk_130[0x134 - 0x130];
     // Counts VMs created from this file.
     i32 vm_count;
-    u8 unk_138[0x13c - 0x138];
+    void *unk_138;
+
+    AnmLoaded()
+    {
+        memset(this, 0, sizeof(AnmLoaded));
+    }
 
     // Points the VM at a sprite: UVs, size and texture matrices. -1 if the
     // file is not loaded.
@@ -61,14 +111,19 @@ struct AnmLoaded
     // 0x40e5c0. Creates a VM running the script at pos (entity_pos), with
     // the given z rotation, on the given layer unless negative.
     HARNESS_CALLED AnmId create_vm(i32 script, Float3 *pos, f32 rotation, i32 layer, i32 unused);
-    // 0x406380. Creates a VM running the script at the origin; also stores
-    // the VM in *out if out is not NULL.
+    // 0x406380. Creates a VM running the script at the origin, on the given
+    // layer unless negative; also stores the VM in *out if out is not NULL.
     AnmId create_effect(i32 script, i32 layer, AnmVm **out);
     // 0x42c920. Like create_effect, for the UI list.
     AnmId create_ui_effect(i32 script, i32 unused, AnmVm **out);
     // 0x426160. Like create_vm at the origin, but inserted at the front of
     // the world list.
     AnmId create_vm_front(i32 script, i32 layer, i32 unused);
+    // 0x46ed60. A child of parent; mode bits 1 and 2 pick the list (see
+    // AnmVm::mode_of_create_child).
+    AnmId create_managed_child(i32 script, AnmVm *parent, i32 mode);
+    // 0x46eea0. A root VM placed like the given one.
+    AnmId create_managed_root(i32 script, AnmVm *like, i32 unused);
 
     void init_vm_with_sprite(AnmVm *vm, i32 sprite)
     {
@@ -81,6 +136,23 @@ struct AnmLoaded
     // destructor: callers reload the pointer for the delete that follows,
     // and that delete has no null check of its own.
     void release();
+    // 0x46cdd0 (ExpHP: AnmManager::do_load_anm). Reads the file and sizes
+    // the tables; 0 on success.
+    i32 load(const char *path);
+    // 0x46d0c0 (ExpHP: load_one_script). Checks an entry and reads its
+    // image file unless the texture is embedded.
+    i32 load_entry(i32 index, AnmRawEntry *entry);
+};
+
+// A VM from the manager's preallocated pool (ExpHP: zAnmFastVm).
+struct AnmFastVm
+{
+    AnmVm vm;
+    ZunList<AnmFastVm> freelist_node;
+    bool is_alive;
+    u8 unk_60d[3];
+    // Index in the pool; the low 13 bits of the VM's id.
+    i32 fast_id;
 };
 
 // Vertex formats of the batched sprites and primitives (ExpHP:
@@ -101,7 +173,8 @@ struct RenderVertex044
 // Loads and runs every ANM file.
 struct AnmManager
 {
-    u8 unk_0[0xc0];
+    ThreadInf thread;
+    u8 unk_1c[0xc0 - 0x1c];
     // Cleared every frame by GameThread's on_draw.
     i32 unk_c0;
     i32 unk_c4;
@@ -109,7 +182,21 @@ struct AnmManager
     i32 unk_cc;
     // Copied from the active camera by Supervisor::swap_transform_matrices.
     Float2 camera_unk_fc;
-    u8 unk_d8[0x184f4f0 - 0xd8];
+    i32 useless_count;
+    // VMs created for the game world and for the UI, in tick order.
+    ZunList<AnmVm> *world_list_head;
+    ZunList<AnmVm> *world_list_tail;
+    ZunList<AnmVm> *ui_list_head;
+    ZunList<AnmVm> *ui_list_tail;
+    AnmFastVm fast_array[0x1fff];
+    // Snapshots of VMs (ExpHP: __lolk_*), kept apart from the live ones.
+    i32 next_snapshot_fast_id;
+    i32 next_snapshot_discriminator;
+    ZunList<AnmVm> snapshot_list_head;
+    AnmFastVm snapshot_fast_array[0x1fff];
+    // Unused entries of fast_array.
+    ZunList<AnmFastVm> freelist_head;
+    u8 unk_184f4ec[4];
     // Indexed by the slot given to preload_anm.
     AnmLoaded *loaded_anms[0x1f];
     D3DMATRIX matrix_184f56c;
@@ -143,6 +230,13 @@ struct AnmManager
     RenderVertex044 primitive_vertex_data[0x8000];
     RenderVertex044 *primitive_write_cursor;
     RenderVertex044 *primitive_render_cursor;
+    AnmVm layer_list_dummy_heads[0x2b];
+    // The upper 19 bits of the next VM id.
+    volatile i32 last_discriminator;
+    u8 unk_1c7fd88[0x1c7fd90 - 0x1c7fd88];
+
+    // 0x46b7d0. Destroys every VM still alive.
+    ~AnmManager();
 
     // Never inlined in the original (over 100 call sites).
     DECOMP_NOINLINE void flush_sprites();
@@ -167,8 +261,9 @@ struct AnmManager
     // anm_unload_46f1c0).
     HARNESS_CALLED void delete_vm(AnmId id);
     // 0x46f220. Marks the VM and its descendants for deletion (ExpHP:
-    // AnmBehemoth::sub_46f220_recursive).
-    void mark_tree_for_delete(AnmVm *vm);
+    // AnmBehemoth::sub_46f220_recursive). Callers keep values in registers
+    // across it, so LTCG has to see the body; never inlined.
+    HARNESS_CALLED void mark_tree_for_delete(AnmVm *vm);
 
     // delete_vm's body. LTCG inlined delete_vm into some callers, with the
     // manager pointer loaded once for several of them.
@@ -189,20 +284,94 @@ struct AnmManager
     void disable_vms_from_anm_file(AnmLoaded *anm);
 
     // Members that do not use this; LTCG dropped it (ret N, no ecx).
-    static void __stdcall interrupt_tree(AnmId id, i32 interrupt);
+    DECOMP_NOINLINE static void __stdcall interrupt_tree(AnmId id, i32 interrupt);
     // 0x46f130. Like interrupt_tree, also running each VM once.
-    static void __stdcall interrupt_tree_and_run(AnmId id, i32 interrupt);
+    DECOMP_NOINLINE static void __stdcall interrupt_tree_and_run(AnmId id, i32 interrupt);
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *path);
+    // 0x46cf80. Loads a file into a slot without waiting for its textures.
+    AnmLoaded *do_preload_anm(i32 slot, const char *path);
+    // 0x46d1c0. Creates the textures of the next entry, or the prototype
+    // VMs once all are done.
+    static AnmLoaded *__stdcall load_next_entry(AnmLoaded *anm);
     // Frees ANM files marked for unloading; nonzero while one is still busy.
-    static i32 sub_46d690();
-    // 0x46f600. Reaches the manager through g_AnmManager.
-    static AnmVm *allocate_vm();
-    // 0x46e7d0. Reaches the manager through g_AnmManager.
-    static AnmId __stdcall insert_in_world_list_back(AnmVm *vm);
-    // 0x46e940. Reaches the manager through g_AnmManager.
-    static AnmId __stdcall insert_in_ui_list_back(AnmVm *vm);
-    // 0x46e890. Reaches the manager through g_AnmManager.
-    static AnmId __stdcall insert_in_world_list_front(AnmVm *vm);
+    // Every caller goes through g_AnmManager (see the list inserts).
+    HARNESS_CALLED i32 sub_46d690();
+    // 0x46f600. A VM from the pool, or a new one when the pool is used up.
+    // Every caller goes through g_AnmManager (see the list inserts).
+    HARNESS_CALLED AnmVm *allocate_vm();
+    // 0x46f720. The same for snapshots; hands out the snapshot's id.
+    AnmVm *allocate_snapshot_vm(i32 *id);
+    // 0x46f810. Copies the VM and its children into snapshots.
+    AnmId store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused);
+    // 0x46f8f0. Brings a stored snapshot back to life as a new VM tree.
+    // Every caller goes through g_AnmManager (see the list inserts).
+    HARNESS_CALLED AnmId restore_snapshot(AnmId id);
+    // 0x46f970. Copies a snapshot and its children back into live VMs.
+    AnmId restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent);
+    // 0x46e7d0 and the next three. Every caller goes through g_AnmManager,
+    // so LTCG replaced this with a load of the global (and kept its stack
+    // slot). They hand out the VM's new id.
+    HARNESS_CALLED AnmId insert_in_world_list_back(AnmVm *vm);
+    HARNESS_CALLED AnmId insert_in_world_list_front(AnmVm *vm);
+    HARNESS_CALLED AnmId insert_in_ui_list_back(AnmVm *vm);
+    HARNESS_CALLED AnmId insert_in_ui_list_front(AnmVm *vm);
+    // get_vm_with_id for snapshots.
+    HARNESS_CALLED AnmVm *get_snapshot_vm_with_id(AnmId id);
+    // UpdateFunc callbacks that run the VMs of each list and rebuild the
+    // per-layer draw lists.
+    DECOMP_NOINLINE static i32 __fastcall tick_world(AnmManager *mgr);
+    DECOMP_NOINLINE static i32 __fastcall tick_ui(AnmManager *mgr);
+    static i32 __fastcall on_tick_21(AnmManager *mgr);
+    static i32 __fastcall on_tick_09(AnmManager *mgr);
+    // Moves the VM and its children onto delete_list, once each.
+    void remove_tree(AnmVm *vm, ZunList<AnmVm> *delete_list);
+    // 0x46eab0. Unlinks a VM and returns it to the pool or frees it.
+    i32 destroy_possibly_managed_vm(AnmVm *vm);
+    // 0x46ec90. The same for snapshots.
+    i32 destroy_possibly_managed_snapshot_vm(AnmVm *vm);
+    // 0x46e750. Draws the VMs of one layer; returns 1 for the callbacks.
+    i32 render_layer(i32 layer);
+    // UpdateFunc callbacks that draw one layer each, named after their
+    // priority.
+    static int __fastcall on_draw_05_layer_00(AnmManager *mgr);
+    static int __fastcall on_draw_0a_layer_03(AnmManager *mgr);
+    static int __fastcall on_draw_2d_layer_20(AnmManager *mgr);
+    static int __fastcall on_draw_3a_layer_24(AnmManager *mgr);
+    static int __fastcall on_draw_40_layer_28(AnmManager *mgr);
+    static int __fastcall on_draw_37_layer_36(AnmManager *mgr);
+    static int __fastcall on_draw_41_layer_39(AnmManager *mgr);
+    static int __fastcall on_draw_07_layer_01(AnmManager *mgr);
+    static int __fastcall on_draw_09_layer_02(AnmManager *mgr);
+    static int __fastcall on_draw_0b_layer_04(AnmManager *mgr);
+    static int __fastcall on_draw_0d_layer_05(AnmManager *mgr);
+    static int __fastcall on_draw_10_layer_06(AnmManager *mgr);
+    static int __fastcall on_draw_12_layer_07(AnmManager *mgr);
+    static int __fastcall on_draw_14_layer_08(AnmManager *mgr);
+    static int __fastcall on_draw_15_layer_09(AnmManager *mgr);
+    static int __fastcall on_draw_16_layer_10(AnmManager *mgr);
+    static int __fastcall on_draw_18_layer_11(AnmManager *mgr);
+    static int __fastcall on_draw_1c_layer_13(AnmManager *mgr);
+    static int __fastcall on_draw_1f_layer_14(AnmManager *mgr);
+    static int __fastcall on_draw_20_layer_15(AnmManager *mgr);
+    static int __fastcall on_draw_22_layer_16(AnmManager *mgr);
+    static int __fastcall on_draw_24_layer_17(AnmManager *mgr);
+    static int __fastcall on_draw_27_layer_18(AnmManager *mgr);
+    static int __fastcall on_draw_1b_layer_12(AnmManager *mgr);
+    static int __fastcall on_draw_2a_layer_19(AnmManager *mgr);
+    static int __fastcall on_draw_2e_layer_21(AnmManager *mgr);
+    static int __fastcall on_draw_34_layer_22(AnmManager *mgr);
+    static int __fastcall on_draw_36_layer_23(AnmManager *mgr);
+    static int __fastcall on_draw_4f_layer_30(AnmManager *mgr);
+    static int __fastcall on_draw_52_layer_31(AnmManager *mgr);
+    static int __fastcall on_draw_4d_layer_29(AnmManager *mgr);
+    static int __fastcall on_draw_3d_layer_26(AnmManager *mgr);
+    static int __fastcall on_draw_3e_layer_27(AnmManager *mgr);
+    static int __fastcall on_draw_3b_layer_25(AnmManager *mgr);
+    static int __fastcall on_draw_3c_layer_37(AnmManager *mgr);
+    static int __fastcall on_draw_3f_layer_38(AnmManager *mgr);
+    static int __fastcall on_draw_4e_layer_40(AnmManager *mgr);
+    static int __fastcall on_draw_50_layer_41(AnmManager *mgr);
+    static int __fastcall on_draw_53_layer_42(AnmManager *mgr);
 
     // Frees the ANM file in a slot, if one is loaded there.
     void unload_anm(i32 slot)

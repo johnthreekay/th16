@@ -22,6 +22,41 @@ union EclStackItem
     f32 f;
 };
 
+// What ECL code pushes: a type tag ('i' or 'f') and the value. Locals
+// below the frame base are plain values without a tag.
+struct EclStackEntry
+{
+    char type;
+    u8 unk_1[3];
+    EclStackItem value;
+};
+
+// One instruction (ExpHP: zEclRawInstructionHeader), arguments following.
+struct EclRawInstr
+{
+    i32 time;
+    u16 opcode;
+    u16 total_size;
+    // Bit n set: argument n names a variable rather than a constant.
+    u16 variable_mask;
+    u8 rank_mask;
+    u8 param_count;
+    u8 num_stack_refs;
+    u8 unk_d[3];
+    EclStackItem args[1];
+};
+
+// One extra argument of the call instructions: the type of the value as
+// written ('f'/'g' float, else int), the type the callee wants ('f' float,
+// else int), and the value.
+struct EclCallArg
+{
+    char type_from;
+    char type_to;
+    u8 unk_2[2];
+    EclStackItem value;
+};
+
 // ExpHP: zEclStack.
 struct EclStack
 {
@@ -34,6 +69,12 @@ struct EclStack
         stack_offset = 0;
         base_offset = 0;
     }
+
+    // 0x474810. Opens a call frame with size bytes of locals; -1 when the
+    // stack is full.
+    i32 enter(i32 size);
+    // 0x474860. Closes the frame enter opened.
+    i32 ecl_return();
 };
 
 // One thread of ECL execution (ExpHP: zEclRunContext).
@@ -57,6 +98,28 @@ struct EclRunContext
     i32 *get_int_arg_ptr(int index);
     f32 get_float_arg(int index);
     f32 *get_float_arg_ptr(int index);
+
+    // The same for a value already read from the instruction.
+    i32 get_int_arg_given_value(int index, i32 value);
+    HARNESS_CALLED f32 get_float_arg_given_value(int index, f32 value);
+    // Like the getters above, but a stack reference pops the entry.
+    HARNESS_CALLED i32 pop_int_arg(int index);
+    HARNESS_CALLED f32 pop_float_arg(int index);
+    i32 pop_int_arg_given_value(int index, i32 value);
+    HARNESS_CALLED f32 pop_float_arg_given_value(int index, f32 value);
+
+    // 0x471db0. Starts dest at the subroutine named by the current
+    // instruction's string argument, passing it the arguments after
+    // argument index start; -1 when there is no such subroutine.
+    HARNESS_CALLED i32 call_sub(EclRunContext *dest, i32 start, i32 unused);
+    // 0x472030. Runs this context's instructions for one frame at the
+    // given speed; nonzero once it has finished.
+    HARNESS_CALLED i32 ecl_run(f32 speed);
+
+    // The instruction at cur_location, NULL when there is none.
+    EclRawInstr *current_instr();
+    // 0x4747d0. current_instr, out of line (ExpHP: get_subroutine_ptr).
+    EclRawInstr *get_subroutine_ptr();
 };
 
 // Intrusive list of run contexts (ExpHP: zEclRunContextList).
@@ -155,6 +218,18 @@ class SptInf
     DECOMP_NOINLINE SptInf();
     void free_all_async();
     void reset_run_context();
+    // 0x474430. Starts a new async context running the subroutine named by
+    // the current instruction.
+    i32 create_async(i32 id, i32 start);
+    // 0x473bc0 (ExpHP: Enemy::ecl_run). Runs the main context and every
+    // async for one frame, freeing asyncs that have finished; -1 once the
+    // main context has finished.
+    HARNESS_CALLED i32 run_ecl(f32 speed);
+    // 0x4744e0. The async with the given id, NULL when there is none.
+    EclRunContextList *lookup_async(i32 id);
+    // 0x474890 (ExpHP: Enemy::load_sub_by_name). Restarts the current
+    // context at the start of the named subroutine.
+    int load_sub_by_name(const char *name);
 
     virtual int run_over_300();
     virtual int get_int_global(int var);
@@ -163,3 +238,14 @@ class SptInf
     virtual f32 *get_float_global_ptr(int var);
     virtual ~SptInf();
 };
+
+inline EclRawInstr *EclRunContext::current_instr()
+{
+    if (cur_location.offset_from_first_instruction == -1 || cur_location.subroutine_index == -1)
+    {
+        return NULL;
+    }
+    // Instructions start after the subroutine's 0x10 byte header.
+    return (EclRawInstr *)((u8 *)vm->file_manager->subroutines[cur_location.subroutine_index].bytecode + 0x10 +
+                           cur_location.offset_from_first_instruction);
+}

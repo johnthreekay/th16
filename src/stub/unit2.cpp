@@ -30,18 +30,6 @@ i32 AnmVm::run()
     return 0;
 }
 
-// STUB: TH16 0x46e7d0
-AnmId __stdcall AnmManager::insert_in_world_list_back(AnmVm *vm)
-{
-    return vm->id;
-}
-
-// STUB: TH16 0x46f600
-AnmVm *AnmManager::allocate_vm()
-{
-    return NULL;
-}
-
 // Opaque sink for the /GL placeholders in src/placeholder/unit2.cpp.
 void placeholder_sink(int a, float b)
 {
