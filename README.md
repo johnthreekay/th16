@@ -181,10 +181,12 @@ decompiled code the surroundings it had in the original:
 
 ### Known tooling gaps
 
-- Functions with internal linkage (per-file `static` copies such as the
-  `sincosmul` fsincos helper) and template members cannot be annotated:
-  build.py looks names up among external symbols, and its name parsing does
-  not handle `Interp<Float3>`-style names.
+- Template members cannot be annotated: build.py's name parsing does not
+  handle `Interp<Float3>`-style names. Static functions defined in a .cpp
+  can be (build.py falls back to the static symbol of that object file), but
+  static functions defined in a header, such as the per-file `sincosmul`
+  copies, cannot, and neither can anything annotated inside a header: move
+  an out-of-line copy into a .cpp instead.
 - Comments must go above `// FUNCTION:`, not between it and the signature:
   reccmp then loses the function and build.py may misread the declaration.
 - quickdiff misreports jump thunks and tail jumps; check those with

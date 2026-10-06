@@ -73,7 +73,7 @@ def constant_size(symbol):
     return len(m.group(2)) // 2 if m else None
 
 
-def paired_constants(orig, ours, map_path, pairs_path, md):
+def paired_constants(orig, ours, map_path, pairs_path, md, lib_funcs=frozenset(), calls=None):
     """Original addresses of the constants (__real@..., __xmm@..., string
     literals) that our annotated functions use.
 
@@ -81,7 +81,12 @@ def paired_constants(orig, ours, map_path, pairs_path, md):
     lockstep. Where an operand names a constant in our build, the original's
     operand at the same place is accepted as the same constant only if the
     bytes stored there are identical, so a wrong constant still shows up as
-    a difference."""
+    a difference.
+
+    Direct calls work the same way: a call that goes to a library function
+    in our build (one too small or generic for the pattern scan, such as
+    operator new[]) names the original's call target at the same place.
+    Those land in `calls`."""
     syms = parse_all_symbols(map_path)
     obase, rbase = orig.OPTIONAL_HEADER.ImageBase, ours.OPTIONAL_HEADER.ImageBase
     oimg, rimg = orig.get_memory_mapped_image(), ours.get_memory_mapped_image()
@@ -104,6 +109,10 @@ def paired_constants(orig, ours, map_path, pairs_path, md):
                     continue
                 name = syms.get(rv)
                 if not name:
+                    continue
+                if calls is not None and name in lib_funcs and yo.type == capstone.x86.X86_OP_IMM and (
+                        y.group(capstone.CS_GRP_CALL) or y.group(capstone.CS_GRP_JUMP)):
+                    calls.setdefault(name, ov)
                     continue
                 if name.startswith("??_C@_0"):
                     # Narrow string literal: compare up to the terminator.
@@ -311,7 +320,11 @@ def main():
             rows = {(addr, name, "library") for name, _, addr in found}
             rows |= {(addr, name, "global") for name, addr in globals_found.items()}
             if args.pairs:
-                consts = paired_constants(orig, ours, args.map, args.pairs, md)
+                lib_funcs = frozenset(n for _, n, obj in funcs if ":" in obj)
+                calls = {}
+                consts = paired_constants(orig, ours, args.map, args.pairs, md, lib_funcs, calls)
+                known_lib = {name for _, name, _ in rows}
+                rows |= {(addr, name, "library") for name, addr in calls.items() if name not in known_lib}
                 kinds = {"__real@": "float", "??_C@_0": "string"}
                 rows |= {(addr, name, next((k for p, k in kinds.items() if name.startswith(p)), "global"))
                          for name, addr in consts.items()}

@@ -92,8 +92,9 @@ def compile_all(obj_dir, no_gl=False):
     return [obj for _, obj, _, _ in results]
 
 
-def coff_functions(obj):
-    """External function symbols defined in a (non-/GL) COFF object."""
+def coff_functions(obj, storage_class=2):
+    """Function symbols defined in a (non-/GL) COFF object: external ones by
+    default, static (internal linkage) ones with storage_class=3."""
     data = obj.read_bytes()
     _, _, _, symtab, nsyms, _, _ = struct.unpack_from("<HHIIIHH", data, 0)
     strtab = symtab + 18 * nsyms
@@ -107,7 +108,7 @@ def coff_functions(obj):
             name = data[start:data.index(b"\0", start)]
         else:
             name = raw.rstrip(b"\0")
-        if section > 0 and storage == 2 and typ == 0x20:
+        if section > 0 and storage == storage_class and typ == 0x20:
             out.append(name.decode())
         i += 1 + naux
     return out
@@ -199,9 +200,21 @@ def keepalive_symbols():
     by_name = {}
     for d in decorated:
         by_name.setdefault(qualified.get(d, d), []).append(d)
+    statics = {}
+    for o in objs:
+        for sym in coff_functions(o, storage_class=3):
+            statics.setdefault(o.stem, []).append(sym)
+    static_qualified = undecorate(sorted({d for syms in statics.values() for d in syms}))
     include = []
     for addr, name, src, harness_called in annotated_functions():
         matches = by_name.get(name, [])
+        if not matches:
+            # A function with internal linkage (a per-file static copy) can't
+            # be forced alive with /INCLUDE, but exists wherever it is used.
+            local = [d for d in statics.get(src.stem, []) if static_qualified.get(d, d) == name]
+            if len(local) == 1:
+                include.append((addr, local[0], "static:" + src.stem))
+                continue
         if len(matches) != 1:
             sys.exit(f"{src}: {addr:#x} {name}: {len(matches)} matching symbols {matches}")
         include.append((addr, matches[0], harness_called))
@@ -222,24 +235,33 @@ def synthetic_functions():
             if not m:
                 continue
             name = lines[i + 1].strip().lstrip("/").strip()
-            sdd = re.fullmatch(r"(\w+)::`scalar deleting destructor'", name)
+            sdd = re.fullmatch(r"((?:\w+::)*\w+)::`scalar deleting destructor'", name)
             if not sdd:
                 sys.exit(f"{rel(src)}:{i + 2}: unsupported synthetic function {name!r}")
-            found.append((int(m.group(1), 16), f"??_G{sdd.group(1)}@@"))
+            mangled = "@".join(reversed(sdd.group(1).split("::")))
+            found.append((int(m.group(1), 16), f"??_G{mangled}@@"))
     return found
 
 
 def write_function_map(include, map_path, out_path):
     """build/functions.txt: original address, our address, symbol."""
     ours = {}
+    per_obj = {}
     for line in map_path.read_text(errors="replace").splitlines():
-        m = re.match(r"\s*0001:[0-9a-f]+\s+(\S+)\s+([0-9a-f]{8})\s", line)
+        m = re.match(r"\s*0001:[0-9a-f]+\s+(\S+)\s+([0-9a-f]{8})\s+f?\s*i?\s*(\S+)\.obj", line)
         if m:
-            ours[m.group(1)] = int(m.group(2), 16)
+            ours.setdefault(m.group(1), int(m.group(2), 16))
+            per_obj[(m.group(1), m.group(3))] = int(m.group(2), 16)
     with open(out_path, "w") as f:
-        for addr, sym, _ in include:
-            if addr is not None and sym in ours:
-                f.write(f"{addr:#x} {ours[sym]:#x} {sym}\n")
+        for addr, sym, keep in include:
+            if addr is None:
+                continue
+            if isinstance(keep, str) and keep.startswith("static:"):
+                va = per_obj.get((sym, keep[len("static:"):]))
+            else:
+                va = ours.get(sym)
+            if va is not None:
+                f.write(f"{addr:#x} {va:#x} {sym}\n")
         for addr, prefix in synthetic_functions():
             for sym, va in ours.items():
                 if sym.startswith(prefix):
@@ -252,7 +274,7 @@ def main():
     objs = compile_all(BUILD / "obj")
     include = keepalive_symbols()
     exe = BUILD / "th16.exe"
-    rc, out = tc.run("link", LFLAGS + [f"/INCLUDE:{s}" for _, s, harness in include if not harness] + [
+    rc, out = tc.run("link", LFLAGS + [f"/INCLUDE:{s}" for _, s, keep in include if not keep] + [
         f"/OUT:{tc.winpath(exe)}", f"/PDB:{tc.winpath(exe.with_suffix('.pdb'))}",
         f"/MAP:{tc.winpath(exe.with_suffix('.map'))}",
         *[tc.winpath(o) for o in objs], *LIBS,
