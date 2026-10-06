@@ -51,8 +51,12 @@ committed.
 ```
 
 `quickdiff.py` skips reccmp's PDB parsing, which takes about 25 seconds under
-Wine, so it is the tool for trying source variants quickly. It treats every
-address as equal, so confirm with `compare.py`.
+Wine, so it is the tool for trying source variants quickly. Data addresses
+compare as symbol+offset when the original's address of the symbol is known
+(`// GLOBAL:` annotations, `build/lib.csv`), so wrong offsets into global
+objects show up; unknown data addresses and call targets still count as
+equal, so confirm with `compare.py`. Large structs should carry
+`static_assert(offsetof(...))` checks for their known offsets.
 
 Each decompiled function carries an annotation with its address in the
 original, in [reccmp](https://github.com/isledecomp/reccmp)'s format:
