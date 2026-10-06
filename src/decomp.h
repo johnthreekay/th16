@@ -9,11 +9,13 @@
 #define DECOMP_NOINLINE __declspec(noinline)
 
 // Functions whose callers are all known get a custom calling convention from
-// link-time code generation; for a plain cdecl function that is __fastcall
-// (first two arguments in ecx/edx, callee pops the rest). Our build keeps
-// annotated functions alive with /INCLUDE, which makes them externally
-// visible and so blocks the conversion. LTCG_FASTCALL states the result
-// directly. ZUN's source most likely had no calling convention here.
+// link-time code generation: the first arguments move into ecx/edx, while
+// stack cleanup stays as declared (cdecl: caller pops; thiscall/stdcall:
+// callee pops). A callee-popped function with its first two arguments in
+// ecx/edx looks exactly like __fastcall; in ZUN's source it was most likely
+// a member function whose unused `this` LTCG dropped. Our build keeps
+// annotated functions alive with /INCLUDE, which blocks the conversion, so
+// LTCG_FASTCALL states the result directly.
 #define LTCG_FASTCALL __fastcall
 
 // The same conversion for functions taking or returning floats: LTCG passes
