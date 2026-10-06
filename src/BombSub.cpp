@@ -286,7 +286,7 @@ i32 BombMarisaSubInf::begin()
                         g_release_radius_winter[g_Globals.season_level()] * 0.2f;
     vm->int_vars[3] = g_release_duration_winter[g_Globals.season_level()];
 
-    g_Player->inner.iframes = 10;
+    g_Player->inner.iframes = 30;
     g_EnemyManager->season_releases_active++;
     return 0;
 }
