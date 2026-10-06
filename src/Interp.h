@@ -50,6 +50,9 @@ struct InterpFloat3
     ZunTimer time;
     i32 end_time;
     i32 method;
+
+    // 0x406200
+    void reset_timer();
 };
 
 struct InterpInt
