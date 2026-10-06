@@ -7,9 +7,10 @@
 #include "GameErrorContext.h"
 #include "Supervisor.h"
 
-// The original keeps this UCRT header function out of line (0x405540) and
-// calls it with the folded NULL locale for vsprintf.
-DECOMP_NOINLINE int __CRTDECL _vsprintf_l(char *buffer, const char *format, _locale_t locale, va_list args);
+// The original keeps this UCRT header function out of line (0x405540).
+// Every caller is vsprintf, so LTCG folds the count (-1) away entirely and
+// leaves the NULL locale's slot filled with junk (push ecx).
+DECOMP_NOINLINE int __CRTDECL _vsnprintf_l(char *buffer, size_t count, const char *format, _locale_t locale, va_list args);
 
 // GLOBAL: TH16 0x4a6d98
 AsciiInf *g_AsciiManager;

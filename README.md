@@ -149,9 +149,10 @@ decompiled code the surroundings it had in the original:
   with `continue` for "execute again".
 - UCRT stdio and math helpers (`vsprintf`, `cosf`, `fabsf`, ...) are inline
   functions in the SDK headers, so they are compiled with `/GL` as part of
-  the game and get LTCG conventions like ZUN's code. `_vsprintf_l` stays out
-  of line in the original but not yet in our build, which is why
-  `GameErrorContext::log`/`fatal` do not match yet.
+  the game and get LTCG conventions like ZUN's code. The out-of-line
+  function at 0x405540 is `_vsnprintf_l` (vsprintf's callee in every UCRT
+  version checked: 10240, 14393, 15063) with the count folded away; the
+  `vsprintf` callers still have a 4-byte stack slot ours lack.
 - Polymorphic classes must use ZUN's names: RTTI stores them in the
   executable (`ThreadInf`, `EnemyInf`, ...).
 - LTCG deletes stores to globals that nothing in the program reads, so a
