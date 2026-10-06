@@ -55,3 +55,8 @@ HARNESS_CALLED f32 Rng::randf_neg_1_to_1_times_pi()
 {
     return randf_neg_1_to_1() * ZUN_PI;
 }
+
+// GLOBAL: TH16 0x4a6d80
+Rng g_replay_unsafe_rng;
+// GLOBAL: TH16 0x4a6d88
+Rng g_replay_safe_rng;

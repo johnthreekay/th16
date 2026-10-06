@@ -81,6 +81,23 @@ struct AnmManager
     u8 unk_d8[0x184f4f0 - 0xd8];
     // Indexed by the slot given to preload_anm.
     AnmLoaded *loaded_anms[0x1f];
+    u8 unk_184f56c[0x184fbb0 - 0x184f56c];
+    // The D3D state the sprite code last set, compared before setting it
+    // again. Code that draws without the sprite code resets these so the
+    // next sprite sets everything.
+    i32 render_cache_184fbb0;
+    u8 render_cache_184fbb4;
+    u8 render_cache_184fbb5;
+    u8 render_cache_184fbb6;
+    u8 render_cache_184fbb7;
+    u8 render_cache_184fbb8;
+    u8 unk_184fbb9;
+    u8 render_cache_184fbba;
+    u8 render_cache_184fbbb;
+    u8 render_cache_184fbbc;
+    u8 render_cache_184fbbd;
+    u8 unk_184fbbe[2];
+    i32 render_cache_184fbc0;
 
     void flush_sprites();
     void draw_vm(AnmVm *vm);

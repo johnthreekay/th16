@@ -109,6 +109,10 @@ i32 g_resolution_x;
 i32 g_resolution_y;
 // GLOBAL: TH16 0x4d9d34
 f32 g_screen_coord_scale;
+// GLOBAL: TH16 0x4d9d38
+i32 g_early_arcade_offset_x;
+// GLOBAL: TH16 0x4d9d3c
+i32 g_early_arcade_offset_y;
 // GLOBAL: TH16 0x4d9d40
 i32 g_arcade_height;
 // GLOBAL: TH16 0x4d9d44

@@ -20,3 +20,9 @@ struct Rng
     // randf_neg_1_to_1() * pi. Used by the ECL movement code.
     HARNESS_CALLED f32 randf_neg_1_to_1_times_pi();
 };
+
+// Drives effects that replays do not need to reproduce, such as screen
+// shake from the ECL (ExpHP: REPLAY_UNSAFE_RNG).
+extern Rng g_replay_unsafe_rng;
+// The game's RNG, recorded in replays (ExpHP: REPLAY_SAFE_RNG).
+extern Rng g_replay_safe_rng;

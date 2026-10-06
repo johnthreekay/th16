@@ -48,7 +48,10 @@ struct Supervisor
     u8 unk_10[0x10];
     IDirectInputDevice8A *keyboard;
     IDirectInputDevice8A *joystick;
-    u8 unk_28[0x1ac - 0x28];
+    u8 unk_28[0xdc - 0x28];
+    // The full-window viewport, set by screen effects before they draw.
+    D3DVIEWPORT9 viewport_dc;
+    u8 unk_f4[0x1ac - 0xf4];
     // Render targets for the arcade region while it is drawn at the
     // default resolution (the "@R" surfaces), and the back buffer.
     IDirect3DSurface9 *arcade_surface_0;
@@ -149,6 +152,11 @@ extern i32 g_arcade_width;
 // Where game coordinate (0, 0) is on the arcade surface.
 extern i32 g_game_2d_origin_x;
 extern i32 g_game_2d_origin_y;
+// Where the arcade region sits on the window-sized "@R" surfaces it is
+// drawn to before upscaling: half the scaled window size minus the unscaled
+// arcade size (ExpHP: EARLY_RENDERING_ARCADE_OFFSET_X/Y).
+extern i32 g_early_arcade_offset_x;
+extern i32 g_early_arcade_offset_y;
 
 // The ANM ids Supervisor::sub_43c630/sub_43c6a0 interrupt.
 extern AnmId g_anm_ids_4c0f4c[3];
