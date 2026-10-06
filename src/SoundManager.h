@@ -42,7 +42,40 @@ struct BgmStream
     i32 fade_mode;
 
     void set_volume(i32 volume);
+    // 0x471270 (CSound::Stop).
+    HRESULT stop(i32 unk);
+
+    // Deletes the stream through its virtual destructor.
+    void destroy();
 };
+
+// Only the virtual destructor, so that BgmStream can be deleted the way
+// ZUN's code does it.
+class CStreamingSound
+{
+  public:
+    virtual ~CStreamingSound();
+};
+
+inline void BgmStream::destroy()
+{
+    delete (CStreamingSound *)this;
+}
+
+// A row of the sound effect table.
+struct SoundEffectData
+{
+    i32 id;
+    // Index into g_sound_file_names.
+    i32 file_index;
+    i16 volume;
+    i16 unk_a;
+    i32 unk_c;
+    i32 unk_10;
+};
+
+#define SOUND_EFFECT_COUNT 78
+#define SOUND_QUEUE_SIZE 12
 
 enum BgmCommand
 {
@@ -81,7 +114,15 @@ struct SoundManager
     struct IDirectSoundBuffer *init_sound_buffer;
     HWND game_window;
     struct CSoundManager *manager;
-    u8 unk_10[0x1980 - 0x10];
+    DWORD bgm_thread_id;
+    HANDLE bgm_thread;
+    u8 unk_18[0x1c - 0x18];
+    // Sounds to start this frame (-1 for none), how many times each was
+    // requested (-1 to stop it instead) and their pans.
+    i32 queued_ids[SOUND_QUEUE_SIZE];
+    i32 queued_counts[SOUND_QUEUE_SIZE];
+    i32 queued_pans[SOUND_QUEUE_SIZE][0x80];
+    u8 unk_187c[0x1980 - 0x187c];
     // thbgm.fmt.
     ThBgmFormat *bgm_format;
     // File name of the BGM that select_bgm last switched to.
@@ -91,14 +132,19 @@ struct SoundManager
     u8 *sound_file_data[SOUND_FILE_COUNT];
     u8 unk_22e0[0x5660 - 0x22e0];
     BgmStream *bgm_stream;
-    u8 unk_5664[0x5674 - 0x5664];
+    u8 unk_5664[0x5668 - 0x5664];
+    HANDLE bgm_event;
+    u8 unk_566c[0x5674 - 0x566c];
     HANDLE init_thread;
     HANDLE load_thread;
     DWORD init_thread_id;
     i32 thread_state;
     HWND window;
     i32 init_done;
-    u8 unk_568c[0x5698 - 0x568c];
+    i32 bgm_volume;
+    i32 se_volume;
+    // DirectSound volume (hundredths of dB) for the BGM.
+    i32 bgm_db;
 
     // Queues a command for the sound thread.
     void modify_bgm(i32 command, i32 arg, const char *name);
@@ -113,6 +159,14 @@ struct SoundManager
     // Index of a track in thbgm.fmt by file name (directories ignored), 0
     // if there is none.
     i32 find_bgm(const char *path);
+    // Stops the BGM, ends its streaming thread and frees the stream.
+    void stop_bgm();
+    // Clears the sound queue, stops the sound threads and picks up the
+    // volume settings.
+    i32 reset();
+    // Stops one sound, or every sound when id is negative (remembering
+    // which were playing).
+    void stop_sound(i32 id);
     // Points the BGM stream at another track. Reaches the manager through
     // g_SoundManager; LTCG dropped this.
     i32 select_bgm(const char *path);
@@ -133,5 +187,6 @@ extern SoundManager g_SoundManager;
 // data and stores its size (TH06: GetWavFormatData).
 HARNESS_CALLED WAVEFORMATEX *__stdcall get_wav_chunk(u8 *data, const char *tag, i32 *chunk_size, u32 size);
 extern const char *const g_sound_file_names[SOUND_FILE_COUNT];
+extern SoundEffectData g_sound_effect_table[SOUND_EFFECT_COUNT];
 
 void play_sound_centered_stub(i32 id, i32 unused);

@@ -8,9 +8,4 @@
 #include "../AnmManager.h"
 #include "../SoundManager.h"
 
-// STUB: TH16 0x45e150
-HARNESS_CALLED void SoundManager::play_sound_centered(i32 id, i32 unused)
-{
-    play_sound_centered_stub(id, unused);
-}
 

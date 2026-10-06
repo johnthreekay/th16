@@ -13,11 +13,6 @@
 
 void placeholder_sink(int a, float b);
 
-// STUB: TH16 0x45e1f0
-HARNESS_CALLED void SoundManager::play_sound_at_position(i32 id, f32 x)
-{
-    placeholder_sink(id, x);
-}
 
 // STUB: TH16 0x46f1c0
 HARNESS_CALLED void AnmManager::delete_vm(AnmId id)

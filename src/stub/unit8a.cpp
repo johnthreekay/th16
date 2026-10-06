@@ -12,3 +12,13 @@ HRESULT CWaveFile::open_bgm(ThBgmFormat *track, i32 unk)
 {
     return 0;
 }
+
+// STUB: TH16 0x471270
+HRESULT BgmStream::stop(i32 unk)
+{
+    return 0;
+}
+
+CStreamingSound::~CStreamingSound()
+{
+}

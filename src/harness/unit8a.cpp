@@ -45,3 +45,12 @@ i32 harness_sound_select_bgm(const char *path)
 {
     return g_SoundManager.select_bgm(path);
 }
+
+// Like the sound update and pause code (0x45e330, 0x43e5f0).
+void harness_sound_misc(i32 id)
+{
+    g_SoundManager.stop_bgm();
+    g_SoundManager.reset();
+    g_SoundManager.stop_sound(id);
+    g_SoundManager.stop_sound(-1);
+}

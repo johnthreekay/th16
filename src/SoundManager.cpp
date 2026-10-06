@@ -5,6 +5,31 @@
 #include "FileSystem.h"
 #include "GameErrorContext.h"
 #include "SoundManager.h"
+#include "Supervisor.h"
+
+// GLOBAL: TH16 0x4a2a30
+SoundEffectData g_sound_effect_table[SOUND_EFFECT_COUNT] = {
+    {0, 0, -1900, 0, 0, 0}, {1, 0, -2100, 0, 0, 0}, {3, 1, -1200, 5, 0, 1}, {4, 1, -1500, 5, 0, 1},
+    {2, 2, -1100, 100, 0, 1}, {28, 3, -700, 100, 0, 1}, {29, 4, -700, 100, 0, 1}, {21, 5, -1900, 50, 0, 1},
+    {22, 6, -2200, 50, 0, 1}, {23, 7, -2400, 50, 0, 1}, {7, 8, -500, 100, 0, 0}, {9, 9, -400, 100, 0, 0},
+    {10, 10, -800, 10, 0, 0}, {32, 11, -1500, 10, 0, 1}, {33, 12, -300, 100, 0, 1}, {27, 5, -1100, 50, 0, 1},
+    {18, 13, -1300, 50, 0, 1}, {19, 14, -1400, 50, 0, 1}, {5, 15, -900, 100, 0, 1}, {34, 16, -880, 0, 0, 1},
+    {36, 39, -880, 0, 0, 1}, {37, 17, -1500, 0, 0, 1}, {24, 5, -300, 20, 0, 1}, {25, 6, -1800, 20, 0, 1},
+    {26, 7, -1800, 20, 0, 1}, {38, 18, -1100, 50, 0, 1}, {39, 19, -1300, 50, 0, 1}, {40, 20, -1500, 50, 0, 1},
+    {11, 21, -500, 100, 0, 1}, {42, 22, -600, 20, 0, 1}, {43, 22, -700, 20, 0, 1}, {76, 65, 0, 20, 0, 1},
+    {13, 23, -100, 90, 0, 1}, {41, 18, -500, 50, 0, 1}, {14, 24, -800, 100, 0, 1}, {15, 25, -800, 100, 0, 1},
+    {35, 26, -500, 0, 0, 1}, {12, 27, -300, 100, 0, 1}, {16, 28, 0, 100, 0, 1}, {44, 29, 0, 100, 0, 1},
+    {45, 29, -600, 100, 0, 1}, {8, 8, -300, 100, 0, 0}, {30, 30, -300, 100, 0, 1}, {31, 31, -300, 100, 0, 1},
+    {17, 32, -100, 100, 0, 1}, {46, 33, 0, 100, 0, 1}, {49, 34, -200, 100, 0, 1}, {47, 35, 0, 100, 0, 1},
+    {48, 36, 0, 100, 0, 1}, {6, 37, -500, 100, 0, 1}, {20, 38, -3000, 0, 1, 1}, {50, 40, -500, 0, 0, 1},
+    {51, 41, 0, 0, 0, 1}, {52, 42, 0, 0, 0, 1}, {53, 42, -300, 0, 0, 1}, {54, 43, -300, 100, 0, 1},
+    {55, 44, -1500, 0, 1, 1}, {56, 45, 0, 100, 0, 1}, {57, 46, -200, 100, 0, 1}, {58, 47, -200, 100, 0, 1},
+    {59, 48, -500, 100, 0, 1}, {60, 49, -500, 100, 0, 1}, {61, 50, -500, 100, 0, 1}, {62, 51, 0, 100, 0, 1},
+    {63, 52, 0, 100, 0, 1}, {64, 53, -900, 5, 0, 1}, {65, 54, -900, 5, 0, 1}, {66, 55, 0, 100, 0, 1},
+    {67, 56, 0, 100, 0, 1}, {68, 57, -2500, 5, 0, 1}, {69, 58, -500, 100, 0, 1}, {70, 59, 0, 100, 0, 1},
+    {71, 60, -400, 0, 0, 1}, {72, 61, -500, 0, 0, 1}, {73, 62, -500, 0, 0, 1}, {74, 63, 0, 100, 0, 1},
+    {75, 64, 0, 100, 0, 1}, {77, 66, 0, 100, 0, 1},
+};
 
 // GLOBAL: TH16 0x491a00
 const char *const g_sound_file_names[SOUND_FILE_COUNT] = {
@@ -203,4 +228,167 @@ i32 SoundManager::select_bgm(const char *path)
     g_SoundManager.bgm_stream->wave_file->open_bgm(&g_SoundManager.bgm_format[i], 0);
     strcpy(g_SoundManager.bgm_name, path);
     return 0;
+}
+
+// FUNCTION: TH16 0x45df60
+void SoundManager::stop_bgm()
+{
+    if (bgm_stream == NULL)
+    {
+        return;
+    }
+    bgm_stream->stop(1);
+    if (bgm_thread != NULL)
+    {
+        PostThreadMessageA(bgm_thread_id, WM_QUIT, 0, 0);
+        while (WaitForSingleObject(bgm_thread, 0x100) != WAIT_OBJECT_0)
+        {
+            PostThreadMessageA(bgm_thread_id, WM_QUIT, 0, 0);
+        }
+        CloseHandle(bgm_thread);
+        CloseHandle(bgm_event);
+        bgm_thread = NULL;
+    }
+    if (bgm_stream != NULL)
+    {
+        bgm_stream->destroy();
+        bgm_stream = NULL;
+    }
+}
+
+// TODO: the inlined stop_threads keeps Sleep in ebx; the original calls it through the import each time.
+// FUNCTION: TH16 0x45e000
+i32 SoundManager::reset()
+{
+    for (i32 i = 0; i < SOUND_QUEUE_SIZE; i++)
+    {
+        queued_ids[i] = -1;
+    }
+    stop_threads();
+    if (manager == NULL)
+    {
+        return -1;
+    }
+    if (dsound == NULL)
+    {
+        return 0;
+    }
+    bgm_volume = g_Supervisor.config.bgm_volume;
+    se_volume = g_Supervisor.config.se_volume;
+    if (se_volume != 0)
+    {
+        f32 x = bgm_volume / 100.0f;
+        f32 t = (1.0f - x) * (1.0f - x);
+        f32 u = 1.0f - t * t;
+        bgm_db = -5000 - (i32)(u * -5000.0f);
+    }
+    else
+    {
+        bgm_db = -10000;
+    }
+    return 0;
+}
+
+// TODO: the original stores the new slot's pan before its count, keeping i in eax.
+// FUNCTION: TH16 0x45e150
+HARNESS_CALLED void SoundManager::play_sound_centered(i32 id, i32 unused)
+{
+    i32 unk = g_sound_effect_table[id].unk_a;
+    i32 i;
+    for (i = 0; i < SOUND_QUEUE_SIZE; i++)
+    {
+        if (g_SoundManager.queued_ids[i] < 0)
+        {
+            break;
+        }
+        if (g_SoundManager.queued_ids[i] == id)
+        {
+            if (g_SoundManager.queued_counts[i] < 60 && g_SoundManager.queued_counts[i] >= 0)
+            {
+                g_SoundManager.queued_pans[i][g_SoundManager.queued_counts[i]] = 0;
+                g_SoundManager.queued_counts[i]++;
+            }
+            return;
+        }
+    }
+    if (i >= SOUND_QUEUE_SIZE)
+    {
+        return;
+    }
+    g_SoundManager.queued_ids[i] = id;
+    g_SoundManager.queued_counts[i] = 1;
+    g_SoundManager.queued_pans[i][0] = 0;
+    g_SoundManager.sound_buffers[id].unk_4 = unk;
+}
+
+// TODO: the original keeps i in ecx and copies it for the pan index instead of precomputing i * 4.
+// FUNCTION: TH16 0x45e1f0
+HARNESS_CALLED void SoundManager::play_sound_at_position(i32 id, f32 x)
+{
+    i32 pan = x * 1000.0f / 192.0f;
+    i32 unk = g_sound_effect_table[id].unk_a;
+    i32 i;
+    for (i = 0; i < SOUND_QUEUE_SIZE; i++)
+    {
+        if (g_SoundManager.queued_ids[i] < 0)
+        {
+            break;
+        }
+        if (g_SoundManager.queued_ids[i] == id)
+        {
+            if (g_SoundManager.queued_counts[i] < 60 && g_SoundManager.queued_counts[i] >= 0)
+            {
+                g_SoundManager.queued_pans[i][g_SoundManager.queued_counts[i]] = pan;
+                g_SoundManager.queued_counts[i]++;
+            }
+            return;
+        }
+    }
+    if (i >= SOUND_QUEUE_SIZE)
+    {
+        return;
+    }
+    g_SoundManager.queued_ids[i] = id;
+    g_SoundManager.queued_pans[i][0] = pan;
+    g_SoundManager.queued_counts[i] = 1;
+    g_SoundManager.sound_buffers[id].unk_4 = unk;
+}
+
+// FUNCTION: TH16 0x45e2a0
+void SoundManager::stop_sound(i32 id)
+{
+    if (id < 0)
+    {
+        for (i32 i = 0; i < 0x4e; i++)
+        {
+            g_SoundManager.sound_buffers[i].unk_14 = 0;
+            if (g_SoundManager.sound_buffers[i].buffer != NULL)
+            {
+                DWORD status;
+                g_SoundManager.sound_buffers[i].buffer->GetStatus(&status);
+                g_SoundManager.sound_buffers[i].unk_14 = status & DSBSTATUS_PLAYING;
+                g_SoundManager.sound_buffers[i].buffer->Stop();
+            }
+        }
+        return;
+    }
+    i32 i;
+    for (i = 0; i < SOUND_QUEUE_SIZE; i++)
+    {
+        if (g_SoundManager.queued_ids[i] < 0)
+        {
+            break;
+        }
+        if (g_SoundManager.queued_ids[i] == id)
+        {
+            g_SoundManager.queued_counts[i] = -1;
+            return;
+        }
+    }
+    if (i >= SOUND_QUEUE_SIZE)
+    {
+        return;
+    }
+    g_SoundManager.queued_ids[i] = id;
+    g_SoundManager.queued_counts[i] = -1;
 }
