@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 #include "AnmVm.h"
 #include "Thread.h"
 #include "ZunMath.h"
@@ -40,6 +42,29 @@ struct AnmLoadedD3D
     void clear_texture();
 };
 
+// The header of one entry of an .anm file (ExpHP: zAnmRawEntry); the
+// pointers are offsets from the header.
+struct AnmRawEntry
+{
+    u32 version;
+    u16 num_sprites;
+    u16 num_scripts;
+    u16 unk_8;
+    u16 width;
+    u16 height;
+    u16 format;
+    u32 image_path;
+    u16 offset_x;
+    u16 offset_y;
+    u32 memory_priority;
+    u32 texture;
+    u8 has_data;
+    u8 unk_21;
+    u16 low_res_scale;
+    u32 offset_to_next;
+    u32 unused[6];
+};
+
 // One loaded ANM file.
 struct AnmLoaded
 {
@@ -55,11 +80,20 @@ struct AnmLoaded
     u8 **scripts;
     // One per entry.
     AnmLoadedD3D *d3d;
+    // Nonzero while the textures are still being created: the index (plus
+    // one) of the next entry to set up.
     i32 load_wait;
-    u8 unk_12c[0x134 - 0x12c];
+    // Set to have sub_46d690 unload the file.
+    i32 unload_requested;
+    u8 unk_130[0x134 - 0x130];
     // Counts VMs created from this file.
     i32 vm_count;
-    u8 unk_138[0x13c - 0x138];
+    void *unk_138;
+
+    AnmLoaded()
+    {
+        memset(this, 0, sizeof(AnmLoaded));
+    }
 
     void set_sprite(AnmVm *vm, i32 sprite);
     // 0x407b20
@@ -89,6 +123,12 @@ struct AnmLoaded
     // destructor: callers reload the pointer for the delete that follows,
     // and that delete has no null check of its own.
     void release();
+    // 0x46cdd0 (ExpHP: AnmManager::do_load_anm). Reads the file and sizes
+    // the tables; 0 on success.
+    i32 load(const char *path);
+    // 0x46d0c0 (ExpHP: load_one_script). Checks an entry and reads its
+    // image file unless the texture is embedded.
+    i32 load_entry(i32 index, AnmRawEntry *entry);
 };
 
 // A VM from the manager's preallocated pool (ExpHP: zAnmFastVm).
@@ -182,8 +222,14 @@ struct AnmManager
     // Members that do not use this; LTCG dropped it (ret N, no ecx).
     static void __stdcall interrupt_tree(AnmId id, i32 interrupt);
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *path);
+    // 0x46cf80. Loads a file into a slot without waiting for its textures.
+    AnmLoaded *do_preload_anm(i32 slot, const char *path);
+    // 0x46d1c0. Creates the textures of the next entry, or the prototype
+    // VMs once all are done.
+    static AnmLoaded *__stdcall load_next_entry(AnmLoaded *anm);
     // Frees ANM files marked for unloading; nonzero while one is still busy.
-    static i32 sub_46d690();
+    // Every caller goes through g_AnmManager (see the list inserts).
+    HARNESS_CALLED i32 sub_46d690();
     // 0x46f600. A VM from the pool, or a new one when the pool is used up.
     // Every caller goes through g_AnmManager (see the list inserts).
     HARNESS_CALLED AnmVm *allocate_vm();

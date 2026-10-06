@@ -23,11 +23,6 @@ i32 unit5_placeholder(void *object)
     return object != NULL;
 }
 
-// STUB: TH16 0x46d770
-void AnmLoaded::release()
-{
-}
-
 // STUB: TH16 0x402440
 u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size, i32 not_in_archive)
 {

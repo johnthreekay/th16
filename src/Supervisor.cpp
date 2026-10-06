@@ -392,7 +392,7 @@ int __fastcall Supervisor::on_tick(void *arg)
     SoundManager::update_sound_thread();
     SoundManager::tick_bgm_fade();
     read_keyboard_input();
-    if (AnmManager::sub_46d690())
+    if (g_AnmManager->sub_46d690())
     {
         return UPDATE_FUNC_EXIT_SUCCESS;
     }
