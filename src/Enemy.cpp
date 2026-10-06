@@ -1,0 +1,182 @@
+#include "Enemy.h"
+
+static_assert(sizeof(PosVel) == 0x44, "PosVel size");
+static_assert(sizeof(EnemyBulletShooter) == 0x380, "EnemyBulletShooter size");
+static_assert(sizeof(EnemyData) == 0x4530, "EnemyData size");
+static_assert(sizeof(EnemyInf) == 0x574c, "EnemyInf size");
+static_assert(sizeof(EnemyManager) == 0x190, "EnemyManager size");
+
+// FUNCTION: TH16 0x41a6d0
+i32 EnemyLife::receive_damage(i32 damage)
+{
+    total_damage_including_ignored += damage;
+    if (is_spell & 1)
+    {
+        current_scaled_by_seven -= damage;
+        return current = (current_scaled_by_seven - starting_value_for_next_attack * 7) / 7 +
+                         starting_value_for_next_attack;
+    }
+    return current -= damage;
+}
+
+// SYNTHETIC: TH16 0x41a760
+// EnemyInf::`scalar deleting destructor'
+
+// FUNCTION: TH16 0x41a790
+EnemyData::EnemyData()
+{
+}
+
+// TODO: the memset arguments for drops are pushed a few stores later in the original.
+// FUNCTION: TH16 0x41b580
+EnemyInf::EnemyInf(const char *sub_name)
+{
+    memset(&enemy, 0, sizeof(enemy));
+    reset_run_context();
+    enemy.full = this;
+    enemy.abs_pos_i.end_time = 0;
+    enemy.rel_pos_i.end_time = 0;
+    enemy.abs_angle_i.end_time = 0;
+    enemy.rel_angle_i.end_time = 0;
+    enemy.abs_speed_i.end_time = 0;
+    enemy.rel_speed_i.end_time = 0;
+    enemy.abs_radial_dist_i.end_time = 0;
+    enemy.rel_radial_dist_i.end_time = 0;
+    enemy.abs_ellipse_i.end_time = 0;
+    enemy.rel_ellipse_i.end_time = 0;
+    enemy.hit_sound = -1;
+    enemy.death_anm_script = 0;
+    memset(&enemy.final_pos, 0, sizeof(PosVel) * 3);
+    enemy.hurtbox_size.x = 24.0f;
+    enemy.hurtbox_size.y = 24.0f;
+    enemy.hitbox_size.x = 24.0f;
+    enemy.hitbox_size.y = 24.0f;
+    enemy.rotation = 0.0f;
+    enemy.own_boss_id = -1;
+    enemy.node_in_global_storage.entry = this;
+    enemy.node_in_global_storage.next = NULL;
+    enemy.node_in_global_storage.prev = NULL;
+    enemy.node_in_global_storage.unk_c = NULL;
+    enemy.drops.reset();
+    enemy.time_in_ecl.initialize();
+    enemy.time_in_ecl.set(0);
+    enemy.time_alive.initialize();
+    enemy.time_alive.set(0);
+    enemy.set_invuln.initialize();
+    enemy.set_invuln.set(0);
+    enemy.no_hitbox_dur.initialize();
+    enemy.no_hitbox_dur.set(0);
+    enemy.anm_layers = 1;
+    on_death_callback = NULL;
+    enemy.set_death[0] = '\0';
+    enemy_id = g_EnemyManager->inner.next_enemy_id;
+    g_EnemyManager->inner.last_enemy_id = g_EnemyManager->inner.next_enemy_id;
+    // Skip 0, which means "no enemy".
+    g_EnemyManager->inner.next_enemy_id =
+        g_EnemyManager->inner.next_enemy_id + 1 == 0 ? 1 : g_EnemyManager->inner.next_enemy_id + 1;
+    enemy.slowdown = 0.0f;
+    unk_5748 = 0;
+    file_manager = g_EnemyManager->file_manager;
+    context.current_context->cur_location.subroutine_index = file_manager->find_sub_by_name(sub_name);
+    context.current_context->cur_location.offset_from_first_instruction = 0;
+    context.current_context->time = 0.0f;
+    enemy.life.is_spell &= ~2;
+    enemy.life.current = 0;
+    enemy.life.maximum = 0;
+    enemy.life.remaining_for_cur_attack = 0;
+    enemy.life.total_damage_including_ignored = 0;
+    for (int i = 0; i < 8; i++)
+    {
+        enemy.interrupts[i].life = -1;
+        enemy.interrupts[i].time = -1;
+        enemy.interrupts[i].sub_for_set_next[0] = '\0';
+    }
+    for (int i = 0; i < 16; i++)
+    {
+        enemy.unk_224[i] = -1;
+    }
+    enemy.bomb_damage_multiplier = 1.0f;
+    enemy.unk_452c = 0;
+}
+
+// FUNCTION: TH16 0x41a8c0
+int EnemyManager::get_enemy_count()
+{
+    int count = 0;
+    EnemyList *node = g_EnemyManager->active_enemy_list_head;
+    EnemyList *next;
+    for (; node != NULL; node = next)
+    {
+        next = node->next;
+        EnemyInf *enemy = node->entry;
+        BOOL ignored = (enemy->enemy.flags_low & 0x31) || enemy->enemy.set_invuln.current > 0 ? TRUE : FALSE;
+        if (!ignored)
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+// TODO: the original reserves an unused stack slot (push ecx).
+// FUNCTION: TH16 0x41a910
+void EnemyManager::set_boss_id(int index, EnemyInf *enemy)
+{
+    EnemyManager *mgr = g_EnemyManager;
+    if (enemy != NULL)
+    {
+        mgr->inner.boss_ids[index] = enemy->enemy_id;
+    }
+    else
+    {
+        mgr->inner.boss_ids[index] = 0;
+    }
+}
+
+// TODO: the original reserves an unused stack slot (push ecx).
+// FUNCTION: TH16 0x41a950
+void EnemyManager::set_boss_bit(int value)
+{
+    g_EnemyManager->inner.boss_bit = value;
+}
+
+// FUNCTION: TH16 0x41a980
+BOOL EnemyManager::is_enemy_alive(int id)
+{
+    if (id == 0)
+    {
+        return FALSE;
+    }
+    for (EnemyList *node = g_EnemyManager->active_enemy_list_head; node != NULL; node = node->next)
+    {
+        if (node->entry->enemy_id == id)
+        {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+// FUNCTION: TH16 0x41a9c0
+EnemyInf *EnemyManager::find_enemy_by_id(int id)
+{
+    EnemyInf *enemy = NULL;
+    if (id == 0)
+    {
+        return NULL;
+    }
+    EnemyList *node = g_EnemyManager->active_enemy_list_head;
+    while (node != NULL)
+    {
+        enemy = node->entry;
+        if (enemy->enemy_id == id)
+        {
+            return enemy;
+        }
+        node = node->next;
+    }
+    return enemy;
+}
+
+// GLOBAL: TH16 0x4a6dc0
+EnemyManager *g_EnemyManager;
