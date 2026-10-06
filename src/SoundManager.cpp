@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "CriticalSections.h"
 #include "FileSystem.h"
 #include "GameErrorContext.h"
 #include "SoundManager.h"
@@ -389,4 +390,85 @@ void SoundManager::stop_sound(i32 id)
     }
     g_SoundManager.queued_ids[i] = id;
     g_SoundManager.queued_counts[i] = -1;
+}
+
+// TODO: ours merges the two SetVolume calls into one; the original keeps both.
+// FUNCTION: TH16 0x45e8d0
+void SoundBufferEntry::play(i32 pan)
+{
+    if (buffer == NULL)
+    {
+        return;
+    }
+    buffer->Stop();
+    buffer->SetCurrentPosition(0);
+    buffer->SetPan(pan);
+    this->pan = pan;
+    if (g_SoundManager.se_volume != 0)
+    {
+        f32 x = g_SoundManager.se_volume / 100.0f;
+        f32 t = (1.0f - x) * (1.0f - x) * (1.0f - x);
+        f32 u = 1.0f - t;
+        buffer->SetVolume((i32)(u * (data->volume + 5000)) - 5000);
+    }
+    else
+    {
+        buffer->SetVolume(-10000);
+    }
+    buffer->Play(0, 0, data->play_flags);
+}
+
+// TODO: the stubbed refill call keeps its argument (the original pushes junk for the folded one) and PeekMessageA/MsgWaitForMultipleObjects are cached differently.
+// FUNCTION: TH16 0x45ec50
+DWORD WINAPI SoundManager::bgm_thread_proc(void *arg)
+{
+    BOOL done = FALSE;
+    MSG msg;
+    do
+    {
+        DWORD result = MsgWaitForMultipleObjects(1, &g_SoundManager.bgm_event, FALSE, INFINITE, QS_ALLEVENTS);
+        if (g_SoundManager.bgm_stream == NULL)
+        {
+            done = TRUE;
+        }
+        switch (result)
+        {
+        case WAIT_OBJECT_0:
+            if (g_SoundManager.bgm_stream != NULL && g_SoundManager.bgm_stream->unk_50 != 0)
+            {
+                g_SoundManager.bgm_stream->refilling = 1;
+                g_SoundManager.bgm_stream->handle_wave_stream_notification(0);
+                g_SoundManager.bgm_stream->refilling = 0;
+            }
+            break;
+        case WAIT_OBJECT_0 + 1:
+            while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE))
+            {
+                if (msg.message == WM_QUIT)
+                {
+                    done = TRUE;
+                }
+            }
+            break;
+        }
+    } while (!done);
+    return 0;
+}
+
+// FUNCTION: TH16 0x45ed00
+void SoundManager::modify_bgm(i32 command, i32 arg, const char *name)
+{
+    ENTER_CS(CS_SOUND);
+    for (i32 i = 0; i < 0x1f; i++)
+    {
+        if (bgm_commands[i].command == 0)
+        {
+            bgm_commands[i].command = command;
+            bgm_commands[i].arg = arg;
+            strcpy(bgm_commands[i].name, name);
+            bgm_commands[i].unk_8 = 0;
+            break;
+        }
+    }
+    LEAVE_CS(CS_SOUND);
 }

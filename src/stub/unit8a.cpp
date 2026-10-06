@@ -57,3 +57,9 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
 void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
 {
 }
+
+// STUB: TH16 0x4714c0
+HRESULT BgmStream::handle_wave_stream_notification(i32 unused)
+{
+    return 0;
+}

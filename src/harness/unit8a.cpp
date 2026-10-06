@@ -68,3 +68,9 @@ void harness_anm_reset_vertex_buffers()
 {
     g_AnmManager->reset_vertex_buffers();
 }
+
+// Like the sound update (0x45e330), which plays queued sounds.
+void harness_sound_play(i32 i, i32 pan)
+{
+    g_SoundManager.sound_buffers[i].play(pan);
+}

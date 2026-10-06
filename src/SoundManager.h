@@ -40,10 +40,18 @@ struct BgmStream
     i32 fade_duration;
     // 1: fade out and stop, 2: fade in, 3/4: like 2/1 but quieter.
     i32 fade_mode;
+    u8 unk_20[0x50 - 0x20];
+    i32 unk_50;
+    u8 unk_54[0x9c - 0x54];
+    // Set while the streaming thread refills the buffer.
+    i32 refilling;
 
     void set_volume(i32 volume);
     // 0x471270 (CSound::Stop).
     HRESULT stop(i32 unk);
+    // 0x4714c0. Refills the part of the buffer that has played. The
+    // argument is the same at every call site; LTCG folded it.
+    HRESULT handle_wave_stream_notification(i32 unused);
 
     // Deletes the stream through its virtual destructor.
     void destroy();
@@ -70,7 +78,8 @@ struct SoundEffectData
     i32 file_index;
     i16 volume;
     i16 unk_a;
-    i32 unk_c;
+    // Play flags (DSBPLAY_LOOPING).
+    i32 play_flags;
     i32 unk_10;
 };
 
@@ -86,16 +95,30 @@ enum BgmCommand
     BGM_FADE_OUT = 5,
 };
 
+struct SoundEffectData;
+
 // One loaded sound effect.
 struct SoundBufferEntry
 {
     struct IDirectSoundBuffer *buffer;
     i32 unk_4;
     // Entry of the sound effect table this slot plays.
-    void *data;
+    SoundEffectData *data;
     i32 id;
-    i32 unk_10;
+    i32 pan;
     i32 unk_14;
+
+    // Restarts the sound at a pan, at the configured volume.
+    void play(i32 pan);
+};
+
+// A request to the sound thread (SoundManager::modify_bgm).
+struct BgmCommandEntry
+{
+    i32 command;
+    i32 arg;
+    i32 unk_8;
+    char name[0x100];
 };
 
 #define SOUND_FILE_COUNT 0x43
@@ -130,7 +153,9 @@ struct SoundManager
     SoundBufferEntry sound_buffers[0x4e];
     // The se_*.wav files, read by the loading thread.
     u8 *sound_file_data[SOUND_FILE_COUNT];
-    u8 unk_22e0[0x5660 - 0x22e0];
+    u8 unk_22e0[0x23e0 - 0x22e0];
+    BgmCommandEntry bgm_commands[0x1f];
+    u8 unk_4594[0x5660 - 0x4594];
     BgmStream *bgm_stream;
     u8 unk_5664[0x5668 - 0x5664];
     HANDLE bgm_event;
@@ -156,6 +181,9 @@ struct SoundManager
     // Thread procedures. ZUN passes these cdecl functions to CreateThread.
     static void thread_init(void *arg);
     static void thread_load_sound_files(void *arg);
+    // Refills the BGM stream when DirectSound signals bgm_event, until it
+    // gets WM_QUIT.
+    static DWORD WINAPI bgm_thread_proc(void *arg);
     // Index of a track in thbgm.fmt by file name (directories ignored), 0
     // if there is none.
     i32 find_bgm(const char *path);
