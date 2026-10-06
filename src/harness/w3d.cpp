@@ -2,6 +2,8 @@
 // PauseMenu, ReplayManager, PopupManager, the title screen) whose shape
 // depends on how the rest of the game calls them.
 #include "../AnmManager.h"
+#include "../MainMenu.h"
+#include "../Supervisor.h"
 #include "../ReplayManager.h"
 #include "../ZunMath.h"
 
@@ -35,4 +37,31 @@ void harness_w3d_replay_start_stage()
 void harness_w3d_replay_begin_stage()
 {
     g_ReplayManager->begin_stage();
+}
+
+// The title menus (0x44c8c0 and others) always interrupt children of
+// anm_ids[0] with 29.
+void harness_w3d_title_interrupt(TitleInf *menu, i32 script)
+{
+    menu->interrupt_child(0, script, 0x1d);
+}
+
+// Supervisor's game mode switch creates and destroys the title screen.
+void harness_w3d_title(i32 create)
+{
+    if (create)
+    {
+        TitleInf::create();
+    }
+    else
+    {
+        TitleInf::destroy();
+    }
+}
+
+// Some code in the original takes the address of g_unk_4d9d90, so stores to
+// it stay in order with stores through pointers (TitleInf::thread_start).
+i32 *harness_w3d_unk_4d9d90()
+{
+    return &g_unk_4d9d90;
 }
