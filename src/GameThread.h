@@ -84,6 +84,8 @@ struct GameThread
     static void thread_start();
     static void thread_start_callback();
     i32 on_tick_body();
+    // 0x418420. Reactivates on_tick and on_draw.
+    void enable_update_funcs();
     static i32 __fastcall on_tick_callback(GameThread *thread);
     static i32 __fastcall on_draw_callback(GameThread *thread);
 };

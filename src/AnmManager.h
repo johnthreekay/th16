@@ -13,7 +13,16 @@ struct AnmLoaded
 {
     i32 slot_num;
     char name[0x104];
-    u8 unk_108[0x134 - 0x108];
+    void *anm_file;
+    AnmVm *vms;
+    i32 entry_count;
+    i32 script_count;
+    i32 sprite_count;
+    void *sprites;
+    u8 **scripts;
+    void *d3d;
+    i32 load_wait;
+    u8 unk_12c[0x134 - 0x12c];
     // Counts VMs created from this file.
     i32 vm_count;
     u8 unk_138[0x13c - 0x138];
@@ -60,8 +69,11 @@ struct AnmManager
     // 0x46efa0
     AnmVm *get_vm_with_id(AnmId id);
     // 0x46f1c0. Marks the VM and its children for deletion. Reaches the
-    // manager through g_AnmManager, so LTCG drops the unused this.
+    // manager through g_AnmManager, so LTCG drops the unused this (ExpHP:
+    // anm_unload_46f1c0).
     HARNESS_CALLED void delete_vm(AnmId id);
+    // 0x46f270 (ExpHP: AnmBehemoth::disable_vms_from_anm_file).
+    void disable_vms_from_anm_file(AnmLoaded *anm);
 
     // Members that do not use this; LTCG dropped it (ret N, no ecx).
     static void __stdcall interrupt_tree(AnmId id, i32 interrupt);

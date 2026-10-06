@@ -295,8 +295,6 @@ i32 BombInf::activate()
     return 0;
 }
 
-// TODO: the inlined tick stores current_f before the join in its else path;
-// the original sinks both stores to the join.
 // FUNCTION: TH16 0x40dd00
 i32 BombInf::update()
 {
@@ -369,14 +367,14 @@ void BombInf::draw()
         }
         u32 colors[7] = {0x60606060, 0xa0b0b080, 0xb0b8b880, 0xc0c0c080, 0xd0d0d080, 0xe0e0e080, 0xffffff30};
         AsciiManager *ascii = g_AsciiManager;
-        ascii->color = colors[release_bonus_level];
+        ascii->color.d3d = colors[release_bonus_level];
         ascii->group = 1;
         ascii->font_id = 2;
         ascii->align_h = 0;
         ascii->align_v = 2;
         ascii->sprintf(&release_bonus_pos, "+%d", (i32)release_bonus_shown / 10 * 10);
-        g_AsciiManager->color = 0xffffffff;
-        g_AsciiManager->color_bytes[3] = 0xff;
+        g_AsciiManager->color.d3d = 0xffffffff;
+        g_AsciiManager->color.a = 0xff;
         g_AsciiManager->font_id = 0;
         g_AsciiManager->group = 0;
         g_AsciiManager->align_h = 1;

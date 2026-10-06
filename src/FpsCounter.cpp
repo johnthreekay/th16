@@ -89,13 +89,13 @@ int FpsCounter::draw()
     {
         color = 0xffffffff;
     }
-    g_AsciiManager->color = color;
+    g_AsciiManager->color.d3d = color;
     D3DXVECTOR3 pos;
     pos.x = 588.0f;
     pos.y = 470.0f;
     pos.z = 0.0f;
     g_AsciiManager->drawf_debug(&pos, "%2.1ffps", fps + 0.05);
-    g_AsciiManager->color = 0xffffffff;
+    g_AsciiManager->color.d3d = 0xffffffff;
     return UPDATE_FUNC_CONTINUE;
 }
 

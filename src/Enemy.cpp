@@ -258,9 +258,9 @@ HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
     {
         active_enemy_list_tail = enemy->enemy.node_in_global_storage.prev;
     }
-    if (unk_188 == node)
+    if (owned_list_188 == node)
     {
-        unk_188 = enemy->enemy.node_in_global_storage.next;
+        owned_list_188 = enemy->enemy.node_in_global_storage.next;
     }
     if (node->next != NULL)
     {

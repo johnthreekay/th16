@@ -13,10 +13,8 @@ struct AsciiManager
     UpdateFunc *on_tick_func;
     UpdateFunc *on_draw_func_1;
     u8 unk_10[0x1920c - 0x10];
-    union {
-        u32 color;
-        u8 color_bytes[4];
-    };
+    // Applies to strings added from now on.
+    ZunColor color;
     u8 unk_19210[0x19224 - 0x19210];
     i32 font_id;
     i32 group;

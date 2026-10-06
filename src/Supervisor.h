@@ -124,6 +124,8 @@ enum SupervisorFlags
 {
     // Read the pad through DirectInput rather than joyGetPosEx.
     SUPERVISOR_USE_DIRECTINPUT_PAD = 1 << 11,
+    // Picks the game mode after the ending (2 if set, else 16).
+    SUPERVISOR_FLAG_2000 = 1 << 13,
 };
 
 extern Supervisor g_Supervisor;

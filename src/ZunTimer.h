@@ -94,18 +94,20 @@ struct ZunTimer
     {
         f32 *speed = this->speed();
         i32 cur = current;
+        f32 cur_f;
         previous = cur;
-        if (speed != NULL && !(*speed > 0.99f && *speed < 1.01f))
+        if (speed == NULL || (*speed > 0.99f && *speed < 1.01f))
         {
-            current_f += *speed;
-            cur = (i32)current_f;
+            cur++;
+            cur_f = current_f + 1.0f;
         }
         else
         {
-            current_f += 1.0f;
-            cur++;
+            cur_f = current_f + *speed;
+            cur = (i32)cur_f;
         }
         current = cur;
+        current_f = cur_f;
     }
 
     // 0x406190. The out-of-line copy of tick. The int is C++'s postfix

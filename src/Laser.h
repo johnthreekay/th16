@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "AnmVm.h"
+#include "BulletManager.h"
 #include "UpdateFunc.h"
 #include "ZunMath.h"
 #include "ZunTimer.h"
@@ -10,14 +11,6 @@
 #include "types.h"
 
 struct AnmLoaded;
-
-// State of one bullet/laser effect slot (ExpHP: zBulletExState).
-struct BulletExState
-{
-    ZunTimer timer;
-    f32 floats[8];
-    i32 ints[5];
-};
 
 // Base of every laser kind. The name is ZUN's, from RTTI. The base methods
 // are almost all empty; the slot names follow ExpHP's zVTableLaser.
@@ -142,17 +135,37 @@ class LaserLineInf : public LaserDataInf
     virtual LaserDataInf *clone();
 };
 
+// Parameters of an infinite laser, filled in by ECL before the laser is
+// created. Layout from ExpHP (zLaserInfiniteInner); his field names say
+// which BulletManager shooter field each one comes from.
 struct LaserInfiniteInner
 {
-    u8 unk_0[0x2c];
+    D3DXVECTOR3 start_pos;
+    u8 unk_c[0x18 - 0xc];
+    f32 ang_aim;
+    f32 laser_st_rotation;
+    f32 laser_new_arg_2;
+    f32 laser_new_arg_1;
+    f32 laser_new_arg_4;
+    // ExpHP: spd1.
     f32 speed;
-    u8 unk_30[0x378 - 0x30];
+    i32 unk_30;
+    i32 unk_34;
+    i32 unk_38;
+    i32 unk_3c;
+    i32 shot_sfx;
+    i32 shot_transform_sfx;
+    i32 laser_st_on_arg_1;
+    f32 distance;
+    u8 unk_50[4];
+    i32 type;
+    i32 color;
+    u32 flags;
+    BulletEx ex[0x12];
 
-    LaserInfiniteInner()
-    {
-        memset(this, 0, sizeof(*this));
-        speed = 8.0f;
-    }
+    // Inlined into LaserInfiniteInf's constructor; the out-of-line copy is
+    // at 0x411860.
+    LaserInfiniteInner();
 };
 
 // VTABLE: TH16 0x4923b8

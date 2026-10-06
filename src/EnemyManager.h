@@ -22,8 +22,9 @@ struct EnemyManagerInner
     i32 bomb_count;
     // Cleared by BombInf (Bomb.cpp).
     i32 can_still_capture_spell;
-    i32 boss_ids[4];
-    u8 unk_4c[0x7c - 0x4c];
+    // Enemy ids of the bosses (0: none). ExpHP has 4 and unknown space up
+    // to 0x7c, which destroy_all clears as 16 ids.
+    i32 boss_ids[16];
     u32 boss_bit : 1;
     i32 enemy_limit;
     i32 next_enemy_id;
@@ -49,7 +50,8 @@ struct EnemyManager
     EclResourceInf *file_manager;
     EnemyList *active_enemy_list_head;
     EnemyList *active_enemy_list_tail;
-    EnemyList *unk_188;
+    // ExpHP: __owned_list_188__always_empty.
+    EnemyList *owned_list_188;
     i32 enemy_count_real;
 
     EnemyManager()
@@ -74,6 +76,8 @@ struct EnemyManager
     DECOMP_NOINLINE int update();
     static int __fastcall on_tick_callback(EnemyManager *mgr);
     static int __fastcall on_draw_callback(EnemyManager *mgr);
+    // Uses g_EnemyManager; callers pass no this.
+    EnemyInf *get_boss(i32 i);
     BOOL is_enemy_alive(int id);
     EnemyInf *find_enemy_by_id(int id);
     HARNESS_CALLED struct EnemyRef find_closest(D3DXVECTOR3 *pos, f32 max_dist);

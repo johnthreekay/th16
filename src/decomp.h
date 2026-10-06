@@ -29,3 +29,10 @@
 // no declarable convention produces). The function must stay out of line
 // for that, hence noinline.
 #define HARNESS_CALLED __declspec(noinline)
+
+// LTCG works out which functions cannot throw and drops the unwind state
+// around calls to them (and around array members built from them). A
+// placeholder in src/stub/ hides the callee's body, so its declaration needs
+// the promise spelled out to keep callers shaped like the original. Remove
+// it once the callee is decompiled.
+#define LTCG_NOTHROW throw()

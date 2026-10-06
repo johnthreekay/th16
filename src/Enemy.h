@@ -6,6 +6,7 @@
 #include "Ecl.h"
 #include "Interp.h"
 #include "UpdateFunc.h"
+#include "ZunList.h"
 #include "ZunTimer.h"
 #include "decomp.h"
 #include "types.h"
@@ -29,13 +30,7 @@ struct PosVel
 };
 
 // ExpHP: zEnemyList.
-struct EnemyList
-{
-    EnemyInf *entry;
-    EnemyList *next;
-    EnemyList *prev;
-    EnemyList *unk_c;
-};
+typedef ZunList<EnemyInf> EnemyList;
 
 // ExpHP: zEnemyBulletShooter.
 struct EnemyBulletShooter

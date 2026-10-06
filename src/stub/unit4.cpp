@@ -51,11 +51,6 @@ int SptResourceInf::load_ecl_data(void *data)
     return 0;
 }
 
-// STUB: TH16 0x4185b0
-void EnemyManager::destroy_all()
-{
-}
-
 // Not a game function: lets placeholders in src/harness/ look opaque.
 void unit4_opaque(void *p)
 {

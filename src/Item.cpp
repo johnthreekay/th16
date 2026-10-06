@@ -17,8 +17,6 @@ ItemManager::ItemManager()
     flags |= 2;
 }
 
-// TODO: the original keeps a spilled this (push ecx; mov [ebp-4], esi) left
-// over from EH cleanup that LTCG removed; ours never has the cleanup.
 // FUNCTION: TH16 0x42f1a0
 Item::Item()
 {

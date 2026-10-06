@@ -56,7 +56,7 @@ void AsciiManager::drawf_debug(Float3 *pos, const char *fmt, ...)
 {
     // Opaque, so callers still assume this may change any global.
     unit4_opaque(this);
-    color = (u32)(pos->x + fmt[0]);
+    color.d3d = (D3DCOLOR)(pos->x + fmt[0]);
 }
 
 // Like the dialogue skip check at 0x42b043.

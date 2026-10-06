@@ -252,7 +252,7 @@ int __fastcall Supervisor::on_draw_1a(void *arg)
             g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
             g_Supervisor.current_camera_index = 3;
             g_AnmManager->draw_vm(g_Supervisor.vm_1c0);
-            g_Supervisor.vm_1c0->color_1 = 0xffffffff;
+            g_Supervisor.vm_1c0->color_1.d3d = 0xffffffff;
             g_AnmManager->flush_sprites();
             g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
         }
@@ -292,7 +292,7 @@ int __fastcall Supervisor::on_draw_2c(void *arg)
         g_Supervisor.disable_zwrite();
         g_AnmManager->draw_vm(g_Supervisor.vm_1c4);
         g_AnmManager->flush_sprites();
-        g_Supervisor.vm_1c4->color_1 = 0xffffffff;
+        g_Supervisor.vm_1c4->color_1.d3d = 0xffffffff;
         g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
     }
     return 1;
@@ -325,7 +325,7 @@ int __fastcall Supervisor::on_draw_39(void *arg)
     {
         g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
         g_AnmManager->draw_vm(g_Supervisor.vm_1c8);
-        g_Supervisor.vm_1c8->color_1 = 0xffffffff;
+        g_Supervisor.vm_1c8->color_1.d3d = 0xffffffff;
         g_AnmManager->flush_sprites();
         g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
     }

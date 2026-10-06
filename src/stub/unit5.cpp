@@ -45,22 +45,3 @@ i32 ItemManager::on_draw_body(i32 layer)
     return 1;
 }
 
-// GLOBAL: TH16 0x4a6db8
-EffectManager *g_EffectManager;
-
-// STUB: TH16 0x418a30
-EffectManager *EffectManager::create()
-{
-    return NULL;
-}
-
-// STUB: TH16 0x4188d0
-EffectManager::~EffectManager()
-{
-}
-
-// STUB: TH16 0x418790
-i32 preload_bullet_and_effect_anm()
-{
-    return 0;
-}

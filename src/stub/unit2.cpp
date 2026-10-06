@@ -11,22 +11,11 @@
 #include "../Spellcard.h"
 #include "../ZunTimer.h"
 
-// GLOBAL: TH16 0x4a6dac
-BulletManager *g_BulletManager;
-
-// GLOBAL: TH16 0x4a6db0
-Spellcard *g_Spellcard;
-
 // GLOBAL: TH16 0x4a6ef8
 Player *g_Player;
 
 // STUB: TH16 0x407b20
 void AnmLoaded::copy_vm(AnmVm *vm, i32 script)
-{
-}
-
-// STUB: TH16 0x408260
-void AsciiManager::sprintf(D3DXVECTOR3 *pos, const char *fmt, ...)
 {
 }
 

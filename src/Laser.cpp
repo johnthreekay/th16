@@ -290,8 +290,6 @@ LaserManager *LaserManager::create()
     return mgr;
 }
 
-// TODO: in the inlined ZunTimer::tick the original loads the speed pointer into
-// ecx before reading current into eax; ours swaps them.
 // FUNCTION: TH16 0x431510
 i32 LaserManager::on_tick_body()
 {
@@ -498,4 +496,11 @@ HARNESS_CALLED i32 LaserManager::clear_all(i32 mode, i32 b)
         laser = next;
     }
     return 1;
+}
+
+// FUNCTION: TH16 0x411860
+LaserInfiniteInner::LaserInfiniteInner()
+{
+    memset(this, 0, sizeof(LaserInfiniteInner));
+    speed = 8.0f;
 }
