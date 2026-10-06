@@ -3,7 +3,25 @@
 #include <d3d9.h>
 
 #include "ZunMath.h"
+#include "decomp.h"
 #include "types.h"
+
+// Distance fog of a camera: linear from begin to end distance, in color.
+// The float components are what interpolation works on; color follows
+// them. Layout from ExpHP (zCameraSky).
+struct CameraSky
+{
+    f32 begin_distance;
+    f32 end_distance;
+    f32 color_components[4];
+    u8 color[4];
+
+    CameraSky() = default;
+    // 0x40d400
+    HARNESS_CALLED CameraSky(f32 begin_distance, f32 end_distance, f32 c0, f32 c1, f32 c2, f32 c3);
+    // 0x40d370
+    HARNESS_CALLED CameraSky operator+(const CameraSky &other) const;
+};
 
 // One of the Supervisor's four cameras. Layout from ExpHP's th-re-data.
 struct Camera
@@ -23,5 +41,5 @@ struct Camera
     i32 camera_index;
     Float2 unk_fc;
     Float3 unk_104;
-    u8 sky[0x12c - 0x110];
+    CameraSky sky;
 };

@@ -90,6 +90,9 @@ struct AnmManager
     // manager through g_AnmManager, so LTCG drops the unused this (ExpHP:
     // anm_unload_46f1c0).
     HARNESS_CALLED void delete_vm(AnmId id);
+    // 0x46f220. Marks a VM and its children for deletion (ExpHP:
+    // AnmBehemoth::sub_46f220_recursive).
+    void mark_tree_for_deletion(AnmVm *vm);
     // 0x46f270 (ExpHP: AnmBehemoth::disable_vms_from_anm_file).
     void disable_vms_from_anm_file(AnmLoaded *anm);
 
@@ -102,6 +105,21 @@ struct AnmManager
     static AnmVm *allocate_vm();
     // 0x46e7d0. Reaches the manager through g_AnmManager.
     static AnmId __stdcall insert_in_world_list_back(AnmVm *vm);
+
+    // delete_vm's body, which LTCG inlines into some callers' loops.
+    void delete_vm_inline(AnmId id)
+    {
+        AnmVm *vm = get_vm_with_id(id);
+        if (vm != NULL && !(vm->flags_hi & 0x4000000))
+        {
+            vm->flags_hi &= ~0x40;
+            vm->flags_hi |= 0x20;
+            for (ZunList<AnmVm> *node = vm->list_of_children.next; node != NULL; node = node->next)
+            {
+                mark_tree_for_deletion(node->entry);
+            }
+        }
+    }
 
     // Frees the ANM file in a slot, if one is loaded there.
     void unload_anm(i32 slot)
@@ -125,6 +143,13 @@ extern AnmManager *g_AnmManager;
 inline void delete_vm_and_clear(AnmId &id)
 {
     g_AnmManager->delete_vm(id);
+    id.id = 0;
+}
+
+// The same with delete_vm inlined, as LTCG does in some loops.
+inline void delete_vm_inline_and_clear(AnmId &id)
+{
+    g_AnmManager->delete_vm_inline(id);
     id.id = 0;
 }
 
