@@ -180,9 +180,9 @@ void Supervisor::sub_43c630()
         AnmManager::interrupt_tree(g_anm_ids_4c0f4c[0], 1);
         AnmManager::interrupt_tree(g_anm_ids_4c0f4c[1], 1);
         AnmManager::interrupt_tree(g_anm_ids_4c0f4c[2], 1);
-        g_anm_ids_4c0f4c[0] = 0;
-        g_anm_ids_4c0f4c[1] = 0;
-        g_anm_ids_4c0f4c[2] = 0;
+        g_anm_ids_4c0f4c[0].id = 0;
+        g_anm_ids_4c0f4c[1].id = 0;
+        g_anm_ids_4c0f4c[2].id = 0;
         unk_9b8 = 0;
     }
     g_unk_4a6ef0 = 0;
@@ -196,9 +196,9 @@ void Supervisor::sub_43c6a0()
         AnmManager::interrupt_tree(g_anm_ids_4c0f4c[0], 2);
         AnmManager::interrupt_tree(g_anm_ids_4c0f4c[1], 2);
         AnmManager::interrupt_tree(g_anm_ids_4c0f4c[2], 2);
-        g_anm_ids_4c0f4c[0] = 0;
-        g_anm_ids_4c0f4c[1] = 0;
-        g_anm_ids_4c0f4c[2] = 0;
+        g_anm_ids_4c0f4c[0].id = 0;
+        g_anm_ids_4c0f4c[1].id = 0;
+        g_anm_ids_4c0f4c[2].id = 0;
         unk_9b8 = 2;
     }
     g_unk_4a6ef0 = 0;
@@ -375,6 +375,8 @@ void Supervisor::release_surfaces()
 
 // GLOBAL: TH16 0x4d9d20
 i32 g_unk_4d9d20;
+// GLOBAL: TH16 0x4d9d90
+i32 g_unk_4d9d90;
 // GLOBAL: TH16 0x4a5788
 f32 g_game_speed;
 

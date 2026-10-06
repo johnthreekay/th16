@@ -9,7 +9,17 @@
 // Only the parts unit 6 (Supervisor, Player, menus) needs so far. Layouts
 // from ExpHP's th-re-data.
 
-typedef i32 AnmId;
+// Handle to a running VM. A class in ZUN's code: it is returned through a
+// hidden pointer and constructed to 0 before its owner's memset.
+struct AnmId
+{
+    i32 id;
+
+    AnmId()
+    {
+        id = 0;
+    }
+};
 
 // One running ANM script.
 struct AnmVm
@@ -41,7 +51,7 @@ struct AnmVm
         }
         ins_508_extra_data = NULL;
         ins_508_extra_data_size = 0;
-        id = 0;
+        id.id = 0;
         instr_offset = -1;
     }
 };

@@ -27,8 +27,6 @@ void PauseMenu::set_unk_1f4(i32 value)
 // FUNCTION: TH16 0x43e350
 PauseMenu::PauseMenu()
 {
-    anm_id_1e4 = 0;
-    anm_id_1e8 = 0;
     memset(this, 0, sizeof(PauseMenu));
     flags |= 2;
     g_PauseMenu = this;

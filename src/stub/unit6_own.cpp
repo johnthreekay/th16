@@ -97,3 +97,27 @@ int __fastcall PopupManager::on_draw(void *arg)
 {
     return 1;
 }
+
+#include "../LoadingThread.h"
+
+// STUB: TH16 0x43d970
+void Supervisor::setup_special_anms()
+{
+}
+
+// STUB: TH16 0x43afe0
+LoadingThread::~LoadingThread()
+{
+}
+
+// STUB: TH16 0x43adc0
+unsigned __stdcall LoadingThread::thread_start(void *arg)
+{
+    return 0;
+}
+
+// STUB: TH16 0x43b3c0
+int __fastcall LoadingThread::on_draw(void *arg)
+{
+    return 1;
+}

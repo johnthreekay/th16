@@ -19,6 +19,13 @@ class ThreadInf
     int unk_14;
     ThreadStart start;
 
+    ThreadInf()
+    {
+        handle = NULL;
+        id = 0;
+        stop_requested = FALSE;
+        should_run = FALSE;
+    }
     virtual ~ThreadInf();
     DECOMP_NOINLINE void join_if_running();
     void restart(ThreadStart start, void *arg);

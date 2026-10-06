@@ -4,13 +4,14 @@
 #include "../Supervisor.h"
 #include "../UpdateFunc.h"
 #include "../Globals.h"
+#include "../LoadingThread.h"
 #include "../PauseMenu.h"
 #include "../PopupManager.h"
 
 int harness_unit6_read_globals()
 {
     return g_unk_4a6ef0 + g_arcade_width + g_arcade_height + g_game_2d_origin_x + g_game_2d_origin_y +
-           (int)g_PauseMenu + (int)g_PopupManager;
+           (int)g_PauseMenu + (int)g_PopupManager + (int)g_LoadingThread + g_unk_4d9d90;
 }
 
 static unsigned __stdcall harness_thread_proc(void *arg)
