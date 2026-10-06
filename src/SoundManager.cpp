@@ -297,16 +297,16 @@ HARNESS_CALLED void SoundManager::play_sound_centered(i32 id, i32 unused)
     i32 i;
     for (i = 0; i < SOUND_QUEUE_SIZE; i++)
     {
-        if (g_SoundManager.queued_ids[i] < 0)
+        if (queued_ids[i] < 0)
         {
             break;
         }
-        if (g_SoundManager.queued_ids[i] == id)
+        if (queued_ids[i] == id)
         {
-            if (g_SoundManager.queued_counts[i] < 60 && g_SoundManager.queued_counts[i] >= 0)
+            if (queued_counts[i] < 60 && queued_counts[i] >= 0)
             {
-                g_SoundManager.queued_pans[i][g_SoundManager.queued_counts[i]] = 0;
-                g_SoundManager.queued_counts[i]++;
+                queued_pans[i][queued_counts[i]] = 0;
+                queued_counts[i]++;
             }
             return;
         }
@@ -315,13 +315,12 @@ HARNESS_CALLED void SoundManager::play_sound_centered(i32 id, i32 unused)
     {
         return;
     }
-    g_SoundManager.queued_ids[i] = id;
-    g_SoundManager.queued_counts[i] = 1;
-    g_SoundManager.queued_pans[i][0] = 0;
-    g_SoundManager.sound_buffers[id].unk_4 = unk;
+    queued_ids[i] = id;
+    queued_counts[i] = 1;
+    queued_pans[i][0] = 0;
+    sound_buffers[id].unk_4 = unk;
 }
 
-// TODO: the original keeps i in ecx and copies it for the pan index instead of precomputing i * 4.
 // FUNCTION: TH16 0x45e1f0
 HARNESS_CALLED void SoundManager::play_sound_at_position(i32 id, f32 x)
 {
@@ -330,16 +329,16 @@ HARNESS_CALLED void SoundManager::play_sound_at_position(i32 id, f32 x)
     i32 i;
     for (i = 0; i < SOUND_QUEUE_SIZE; i++)
     {
-        if (g_SoundManager.queued_ids[i] < 0)
+        if (queued_ids[i] < 0)
         {
             break;
         }
-        if (g_SoundManager.queued_ids[i] == id)
+        if (queued_ids[i] == id)
         {
-            if (g_SoundManager.queued_counts[i] < 60 && g_SoundManager.queued_counts[i] >= 0)
+            if (queued_counts[i] < 60 && queued_counts[i] >= 0)
             {
-                g_SoundManager.queued_pans[i][g_SoundManager.queued_counts[i]] = pan;
-                g_SoundManager.queued_counts[i]++;
+                queued_pans[i][queued_counts[i]] = pan;
+                queued_counts[i]++;
             }
             return;
         }
@@ -348,10 +347,10 @@ HARNESS_CALLED void SoundManager::play_sound_at_position(i32 id, f32 x)
     {
         return;
     }
-    g_SoundManager.queued_ids[i] = id;
-    g_SoundManager.queued_pans[i][0] = pan;
-    g_SoundManager.queued_counts[i] = 1;
-    g_SoundManager.sound_buffers[id].unk_4 = unk;
+    queued_ids[i] = id;
+    queued_pans[i][0] = pan;
+    queued_counts[i] = 1;
+    sound_buffers[id].unk_4 = unk;
 }
 
 // FUNCTION: TH16 0x45e2a0
