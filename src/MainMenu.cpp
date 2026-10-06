@@ -8,6 +8,7 @@
 #include "GameErrorContext.h"
 #include "LoadingThread.h"
 #include "ReplayManager.h"
+#include "Scorefile.h"
 #include "Supervisor.h"
 
 static_assert(offsetof(TitleInf, state) == 0x18, "TitleInf::state");
@@ -232,4 +233,36 @@ i32 __fastcall TitleInf::on_tick_thunk(void *arg)
 i32 __fastcall TitleInf::on_draw_thunk(void *arg)
 {
     return ((TitleInf *)arg)->on_draw();
+}
+
+// FUNCTION: TH16 0x44a800
+i32 Scorefile::has_cleared(i32 character)
+{
+    if (characters[character].clears[0] != 0 || characters[character].clears[1] != 0 ||
+        characters[character].clears[2] != 0 || characters[character].clears[3] != 0)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+// FUNCTION: TH16 0x44a850
+HARNESS_CALLED i32 Scorefile::any_cleared()
+{
+    if (has_cleared(0) || has_cleared(1) || has_cleared(2) || has_cleared(3))
+    {
+        return 1;
+    }
+    return 0;
+}
+
+// FUNCTION: TH16 0x44a8e0
+HARNESS_CALLED i32 Scorefile::all_cleared(i32 difficulty)
+{
+    if (characters[0].clears[difficulty] != 0 && characters[3].clears[difficulty] != 0 &&
+        characters[1].clears[difficulty] != 0 && characters[2].clears[difficulty] != 0)
+    {
+        return 1;
+    }
+    return 0;
 }

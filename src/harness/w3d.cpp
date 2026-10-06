@@ -5,6 +5,7 @@
 #include "../MainMenu.h"
 #include "../Supervisor.h"
 #include "../ReplayManager.h"
+#include "../Scorefile.h"
 #include "../ZunMath.h"
 
 // Like PauseMenu's snapshot of the game screen (0x43f62c).
@@ -64,4 +65,11 @@ void harness_w3d_title(i32 create)
 i32 *harness_w3d_unk_4d9d90()
 {
     return &g_unk_4d9d90;
+}
+
+// The title and difficulty menus (0x44b621, 0x44ff93) and the character
+// select (0x45031d), which keeps edx across has_cleared.
+i32 harness_w3d_scorefile(i32 difficulty, Scorefile *scorefile, i32 character)
+{
+    return g_Scorefile->any_cleared() + g_Scorefile->all_cleared(difficulty) + scorefile->has_cleared(character);
 }
