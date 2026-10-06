@@ -29,6 +29,8 @@ struct InterpFloat2
     Timer time;
     i32 end_time;
     i32 method;
+
+    void reset_timer();
 };
 
 struct InterpStrange1
@@ -45,4 +47,6 @@ struct InterpStrange1
     u32 unk_5c;
     i32 method_for_3d;
     i32 flag_1d;
+
+    void reset_timer();
 };

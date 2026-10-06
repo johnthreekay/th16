@@ -106,3 +106,9 @@ double LTCG_VECTORCALL get_runtime()
 {
     return 0.0;
 }
+
+// GLOBAL: TH16 0x4a5244
+InputState g_InputState;
+
+// GLOBAL: TH16 0x4a57d8
+i32 g_current_piv;

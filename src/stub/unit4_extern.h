@@ -99,6 +99,20 @@ struct EffectManager
 // Reads a whole file (from the archive if present) into a new allocation.
 u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size_out, i32 flag);
 
+// Button state block around ExpHP's INPUT (0x4a52c8).
+struct InputState
+{
+    // Frames each button has been held.
+    i32 hold_time[0x21];
+    u32 input;
+    u32 input_prev;
+
+    HARNESS_CALLED i32 get_hold_time(int button);
+};
+
+extern InputState g_InputState;
+// ExpHP: CURRENT_PIV.
+extern i32 g_current_piv;
 extern GameThread *g_GameThread;
 extern AsciiManager *g_AsciiManager;
 extern Player *g_Player;
