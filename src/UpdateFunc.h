@@ -103,6 +103,21 @@ struct UpdateFuncRegistry
     void unregister_all_in_list(UpdateFunc *head);
     // TH06 equivalent: Chain::Cut
     DECOMP_NOINLINE void unregister(UpdateFunc *f);
+    // unregister under the registry's critical section; owners call it on
+    // their UpdateFunc pointers when they go away.
+    void unregister_locked(UpdateFunc *f);
 };
 
 extern UpdateFuncRegistry *g_UpdateFuncRegistry;
+
+#include "CriticalSections.h"
+
+inline void UpdateFuncRegistry::unregister_locked(UpdateFunc *f)
+{
+    if (f != NULL)
+    {
+        ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
+        unregister(f);
+        LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
+    }
+}

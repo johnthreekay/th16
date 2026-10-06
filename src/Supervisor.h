@@ -20,7 +20,11 @@ struct Config
     // Analog stick dead zones (DirectInput axis units).
     i16 deadzone_x;
     i16 deadzone_y;
-    u8 unk_20[0x68 - 0x20];
+    u8 unk_20[0x23 - 0x20];
+    // Window size option; 0, 1, 2 pick ascii.anm, ascii_960.anm,
+    // ascii_1280.anm.
+    u8 window_size;
+    u8 unk_24[0x68 - 0x24];
 };
 
 // Owns the Direct3D/DirectInput objects and global game state. ZUN's name
@@ -51,6 +55,9 @@ enum SupervisorFlags
 };
 
 extern Supervisor g_Supervisor;
+
+// Scale from 640x480 coordinates to the window's (1, 1.5 or 2).
+extern f32 g_screen_coord_scale;
 
 // Pad button numbers for each game button, -1 if unassigned. Index meaning
 // (from read_joypad): 0 shot, 1 bomb, 2 -> 0x8, 3 -> 0x100, 9 -> 0x800.

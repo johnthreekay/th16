@@ -71,4 +71,12 @@ struct Float3
         z += other.z;
         return *this;
     }
+
+    Float3 &operator*=(f32 scale)
+    {
+        x *= scale;
+        y *= scale;
+        z *= scale;
+        return *this;
+    }
 };

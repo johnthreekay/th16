@@ -193,5 +193,18 @@ struct AnmLoaded
     i32 unk_134;
     u8 unk_138[4];
 
+    // noexcept(false) stands in for something in the real one that makes
+    // ~AsciiInf keep a noexcept guard frame (FuncInfo EHFlags 5, no states).
+    // Revisit once 0x46d770 is decompiled.
+    ~AnmLoaded() noexcept(false);
     void copy_vm(AnmVm *dst, i32 script);
+    void set_sprite(AnmVm *vm, i32 sprite);
+
+    // Resets vm and shows one of this file's sprites with it.
+    void setup_vm(AnmVm *vm, i32 sprite)
+    {
+        vm->initialize();
+        vm->anm_loaded_index = slot_num;
+        set_sprite(vm, sprite);
+    }
 };

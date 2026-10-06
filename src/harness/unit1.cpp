@@ -1,6 +1,8 @@
 // Stand-in callers for unit 1 (0x402e70-0x409490).
 #include "../AnmVm.h"
+#include "../AsciiManager.h"
 #include "../CriticalSections.h"
+#include "../Supervisor.h"
 #include "../Interp.h"
 #include "../ZunMath.h"
 
@@ -28,4 +30,17 @@ f32 harness_interp_ratio(i32 mode, i32 time, i32 end_time)
 f32 harness_anm_vm_slowdown(AnmVm *vm)
 {
     return vm->get_slowdown_factor() * 2.0f;
+}
+
+// Some globals have their address taken elsewhere in the game, so LTCG
+// must assume stores through pointers may change them. Without that it
+// moves loads of them across such stores.
+f32 *harness_screen_coord_scale_ptr()
+{
+    return &g_screen_coord_scale;
+}
+
+AsciiInf **harness_ascii_manager_ptr()
+{
+    return &g_AsciiManager;
 }
