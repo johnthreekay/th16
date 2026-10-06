@@ -1,7 +1,7 @@
 #include <windows.h>
 
 #include "CriticalSections.h"
-#include "Thread.h"
+#include "Supervisor.h"
 #include "UpdateFunc.h"
 
 // GLOBAL: TH16 0x4a6d94
@@ -23,7 +23,7 @@ UpdateFuncRegistry::UpdateFuncRegistry()
 // Only ever inlined into the scalar deleting destructor below.
 UpdateFuncRegistry::~UpdateFuncRegistry()
 {
-    g_Thread_4c1a68.join_if_running();
+    g_Supervisor.thread.join_if_running();
     is_cleaning_up = 1;
     run_all_on_tick();
     unregister_all_in_list(&on_tick_head);

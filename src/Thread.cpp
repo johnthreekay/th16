@@ -2,9 +2,6 @@
 
 #include "Thread.h"
 
-// GLOBAL: TH16 0x4c1a68
-ThreadInf g_Thread_4c1a68;
-
 ThreadInf::~ThreadInf()
 {
     join_if_running();

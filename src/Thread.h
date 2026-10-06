@@ -23,6 +23,3 @@ class ThreadInf
     DECOMP_NOINLINE void join_if_running();
     void restart(ThreadStart start, void *arg);
 };
-
-// Unknown owner; possibly a field of a larger static object.
-extern ThreadInf g_Thread_4c1a68;
