@@ -94,3 +94,9 @@ f32 harness_unit8b_enemy_args(EnemyData *enemy, EclRunContext *ctx, i32 index)
     *ctx->get_int_arg_ptr(0) = 2;
     return enemy->get_float_arg(index) + ctx->get_float_arg(index + 1);
 }
+
+// ANM instructions and the pause menu restore snapshots by id.
+AnmId harness_unit8b_restore_snapshot(AnmId id)
+{
+    return g_AnmManager->restore_snapshot(id);
+}

@@ -237,6 +237,11 @@ struct AnmManager
     AnmVm *allocate_snapshot_vm(i32 *id);
     // 0x46f810. Copies the VM and its children into snapshots.
     AnmId store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused);
+    // 0x46f8f0. Brings a stored snapshot back to life as a new VM tree.
+    // Every caller goes through g_AnmManager (see the list inserts).
+    HARNESS_CALLED AnmId restore_snapshot(AnmId id);
+    // 0x46f970. Copies a snapshot and its children back into live VMs.
+    AnmId restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent);
     // 0x46e7d0 and the next three. Every caller goes through g_AnmManager,
     // so LTCG replaced this with a load of the global (and kept its stack
     // slot). They hand out the VM's new id.
@@ -249,7 +254,7 @@ struct AnmManager
     // AnmBehemoth::sub_46f220_recursive).
     HARNESS_CALLED_INLINABLE void mark_tree_for_deletion(AnmVm *vm);
     // get_vm_with_id for snapshots.
-    AnmVm *get_snapshot_vm_with_id(AnmId id);
+    HARNESS_CALLED AnmVm *get_snapshot_vm_with_id(AnmId id);
     // UpdateFunc callbacks that run the VMs of each list and rebuild the
     // per-layer draw lists.
     DECOMP_NOINLINE static i32 __fastcall tick_world(AnmManager *mgr);

@@ -147,7 +147,7 @@ AnmVm *AnmManager::get_vm_with_id(AnmId id)
 }
 
 // FUNCTION: TH16 0x46f040
-AnmVm *AnmManager::get_snapshot_vm_with_id(AnmId id)
+HARNESS_CALLED AnmVm *AnmManager::get_snapshot_vm_with_id(AnmId id)
 {
     if (id.id == 0)
     {
@@ -841,4 +841,65 @@ AnmId AnmManager::store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused)
     AnmId result;
     result.id = id;
     return result;
+}
+
+// FUNCTION: TH16 0x46f8f0
+HARNESS_CALLED AnmId AnmManager::restore_snapshot(AnmId id)
+{
+    if (id.id == 0)
+    {
+        return AnmId();
+    }
+    ENTER_CS(CS_ANM_MANAGER);
+    AnmVm *snapshot = get_snapshot_vm_with_id(id);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return restore_snapshot_vm(snapshot, NULL);
+}
+
+// FUNCTION: TH16 0x46f970
+AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
+{
+    if (snapshot == NULL)
+    {
+        AnmId none;
+        none.id = (i32)snapshot;
+        return none;
+    }
+    ENTER_CS(CS_ANM_MANAGER);
+    AnmVm *vm = g_AnmManager->allocate_vm();
+    vm->copy_from(*snapshot, 1);
+    vm->flags_hi &= ~ANM_VM_SNAPSHOT;
+    i32 mode = vm->mode_of_create_child;
+    AnmId id;
+    if ((mode & 6) == 6)
+    {
+        id = g_AnmManager->insert_in_ui_list_front(vm);
+        vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
+    }
+    else if (mode & 4)
+    {
+        id = g_AnmManager->insert_in_ui_list_back(vm);
+        vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
+    }
+    else if (mode & 2)
+    {
+        id = g_AnmManager->insert_in_world_list_front(vm);
+    }
+    else
+    {
+        id = g_AnmManager->insert_in_world_list_back(vm);
+    }
+    if (parent != NULL)
+    {
+        AnmVm *root = parent->parent;
+        vm->unk_5b0 = parent;
+        vm->parent = root != NULL ? root : parent;
+        parent->list_of_children.insert_after(&vm->node_as_child);
+    }
+    LEAVE_CS(CS_ANM_MANAGER);
+    for (ZunList<AnmVm> *node = snapshot->list_of_children.next; node != NULL; node = node->next)
+    {
+        restore_snapshot_vm(node->entry, vm);
+    }
+    return id;
 }
