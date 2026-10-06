@@ -25,8 +25,6 @@ i32 preload_bullet_and_effect_anm()
     return 0;
 }
 
-// TODO: the original keeps the UpdateFunc constructor's stores but still
-// merges the two flag updates; volatile here keeps both apart.
 // FUNCTION: TH16 0x4187d0
 i32 EffectManager::initialize()
 {
@@ -50,15 +48,15 @@ i32 EffectManager::initialize()
     g_UpdateFuncRegistry->register_on_tick(f, 0x1f);
     on_tick = f;
 
-    // create_func, inlined here in the original.
-    volatile UpdateFunc *vf = new UpdateFunc();
-    vf->flags |= UPDATE_FUNC_HEAP_ALLOCATED;
-    vf->function = (UpdateFuncCallback)on_draw_callback;
-    vf->on_registration = NULL;
-    vf->on_cleanup = NULL;
-    f = (UpdateFunc *)vf;
-    f->flags &= ~UPDATE_FUNC_ACTIVE;
+    // create_func, inlined here in the original. The caller's arg store
+    // goes first to come out in the original's order.
+    f = new UpdateFunc;
+    f->flags |= UPDATE_FUNC_HEAP_ALLOCATED;
+    f->function = (UpdateFuncCallback)on_draw_callback;
+    f->on_registration = NULL;
+    f->on_cleanup = NULL;
     f->arg = this;
+    f->flags &= ~UPDATE_FUNC_ACTIVE;
     g_UpdateFuncRegistry->register_on_draw(f, 0x26);
     on_draw = f;
 

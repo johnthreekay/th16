@@ -40,6 +40,8 @@ union ZunColor
 enum AnmVmFlagsLo
 {
     ANM_VM_VISIBLE = 1 << 0,
+    // Set and cleared for a whole tree by ANM instruction 316 (ExpHP).
+    ANM_VM_FLAG_LO_2 = 1 << 1,
     // Rotation or scale changed; the matrix needs a rebuild.
     ANM_VM_ROTATION_CHANGED = 1 << 2,
     ANM_VM_SCALE_CHANGED = 1 << 3,
@@ -64,6 +66,11 @@ enum AnmVmFlagsHi
     ANM_VM_COORD_MODE_MASK = 7 << 20,
     ANM_VM_COORD_MODE_1 = 1 << 20,
     ANM_VM_ROTATE_WITH_PARENT = 1 << 23,
+    // Marked for deletion: the manager frees it on its next pass.
+    ANM_VM_DELETE_PENDING = 1 << 5,
+    ANM_VM_FLAG_HI_40 = 1 << 6,
+    // Already gone; deleting it again does nothing.
+    ANM_VM_FLAG_HI_4000000 = 1 << 26,
 };
 
 struct AnmVm;
@@ -195,6 +202,29 @@ struct AnmVm
     void fade_rgb1(i32 end_time, i32 method, ZunColor *goal);
     // 0x426020. LTCG passes x in xmm3.
     HARNESS_CALLED void scale_to(i32 end_time, i32 method, f32 x, f32 y);
+    // 0x46f380 and 0x46f3b0 (ExpHP: set/clear_ins_316_flag_recursively).
+    void set_flag_lo_2_tree();
+    void clear_flag_lo_2_tree();
+
+    // The two above with their first level inlined, as LTCG did in some
+    // callers.
+    void set_flag_lo_2_tree_inline()
+    {
+        flags_lo |= ANM_VM_FLAG_LO_2;
+        for (ZunList<AnmVm> *node = list_of_children.next; node != NULL; node = node->next)
+        {
+            node->entry->set_flag_lo_2_tree();
+        }
+    }
+
+    void clear_flag_lo_2_tree_inline()
+    {
+        flags_lo &= ~ANM_VM_FLAG_LO_2;
+        for (ZunList<AnmVm> *node = list_of_children.next; node != NULL; node = node->next)
+        {
+            node->entry->clear_flag_lo_2_tree();
+        }
+    }
 
     void interrupt(i32 n)
     {

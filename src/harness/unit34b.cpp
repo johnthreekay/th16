@@ -1,6 +1,7 @@
 // Stand-in callers for the second pass over 0x411860-0x42cb00, for
 // functions whose shape depends on how they are called.
 #include "../AnmVm.h"
+#include "../Gui.h"
 #include "../PosVel.h"
 
 // Like the ECL anm scale instruction at 0x42354a.
@@ -16,4 +17,10 @@ void harness_posvel_set_ellipse_angle(PosVel *pv, f32 angle)
     {
         pv->set_ellipse_angle(angle);
     }
+}
+
+// Like the stage restart code at 0x42d4d1.
+void harness_gui_release_msg()
+{
+    g_Gui->release_msg();
 }

@@ -226,17 +226,14 @@ done:
 // FUNCTION: TH16 0x401730
 HARNESS_CALLED UpdateFunc *UpdateFuncRegistry::create_func(UpdateFuncCallback function)
 {
-    // The original keeps every constructor store and then overwrites them,
-    // and never folds the two flag updates together. Writing through a
-    // volatile-qualified pointer is the only construct found so far that
-    // reproduces this; ZUN's source may have done something else with the
-    // same effect.
-    volatile UpdateFunc *f = new UpdateFunc();
+    // The original keeps every constructor store and then overwrites them
+    // (see the constructor).
+    UpdateFunc *f = new UpdateFunc;
     f->flags |= UPDATE_FUNC_HEAP_ALLOCATED;
     f->function = function;
     f->on_registration = NULL;
     f->on_cleanup = NULL;
-    return (UpdateFunc *)f;
+    return f;
 }
 
 // FUNCTION: TH16 0x4016b0
