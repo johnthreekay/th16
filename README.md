@@ -102,14 +102,21 @@ program is linked. That has consequences for how we work:
 
 ### Placeholders and stand-in callers
 
-Two directories hold code that is not ZUN's, to give partially decompiled
-code the surroundings it had in the original:
+Three directories hold code that is not ZUN's, to give partially
+decompiled code the surroundings it had in the original:
 
 - `src/stub/` is compiled **without** `/GL`. It holds placeholder bodies for
   functions we call but have not decompiled (and the temporary `WinMain`).
   Link-time code generation cannot see inside them, so calls to them stay
   opaque the way calls to real, non-trivial code are: they may throw, they
   keep the standard calling convention, and nothing gets inlined.
+- `src/placeholder/` is compiled **with** `/GL` and not forced alive. It holds
+  stand-ins for callees whose shape LTCG must see: a custom calling
+  convention, a constructor LTCG has to know cannot throw, a parameter it
+  should fold, overrides that stop speculative devirtualization. Their
+  bodies call an opaque stub so the calls survive, and they should clobber
+  registers roughly like the real code, because LTCG's register allocation
+  across calls looks inside them.
 - `src/harness/` is compiled **with** `/GL`. It recreates call sites from code
   that is not decompiled yet, when a function's shape depends on how it is
   called (for example `delete g_UpdateFuncRegistry`, which is what makes the
@@ -147,6 +154,40 @@ code the surroundings it had in the original:
   `GameErrorContext::log`/`fatal` do not match yet.
 - Polymorphic classes must use ZUN's names: RTTI stores them in the
   executable (`ThreadInf`, `EnemyInf`, ...).
+- LTCG deletes stores to globals that nothing in the program reads, so a
+  harness function has to read manager pointers such as `g_PauseMenu`.
+  Conversely, if every caller is `g_X->method()`, LTCG replaces `this`
+  inside the method with the global (an unused `push ecx` slot plus a load
+  of `g_X`): write it with `this`, mark it HARNESS_CALLED and call it as
+  `g_X->method()` from the harness.
+- Any parameter that is constant at every call site gets folded, including
+  in our own harness. Harness callers pass varied values unless the
+  original folded it too (then callers `push ecx` junk for that slot).
+- `new T` and `new T()` differ: the parentheses value-initialize and add a
+  memset. ZUN writes `new T`.
+- Jump-table switches lay case blocks out in source order, which reveals
+  ZUN's case order. For `a + b` of two globals MSVC loads `b` first.
+- A UCRT inline (`sinf`, `_vsprintf_l`, ...) can be kept out of line for the
+  whole program by redeclaring it `DECOMP_NOINLINE` in one source file.
+- `#pragma loop(no_vector)` reproduces loops the original did not
+  vectorize where ours would.
+- Constructors and `new` expressions in the original sometimes keep a dead
+  `push ecx; mov [ebp-4], this`: leftover EH cleanup state. It appears when
+  the callee is visible to LTCG and not known nothrow; `LTCG_NOTHROW`
+  (decomp.h) declares a stubbed constructor nothrow when it must not appear.
+- ExpHP's Supervisor layout is 4 bytes off at the start: `d3d` is at +4,
+  `d3d_device` at +8 (0x4c10d8, hundreds of uses), `dinput` at +0xc.
+
+### Known tooling gaps
+
+- Functions with internal linkage (per-file `static` copies such as the
+  `sincosmul` fsincos helper) and template members cannot be annotated:
+  build.py looks names up among external symbols, and its name parsing does
+  not handle `Interp<Float3>`-style names.
+- Comments must go above `// FUNCTION:`, not between it and the signature:
+  reccmp then loses the function and build.py may misread the declaration.
+- quickdiff misreports jump thunks and tail jumps; check those with
+  compare.py.
 - The TH06 decomp's `Chain` code (`src/Global.cpp` there) is a close ancestor
   of TH16's `UpdateFuncRegistry`: same callback result codes, same case
   order in the switch, same search-then-cut structure in `unregister`.

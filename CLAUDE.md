@@ -54,8 +54,11 @@ then build. List your functions with
 
 To keep branches mergeable:
 - New code goes in files named after the class or module (`src/Bullet.cpp`).
-- Placeholders for callees from other ranges go in `src/stub/<unit>.cpp`,
-  stand-in callers in `src/harness/<unit>.cpp` (one file per unit).
+- Placeholders for callees from other ranges go in `src/stub/<unit>.cpp`
+  (opaque) or `src/placeholder/<unit>.cpp` (visible to LTCG), stand-in
+  callers in `src/harness/<unit>.cpp` (one file per unit).
+- Before merging, check for clashes: every `// (FUNCTION|STUB|GLOBAL|
+  SYNTHETIC|VTABLE): TH16 0x...` address must appear once across src/.
 - Shared headers (Supervisor.h, CriticalSections.h, decomp.h, types.h, ...):
   only add. Never reorder, rename or delete existing items; to add a struct
   field, split the padding array around it in place.
