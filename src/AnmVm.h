@@ -176,8 +176,9 @@ struct AnmVm
     void wipe();
     // 0x40e490. Position including entity_pos and every parent's.
     Float3 world_pos();
-    // 0x45f980
-    void run();
+    // 0x45f980. Nonzero once the script has ended (anm_effect_1_on_tick
+    // counts on it).
+    i32 run();
     HARNESS_CALLED f32 get_slowdown_factor();
     void alloc_extra_data(u32 size);
     void set_layer(i32 layer);
