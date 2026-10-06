@@ -16,7 +16,10 @@ struct PlayerInner
     ZunTimer iframes;
     // 0x20: damage is multiplied this frame (EnemyManager::update).
     u32 flags;
-    u8 unk_16040[0x16078 - 0x16040];
+    u8 unk_16040[0x16050 - 0x16040];
+    // Scaled by 1/128; aims and sizes Aya's bomb.
+    f32 unk_16050;
+    u8 unk_16054[0x16078 - 0x16054];
     // Set every frame by the autumn release.
     f32 speed_multiplier;
     u8 unk_1607c[0x16090 - 0x1607c];
@@ -39,6 +42,9 @@ struct Player
 
     // 0x4449b0. Returns the index of the new damage source plus one.
     HARNESS_CALLED i32 create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 unk_2, i32 damage);
+    // 0x444b20. The same for a rectangle (ExpHP:
+    // sub_444b20_prolly_creates_rectangular_damage_source).
+    HARNESS_CALLED i32 create_rect_damage_source(D3DXVECTOR3 *pos, f32 width, f32 height, f32 angle, i32 unk_2, i32 damage);
 };
 
 extern Player *g_Player;

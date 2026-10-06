@@ -116,3 +116,36 @@ i32 __fastcall EffectManager::on_draw_callback(EffectManager *self)
 {
     return 1;
 }
+
+// FUNCTION: TH16 0x40e6c0
+i32 EffectManager::next_index()
+{
+    for (i32 i = 0; i < EFFECT_COUNT; i++)
+    {
+        i32 index = last_used_index;
+        last_used_index = (last_used_index + 1) % EFFECT_COUNT;
+        AnmId &id = anm_ids[last_used_index];
+        if (id.id == 0)
+        {
+            return index;
+        }
+        if (g_AnmManager->get_vm_with_id(id) != NULL)
+        {
+            return index;
+        }
+        id.id = 0;
+    }
+    return -1;
+}
+
+// FUNCTION: TH16 0x40e730
+HARNESS_CALLED i32 EffectManager::create_tracked(i32 effect, D3DXVECTOR3 *pos, i32 unused)
+{
+    i32 index = next_index();
+    if (index == -1)
+    {
+        return 0;
+    }
+    anm_ids[index] = create_effect(effect, pos, 0);
+    return index | 0x80000000;
+}

@@ -2,6 +2,8 @@
 
 #include "AnmManager.h"
 #include "AnmVm.h"
+
+#include <d3dx9math.h>
 #include "UpdateFunc.h"
 #include "decomp.h"
 #include "types.h"
@@ -30,6 +32,44 @@ struct EffectManager
     i32 initialize();
     static i32 __fastcall on_tick_callback(EffectManager *self);
     static i32 __fastcall on_draw_callback(EffectManager *self);
+
+    // 0x418af0. Starts effect script `effect` at pos.
+    AnmId create_effect(i32 effect, D3DXVECTOR3 *pos, i32 unk);
+    // 0x40e6c0. Moves last_used_index on and returns the index before it,
+    // clearing ids of finished effects on the way; -1 if all are taken.
+    i32 next_index();
+    // 0x40e730. create_effect, remembering the effect in anm_ids. Returns a
+    // handle (index | 0x80000000), 0 if no slot is free. Reaches the
+    // manager through g_EffectManager; every caller passes 0 for unused.
+    HARNESS_CALLED i32 create_tracked(i32 effect, D3DXVECTOR3 *pos, i32 unused);
+
+    // create_tracked as LTCG inlines it into some callers.
+    i32 create_tracked_inline(i32 effect, D3DXVECTOR3 *pos)
+    {
+        i32 index = next_index();
+        if (index == -1)
+        {
+            return 0;
+        }
+        anm_ids[index] = create_effect(effect, pos, 0);
+        return index | 0x80000000;
+    }
+
+    // The VM of a create_tracked handle (NULL for 0). Always inlined in the
+    // original; ours would keep a copy out of line.
+    __forceinline AnmVm *get_tracked_vm(i32 handle)
+    {
+        AnmId id;
+        if (handle < 0)
+        {
+            id = anm_ids[(u16)handle];
+        }
+        else
+        {
+            id.id = 0;
+        }
+        return g_AnmManager->get_vm_with_id(id);
+    }
 };
 
 extern EffectManager *g_EffectManager;

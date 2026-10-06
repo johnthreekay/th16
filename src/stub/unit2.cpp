@@ -25,8 +25,9 @@ void PlayerInner::repopulate_options()
 }
 
 // STUB: TH16 0x45f980
-void AnmVm::run()
+i32 AnmVm::run()
 {
+    return 0;
 }
 
 // STUB: TH16 0x46e7d0

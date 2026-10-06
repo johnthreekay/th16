@@ -21,7 +21,9 @@ class BombInf
     UpdateFunc *on_draw_func;
     void *unk_10;
     D3DXVECTOR3 pos;
-    u8 unk_20[0xc];
+    // Aya's bomb: how far it moves each frame.
+    f32 speed;
+    u8 unk_24[0x2c - 0x24];
     f32 angle;
     i32 in_use;
     // Counts frames while in use; negative while a release cools down.
@@ -76,10 +78,39 @@ class BombInf
     static void destroy_all();
 };
 
+// One of Reimu's homing orbs (unk_70 of her bomb holds eight).
+struct BombReimuAOrb
+{
+    AnmId anm_id;
+    D3DXVECTOR3 pos;
+    u8 unk_10[0xa0 - 0x10];
+    i32 active;
+    u8 unk_a4[0xd0 - 0xa4];
+    // Index plus one of the orb's damage source, 0 for none.
+    i32 damage_source;
+    // Set once the orb has exploded; it is then just deleted.
+    i32 done;
+
+    // 0x410ae0
+    void finish();
+};
+
+struct BombReimuAOrbs
+{
+    BombReimuAOrb orbs[8];
+
+    // 0x410bb0. Ends every orb.
+    void finish_all();
+};
+
 // VTABLE: TH16 0x491e3c
 class BombReimuAInf : public BombInf
 {
   public:
+    virtual i32 begin();
+    virtual i32 on_tick();
+    virtual i32 method_10();
+    virtual void method_14();
     virtual i32 on_draw();
     virtual i32 method_c(i32 a, i32 b);
 };
@@ -88,6 +119,9 @@ class BombReimuAInf : public BombInf
 class BombCirnoAInf : public BombInf
 {
   public:
+    virtual i32 begin();
+    virtual i32 on_tick();
+    virtual i32 method_10();
     virtual i32 on_draw();
     virtual i32 method_c(i32 a, i32 b);
     virtual void method_14();
@@ -97,6 +131,9 @@ class BombCirnoAInf : public BombInf
 class BombAyaAInf : public BombInf
 {
   public:
+    virtual i32 begin();
+    virtual i32 on_tick();
+    virtual i32 method_10();
     virtual i32 on_draw();
     virtual i32 method_c(i32 a, i32 b);
     virtual void method_14();
@@ -106,6 +143,9 @@ class BombAyaAInf : public BombInf
 class BombMarisaAInf : public BombInf
 {
   public:
+    virtual i32 begin();
+    virtual i32 on_tick();
+    virtual i32 method_10();
     virtual i32 on_draw();
     virtual i32 method_c(i32 a, i32 b);
     virtual void method_14();

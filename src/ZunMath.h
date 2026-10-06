@@ -39,6 +39,16 @@ static void __fastcall sincosmul(Float3 *dst, f32 angle, f32 radius)
 // code calls. Unit 1 had it as Float3::from_polar.
 void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius);
 
+// The UCRT's inline sinf and cosf as LTCG kept them out of line for some
+// callers (0x405510, 0x4054f0), taking and returning xmm0. A DECOMP_NOINLINE
+// redeclaration of sinf does not stop our build from inlining it, so the
+// callers that the original has calling these copies use these instead.
+HARNESS_CALLED f32 zun_sinf(f32 x);
+HARNESS_CALLED f32 zun_cosf(f32 x);
+// The same for floorf (0x405260) and atan2f (0x4052a0).
+HARNESS_CALLED f32 zun_floorf(f32 x);
+HARNESS_CALLED f32 zun_atan2f(f32 y, f32 x);
+
 // The loop of normalize_angle, for the many places that inline it. The
 // original inlines it everywhere; ours would call it from PosVel::step.
 __forceinline f32 wrap_angle(f32 a)

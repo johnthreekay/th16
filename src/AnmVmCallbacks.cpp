@@ -79,6 +79,38 @@ int __fastcall anm_effect_3_on_switch(AnmVm *vm, i32 n)
     return 0;
 }
 
+// ins_508 data of effect kind 1: four VMs, then a fifth that runs until
+// those have all ended.
+struct AnmEffect1Data
+{
+    AnmVm vms[5];
+    i32 unk_1dec;
+    i32 frame_count;
+};
+
+// TODO: the original aligns its frame to 8 bytes (LTCG; AnmVm::run is
+// still a stub here).
+// FUNCTION: TH16 0x407330
+int __fastcall anm_effect_1_on_tick(AnmVm *vm)
+{
+    AnmEffect1Data *data = (AnmEffect1Data *)vm->ins_508_extra_data;
+    i32 finished = 0;
+    for (i32 i = 0; i < 4; i++)
+    {
+        if (data->vms[i].run())
+        {
+            finished++;
+        }
+    }
+    if (finished >= 4)
+    {
+        return 1;
+    }
+    data->vms[4].run();
+    data->frame_count++;
+    return 0;
+}
+
 // FUNCTION: TH16 0x4078f0
 int __fastcall anm_effect_1_on_destroy(AnmVm *vm)
 {
