@@ -67,8 +67,3 @@ i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     return 0;
 }
 
-// STUB: TH16 0x445d40
-i32 __fastcall damage_source_on_hit_445d40(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y)
-{
-    return 0;
-}

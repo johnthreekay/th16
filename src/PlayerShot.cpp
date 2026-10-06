@@ -148,3 +148,33 @@ i32 __fastcall sht_on_init_4474d0(PlayerBullet *bullet)
                                          g_replay_safe_rng.randf_neg_1_to_1() * (ZUN_PI / 180.0f) * 15.0f);
     return 0;
 }
+
+// TODO: the original computes the shooter twice from scratch (keeping ref in
+// ebx); ours shares the common parts and spills them.
+// FUNCTION: TH16 0x445d40
+i32 __fastcall damage_source_on_hit_445d40(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y)
+{
+    Player *player = g_Player;
+    i32 ref = player->inner.bullets[source->bullet_index].shooter_ref;
+    if (player->get_shooter(ref)->func_on_hit != NULL)
+    {
+        return player->get_shooter(ref)->func_on_hit(&player->inner.bullets[source->bullet_index], unk, enemy, x,
+                                                      y);
+    }
+    return player->inner.bullets[source->bullet_index].hit();
+}
+
+// FUNCTION: TH16 0x445e20
+i32 PlayerBullet::hit()
+{
+    AnmVm *vm = get_vm_or_clear(anm_id);
+    pos.pos.z = 0.1f;
+    vm->interrupt(1);
+    pos.speed *= 0.125f;
+    state = 2;
+    vm->entity_pos = pos.pos;
+    damage_source()->flags &= ~1;
+    i32 result = unk_9c;
+    damage_source_index = 0;
+    return result;
+}

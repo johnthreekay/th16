@@ -67,6 +67,9 @@ struct PlayerBullet
     u8 unk_b4[0xc0 - 0xb4];
 
     struct PlayerDamageSource *damage_source();
+    // 0x445e20. The default reaction to hitting an enemy: the bullet
+    // stops being a damage source and plays its hit animation.
+    i32 hit();
 };
 
 // Something that hurts enemies: player bullets, bombs, releases.
@@ -230,6 +233,24 @@ struct Player
     // Loads a .sht file and resolves its offsets and callbacks. Does not
     // use this.
     i32 read_sht_file(ShtFile **out, const char *path);
+
+    // The shooter a bullet's shooter_ref names.
+    ShtShooter *get_shooter(i32 ref)
+    {
+        ShtFile *sht;
+        i32 array;
+        if (!(ref & 0xf0000))
+        {
+            sht = sht_file;
+            array = ref >> 8;
+        }
+        else
+        {
+            sht = sht_file_subseason;
+            array = (u8)(ref >> 8);
+        }
+        return &sht->shooter_arrays[array][(u8)ref];
+    }
     // 0x443f10
     void die();
     // Enters state 1 for 60 frames.
