@@ -27,6 +27,8 @@ struct AnmManager
     // Reaches the manager through g_AnmManager; callers push only the
     // arguments and the callee pops them.
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *path);
+    // Marks the VM and its children for deletion. ExpHP: anm_unload_46f1c0.
+    static void __stdcall unload_vm(AnmId id);
 
     // ExpHP: AnmBehemoth::disable_vms_from_anm_file
     void disable_vms_from_anm_file(AnmLoaded *anm);

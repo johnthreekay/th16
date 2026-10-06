@@ -5,6 +5,7 @@
 #include "../AnmVm.h"
 #include "../BulletManager.h"
 #include "../GameThread.h"
+#include "../Spellcard.h"
 #include "../Timer.h"
 
 // GLOBAL: TH16 0x4c0f48
@@ -48,6 +49,11 @@ AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *path)
     return NULL;
 }
 
+// STUB: TH16 0x46f1c0
+void __stdcall AnmManager::unload_vm(AnmId id)
+{
+}
+
 // STUB: TH16 0x46f270
 void AnmManager::disable_vms_from_anm_file(AnmLoaded *anm)
 {
@@ -56,6 +62,18 @@ void AnmManager::disable_vms_from_anm_file(AnmLoaded *anm)
 // STUB: TH16 0x468490
 void AnmManager::draw_vm(AnmVm *vm)
 {
+}
+
+// STUB: TH16 0x417930
+i32 Spellcard::on_tick_body()
+{
+    return 1;
+}
+
+// STUB: TH16 0x417d70
+i32 Spellcard::on_draw_body()
+{
+    return 1;
 }
 
 // STUB: TH16 0x411e70
