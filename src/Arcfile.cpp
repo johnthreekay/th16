@@ -3,6 +3,7 @@
 
 #include "Arcfile.h"
 #include "Crypt.h"
+#include "Lzss.h"
 
 // GLOBAL: TH16 0x4c10b8
 Arcfile g_Arcfile;
@@ -192,6 +193,8 @@ struct ArcfileHeader
     u32 entry_count;
 };
 
+// TODO: the original calls get_size without the devirtualization guard
+// (an LTCG inlining decision); everything else is the same.
 // FUNCTION: TH16 0x4572e0
 HARNESS_CALLED bool Arcfile::read_directory(const char *path)
 {
@@ -251,6 +254,8 @@ HARNESS_CALLED bool Arcfile::read_directory(const char *path)
     return false;
 }
 
+// TODO: count + 1 and entries swap stack slots, and the loop counter lives
+// in a different slot.
 // FUNCTION: TH16 0x4574b0
 HARNESS_CALLED ArcfileEntry *Arcfile::parse_directory(u8 *data, i32 count, u32 end_offset)
 {

@@ -105,7 +105,3 @@ extern Arcfile g_arcfiles[0x14];
 // The archive code's own debug log; empty like zun_log, but a separate
 // function.
 void arcfile_log(const char *fmt, ...);
-
-// LZSS with a 13-bit window and 4-bit lengths. Both return a new allocation
-// (or fill dest if it is not NULL).
-u8 *LTCG_FASTCALL lzss_decompress(u8 *in, i32 in_size, u8 *dest, i32 out_size);
