@@ -92,7 +92,7 @@ struct UpdateFuncRegistry
     ~UpdateFuncRegistry();
 
     // TH06 equivalent: Chain::CreateElem
-    UpdateFunc *create_func(UpdateFuncCallback function);
+    DECOMP_NOINLINE UpdateFunc *create_func(UpdateFuncCallback function);
     // TH06 equivalent: Chain::AddToCalcChain
     int register_on_tick(UpdateFunc *f, int priority);
     // TH06 equivalent: Chain::AddToDrawChain
@@ -107,7 +107,7 @@ struct UpdateFuncRegistry
 
     // What owners' destructors do with their on_tick/on_draw functions.
     // Always inlined in the original; the registry pointer is loaded before
-    // the NULL check.
+    // the NULL check. Does nothing for NULL.
     void unregister_locked(UpdateFunc *f)
     {
         if (f != NULL)

@@ -23,3 +23,11 @@ void ZunTimer::operator-=(i32 frames)
         current = (i32)current_f;
     }
 }
+
+// TODO: the original keeps a multiply of the speed by 1.0f that our build
+// folds away (here and wherever decrement is inlined).
+// FUNCTION: TH16 0x40d490
+HARNESS_CALLED void ZunTimer::operator--(int)
+{
+    decrement(1.0f);
+}

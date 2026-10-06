@@ -3,7 +3,7 @@
 #include "decomp.h"
 #include "types.h"
 
-// Only the parts unit 6 needs so far.
+// Only the parts decompiled code needs so far.
 
 // The BGM stream (an adapted DirectSound sample CStreamingSound). Fields
 // from 0x14 on are ZUN's fade state.
@@ -44,6 +44,8 @@ struct SoundManager
     // The second argument is 0 at every call site; LTCG folded it, so
     // callers push whatever register is handy.
     HARNESS_CALLED void play_sound_centered(i32 id, i32 unused);
+    // 0x45e1f0. Pans by the x coordinate.
+    void play_sound_at_position(i32 id, f32 x);
 };
 
 extern SoundManager g_SoundManager;

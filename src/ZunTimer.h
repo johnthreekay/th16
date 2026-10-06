@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "decomp.h"
 #include "types.h"
 
 // Pointers to the speed multipliers a ZunTimer can follow; entry 0 is the
@@ -16,8 +17,8 @@ enum ZunTimerControl
 // A frame counter that follows the game speed, advancing by fractional
 // frames when it changes. Layout from ExpHP's th-re-data (zTimer); TH06's
 // ZunTimer is the same idea without the control word. The inline helpers are
-// what the out-of-line copies and their inlined uses (set at 0x406490,
-// operator++ at 0x406190) do.
+// what the out-of-line copies and their inlined uses (set_value at 0x406490,
+// operator++ at 0x406190, operator-- at 0x40d490) do.
 struct ZunTimer
 {
     i32 previous;
@@ -65,28 +66,69 @@ struct ZunTimer
         previous = time - 1;
     }
 
+    void operator=(i32 time)
+    {
+        set(time);
+    }
+
+    // 0x406490. The out-of-line copy of set.
+    HARNESS_CALLED void set_value(i32 time);
+
     // Count back by the given number of frames, scaled like tick().
     void operator-=(i32 frames);
 
-    // Advance by one frame, scaled by the speed multiplier unless it is
-    // close enough to 1.
-    void tick()
+    // The speed multiplier this timer follows; resets a bad index to the
+    // game speed.
+    f32 *speed()
     {
         if (speed_index >= 1)
         {
             speed_index = 0;
         }
-        f32 *speed = g_timer_speed_ptrs[speed_index];
-        previous = current;
-        if (speed == NULL || (*speed > 0.99f && *speed < 1.01f))
+        return g_timer_speed_ptrs[speed_index];
+    }
+
+    // Advance by one frame, scaled by the speed multiplier unless it is
+    // close enough to 1.
+    void tick()
+    {
+        f32 *speed = this->speed();
+        i32 cur = current;
+        previous = cur;
+        if (speed != NULL && !(*speed > 0.99f && *speed < 1.01f))
         {
-            current_f += 1.0f;
-            current++;
+            current_f += *speed;
+            cur = (i32)current_f;
         }
         else
         {
-            current_f += *speed;
-            current = (i32)current_f;
+            current_f += 1.0f;
+            cur++;
         }
+        current = cur;
     }
+
+    // 0x406190. The out-of-line copy of tick. The int is C++'s postfix
+    // marker; LTCG drops it but keeps the stack slot.
+    HARNESS_CALLED void operator++(int);
+
+    // Count back by n frames, scaled by the speed multiplier unless it is
+    // close enough to 1.
+    void decrement(f32 n)
+    {
+        f32 *speed = this->speed();
+        previous = current;
+        if (speed != NULL && !(*speed > 0.99f && *speed < 1.01f))
+        {
+            current_f -= *speed * n;
+        }
+        else
+        {
+            current_f -= n;
+        }
+        current = (i32)current_f;
+    }
+
+    // 0x40d490
+    HARNESS_CALLED void operator--(int);
 };

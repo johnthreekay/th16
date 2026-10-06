@@ -9,6 +9,7 @@ enum
     CS_GAME_ERROR_CONTEXT = 3,
     // Guards restarting g_Supervisor.thread.
     CS_SUPERVISOR_THREAD = 6,
+    CS_ANM_MANAGER = 9,
     CS_RNG = 10,
     CS_COUNT = 14,
 };
