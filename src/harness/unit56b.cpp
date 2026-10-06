@@ -34,3 +34,9 @@ void harness_popup(Float3 *pos, i32 value, D3DCOLOR color)
     g_PopupManager->generate_small_score_popup(pos, value, color);
     g_PopupManager->generate_small_score_popup(pos, value * 10, 0xffffffff);
 }
+
+// Like replay playback restoring the player's position (0x448fbc).
+void harness_player_set_position_subpixel(Int2 *pos)
+{
+    g_Player->set_position_subpixel(pos);
+}

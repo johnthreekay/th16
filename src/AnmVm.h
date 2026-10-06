@@ -186,6 +186,8 @@ struct AnmVm
     void wipe_suffix();
     // Switches to another sprite of the same file, changing only the UVs.
     void set_sprite_uvs(i32 sprite);
+    // 0x447550. Starts interpolating the scale from initial to goal.
+    void set_scale_interp(i32 end_time, i32 method, D3DXVECTOR2 *initial, D3DXVECTOR2 *goal);
 
     void interrupt(i32 n)
     {

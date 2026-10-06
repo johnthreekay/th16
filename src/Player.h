@@ -239,6 +239,8 @@ struct Player
     void set_shoot_key_short_timer(i32 time);
     void interrupt_options();
     HARNESS_CALLED void set_position(f32 x, f32 y);
+    // Works on g_Player (replay playback restores the position with it).
+    HARNESS_CALLED void set_position_subpixel(Int2 *pos);
     // Loads a .sht file and resolves its offsets and callbacks. Does not
     // use this.
     i32 read_sht_file(ShtFile **out, const char *path);

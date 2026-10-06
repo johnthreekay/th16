@@ -209,3 +209,41 @@ i32 __fastcall sht_on_hit_447270(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     g_EffectManager->effect_anm->create_vm(0x98, &bullet->pos.pos, angle, -1, 0);
     return bullet->hit();
 }
+
+// TODO: register allocation: the original keeps the player in edi and the
+// bullet in esi throughout (with an unused stack slot); ours reloads the
+// player for create_damage_source.
+// FUNCTION: TH16 0x446f80
+i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+{
+    Player *player = g_Player;
+    i32 damage = player->get_shooter(bullet->shooter_ref)->damage;
+    i32 index = player->create_damage_source(&bullet->pos.pos, 24.0f, 2.0f, 0x14, damage);
+    PlayerDamageSource *source = index != 0 ? &player->inner.damage_sources[index - 1] : NULL;
+    source->unk_80 = 4;
+    AnmManager::interrupt_tree(bullet->anm_id, 1);
+    bullet->state = 2;
+    bullet->pos.speed = 2.0f;
+    source->pos = bullet->pos;
+    bullet->damage_source()->flags &= ~1;
+    bullet->damage_source_index = 0;
+    g_SoundManager.play_sound_at_position(0x41, bullet->pos.pos.x);
+    return bullet->unk_9c;
+}
+
+// TODO: the original aligns its frame to 8 bytes (and esp, -8) and
+// addresses its locals through esp.
+// FUNCTION: TH16 0x447320
+i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+{
+    f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * (ZUN_PI / 9.0f));
+    AnmId id = g_EffectManager->effect_anm->create_vm(0x98, &bullet->pos.pos, angle, -1, 0);
+    AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+    D3DXVECTOR2 initial(1.0f, 1.0f);
+    D3DXVECTOR2 goal(3.0f, 3.0f);
+    vm->set_scale_interp(0x14, 0, &initial, &goal);
+    vm->color_1.r = (g_replay_unsafe_rng.rand_u32() & 0x7f) + 0x7f;
+    vm->color_1.g = (g_replay_unsafe_rng.rand_u32() & 0x7f) + 0x40;
+    vm->color_1.b = (g_replay_unsafe_rng.rand_u32() & 0x3f) + 0x40;
+    return bullet->hit();
+}

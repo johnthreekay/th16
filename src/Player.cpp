@@ -250,3 +250,18 @@ HARNESS_CALLED i32 Player::create_damage_source(D3DXVECTOR3 *pos, f32 radius, f3
     inner.last_created_damage_source_index = index;
     return index + 1;
 }
+
+// TODO: the original stores both halves of the position before reading x
+// back; ours reads x back between the stores.
+// FUNCTION: TH16 0x4476d0
+HARNESS_CALLED void Player::set_position_subpixel(Int2 *pos)
+{
+    inner.pos_subpixel.x = pos->x;
+    inner.pos_subpixel.y = pos->y;
+    inner.pos.x = inner.pos_subpixel.x / 128.0f;
+    inner.pos.y = inner.pos_subpixel.y / 128.0f;
+    inner.main_options[0].should_instajump = 1;
+    inner.main_options[1].should_instajump = 1;
+    inner.main_options[2].should_instajump = 1;
+    inner.main_options[3].should_instajump = 1;
+}
