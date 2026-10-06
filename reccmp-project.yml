@@ -1,0 +1,19 @@
+targets:
+  TH16:
+    filename: th16.exe
+    source_root: src
+    hash:
+      sha256: c11776019f083978e66027e7394dafb1fb9543afca986f28049a49417e341929
+    data_sources:
+    - build/lib.csv
+    encoding:
+    ghidra:
+      ignore_types: []
+      ignore_functions: []
+      name_substitutions: []
+      allow_hash_mismatch: false
+    report:
+      ignore_functions: []
+      ignore_variables: []
+      icon:
+    marker_aliases: {}

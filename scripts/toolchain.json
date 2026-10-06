@@ -1,0 +1,260 @@
+[
+  {
+    "id": "Microsoft.VisualCpp.Tools.HostX86.TargetX86",
+    "version": "14.10.25017.0",
+    "source": "VS2017 15.0 RTW (26228.4) catalog",
+    "kind": "vsix",
+    "payloads": [
+      {
+        "file": "microsoft.visualcpp.tools.hostx86.targetx86.vsix",
+        "url": "https://download.microsoft.com/download/1/F/C/1FC10CF0-5BE5-411C-B231-470719DEBE94/microsoft.visualcpp.tools.hostx86.targetx86.vsix",
+        "sha256": "4d1c294c7168c2f5a68b86b263a576c617cdee520e7148ea999c0dcfe2d017c6",
+        "size": 11472555
+      }
+    ]
+  },
+  {
+    "id": "Microsoft.VisualCpp.Tools.HostX86.TargetX86.Resources",
+    "version": "14.10.25017.0",
+    "source": "VS2017 15.0 RTW (26228.4) catalog",
+    "kind": "vsix",
+    "payloads": [
+      {
+        "file": "microsoft.visualcpp.tools.hostx86.targetx86.resources.vsix",
+        "url": "https://download.microsoft.com/download/E/8/E/E8E5DE64-5593-4F0E-BC55-9897747359A4/microsoft.visualcpp.tools.hostx86.targetx86.resources.vsix",
+        "sha256": "218b0a0e42b16d0708fa6311c049409356521d2ab83cb38f1b93e0d854500671",
+        "size": 222635
+      }
+    ]
+  },
+  {
+    "id": "Microsoft.VisualCpp.Tools.Core",
+    "version": "14.10.25017.0",
+    "source": "VS2017 15.0 RTW (26228.4) catalog",
+    "kind": "vsix",
+    "payloads": [
+      {
+        "file": "microsoft.visualcpp.tools.core.vsix",
+        "url": "https://download.microsoft.com/download/E/2/5/E2532B12-2BA7-4218-9464-E60D2515B9DB/microsoft.visualcpp.tools.core.vsix",
+        "sha256": "dcadf82aa9444a04dad34db72200e8c569ad5ba028e7241906ea859f296a534c",
+        "size": 268282
+      }
+    ]
+  },
+  {
+    "id": "Microsoft.VisualCpp.Tools.Core.Resources",
+    "version": "14.10.25017.0",
+    "source": "VS2017 15.0 RTW (26228.4) catalog",
+    "kind": "vsix",
+    "payloads": [
+      {
+        "file": "microsoft.visualcpp.tools.core.resources.vsix",
+        "url": "https://download.microsoft.com/download/9/3/3/9332C245-DCFC-46A6-9C81-67699668C1E1/microsoft.visualcpp.tools.core.resources.vsix",
+        "sha256": "9ac722e56c0c11f81c4463d6b8c3e75db8e50d81cf264659c4c2f2b749cf8d09",
+        "size": 28199
+      }
+    ]
+  },
+  {
+    "id": "Microsoft.VisualCpp.CRT.Headers",
+    "version": "14.10.25017.0",
+    "source": "VS2017 15.0 RTW (26228.4) catalog",
+    "kind": "vsix",
+    "payloads": [
+      {
+        "file": "microsoft.visualcpp.crt.headers.vsix",
+        "url": "https://download.microsoft.com/download/7/4/4/744F3384-4F26-4B3D-BEE5-AC49B9F252DA/microsoft.visualcpp.crt.headers.vsix",
+        "sha256": "df6a4ec7496d1ad49a4d097f4b7e1d0406ec35e81827a1a4fadd2481a6ad19a7",
+        "size": 2783151
+      }
+    ]
+  },
+  {
+    "id": "Microsoft.VisualCpp.CRT.x86.Desktop",
+    "version": "14.10.25017.0",
+    "source": "VS2017 15.0 RTW (26228.4) catalog",
+    "kind": "vsix",
+    "payloads": [
+      {
+        "file": "microsoft.visualcpp.crt.x86.desktop.vsix",
+        "url": "https://download.microsoft.com/download/5/F/0/5F02CC8A-EED5-428A-92C8-213CAC8D8AE9/microsoft.visualcpp.crt.x86.desktop.vsix",
+        "sha256": "4d220747c8ef6e7ebdee1aa2aede911acc08685f9baa3a09bb1447d4d82b994a",
+        "size": 53782504
+      }
+    ]
+  },
+  {
+    "id": "Microsoft.VisualCpp.CRT.x86.Store",
+    "version": "14.10.25017.0",
+    "source": "VS2017 15.0 RTW (26228.4) catalog",
+    "kind": "vsix",
+    "payloads": [
+      {
+        "file": "microsoft.visualcpp.crt.x86.store.vsix",
+        "url": "https://download.microsoft.com/download/D/3/A/D3A7C303-4F84-4E62-A4F2-D1B4843703AC/microsoft.visualcpp.crt.x86.store.vsix",
+        "sha256": "f7828eb5cec0bc3a807d57585829a829b41566cf5f379d195bd882f7ab40df6c",
+        "size": 8731023
+      }
+    ]
+  },
+  {
+    "id": "Microsoft.VisualCpp.CRT.Source",
+    "version": "14.10.25017.0",
+    "source": "VS2017 15.0 RTW (26228.4) catalog",
+    "kind": "vsix",
+    "payloads": [
+      {
+        "file": "microsoft.visualcpp.crt.source.vsix",
+        "url": "https://download.microsoft.com/download/6/C/1/6C1CA346-241E-4AEA-99DE-4C465F7D3416/microsoft.visualcpp.crt.source.vsix",
+        "sha256": "2904aaf1a2ef63605f6d667d5117c5e29bb74c94ebcc4e2b728c79a6fac60932",
+        "size": 982956
+      }
+    ]
+  },
+  {
+    "id": "Microsoft.VisualCpp.DIA.SDK",
+    "version": "14.10.25017.0",
+    "source": "VS2017 15.0 RTW (26228.4) catalog",
+    "kind": "vsix",
+    "payloads": [
+      {
+        "file": "microsoft.visualcpp.dia.sdk.vsix",
+        "url": "https://download.microsoft.com/download/7/B/C/7BCBA5C1-851E-42B6-8C53-88F918ECD1AF/microsoft.visualcpp.dia.sdk.vsix",
+        "sha256": "bb6ffd8417a8471c8c4b858c534021df9ecaac6a118d0beee23fbaee4ec7efdc",
+        "size": 3605517
+      }
+    ]
+  },
+  {
+    "id": "Microsoft.Windows.XPSupport.Msi",
+    "version": "11.0.51106.2",
+    "source": "VS2017 15.9 catalog",
+    "kind": "msi",
+    "payloads": [
+      {
+        "file": "Win_XPSupport.msi",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/16058eb2-991e-4a6e-8588-f6ce31a69bf5/7aa88c7d872c6d8ad00fcc81c53d5103/win_xpsupport.msi",
+        "sha256": "00b4d7e2c384d57fef6264336eabc4d93c5523c1ce7987207263b3e85cc03932",
+        "size": 483328
+      },
+      {
+        "file": "cab1.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/16058eb2-991e-4a6e-8588-f6ce31a69bf5/12932fc2e6c5c109821dc80ffe16639f/cab1.cab",
+        "sha256": "b27cd4cf11b7a95fbaac604d5524f1adf5e6ebd65f1aa3c125e2bc38dd2a74da",
+        "size": 8752406
+      },
+      {
+        "file": "cab2.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/99c77055-8027-4e25-a215-082ad23689e5/54407c255e5ad02b0472ec889a12a198/cab2.cab",
+        "sha256": "d5d7c33e1c55a0dfe36c530cdad670a73f507b7b60b5c83c45af4c1b4c91241f",
+        "size": 4819954
+      },
+      {
+        "file": "cab3.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/99c77055-8027-4e25-a215-082ad23689e5/dd4a91259ca9b7626703e788beb8e9c3/cab3.cab",
+        "sha256": "4e8f8e8af4b012bb530668dd55837b217f3c8011c9d6cbec13e18ada0418ae37",
+        "size": 5794594
+      },
+      {
+        "file": "cab4.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/e98d1ad5-53a6-4a91-a613-3ecc4c2d17be/0d6e2a4785681b1771e20bf041d37fbf/cab4.cab",
+        "sha256": "cd167d5bb21d01e2fad461180aa9d756d1ba2e4e690552d51a54978bff217599",
+        "size": 4130192
+      }
+    ]
+  },
+  {
+    "id": "Microsoft.Windows.UniversalCRT.HeadersLibsSources.Msi",
+    "version": "10.0.26624.1",
+    "source": "VS2017 15.9 catalog",
+    "kind": "msi",
+    "payloads": [
+      {
+        "file": "Universal CRT Headers Libraries and Sources-x86_en-us.msi",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/fb762014-2a36-4840-8a24-7ff61d1ee019/975874342d151b32b3f4e0eac90db7c8/universal%20crt%20headers%20libraries%20and%20sources-x86_en-us.msi",
+        "sha256": "54448641eef058318b540188245a62982f97ccc462c0c1c1cf3c6d771e26f214",
+        "size": 405504
+      },
+      {
+        "file": "16ab2ea2187acffa6435e334796c8c89.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/8c0441e7-98ee-40ae-9a5a-127bcd5f4c52/a4e7a0a15baf966e92c612347f058e7d/16ab2ea2187acffa6435e334796c8c89.cab",
+        "sha256": "fd8099addd4b177bc38e1c25ead2f1237a3b92979c2b7083eb756c7ff4549f83",
+        "size": 581313
+      },
+      {
+        "file": "2868a02217691d527e42fe0520627bfa.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/8c0441e7-98ee-40ae-9a5a-127bcd5f4c52/0c73cc42594f36fcb900543d5ae1c5d4/2868a02217691d527e42fe0520627bfa.cab",
+        "sha256": "351c9fb52417528084206c13fde01992031e2a79fbbe94e808963ed6470610af",
+        "size": 501482
+      },
+      {
+        "file": "6ee7bbee8435130a869cf971694fd9e2.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/fa0c8bc3-bd08-4c37-a465-4d6b8c951bf6/65b6615dbccc5ab984a6602bccc2fddf/6ee7bbee8435130a869cf971694fd9e2.cab",
+        "sha256": "96d28a324939c9a6bbceb3acfa1061525a0e63ad95ae286a5778ed3e8ae366fa",
+        "size": 34999208
+      },
+      {
+        "file": "78fa3c824c2c48bd4a49ab5969adaaf7.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/7d9e4bde-cfb6-4a65-9cf1-8c013670a545/c83ab50003c24faecb1712c036583913/78fa3c824c2c48bd4a49ab5969adaaf7.cab",
+        "sha256": "f4737a26feb8b380788379b2a7710ad306bfb1bf13f5177361f2a0b29dc25737",
+        "size": 35534891
+      },
+      {
+        "file": "7afc7b670accd8e3cc94cfffd516f5cb.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/4a925113-4714-47d1-8e22-1d149bb57d9f/f0aa309e7ce05004accdc494ea5be759/7afc7b670accd8e3cc94cfffd516f5cb.cab",
+        "sha256": "495312c864a202eb3301cc63e919f5e83d14c8cde07bf9ebf8054332fa9c7c25",
+        "size": 518298
+      },
+      {
+        "file": "80dcdb79b8a5960a384abe5a217a7e3a.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/7d9e4bde-cfb6-4a65-9cf1-8c013670a545/bb8935c38f52f40c6ff4499e5ce22636/80dcdb79b8a5960a384abe5a217a7e3a.cab",
+        "sha256": "37af50386bf3b5afc2f4117af9988c0bec85e65ae5a9c3a6f0e83eda3a1cd168",
+        "size": 35673422
+      },
+      {
+        "file": "96076045170fe5db6d5dcf14b6f6688e.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/8c0441e7-98ee-40ae-9a5a-127bcd5f4c52/c01c850a877e91acdac97a613c6ba339/96076045170fe5db6d5dcf14b6f6688e.cab",
+        "sha256": "a8ec9e2ff216856ad9fdcd6516092c08f33adefbfdc696113f6f31552e7cf138",
+        "size": 592236
+      },
+      {
+        "file": "a1e2a83aa8a71c48c742eeaff6e71928.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/7d9e4bde-cfb6-4a65-9cf1-8c013670a545/c1b2fdd6a1d50f343b8ed11484250233/a1e2a83aa8a71c48c742eeaff6e71928.cab",
+        "sha256": "c777aea86b4126c90b7ae9017a2bf753f57b9dd450761db7d312d5bd8f5874fa",
+        "size": 36296724
+      },
+      {
+        "file": "b2f03f34ff83ec013b9e45c7cd8e8a73.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/4a925113-4714-47d1-8e22-1d149bb57d9f/6d97f0ae0c61820e66c6ac988de5f096/b2f03f34ff83ec013b9e45c7cd8e8a73.cab",
+        "sha256": "d0edd2447f7314f283f61b3db56eb65e01ca2b6f24bd4be52aaa285466fbc1ff",
+        "size": 140191
+      },
+      {
+        "file": "beb5360d2daaa3167dea7ad16c28f996.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/4a925113-4714-47d1-8e22-1d149bb57d9f/8ab6a768c40050b35631171e8506e5e2/beb5360d2daaa3167dea7ad16c28f996.cab",
+        "sha256": "3120fb967c9bd33edf5e44370a52708f27c1e249e39bad07f9cb745d094de7fb",
+        "size": 551478
+      },
+      {
+        "file": "f9ff50431335056fb4fbac05b8268204.cab",
+        "url": "https://download.visualstudio.microsoft.com/download/pr/7d9e4bde-cfb6-4a65-9cf1-8c013670a545/e30af4713083de082115ef655cc31621/f9ff50431335056fb4fbac05b8268204.cab",
+        "sha256": "212c2e08ca3aafb8111f780de5b97d5d921b7e0c4346f1455434907c263eb414",
+        "size": 14203
+      }
+    ]
+  },
+  {
+    "id": "DirectX SDK (June 2010)",
+    "version": "9.29.1962",
+    "source": "Microsoft Download Center",
+    "kind": "dxsdk",
+    "payloads": [
+      {
+        "file": "DXSDK_Jun10.exe",
+        "url": "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
+        "sha256": "705271dc83bfee54d9b94e028426e288d5f070784b7446d164f48ecfbb2a02cb",
+        "size": 599455936
+      }
+    ]
+  }
+]

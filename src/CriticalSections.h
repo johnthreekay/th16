@@ -1,0 +1,33 @@
+#pragma once
+
+#include <windows.h>
+
+enum
+{
+    CS_UPDATE_FUNC_REGISTRY = 0,
+    CS_COUNT = 14,
+};
+
+// Optional locking; only active when the game runs its threaded mode.
+struct CriticalSections
+{
+    CRITICAL_SECTION cs[CS_COUNT];
+    unsigned char depth[CS_COUNT];
+    bool enabled;
+};
+
+extern CriticalSections g_CriticalSections;
+
+#define ENTER_CS(i) \
+    if (g_CriticalSections.enabled) \
+    { \
+        EnterCriticalSection(&g_CriticalSections.cs[i]); \
+        g_CriticalSections.depth[i]++; \
+    }
+
+#define LEAVE_CS(i) \
+    if (g_CriticalSections.enabled) \
+    { \
+        LeaveCriticalSection(&g_CriticalSections.cs[i]); \
+        g_CriticalSections.depth[i]--; \
+    }
