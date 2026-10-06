@@ -44,6 +44,9 @@ enum AnmVmFlagsLo
     ANM_VM_ROTATION_CHANGED = 1 << 2,
     ANM_VM_SCALE_CHANGED = 1 << 3,
     ANM_VM_UV_SCALE_CHANGED = 1 << 4,
+    // Four bits of blend mode (AnmManager::setup_render_state_for_vm).
+    ANM_VM_BLEND_MODE_SHIFT = 5,
+    ANM_VM_BLEND_MODE_MASK = 0xf << 5,
     // pos_i moves pos_2 instead of pos.
     ANM_VM_POS_I_TO_POS_2 = 1 << 10,
     ANM_VM_FLAG_LO_800 = 1 << 11,
@@ -52,10 +55,16 @@ enum AnmVmFlagsLo
     // set_alpha2_time switch to 1, color_2).
     ANM_VM_COLOR_MODE_MASK = 3 << 17,
     ANM_VM_COLOR_MODE_1 = 1 << 17,
+    // Two bits of texture addressing along v: wrap, clamp, mirror.
+    ANM_VM_ADDRESS_V_SHIFT = 30,
 };
 
 enum AnmVmFlagsHi
 {
+    // Two bits of texture addressing along u: wrap, clamp, mirror.
+    ANM_VM_ADDRESS_U_MASK = 3 << 0,
+    // Point instead of linear filtering.
+    ANM_VM_FILTER_POINT_SHIFT = 11,
     // Rotate the sprite to the owner's movement angle.
     ANM_VM_AUTO_ROTATE = 1 << 7,
     ANM_VM_CREATED_BY_GAME = 1 << 10,

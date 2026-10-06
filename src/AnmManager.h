@@ -75,6 +75,21 @@ struct AnmLoaded
     void release();
 };
 
+// Vertex formats of the batched sprites and primitives (ExpHP:
+// zRenderVertex144, zRenderVertex044).
+struct RenderVertex144
+{
+    D3DXVECTOR4 pos;
+    D3DCOLOR diffuse;
+    Float2 uv;
+};
+
+struct RenderVertex044
+{
+    D3DXVECTOR4 pos;
+    D3DCOLOR diffuse;
+};
+
 // Loads and runs every ANM file.
 struct AnmManager
 {
@@ -89,9 +104,38 @@ struct AnmManager
     u8 unk_d8[0x184f4f0 - 0xd8];
     // Indexed by the slot given to preload_anm.
     AnmLoaded *loaded_anms[0x1f];
+    D3DMATRIX matrix_184f56c;
+    AnmVm vm_184f5ac;
+    u8 unk_184fba8[0x184fbb4 - 0x184fba8];
+    // Render state last set for a VM, so that it only changes (and flushes
+    // the batch) when needed.
+    u8 last_blend_mode;
+    u8 unk_184fbb5[0x184fbba - 0x184fbb5];
+    u8 last_filter_point;
+    u8 last_color_op;
+    u8 last_address_u;
+    u8 last_address_v;
+    u8 unk_184fbbe[0x184fc18 - 0x184fbbe];
+    // Sprites waiting for flush_sprites, six vertices each (ExpHP:
+    // zAnmVertexBuffers).
+    i32 unrendered_sprite_count;
+    RenderVertex144 sprite_vertex_data[0x20000];
+    RenderVertex144 *sprite_write_cursor;
+    RenderVertex144 *sprite_render_cursor;
+    i32 unrendered_primitive_count;
+    RenderVertex044 primitive_vertex_data[0x8000];
+    RenderVertex044 *primitive_write_cursor;
+    RenderVertex044 *primitive_render_cursor;
 
     void flush_sprites();
     void draw_vm(AnmVm *vm);
+    // Sets blending, filtering and texture addressing for a VM, flushing
+    // the batch first when they change.
+    void setup_render_state_for_vm(AnmVm *vm);
+    // Adds a quad (as two triangles) to the sprite batch; 1 if it is full.
+    i32 write_sprite(RenderVertex144 *vertices);
+    // Empties both vertex batches.
+    HARNESS_CALLED void reset_vertex_buffers();
     // 0x46efa0
     AnmVm *get_vm_with_id(AnmId id);
     // 0x46f1c0. Marks the VM and its children for deletion. Reaches the

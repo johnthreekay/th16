@@ -4,11 +4,6 @@
 // GLOBAL: TH16 0x4c0f48
 AnmManager *g_AnmManager;
 
-// STUB: TH16 0x465a80
-void AnmManager::flush_sprites()
-{
-}
-
 // STUB: TH16 0x468490
 void AnmManager::draw_vm(AnmVm *vm)
 {

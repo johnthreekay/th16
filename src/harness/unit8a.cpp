@@ -62,3 +62,9 @@ void harness_anm_step_interpolators(AnmVm *vm)
     vm->step_interpolators();
     vm->rotate_2d_i.reset_time();
 }
+
+// Like Supervisor's per-frame drawing setup, which resets the batches.
+void harness_anm_reset_vertex_buffers()
+{
+    g_AnmManager->reset_vertex_buffers();
+}
