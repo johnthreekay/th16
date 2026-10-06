@@ -96,6 +96,10 @@ typedef i32(__fastcall *AnmVmSwitchFunc)(AnmVm *vm, i32 interrupt);
 extern AnmVmSwitchFunc g_anm_on_switch_funcs[4];
 typedef i32(__fastcall *AnmVmFunc)(AnmVm *vm);
 extern AnmVmFunc g_anm_on_destroy_funcs[4];
+// Called with the copy, the original and an extra argument when a VM with
+// extra data is copied (ExpHP: ANM_ON_COPY_FUNC_2).
+typedef i32(__fastcall *AnmVmCopyFunc)(AnmVm *vm, const AnmVm *other, i32 arg);
+extern AnmVmCopyFunc g_anm_on_copy_funcs[2];
 
 // One running ANM script (layout: ExpHP's zAnmVm, flattened, 0x5fc bytes).
 struct AnmVm
@@ -236,4 +240,7 @@ struct AnmVm
     // 0x46f510. Depth-first search for the n-th descendant with the given
     // unk_49c (-1 for any).
     AnmVm *search_children(i32 unk_49c, i32 n);
+    // 0x46fd50 (ExpHP: AnmVm::constructor(const AnmVm&, int)). Copies
+    // another VM's state, but not its place in any list.
+    void copy_from(const AnmVm &other, i32 arg);
 };

@@ -234,7 +234,7 @@ struct AnmManager
     // Every caller goes through g_AnmManager (see the list inserts).
     HARNESS_CALLED AnmVm *allocate_vm();
     // 0x46f720. The same for snapshots; hands out the snapshot's id.
-    AnmVm *allocate_snapshot_vm(AnmId *id);
+    AnmVm *allocate_snapshot_vm(i32 *id);
     // 0x46f810. Copies the VM and its children into snapshots.
     AnmId store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused);
     // 0x46e7d0 and the next three. Every caller goes through g_AnmManager,

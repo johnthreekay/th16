@@ -730,3 +730,115 @@ AnmId AnmLoaded::create_managed_root(i32 script, AnmVm *like, i32 unused)
     LEAVE_CS(CS_ANM_MANAGER);
     return id;
 }
+
+// FUNCTION: TH16 0x46fd50
+void AnmVm::copy_from(const AnmVm &other, i32 arg)
+{
+    memcpy(this, &other, offsetof(AnmVm, id));
+    ZunTimer timer = other.script_time;
+    script_time = timer.current;
+    timer = other.timer_1c;
+    timer_1c = timer.current;
+    node_in_global_list.entry = this;
+    node_in_global_list.next = NULL;
+    node_in_global_list.prev = NULL;
+    node_in_global_list.unk_c = NULL;
+    node_as_child.entry = this;
+    node_as_child.next = NULL;
+    node_as_child.prev = NULL;
+    node_as_child.unk_c = NULL;
+    list_of_children.entry = this;
+    list_of_children.next = NULL;
+    list_of_children.prev = NULL;
+    list_of_children.unk_c = NULL;
+    next_in_layer = NULL;
+    parent = NULL;
+    unk_5b0 = NULL;
+    slowdown = other.slowdown;
+    entity_pos = other.entity_pos;
+    associated_game_entity = other.associated_game_entity;
+    index_of_sprite_mapping_func = other.index_of_sprite_mapping_func;
+    index_of_on_wait = other.index_of_on_wait;
+    index_of_on_tick = other.index_of_on_tick;
+    index_of_on_draw = other.index_of_on_draw;
+    index_of_on_destroy = other.index_of_on_destroy;
+    index_of_on_interrupt = other.index_of_on_interrupt;
+    index_of_on_copy_1 = other.index_of_on_copy_1;
+    index_of_on_copy_2 = other.index_of_on_copy_2;
+    if (other.ins_508_extra_data != NULL)
+    {
+        ins_508_extra_data_size = other.ins_508_extra_data_size;
+        ins_508_extra_data = malloc(ins_508_extra_data_size);
+        memcpy(ins_508_extra_data, other.ins_508_extra_data, ins_508_extra_data_size);
+        if (other.index_of_on_copy_1 != 0)
+        {
+            g_anm_on_copy_funcs[other.index_of_on_copy_1](this, &other, arg);
+        }
+    }
+}
+
+// TODO: the original copies the new discriminator to ecx before storing it (slow path).
+// FUNCTION: TH16 0x46f720
+AnmVm *AnmManager::allocate_snapshot_vm(i32 *id)
+{
+    // Snapshot ids have the top bit set and an 18-bit discriminator.
+    if (next_snapshot_fast_id >= 0x1fff)
+    {
+        next_snapshot_discriminator = (next_snapshot_discriminator + 1) & 0x3ffff;
+        if (next_snapshot_discriminator == 0)
+        {
+            next_snapshot_discriminator = 1;
+        }
+        *id = (next_snapshot_discriminator << 13) | 0x80001fff;
+        AnmVm *vm = new AnmVm;
+        vm->wipe();
+        vm->fast_id = 0x1fff;
+        return vm;
+    }
+    AnmVm *vm = &snapshot_fast_array[next_snapshot_fast_id].vm;
+    vm->wipe();
+    snapshot_fast_array[next_snapshot_fast_id].is_alive = true;
+    next_snapshot_discriminator = (next_snapshot_discriminator + 1) & 0x3ffff;
+    if (next_snapshot_discriminator == 0)
+    {
+        next_snapshot_discriminator = 1;
+    }
+    i32 fast_id = next_snapshot_fast_id;
+    *id = 0x80000000 | (next_snapshot_discriminator << 13) | fast_id;
+    snapshot_fast_array[fast_id].is_alive = true;
+    next_snapshot_fast_id++;
+    return vm;
+}
+
+// FUNCTION: TH16 0x46f810
+AnmId AnmManager::store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused)
+{
+    if (vm == NULL)
+    {
+        AnmId none;
+        none.id = (i32)vm;
+        return none;
+    }
+    i32 id;
+    AnmVm *copy = allocate_snapshot_vm(&id);
+    copy->copy_from(*vm, 0);
+    copy->flags_hi |= ANM_VM_SNAPSHOT;
+    copy->id.id = id;
+    snapshot_list_head.insert_after(&copy->node_in_global_list);
+    if (parent != NULL)
+    {
+        ((ZunList<void> *)&parent->list_of_children)->append((ZunList<void> *)&copy->node_as_child);
+        if (parent->parent != NULL)
+        {
+            copy->parent = parent->parent;
+        }
+        copy->unk_5b0 = parent;
+    }
+    for (ZunList<AnmVm> *node = vm->list_of_children.next; node != NULL; node = node->next)
+    {
+        store_snapshot_of_vm(node->entry, copy, 0);
+    }
+    AnmId result;
+    result.id = id;
+    return result;
+}

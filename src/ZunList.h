@@ -66,3 +66,5 @@ template <class T> struct ZunList
 };
 
 template <> void ZunList<void>::unlink();
+// 0x425d80. The out-of-line copy of append (most callers inline it).
+template <> void ZunList<void>::append(ZunList<void> *node);
