@@ -63,6 +63,13 @@ enum AnmVmFlagsHi
     ANM_VM_FLAG_HI_8000 = 1 << 15,
     // get_slowdown_factor stops walking up the parents at a VM with this.
     ANM_VM_FLAG_HI_OWN_SLOWDOWN = 1 << 16,
+    // Two bits: 1 for layers 3-19, 2 for layers 20-23, else 0.
+    ANM_VM_FLAG_HI_LAYER_KIND_MASK = 3 << 18,
+    ANM_VM_FLAG_HI_LAYER_KIND_1 = 1 << 18,
+    ANM_VM_FLAG_HI_LAYER_KIND_2 = 2 << 18,
+    // Three bits; set_layer sets it to 1 for layers 20-31 and 36-42.
+    ANM_VM_FLAG_HI_COORD_MODE_MASK = 7 << 20,
+    ANM_VM_FLAG_HI_COORD_MODE_1 = 1 << 20,
 };
 
 // An ANM script interpreter: one sprite (or a tree of them) with its
@@ -73,7 +80,7 @@ struct AnmVm
     // --- prefix (0x0) ---
     Timer interrupt_return_time;
     i32 interrupt_return_offset;
-    u32 layer;
+    i32 layer;
     i32 anm_loaded_index;
     i32 sprite_id;
     i32 script_id;
@@ -161,4 +168,30 @@ struct AnmVm
     void initialize();
     HARNESS_CALLED f32 get_slowdown_factor();
     void alloc_extra_data(u32 size);
+    void set_layer(i32 layer);
+    void set_alpha1_time(i32 end_time, i32 method, u8 initial, u8 goal);
+    // Clears the suffix except for the fields that identify the VM.
+    void wipe_suffix();
+};
+
+// One loaded .anm file. Layout from ExpHP's th-re-data (zAnmLoaded).
+struct AnmLoaded
+{
+    i32 slot_num;
+    char name[0x104];
+    void *anm_file;
+    // One prototype VM per script.
+    AnmVm *vms;
+    i32 entry_count;
+    i32 script_count;
+    i32 sprite_count;
+    void *sprites;
+    u8 **scripts;
+    void *d3d;
+    i32 load_wait;
+    u8 unk_12c[8];
+    i32 unk_134;
+    u8 unk_138[4];
+
+    void copy_vm(AnmVm *dst, i32 script);
 };

@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -99,4 +100,72 @@ void AnmVm::alloc_extra_data(u32 size)
 {
     ins_508_extra_data_size = size;
     ins_508_extra_data = malloc(size);
+}
+
+// FUNCTION: TH16 0x406d80
+void AnmVm::set_layer(i32 layer)
+{
+    this->layer = layer;
+    if (this->layer >= 3 && this->layer <= 19)
+    {
+        flags_hi = flags_hi & ~ANM_VM_FLAG_HI_LAYER_KIND_MASK | ANM_VM_FLAG_HI_LAYER_KIND_1;
+    }
+    else if (this->layer >= 20 && this->layer <= 23)
+    {
+        flags_hi = flags_hi & ~ANM_VM_FLAG_HI_LAYER_KIND_MASK | ANM_VM_FLAG_HI_LAYER_KIND_2;
+    }
+    else
+    {
+        flags_hi &= ~ANM_VM_FLAG_HI_LAYER_KIND_MASK;
+    }
+    if (this->layer >= 20 && this->layer <= 31 || this->layer >= 36 && this->layer <= 42)
+    {
+        flags_hi = flags_hi & ~ANM_VM_FLAG_HI_COORD_MODE_MASK | ANM_VM_FLAG_HI_COORD_MODE_1;
+    }
+}
+
+// FUNCTION: TH16 0x406ce0
+void AnmVm::set_alpha1_time(i32 end_time, i32 method, u8 initial, u8 goal)
+{
+    alpha1_i.end_time = end_time;
+    alpha1_i.method = method;
+    alpha1_i.initial = initial;
+    alpha1_i.bezier_1 = 0;
+    alpha1_i.bezier_2 = 0;
+    alpha1_i.goal = goal;
+    alpha1_i.time.set(0);
+}
+
+// TODO: fast_id is restored before entity_pos in ours (scheduling).
+// FUNCTION: TH16 0x407a50
+void AnmVm::wipe_suffix()
+{
+    Float3 saved_entity_pos = entity_pos;
+    u32 saved_layer = layer;
+    u32 saved_fast_id = fast_id;
+    memset(&id, 0, sizeof(AnmVm) - offsetof(AnmVm, id));
+    layer = saved_layer;
+    fast_id = saved_fast_id;
+    entity_pos = saved_entity_pos;
+    node_in_global_list.entry = this;
+    node_in_global_list.next = NULL;
+    node_in_global_list.prev = NULL;
+    node_in_global_list.unk_c = NULL;
+    node_as_child.entry = this;
+    node_as_child.next = NULL;
+    node_as_child.prev = NULL;
+    node_as_child.unk_c = NULL;
+    list_of_children.entry = this;
+    list_of_children.next = NULL;
+    list_of_children.prev = NULL;
+    list_of_children.unk_c = NULL;
+}
+
+// FUNCTION: TH16 0x407b20
+void AnmLoaded::copy_vm(AnmVm *dst, i32 script)
+{
+    dst->wipe_suffix();
+    memcpy(dst, &vms[script], offsetof(AnmVm, id));
+    dst->timer_1c.set(0);
+    dst->script_time.set(0);
 }
