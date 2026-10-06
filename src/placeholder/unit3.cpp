@@ -11,10 +11,10 @@
 #include "../AsciiManager.h"
 #include "../ZunMath.h"
 
-// STUB: TH16 0x4033f0
 // Kept out of line so that LTCG gives it the original's register
 // convention: method in ecx, t in xmm1, end_time in xmm2. The original has
 // some thirty curves.
+// STUB: TH16 0x4033f0
 HARNESS_CALLED f32 interp_common_methods(i32 method, f32 t, f32 end_time)
 {
     if (end_time == 0.0f)
@@ -38,11 +38,11 @@ HARNESS_CALLED f32 interp_common_methods(i32 method, f32 t, f32 end_time)
     return t;
 }
 
-// STUB: TH16 0x408260
 // Only reads *pos: with that in view LTCG drops the /GS cookie that callers
 // passing the address of a local position would otherwise get. Like the
 // real one it formats the string with the CRT, which clobbers registers and
 // may write any global.
+// STUB: TH16 0x408260
 void AsciiManager::add_formatted_string(const D3DXVECTOR3 *pos, const char *fmt, ...)
 {
     char buf[0x100];

@@ -134,14 +134,14 @@ i32 Spellcard::on_draw_body()
     pos.y = 35.0f;
     pos.z = 0.0f;
     i32 practice = (g_game_flags_4a5bec & 0x30) == 0x20;
-    i32 captures = g_Scorefile->characters[g_character + g_subshot].spells[spell_id].captures[practice];
+    i32 captures = g_Scorefile->characters[g_subshot + g_character].spells[spell_id].captures[practice];
     if (captures >= 100)
     {
         g_AsciiManager->add_formatted_string(&pos, "MASTER");
     }
     else
     {
-        i32 attempts = g_Scorefile->characters[g_character + g_subshot].spells[spell_id].attempts[practice];
+        i32 attempts = g_Scorefile->characters[g_subshot + g_character].spells[spell_id].attempts[practice];
         if (attempts >= 100)
         {
             g_AsciiManager->add_formatted_string(&pos, "%.2d/99+", captures);

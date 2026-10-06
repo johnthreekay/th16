@@ -72,12 +72,6 @@ AnmVm::AnmVm() LTCG_NOTHROW
     instr_offset = -1;
 }
 
-// STUB: TH16 0x45f980
-i32 AnmVm::run()
-{
-    return 0;
-}
-
 // STUB: TH16 0x46d020
 AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *path)
 {
@@ -132,11 +126,6 @@ i32 Bullet::sub_4124b0(i32 arg)
 i32 Ending::initialize()
 {
     return 0;
-}
-
-// STUB: TH16 0x4197c0
-EndingChildF0::EndingChildF0(void *script)
-{
 }
 
 // STUB: TH16 0x4190b0
