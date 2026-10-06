@@ -330,6 +330,9 @@ struct LaserManager
     i32 cancel_all();
     HARNESS_CALLED i32 cancel_in_radius(Float3 *pos, f32 radius, i32 c, i32 d);
     HARNESS_CALLED i32 clear_all(i32 mode, i32 b);
+    // 0x41aa40. The laser with the given id, NULL if there is none. The
+    // second argument is the same at every call site; LTCG folded it.
+    HARNESS_CALLED LaserDataInf *find_by_id(i32 id, i32 unused);
 
     // cancel_in_radius as the season releases have it inlined, without the
     // count. Our build needs the __forceinline to agree.

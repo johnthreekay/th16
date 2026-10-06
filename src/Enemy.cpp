@@ -6,7 +6,10 @@
 #include "EffectManager.h"
 #include "EnemyManager.h"
 #include "GameThread.h"
+#include "Item.h"
+#include "Laser.h"
 #include "Player.h"
+#include "Rng.h"
 #include "UpdateFunc.h"
 
 static_assert(sizeof(PosVel) == 0x44, "PosVel size");
@@ -479,4 +482,96 @@ EnemyInf::~EnemyInf()
         delete (Fog *)enemy.fog.fog_ptr;
     }
     enemy.fog.fog_ptr = NULL;
+}
+
+// out->x, out->y = (rx cos angle, ry sin angle): sincosmul with separate
+// radii. A per-file copy, like sincosmul.
+// FUNCTION: TH16 0x426240
+static void __fastcall sincosmul_ellipse(Float3 *dst, f32 angle, f32 rx, f32 ry)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul rx
+        fstp [eax]
+        fmul ry
+        fstp [eax+4]
+    }
+}
+
+// FUNCTION: TH16 0x41a720
+void EnemyDrop::eject_all_drops(D3DXVECTOR3 *pos)
+{
+    if (main_type != 0)
+    {
+        g_ItemManager->spawn_item(main_type, pos, 0, -ZUN_PI / 2, 2.2f, 0, 0);
+    }
+    eject_extra_drops(pos);
+    main_type = 0;
+}
+
+// TODO: the original multiplies x as dist * x with dist loaded into a register; ours loads x.
+// FUNCTION: TH16 0x41d700
+void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
+{
+    f32 angle = g_replay_safe_rng.randf_neg_1_to_1() * ZUN_PI;
+    for (i32 i = 0; i < 16; i++)
+    {
+        if (i != 15)
+        {
+            for (i32 j = 0; j < extra_counts[i]; j++)
+            {
+                Float3 item_pos;
+                sincosmul_ellipse(&item_pos, angle, area.x, area.y);
+                f32 dist = g_replay_safe_rng.randf_0_to_1() * 0.5f + 0.5f;
+                Float3 offset(item_pos.x * dist, dist * item_pos.y, 0.0f);
+                item_pos.x = pos->x + offset.x;
+                item_pos.y = pos->y + offset.y;
+                item_pos.z = pos->z + offset.z;
+                g_ItemManager->spawn_item(i + 1, &item_pos, 0, -ZUN_PI / 2, 2.2f, 0, 0);
+                angle = wrap_angle(angle + ZUN_PI / 2 + g_replay_safe_rng.randf_neg_1_to_1() * ZUN_PI * 0.25f);
+            }
+        }
+        else
+        {
+            for (i32 j = 0; j < extra_counts[15]; j++)
+            {
+                g_ItemManager->spawn_item(0x10, pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
+                                          g_replay_safe_rng.randf_0_to_1() * 1.9f + 0.2f, 0, 0);
+            }
+        }
+    }
+    memset(extra_counts, 0, sizeof(extra_counts));
+}
+
+// FUNCTION: TH16 0x41aa00
+HARNESS_CALLED i32 EffectManager::track(AnmId id)
+{
+    i32 index = next_index();
+    if (index == -1)
+    {
+        return 0;
+    }
+    anm_ids[index] = id;
+    return index | 0x80000000;
+}
+
+// FUNCTION: TH16 0x41aa40
+HARNESS_CALLED LaserDataInf *LaserManager::find_by_id(i32 id, i32 unused)
+{
+    LaserDataInf *laser = list_head.next;
+    if (id == 0)
+    {
+        return NULL;
+    }
+    while (laser != NULL)
+    {
+        if (laser->id == id)
+        {
+            return laser;
+        }
+        laser = laser->next;
+    }
+    return NULL;
 }
