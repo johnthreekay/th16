@@ -34,11 +34,6 @@ u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size, i32 not_in_archive)
     return NULL;
 }
 
-// STUB: TH16 0x4184a0
-void ItemManager::destroy_all()
-{
-}
-
 // STUB: TH16 0x4307a0
 i32 ItemManager::on_draw_body(i32 layer)
 {

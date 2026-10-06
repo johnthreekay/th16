@@ -42,6 +42,22 @@ struct Item
     ~Item();
     // Puts the item back on the front of its free list.
     void release();
+
+    // Links the item in at the front of the list.
+    void release_to(ItemList *list)
+    {
+        if (list->next != NULL)
+        {
+            node.next = list->next;
+            list->next->prev = &node;
+        }
+        if (list->unk_c != NULL)
+        {
+            list->unk_c = &node;
+        }
+        list->next = &node;
+        node.prev = list;
+    }
     // Adds value * 100 to the PIV, capped at its maximum. Works on
     // g_Globals only; LTCG drops this (ExpHP: Globals::collect_piv).
     HARNESS_CALLED void collect_piv(f32 value);
