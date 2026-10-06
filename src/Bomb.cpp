@@ -111,7 +111,7 @@ BombInf::~BombInf()
 BombInf *BombInf::create()
 {
     BombInf *bomb;
-    switch (g_Globals.character + g_Globals.subshot)
+    switch (g_Globals.subshot + g_Globals.character)
     {
     default:
         bomb = new BombReimuAInf;
@@ -133,8 +133,8 @@ BombInf *BombInf::create()
         BombInf *release;
         switch (g_Globals.subseason)
         {
-        default:
-            release = new BombReimuSubInf;
+        case 3:
+            release = new BombMarisaSubInf;
             break;
         case 1:
             release = new BombCirnoSubInf;
@@ -142,11 +142,11 @@ BombInf *BombInf::create()
         case 2:
             release = new BombAyaSubInf;
             break;
-        case 3:
-            release = new BombMarisaSubInf;
-            break;
         case 4:
             release = new BombAllSubInf;
+            break;
+        default:
+            release = new BombReimuSubInf;
             break;
         }
         if (release->initialize(1) != 0)
@@ -181,7 +181,7 @@ int __fastcall BombInf::on_draw_callback(void *arg)
 // FUNCTION: TH16 0x40da90
 void BombInf::destroy_all()
 {
-    switch (g_Globals.character + g_Globals.subshot)
+    switch (g_Globals.subshot + g_Globals.character)
     {
     default:
         delete (BombReimuAInf *)g_MainBomb;
@@ -196,22 +196,23 @@ void BombInf::destroy_all()
         delete (BombMarisaAInf *)g_MainBomb;
         break;
     }
+    BombInf *release = g_SubseasonBomb;
     switch (g_Globals.subseason)
     {
     default:
-        delete (BombReimuSubInf *)g_SubseasonBomb;
+        delete (BombReimuSubInf *)release;
         break;
     case 1:
-        delete (BombCirnoSubInf *)g_SubseasonBomb;
+        delete (BombCirnoSubInf *)release;
         break;
     case 2:
-        delete (BombAyaSubInf *)g_SubseasonBomb;
+        delete (BombAyaSubInf *)release;
         break;
     case 3:
-        delete (BombMarisaSubInf *)g_SubseasonBomb;
+        delete (BombMarisaSubInf *)release;
         break;
     case 4:
-        delete (BombAllSubInf *)g_SubseasonBomb;
+        delete (BombAllSubInf *)release;
         break;
     }
     g_MainBomb = NULL;
