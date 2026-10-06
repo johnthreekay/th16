@@ -1,5 +1,6 @@
 // Opaque placeholders for the second pass over units 5 and 6. Compiled
 // without /GL, so calls into them stay opaque.
+#include "../Input.h"
 #include "../Player.h"
 
 // Opaque work for the placeholders in src/placeholder/unit56b.cpp.
@@ -43,3 +44,13 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     return 0;
 }
 
+
+// STUB: TH16 0x418650
+void InputState::update()
+{
+}
+
+// STUB: TH16 0x43f240
+void replay_ended_43f240()
+{
+}
