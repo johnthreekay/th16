@@ -63,3 +63,34 @@ void SoundManager::tick_bgm_fade()
         }
     }
 }
+
+// FUNCTION: TH16 0x42e4d0
+void SoundManager::pause_sounds()
+{
+    g_SoundManager.unk_1c = -1;
+    for (i32 i = 0; i < 78; i++)
+    {
+        SoundBuffer *sound = &g_SoundManager.sound_buffers[i];
+        sound->was_playing = 0;
+        if (sound->buffer != NULL)
+        {
+            DWORD status;
+            sound->buffer->GetStatus(&status);
+            sound->was_playing = status & DSBSTATUS_PLAYING;
+            sound->buffer->Stop();
+        }
+    }
+}
+
+// FUNCTION: TH16 0x440bd0
+void SoundManager::resume_sounds()
+{
+    for (i32 i = 0; i < 78; i++)
+    {
+        SoundBuffer *sound = &g_SoundManager.sound_buffers[i];
+        if (sound->buffer != NULL && sound->was_playing)
+        {
+            sound->buffer->Play(0, 0, sound->desc->play_flags);
+        }
+    }
+}

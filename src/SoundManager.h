@@ -29,9 +29,32 @@ enum BgmCommand
     BGM_FADE_OUT = 5,
 };
 
+// Play settings of a loaded sound effect.
+struct SoundBufferDesc
+{
+    u8 unk_0[0xc];
+    // Flags for IDirectSoundBuffer::Play.
+    u32 play_flags;
+};
+
+// A sound effect's DirectSound buffer.
+struct SoundBuffer
+{
+    struct IDirectSoundBuffer *buffer;
+    i32 unk_4;
+    SoundBufferDesc *desc;
+    u8 unk_c[0x14 - 0xc];
+    // Set while the game is paused if the buffer was playing.
+    i32 was_playing;
+};
+
 struct SoundManager
 {
-    u8 unk_0[0x5660];
+    u8 unk_0[0x1c];
+    i32 unk_1c;
+    u8 unk_20[0x1a84 - 0x20];
+    SoundBuffer sound_buffers[78];
+    u8 unk_21d4[0x5660 - 0x21d4];
     BgmStream *bgm_stream;
     u8 unk_5664[0x5698 - 0x5664];
 
@@ -41,6 +64,10 @@ struct SoundManager
     // Members that do not use this; LTCG dropped it.
     static i32 update_sound_thread();
     static void tick_bgm_fade();
+    // Stop every sound effect for the pause menu, remembering which were
+    // playing, and start those again.
+    static void pause_sounds();
+    static void resume_sounds();
     // The second argument is 0 at every call site; LTCG folded it, so
     // callers push whatever register is handy.
     HARNESS_CALLED void play_sound_centered(i32 id, i32 unused);

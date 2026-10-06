@@ -3,20 +3,106 @@
 #include <d3dx9math.h>
 
 #include "AnmManager.h"
+#include "Interp.h"
+#include "PosVel.h"
+#include "UpdateFunc.h"
 #include "ZunTimer.h"
 #include "decomp.h"
 #include "types.h"
 
-// Partial: only what unit 2 (Stage, Bomb) uses so far. Layout from ExpHP.
+// Layouts from ExpHP's th-re-data (zPlayer, zPlayerInner, zPlayerOption,
+// zPlayerBullet, zPlayerDamageSource94). Positions in the *_subpixel fields
+// are in 1/128 pixels.
+
+struct Int2
+{
+    i32 x;
+    i32 y;
+};
+
+// One of the player's options (main or season).
+struct PlayerOption
+{
+    i32 active;
+    u8 unk_4[0x54 - 0x4];
+    Int2 scaled_preferred_pos;
+    Int2 scaled_cur_pos;
+    Int2 scaled_preferred_pos_rel_to_player;
+    i32 unk_6c;
+    i32 unk_70;
+    u8 unk_74[0x80 - 0x74];
+    i32 unk_80;
+    u8 unk_84[0xb0 - 0x84];
+    AnmId anm_id_b0;
+    AnmId anm_id_b4;
+    ZunTimer timer_b8;
+    u8 unk_cc[0xd4 - 0xcc];
+    // Next update moves the option straight to its preferred position.
+    i32 should_instajump;
+    u8 unk_d8[0xe4 - 0xd8];
+};
+
+struct PlayerBullet
+{
+    i32 unk_0;
+    i32 index_of_self;
+    AnmId anm_id;
+    ZunTimer timer_c;
+    ZunTimer timer_20;
+    ZunTimer timer_34;
+    PosVel pos;
+    i32 state;
+    u8 unk_90[0xc0 - 0x90];
+};
+
+// Something that hurts enemies: player bullets, bombs, releases.
+struct PlayerDamageSource
+{
+    u32 flags;
+    f32 radius;
+    u8 unk_8[0x4];
+    f32 unk_c;
+    u8 unk_10[0x4];
+    f32 unk_14;
+    f32 unk_18;
+    PosVel pos;
+    ZunTimer timer_60;
+    i32 damage;
+    i32 total_damage_dealt;
+    i32 unk_7c;
+    u8 unk_80[0x4];
+    i32 unk_84;
+    i32 unk_88;
+    i32 unk_8c;
+    u8 unk_90[0x94 - 0x90];
+};
 
 struct PlayerInner
 {
     D3DXVECTOR3 pos;
-    u8 unk_c[0x16028 - 0xc];
+    Int2 pos_subpixel;
+    ZunTimer time_in_state;
+    ZunTimer time_in_stage;
+    ZunTimer timer_3c;
+    PlayerOption main_options[4];
+    PlayerOption subseason_options[8];
+    PlayerBullet bullets[0x100];
+    i32 last_created_damage_source_index;
+    PlayerDamageSource damage_sources[0x101];
+    i32 state;
+    AnmId anm_id_focused_hitbox;
+    AnmId anm_id_15fa0;
+    ZunTimer timer_15fa4;
+    i32 is_focused;
+    ZunTimer shoot_key_short_timer;
+    ZunTimer shoot_key_long_timer;
+    i32 num_main_options;
+    u8 unk_15fe8[0x16028 - 0x15fe8];
     ZunTimer iframes;
     // 0x20: damage is multiplied this frame (EnemyManager::update).
     u32 flags;
-    u8 unk_16040[0x16078 - 0x16040];
+    u8 unk_16040[0x16074 - 0x16040];
+    i32 unk_16074;
     // Set every frame by the autumn release.
     f32 speed_multiplier;
     u8 unk_1607c[0x16090 - 0x1607c];
@@ -25,20 +111,76 @@ struct PlayerInner
     void repopulate_options();
 };
 
+struct BoundingBox3
+{
+    D3DXVECTOR3 min_pos;
+    D3DXVECTOR3 max_pos;
+};
+
+// A shot type's .sht file (ExpHP: zShtRawFile); only the header so far.
+struct ShtFile
+{
+    i16 unk_0;
+    i16 sht_off_count;
+    f32 hitbox_radius;
+    f32 grazebox_radius;
+    f32 itembox_radius;
+    f32 move_speed;
+    f32 move_speed_focused;
+    f32 move_speed_diagonal;
+    f32 move_speed_focused_diagonal;
+    i16 power_level_count;
+    i16 max_damage_u;
+    i32 power_per_level;
+    i32 max_damage;
+    i32 unk_2c[5];
+};
+
 struct Player
 {
-    u8 unk_0[0xc];
+    u8 unk_0[0x4];
+    UpdateFunc *on_tick;
+    UpdateFunc *on_draw;
     AnmLoaded *anm_file;
     AnmLoaded *subseason_anm_file;
-    u8 unk_14[0x610 - 0x14];
+    AnmVm vm;
     PlayerInner inner;
-    u8 unk_166a0[0x2c7cc - 0x166a0];
+    // LoLK leftover (ExpHP: __lolk_snapshot_inner).
+    u8 unk_166a0[0x2c730 - 0x166a0];
+    BoundingBox3 hurtbox;
+    D3DXVECTOR3 hurtbox_halfsize;
+    D3DXVECTOR3 item_attract_box_unfocused_halfsize;
+    D3DXVECTOR3 item_attract_box_focused_halfsize;
+    D3DXVECTOR3 unk_2c76c;
+    Int2 attempted_velocity;
+    i32 attempted_direction;
+    u8 unk_2c784[0x2c788 - 0x2c784];
+    ShtFile *sht_file;
+    ShtFile *sht_file_subseason;
+    u8 unk_2c790[0x2c798 - 0x2c790];
+    InterpFloat player_scale_i;
+    // Only used while inner.flags has 0x10.
+    f32 player_scale;
     // Set every frame by the winter release.
     f32 damage_multiplier;
     u8 unk_2c7d0[0x2c828 - 0x2c7d0];
 
     // 0x4449b0. Returns the index of the new damage source plus one.
     HARNESS_CALLED i32 create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 unk_2, i32 damage);
+    void set_shoot_key_short_timer(i32 time);
+    void interrupt_options();
+    HARNESS_CALLED void set_position(f32 x, f32 y);
+    // 0x443f10
+    void die();
+
+    // Members that reach the player through g_Player; LTCG dropped this.
+    // Angle from pos to the player.
+    HARNESS_CALLED f32 angle_to_player(Float3 *pos);
+    // Whether a rectangle (pos, size) or circle hits the player: 0 no, 1
+    // hit (killing the player unless invincible), 2 graze. graze_only
+    // turns a hit into a graze.
+    HARNESS_CALLED i32 check_hit_rect(Float3 *pos, Float3 *size, i32 graze_only);
+    HARNESS_CALLED i32 check_hit_circle(Float3 *pos, f32 radius, i32 graze_only);
 };
 
 extern Player *g_Player;

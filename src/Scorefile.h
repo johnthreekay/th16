@@ -17,8 +17,12 @@ struct ScorefileSpell
 struct ScorefileCharacter
 {
     u8 unk_0[0x8d8];
-    ScorefileSpell spells[0x78];
-    u8 unk_51f8[0x5318 - 0x51f8];
+    // 119 spell cards; the play time follows them.
+    ScorefileSpell spells[0x77];
+    u8 unk_515c[0x5160 - 0x515c];
+    // In hundredths of a second.
+    __int64 play_time;
+    u8 unk_5168[0x5318 - 0x5168];
 };
 
 // The decrypted contents of scoreth16.dat. Only the parts decompiled code
@@ -28,7 +32,10 @@ struct Scorefile
     ScorefileCharacter characters[5];
     u8 unk_19f78[0x19fa6 - 0x19f78];
     // Set once a track has played, unlocking it in the music room.
-    u8 bgm_unlocked[0x1a3ac - 0x19fa6];
+    u8 bgm_unlocked[0x19fc8 - 0x19fa6];
+    // Total of every character's play_time.
+    __int64 play_time;
+    u8 unk_19fd0[0x1a3ac - 0x19fd0];
 };
 
 extern Scorefile *g_Scorefile;

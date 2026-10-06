@@ -88,6 +88,8 @@ struct GameThread
     void enable_update_funcs();
     static i32 __fastcall on_tick_callback(GameThread *thread);
     static i32 __fastcall on_draw_callback(GameThread *thread);
+    // Adds the time since the last call to the scorefile's play time.
+    static void update_play_time();
 };
 
 extern GameThread *g_GameThread;

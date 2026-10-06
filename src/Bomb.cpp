@@ -454,3 +454,13 @@ i32 BombReimuAInf::method_c(i32 a, i32 b)
 {
     return 0;
 }
+
+// FUNCTION: TH16 0x42f090
+i32 BombInf::is_active_before(i32 time)
+{
+    if (in_use == 1 && timer.current < time)
+    {
+        return 1;
+    }
+    return 0;
+}
