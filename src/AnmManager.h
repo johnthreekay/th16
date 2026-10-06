@@ -184,8 +184,13 @@ struct AnmManager
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *path);
     // Frees ANM files marked for unloading; nonzero while one is still busy.
     static i32 sub_46d690();
-    // 0x46f600. Reaches the manager through g_AnmManager.
-    static AnmVm *allocate_vm();
+    // 0x46f600. A VM from the pool, or a new one when the pool is used up.
+    // Every caller goes through g_AnmManager (see the list inserts).
+    HARNESS_CALLED AnmVm *allocate_vm();
+    // 0x46f720. The same for snapshots; hands out the snapshot's id.
+    AnmVm *allocate_snapshot_vm(AnmId *id);
+    // 0x46f810. Copies the VM and its children into snapshots.
+    AnmId store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused);
     // 0x46e7d0 and the next three. Every caller goes through g_AnmManager,
     // so LTCG replaced this with a load of the global (and kept its stack
     // slot). They hand out the VM's new id.
@@ -199,6 +204,49 @@ struct AnmManager
     HARNESS_CALLED_INLINABLE void mark_tree_for_deletion(AnmVm *vm);
     // get_vm_with_id for snapshots.
     AnmVm *get_snapshot_vm_with_id(AnmId id);
+    // 0x46e750. Draws the VMs of one layer; returns 1 for the callbacks.
+    i32 render_layer(i32 layer);
+    // UpdateFunc callbacks that draw one layer each, named after their
+    // priority.
+    static int __fastcall on_draw_05_layer_00(AnmManager *mgr);
+    static int __fastcall on_draw_0a_layer_03(AnmManager *mgr);
+    static int __fastcall on_draw_2d_layer_20(AnmManager *mgr);
+    static int __fastcall on_draw_3a_layer_24(AnmManager *mgr);
+    static int __fastcall on_draw_40_layer_28(AnmManager *mgr);
+    static int __fastcall on_draw_37_layer_36(AnmManager *mgr);
+    static int __fastcall on_draw_41_layer_39(AnmManager *mgr);
+    static int __fastcall on_draw_07_layer_01(AnmManager *mgr);
+    static int __fastcall on_draw_09_layer_02(AnmManager *mgr);
+    static int __fastcall on_draw_0b_layer_04(AnmManager *mgr);
+    static int __fastcall on_draw_0d_layer_05(AnmManager *mgr);
+    static int __fastcall on_draw_10_layer_06(AnmManager *mgr);
+    static int __fastcall on_draw_12_layer_07(AnmManager *mgr);
+    static int __fastcall on_draw_14_layer_08(AnmManager *mgr);
+    static int __fastcall on_draw_15_layer_09(AnmManager *mgr);
+    static int __fastcall on_draw_16_layer_10(AnmManager *mgr);
+    static int __fastcall on_draw_18_layer_11(AnmManager *mgr);
+    static int __fastcall on_draw_1c_layer_13(AnmManager *mgr);
+    static int __fastcall on_draw_1f_layer_14(AnmManager *mgr);
+    static int __fastcall on_draw_20_layer_15(AnmManager *mgr);
+    static int __fastcall on_draw_22_layer_16(AnmManager *mgr);
+    static int __fastcall on_draw_24_layer_17(AnmManager *mgr);
+    static int __fastcall on_draw_27_layer_18(AnmManager *mgr);
+    static int __fastcall on_draw_1b_layer_12(AnmManager *mgr);
+    static int __fastcall on_draw_2a_layer_19(AnmManager *mgr);
+    static int __fastcall on_draw_2e_layer_21(AnmManager *mgr);
+    static int __fastcall on_draw_34_layer_22(AnmManager *mgr);
+    static int __fastcall on_draw_36_layer_23(AnmManager *mgr);
+    static int __fastcall on_draw_4f_layer_30(AnmManager *mgr);
+    static int __fastcall on_draw_52_layer_31(AnmManager *mgr);
+    static int __fastcall on_draw_4d_layer_29(AnmManager *mgr);
+    static int __fastcall on_draw_3d_layer_26(AnmManager *mgr);
+    static int __fastcall on_draw_3e_layer_27(AnmManager *mgr);
+    static int __fastcall on_draw_3b_layer_25(AnmManager *mgr);
+    static int __fastcall on_draw_3c_layer_37(AnmManager *mgr);
+    static int __fastcall on_draw_3f_layer_38(AnmManager *mgr);
+    static int __fastcall on_draw_4e_layer_40(AnmManager *mgr);
+    static int __fastcall on_draw_50_layer_41(AnmManager *mgr);
+    static int __fastcall on_draw_53_layer_42(AnmManager *mgr);
 
     // Frees the ANM file in a slot, if one is loaded there.
     void unload_anm(i32 slot)

@@ -144,7 +144,6 @@ AnmVm *AnmManager::get_vm_with_id(AnmId id)
     return NULL;
 }
 
-// TODO: differs in block layout; not looked at closely yet.
 // FUNCTION: TH16 0x46f040
 AnmVm *AnmManager::get_snapshot_vm_with_id(AnmId id)
 {
@@ -152,6 +151,7 @@ AnmVm *AnmManager::get_snapshot_vm_with_id(AnmId id)
     {
         return NULL;
     }
+    AnmVm *vm = NULL;
     i32 fast_id = id.id & 0x1fff;
     if (fast_id == 0x1fff)
     {
@@ -159,12 +159,16 @@ AnmVm *AnmManager::get_snapshot_vm_with_id(AnmId id)
         {
             if (node->entry->id.id == id.id)
             {
-                return node->entry;
+                vm = node->entry;
+                break;
             }
         }
-        return NULL;
     }
-    return &snapshot_fast_array[fast_id].vm;
+    else
+    {
+        vm = &snapshot_fast_array[fast_id].vm;
+    }
+    return vm;
 }
 
 // FUNCTION: TH16 0x46f0b0
@@ -405,4 +409,47 @@ HARNESS_CALLED AnmId AnmId::search_children(i32 unk_49c, i32 n)
     AnmId result;
     result.id = found != NULL ? found->id.id : 0;
     return result;
+}
+
+// FUNCTION: TH16 0x46f600
+HARNESS_CALLED AnmVm *AnmManager::allocate_vm()
+{
+    if (freelist_head.next != NULL)
+    {
+        AnmFastVm *fast = freelist_head.next->entry;
+        ZunList<AnmFastVm> *node = &fast->freelist_node;
+        if (node->next != NULL)
+        {
+            node->next->prev = node->prev;
+        }
+        if (node->prev != NULL)
+        {
+            node->prev->next = node->next;
+        }
+        node->next = NULL;
+        node->prev = NULL;
+        fast->vm.fast_id = fast->fast_id;
+        fast->is_alive = true;
+        fast->vm.parent = NULL;
+        fast->vm.unk_5b0 = NULL;
+        // ZUN's code stores the manager here; whoever links the node in
+        // overwrites it.
+        fast->vm.node_in_global_list.entry = (AnmVm *)this;
+        fast->vm.node_in_global_list.next = NULL;
+        fast->vm.node_in_global_list.prev = NULL;
+        fast->vm.node_in_global_list.unk_c = NULL;
+        fast->vm.node_as_child.entry = (AnmVm *)this;
+        fast->vm.node_as_child.next = NULL;
+        fast->vm.node_as_child.prev = NULL;
+        fast->vm.node_as_child.unk_c = NULL;
+        fast->vm.list_of_children.entry = (AnmVm *)this;
+        fast->vm.list_of_children.next = NULL;
+        fast->vm.list_of_children.prev = NULL;
+        fast->vm.list_of_children.unk_c = NULL;
+        return &fast->vm;
+    }
+    AnmVm *vm = new AnmVm;
+    vm->wipe();
+    vm->fast_id = 0x1fff;
+    return vm;
 }

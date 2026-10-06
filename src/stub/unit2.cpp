@@ -29,12 +29,6 @@ void AnmVm::run()
 {
 }
 
-// STUB: TH16 0x46f600
-AnmVm *AnmManager::allocate_vm()
-{
-    return NULL;
-}
-
 // Opaque sink for the /GL placeholders in src/placeholder/unit2.cpp.
 void placeholder_sink(int a, float b)
 {
