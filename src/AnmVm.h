@@ -186,6 +186,15 @@ struct AnmVm
     void wipe_suffix();
     // Switches to another sprite of the same file, changing only the UVs.
     void set_sprite_uvs(i32 sprite);
+    // ECL's anm instructions: interpolate from the current value to a goal.
+    // 0x425e70
+    void fade_alpha1(i32 end_time, i32 method, u8 goal);
+    // 0x425dd0
+    void fade_alpha2(i32 end_time, i32 method, u8 goal);
+    // 0x425f10
+    void fade_rgb1(i32 end_time, i32 method, ZunColor *goal);
+    // 0x426020. LTCG passes x in xmm3.
+    HARNESS_CALLED void scale_to(i32 end_time, i32 method, f32 x, f32 y);
 
     void interrupt(i32 n)
     {

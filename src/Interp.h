@@ -64,13 +64,38 @@ struct InterpInt
     i32 method;
 };
 
+// Three ints, copied as a whole (ExpHP: zInt3). Indexing keeps the
+// array syntax InterpInt3's fields had before.
+struct Int3
+{
+    i32 x;
+    i32 y;
+    i32 z;
+
+    Int3()
+    {
+    }
+
+    Int3(i32 x, i32 y, i32 z)
+    {
+        this->x = x;
+        this->y = y;
+        this->z = z;
+    }
+
+    i32 &operator[](i32 i)
+    {
+        return (&x)[i];
+    }
+};
+
 struct InterpInt3
 {
-    i32 initial[3];
-    i32 goal[3];
-    i32 bezier_1[3];
-    i32 bezier_2[3];
-    i32 current[3];
+    Int3 initial;
+    Int3 goal;
+    Int3 bezier_1;
+    Int3 bezier_2;
+    Int3 current;
     ZunTimer time;
     i32 end_time;
     i32 method;

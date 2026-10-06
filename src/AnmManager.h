@@ -53,6 +53,9 @@ struct AnmLoaded
     // 0x40e5c0. Creates a VM running the script at pos (entity_pos), with
     // the given z rotation, on the given layer unless negative.
     HARNESS_CALLED AnmId create_vm(i32 script, Float3 *pos, f32 rotation, i32 layer, i32 unused);
+    // 0x426160. Like create_vm at the origin, but inserted at the front of
+    // the world list.
+    AnmId create_vm_front(i32 script, i32 layer, i32 unused);
 
     void init_vm_with_sprite(AnmVm *vm, i32 sprite)
     {
@@ -102,6 +105,8 @@ struct AnmManager
     static AnmVm *allocate_vm();
     // 0x46e7d0. Reaches the manager through g_AnmManager.
     static AnmId __stdcall insert_in_world_list_back(AnmVm *vm);
+    // 0x46e890. Reaches the manager through g_AnmManager.
+    static AnmId __stdcall insert_in_world_list_front(AnmVm *vm);
 
     // Frees the ANM file in a slot, if one is loaded there.
     void unload_anm(i32 slot)
