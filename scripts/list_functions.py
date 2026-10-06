@@ -4,8 +4,8 @@
 Function starts are direct call targets plus code that follows int3
 padding (so functions only reached through pointers are included, but a
 few jump targets may show up too). Names come from ExpHP's th-re-data when
-TH_RE_DATA points at a checkout. Functions already annotated in src/ are
-marked.
+TH_RE_DATA points at a checkout. Functions already decompiled in src/ are
+marked "done"; ones with only a placeholder are marked "stub".
 
 Usage: list_functions.py 0x409490 0x411860
 """
@@ -50,17 +50,21 @@ def main():
     if th_re:
         for row in json.loads((Path(th_re) / "data/th16.v1.00a/funcs.json").read_text()):
             names[int(row["addr"], 16)] = row["name"]
-    done = set()
+    status = {}
     for src in (ROOT / "src").rglob("*.cpp"):
-        for m in re.finditer(r"//\s*(?:FUNCTION|SYNTHETIC|STUB):\s*TH16\s+(0x[0-9a-fA-F]+)", src.read_text(errors="replace")):
-            done.add(int(m.group(1), 16))
+        for m in re.finditer(r"//\s*(FUNCTION|SYNTHETIC|STUB):\s*TH16\s+(0x[0-9a-fA-F]+)", src.read_text(errors="replace")):
+            addr = int(m.group(2), 16)
+            if m.group(1) == "STUB":
+                status.setdefault(addr, "stub")
+            else:
+                status[addr] = "done"
 
     ordered = sorted(a for a in starts if start <= a < start + len(code))
     for k, a in enumerate(ordered):
         if not lo <= a < hi:
             continue
         size = (ordered[k + 1] if k + 1 < len(ordered) else start + len(code)) - a
-        mark = "done" if a in done else "    "
+        mark = status.get(a, "    ")
         print(f"{a:#x} {size:6d} {mark} {names.get(a, '')}")
 
 
