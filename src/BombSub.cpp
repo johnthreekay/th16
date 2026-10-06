@@ -52,7 +52,8 @@ i32 BombAllSubInf::begin()
     vm->float_vars[1] = g_release_radius_2_doyou[g_Globals.season_level()];
     vm->int_vars[3] = g_release_duration_doyou[g_Globals.season_level()];
 
-    anm_id_64 = g_Player->subseason_anm_file->create_vm(4, &pos, 0.0f, -1, 0);
+    AnmLoaded *anm = g_Player->subseason_anm_file;
+    anm_id_64 = anm->create_vm(4, &pos, 0.0f, -1, 0);
     vm = get_vm_or_clear(anm_id_64);
     vm->float_vars[0] = g_release_radius_doyou[g_Globals.season_level()] + 8.0f;
     vm->float_vars[1] = g_release_radius_2_doyou[g_Globals.season_level()] + 8.0f;
@@ -123,7 +124,8 @@ i32 BombAyaSubInf::begin()
     vm->float_vars[1] = g_release_radius_2_fall[g_Globals.season_level()];
     vm->int_vars[3] = g_release_duration_fall[g_Globals.season_level()];
 
-    anm_id_64 = g_Player->subseason_anm_file->create_vm(4, &pos, 0.0f, -1, 0);
+    AnmLoaded *anm = g_Player->subseason_anm_file;
+    anm_id_64 = anm->create_vm(4, &pos, 0.0f, -1, 0);
     vm = get_vm_or_clear(anm_id_64);
     vm->float_vars[0] = g_release_radius_fall[g_Globals.season_level()] + 8.0f;
     vm->float_vars[1] = g_release_radius_2_fall[g_Globals.season_level()] + 8.0f;
@@ -203,7 +205,8 @@ i32 BombCirnoSubInf::begin()
     vm->float_vars[1] = g_release_radius_summer[g_Globals.season_level()];
     vm->int_vars[3] = g_release_duration_summer[g_Globals.season_level()];
 
-    anm_id_64 = g_Player->subseason_anm_file->create_vm(4, &pos, 0.0f, -1, 0);
+    AnmLoaded *anm = g_Player->subseason_anm_file;
+    anm_id_64 = anm->create_vm(4, &pos, 0.0f, -1, 0);
     vm = get_vm_or_clear(anm_id_64);
     vm->float_vars[0] = g_release_radius_summer[g_Globals.season_level()] + 8.0f;
     vm->float_vars[1] = g_release_radius_summer[g_Globals.season_level()] + 8.0f;
@@ -274,7 +277,8 @@ i32 BombMarisaSubInf::begin()
     vm->float_vars[1] = g_release_radius_winter[g_Globals.season_level()];
     vm->int_vars[3] = g_release_duration_winter[g_Globals.season_level()];
 
-    anm_id_64 = g_Player->subseason_anm_file->create_vm(21, &pos, 0.0f, -1, 0);
+    AnmLoaded *anm = g_Player->subseason_anm_file;
+    anm_id_64 = anm->create_vm(21, &pos, 0.0f, -1, 0);
     vm = get_vm_or_clear(anm_id_64);
     vm->float_vars[0] = g_release_radius_winter[g_Globals.season_level()] +
                         g_release_radius_winter[g_Globals.season_level()] * 0.2f;
@@ -350,7 +354,8 @@ i32 BombReimuSubInf::begin()
     vm->float_vars[1] = g_release_radius_spring[g_Globals.season_level()];
     vm->int_vars[3] = g_release_duration_spring[g_Globals.season_level()];
 
-    anm_id_64 = g_Player->subseason_anm_file->create_vm(4, &pos, 0.0f, -1, 0);
+    AnmLoaded *anm = g_Player->subseason_anm_file;
+    anm_id_64 = anm->create_vm(4, &pos, 0.0f, -1, 0);
     vm = get_vm_or_clear(anm_id_64);
     vm->float_vars[0] = g_release_radius_spring[g_Globals.season_level()] + 16.0f;
     vm->float_vars[1] = g_release_radius_spring[g_Globals.season_level()] + 16.0f;
