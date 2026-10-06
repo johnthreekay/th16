@@ -2,6 +2,13 @@
 #include <string.h>
 
 #include "AnmManager.h"
+#include "BulletManager.h"
+#include "EnemyManager.h"
+#include "GameThread.h"
+#include "Laser.h"
+#include "Scorefile.h"
+#include "SoundManager.h"
+#include "Spellcard.h"
 #include "CriticalSections.h"
 #include "Ecl.h"
 #include "FileSystem.h"
@@ -42,6 +49,9 @@ GuiMsgVm::~GuiMsgVm()
     anm->delete_vm_inline(textbox);
     textbox.id = 0;
 }
+
+// SYNTHETIC: TH16 0x427950
+// GuiMsgVm::`scalar deleting destructor'
 
 // FUNCTION: TH16 0x4268c0
 Gui::Gui()
@@ -672,4 +682,119 @@ void __fastcall anm_vm_interrupt_2_run(AnmVm *vm)
 {
     vm->interrupt(2);
     vm->run();
+}
+
+// TODO: the original keeps g_AnmManager in edi across the lookups (LTCG
+// knows get_vm_with_id leaves it alone).
+// FUNCTION: TH16 0x429b20
+GuiMsgVm::GuiMsgVm(void *script)
+{
+    memset(this, 0, sizeof(GuiMsgVm));
+    timer_4.reset();
+    time_in_script.reset();
+    unk_154 = 0;
+    pause_timer.reset();
+    current_instr = script;
+    text_line_1 = g_Supervisor.text_anm->create_effect(0, -1, NULL);
+    text_line_2 = g_Supervisor.text_anm->create_effect(0, -1, NULL);
+    AnmManager::interrupt_tree_and_run(text_line_2, 7);
+    get_vm_or_clear(text_line_1)->font_dims[0] = 0x15;
+    get_vm_or_clear(text_line_1)->font_dims[1] = 0x15;
+    get_vm_or_clear(text_line_2)->font_dims[0] = 0x15;
+    get_vm_or_clear(text_line_2)->font_dims[1] = 0x15;
+    furigana_1 = g_Supervisor.text_anm->create_effect(1, -1, NULL);
+    furigana_2 = g_Supervisor.text_anm->create_effect(1, -1, NULL);
+    AnmManager::interrupt_tree_and_run(furigana_2, 7);
+    get_vm_or_clear(furigana_1)->font_dims[0] = 0x15;
+    get_vm_or_clear(furigana_1)->font_dims[1] = 0x15;
+    get_vm_or_clear(furigana_2)->font_dims[0] = 0x15;
+    get_vm_or_clear(furigana_2)->font_dims[1] = 0x15;
+    get_vm_or_clear(text_line_1)->flags_hi |= 0x1000;
+    get_vm_or_clear(text_line_2)->flags_hi |= 0x1000;
+    get_vm_or_clear(furigana_1)->flags_hi |= 0x1000;
+    get_vm_or_clear(furigana_2)->flags_hi |= 0x1000;
+    get_vm_or_clear(text_line_1)->index_of_on_draw = 5;
+    get_vm_or_clear(text_line_2)->index_of_on_draw = 5;
+    get_vm_or_clear(furigana_1)->index_of_on_draw = 5;
+    get_vm_or_clear(furigana_2)->index_of_on_draw = 5;
+    next_text_line = 0;
+    unk_198 = 0;
+    unk_1a0 = 0;
+    unk_1a4 = 0;
+    unk_1a8 = 0;
+    unk_1ac = 0;
+    active_side = 0;
+    vec_15c = Float3(16.0f, 0.0f, 0.0f);
+    vec_168 = Float3(16.0f, 0.0f, 0.0f);
+    vec_174 = Float3(16.0f, 0.0f, 0.0f);
+    vec_180 = Float3(16.0f, 0.0f, 0.0f);
+    BulletManager::clear_all(0);
+    // LaserManager::clear_all(0, 0), inlined.
+    LaserDataInf *laser = g_LaserManager->list_head.next;
+    while (laser != NULL)
+    {
+        LaserDataInf *next = laser->next;
+        if (laser->state != 1)
+        {
+            laser->cancel(0, 0);
+        }
+        laser = next;
+    }
+    EnemyManager::kill_all();
+    flags &= ~0x40;
+    unk_1b0 = 384.0f;
+    unk_1b4 = 640.0f;
+    unk_1b8 = 0.0f;
+    unk_1bc = 320.0f;
+}
+
+// TODO: the original stores ".wav" as an immediate (see play_bgm_wav).
+// FUNCTION: TH16 0x429ff0
+void Gui::start_dialogue(i32 script)
+{
+    __asm finit;
+    if (script == -1 || script == -3)
+    {
+        i32 boss = script == -1;
+        StageData *stage = g_stage_data;
+        if (g_Globals.game_mode == 2 && g_GameThread->replay_mode == 0)
+        {
+            char path[0x100];
+            strcpy(path, stage->music_names[boss]);
+            strcat(path, ".wav");
+            if (strcmp(g_SoundManager.bgm_name, path) == 0)
+            {
+                return;
+            }
+        }
+        i32 track = stage->music_ids[boss];
+        if (g_Supervisor.config.flags_2c & 0x10)
+        {
+            g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+        }
+        g_SoundManager.modify_bgm(BGM_PLAY, boss, "dummy");
+        g_Scorefile->bgm_unlocked[track] = 1;
+        g_Gui->stage_logo_anm->create_effect(boss + 1, -1, NULL);
+    }
+    else if (script == -2)
+    {
+        if (g_Spellcard->flags & SPELLCARD_FLAG_80)
+        {
+            pause_menu_43f350();
+        }
+        else
+        {
+            stage_clear_42e150();
+        }
+    }
+    else
+    {
+        if (msg != NULL)
+        {
+            delete msg;
+            msg = NULL;
+        }
+        msg = new GuiMsgVm((u8 *)msg_file + msg_file->scripts[script].offset);
+        msg->script_num = script;
+    }
 }

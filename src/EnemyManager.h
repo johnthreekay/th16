@@ -78,6 +78,9 @@ struct EnemyManager
     static int __fastcall on_draw_callback(EnemyManager *mgr);
     // Uses g_EnemyManager; callers pass no this.
     EnemyInf *get_boss(i32 i);
+    // 0x41d900. Kills every enemy; reaches the manager through
+    // g_EnemyManager.
+    static void kill_all();
     BOOL is_enemy_alive(int id);
     EnemyInf *find_enemy_by_id(int id);
     HARNESS_CALLED struct EnemyRef find_closest(D3DXVECTOR3 *pos, f32 max_dist);

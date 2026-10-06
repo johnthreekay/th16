@@ -3,6 +3,8 @@
 // opaque calls with standard conventions.
 #include "../AnmManager.h"
 #include "../AnmVm.h"
+#include "../BulletManager.h"
+#include "../EnemyManager.h"
 #include "../Gui.h"
 #include "../StageData.h"
 
@@ -34,10 +36,6 @@ i32 Gui::on_draw_2_body()
     return 1;
 }
 
-// STUB: TH16 0x429b20
-GuiMsgVm::GuiMsgVm(void *script)
-{
-}
 
 // STUB: TH16 0x427cf0
 i32 Gui::on_tick_body()
@@ -60,5 +58,25 @@ AnmId __stdcall AnmManager::insert_in_ui_list_back(AnmVm *vm)
 
 // STUB: TH16 0x406c40
 void AnmVm::get_own_transformed_pos(Float3 *out)
+{
+}
+
+// STUB: TH16 0x416f40
+void __stdcall BulletManager::clear_all(i32 unused)
+{
+}
+
+// STUB: TH16 0x41d900
+void EnemyManager::kill_all()
+{
+}
+
+// STUB: TH16 0x43f350
+void pause_menu_43f350()
+{
+}
+
+// STUB: TH16 0x42e150
+void stage_clear_42e150()
 {
 }
