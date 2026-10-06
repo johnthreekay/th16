@@ -2,6 +2,7 @@
 // (g_sht_*_funcs), called with the bullet in ecx.
 #include "Player.h"
 
+#include "EffectManager.h"
 #include "Rng.h"
 #include "SoundManager.h"
 
@@ -177,4 +178,34 @@ i32 PlayerBullet::hit()
     i32 result = unk_9c;
     damage_source_index = 0;
     return result;
+}
+
+// TODO: the original pushes interrupt_tree's 1 between the stores to the new
+// damage source; ours pushes it first.
+// FUNCTION: TH16 0x446e20
+i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+{
+    i32 damage = g_Player->get_shooter(bullet->shooter_ref)->damage;
+    PlayerDamageSource *source =
+        g_Player->get_damage_source(g_Player->create_damage_source(&bullet->pos.pos, 24.0f, 1.0f, 0x14, damage));
+    source->unk_80 = 4;
+    source->pos.speed = 0.3f;
+    source->pos.angle.value = -ZUN_PI / 2;
+    AnmManager::interrupt_tree(bullet->anm_id, 1);
+    bullet->state = 2;
+    source = bullet->damage_source();
+    source->flags &= ~1;
+    bullet->damage_source_index = 0;
+    bullet->pos.speed = 0.3f;
+    source->pos = bullet->pos;
+    g_SoundManager.play_sound_at_position(0x41, bullet->pos.pos.x);
+    return bullet->unk_9c;
+}
+
+// FUNCTION: TH16 0x447270
+i32 __fastcall sht_on_hit_447270(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+{
+    f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * (ZUN_PI / 9.0f));
+    g_EffectManager->effect_anm->create_vm(0x98, &bullet->pos.pos, angle, -1, 0);
+    return bullet->hit();
 }

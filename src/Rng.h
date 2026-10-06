@@ -21,5 +21,6 @@ struct Rng
     HARNESS_CALLED f32 randf_neg_1_to_1_times_pi();
 };
 
-// For effects that must not change replays (ExpHP: REPLAY_SAFE_RNG).
+// ExpHP: REPLAY_UNSAFE_RNG and REPLAY_SAFE_RNG.
+extern Rng g_replay_unsafe_rng;
 extern Rng g_replay_safe_rng;

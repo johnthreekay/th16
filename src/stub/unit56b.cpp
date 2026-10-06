@@ -43,20 +43,8 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     return 0;
 }
 
-// STUB: TH16 0x446e20
-i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
-{
-    return 0;
-}
-
 // STUB: TH16 0x446f80
 i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
-{
-    return 0;
-}
-
-// STUB: TH16 0x447270
-i32 __fastcall sht_on_hit_447270(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
 {
     return 0;
 }

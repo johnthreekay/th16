@@ -1,4 +1,5 @@
 #include <math.h>
+#include <string.h>
 
 #include "Player.h"
 
@@ -215,4 +216,37 @@ i32 Player::read_sht_file(ShtFile **out, const char *path)
         }
     }
     return 0;
+}
+
+// FUNCTION: TH16 0x4449b0
+HARNESS_CALLED i32 Player::create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 time, i32 damage)
+{
+    i32 index = inner.last_created_damage_source_index;
+    for (i32 i = 0; i < 0x100; i++)
+    {
+        index++;
+        if (index >= 0x100)
+        {
+            index = 0;
+        }
+        PlayerDamageSource *source = &inner.damage_sources[index];
+        if (!(source->flags & 1))
+        {
+            source->flags = (source->flags & ~4) | 3;
+            memset(&source->pos, 0, sizeof(source->pos));
+            source->pos.pos = *pos;
+            source->radius = radius;
+            source->unk_8 = unk;
+            source->timer_60 = time;
+            source->damage = damage;
+            source->total_damage_dealt = 0;
+            source->unk_7c = 9999999;
+            source->unk_80 = 1;
+            source->unk_90 = 0;
+            source->unk_84 = 0;
+            break;
+        }
+    }
+    inner.last_created_damage_source_index = index;
+    return index + 1;
 }

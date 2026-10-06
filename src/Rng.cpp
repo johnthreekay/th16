@@ -2,6 +2,9 @@
 #include "Rng.h"
 #include "ZunMath.h"
 
+// GLOBAL: TH16 0x4a6d80
+Rng g_replay_unsafe_rng;
+
 // GLOBAL: TH16 0x4a6d88
 Rng g_replay_safe_rng;
 

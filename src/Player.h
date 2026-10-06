@@ -77,7 +77,7 @@ struct PlayerDamageSource
 {
     u32 flags;
     f32 radius;
-    u8 unk_8[0x4];
+    f32 unk_8;
     f32 unk_c;
     u8 unk_10[0x4];
     f32 unk_14;
@@ -153,7 +153,7 @@ struct ShtShooter
 {
     i8 fire_rate;
     u8 start_delay;
-    u16 damage;
+    i16 damage;
     Float2 offset_from_option;
     Float2 hitbox;
     f32 angle;
@@ -226,7 +226,16 @@ struct Player
     u8 unk_2c7d0[0x2c828 - 0x2c7d0];
 
     // 0x4449b0. Returns the index of the new damage source plus one.
-    HARNESS_CALLED i32 create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 unk_2, i32 damage);
+    HARNESS_CALLED i32 create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 time, i32 damage);
+    // The damage source create_damage_source returned (index plus one).
+    PlayerDamageSource *get_damage_source(i32 index)
+    {
+        if (index == 0)
+        {
+            return NULL;
+        }
+        return &inner.damage_sources[index - 1];
+    }
     void set_shoot_key_short_timer(i32 time);
     void interrupt_options();
     HARNESS_CALLED void set_position(f32 x, f32 y);
@@ -237,19 +246,11 @@ struct Player
     // The shooter a bullet's shooter_ref names.
     ShtShooter *get_shooter(i32 ref)
     {
-        ShtFile *sht;
-        i32 array;
         if (!(ref & 0xf0000))
         {
-            sht = sht_file;
-            array = ref >> 8;
+            return &sht_file->shooter_arrays[ref >> 8][(u8)ref];
         }
-        else
-        {
-            sht = sht_file_subseason;
-            array = (u8)(ref >> 8);
-        }
-        return &sht->shooter_arrays[array][(u8)ref];
+        return &sht_file_subseason->shooter_arrays[(u8)(ref >> 8)][(u8)ref];
     }
     // 0x443f10
     void die();
