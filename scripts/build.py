@@ -118,7 +118,16 @@ def undecorate(names):
     """Map decorated -> qualified function name (no return type or params)."""
     if not names:
         return {}
-    rc, out = tc.run("undname", names)
+    # Wine caps a command line at 32767 characters, so undecorate in batches.
+    out = ""
+    batch = []
+    for name in names + [None]:
+        if name is None or sum(len(n) + 1 for n in batch) + len(name) > 24000:
+            if batch:
+                out += tc.run("undname", batch)[1]
+            batch = []
+        if name is not None:
+            batch.append(name)
     result = {}
     for m in re.finditer(r'Undecoration of :- "(.+?)"\s*is :- "(.+?)"', out):
         full = m.group(2)
