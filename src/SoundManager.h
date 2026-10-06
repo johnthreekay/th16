@@ -163,8 +163,9 @@ class CSound
     HRESULT FillBufferWithSound(struct IDirectSoundBuffer *pDSB, BOOL bRepeatWavIfBufferLarger, DWORD offset);
     // FillBufferWithSound as LTCG inlined it into the constructor.
     HRESULT fill_buffer_inline(struct IDirectSoundBuffer *pDSB, BOOL bRepeatWavIfBufferLarger, DWORD offset);
-    // 0x471040. Does not use this; LTCG passes pDSB in its place.
-    HARNESS_CALLED HRESULT RestoreBuffer(struct IDirectSoundBuffer *pDSB, BOOL *pbWasRestored);
+    // Inline: LTCG split it into the NULL check, left in the callers, and
+    // the rest (0x471040, restore_dsound_buffer in DSUtil.cpp).
+    HRESULT RestoreBuffer(struct IDirectSoundBuffer *pDSB, BOOL *pbWasRestored);
     // 0x4710b0
     struct IDirectSoundBuffer *GetFreeBuffer();
     // 0x471120. offset is where to start in the track.

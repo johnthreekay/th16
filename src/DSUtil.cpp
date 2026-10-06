@@ -318,11 +318,62 @@ HRESULT CSound::FillBufferWithSound(LPDIRECTSOUNDBUFFER pDSB, BOOL bRepeatWavIfB
     return S_OK;
 }
 
-// TODO: the original takes pDSB in ecx and leaves its NULL check to the callers.
-// FUNCTION: TH16 0x471040
-HARNESS_CALLED HRESULT CSound::RestoreBuffer(LPDIRECTSOUNDBUFFER pDSB, BOOL *pbWasRestored)
+// The part of CSound::RestoreBuffer that LTCG kept out of line. Its callers
+// test pDSB for NULL themselves and pass it in ecx, the way a member function
+// of the buffer would get it; this stand-in type reproduces that.
+struct DSoundBufferRestore
 {
-    return restore_buffer(pDSB, pbWasRestored);
+    HRESULT restore(BOOL *pbWasRestored);
+};
+
+// FUNCTION: TH16 0x471040
+HARNESS_CALLED HRESULT DSoundBufferRestore::restore(BOOL *pbWasRestored)
+{
+    HRESULT hr;
+    LPDIRECTSOUNDBUFFER pDSB = (LPDIRECTSOUNDBUFFER)this;
+
+    if (pbWasRestored)
+    {
+        *pbWasRestored = FALSE;
+    }
+
+    DWORD dwStatus;
+    if (FAILED(hr = pDSB->GetStatus(&dwStatus)))
+    {
+        return hr;
+    }
+
+    if (dwStatus & DSBSTATUS_BUFFERLOST)
+    {
+        do
+        {
+            hr = pDSB->Restore();
+            if (hr == DSERR_BUFFERLOST)
+            {
+                Sleep(10);
+            }
+        } while (hr = pDSB->Restore());
+
+        if (pbWasRestored != NULL)
+        {
+            *pbWasRestored = TRUE;
+        }
+
+        return S_OK;
+    }
+    else
+    {
+        return S_FALSE;
+    }
+}
+
+inline HRESULT CSound::RestoreBuffer(LPDIRECTSOUNDBUFFER pDSB, BOOL *pbWasRestored)
+{
+    if (pDSB == NULL)
+    {
+        return CO_E_NOTINITIALIZED;
+    }
+    return ((DSoundBufferRestore *)pDSB)->restore(pbWasRestored);
 }
 
 // FUNCTION: TH16 0x4710b0
