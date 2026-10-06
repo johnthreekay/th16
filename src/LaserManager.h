@@ -38,10 +38,12 @@ struct LaserManager
     D3DXVECTOR3 cancel_pos;
     u8 unk_5f8[0x610 - 0x5f8];
 
-    void cancel_in_radius(D3DXVECTOR3 *pos, f32 radius, i32 a, i32 b)
+    // Inlined into every caller in the original; our build needs the
+    // __forceinline to agree.
+    __forceinline void cancel_in_radius(D3DXVECTOR3 *pos, f32 radius, i32 a, i32 b)
     {
-        cancel_pos = *pos;
         LaserBaseClass *laser = list_head;
+        cancel_pos = *pos;
         while (laser != NULL)
         {
             LaserBaseClass *next = laser->next;

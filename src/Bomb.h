@@ -62,10 +62,6 @@ class BombInf
     virtual i32 method_10();
     virtual void method_14();
 
-    // Shared by the releases' method_10: cancels bullets and lasers inside
-    // the release.
-    i32 release_cancel_in_radius();
-
     i32 initialize(i32 is_season);
     i32 update();
     void draw();

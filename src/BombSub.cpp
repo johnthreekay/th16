@@ -38,19 +38,6 @@ const i32 g_release_duration_spring[7] = {0, 10, 13, 16, 20, 20, 20};
 // GLOBAL: TH16 0x491fd4
 const f32 g_release_radius_spring[7] = {0.0f, 60.0f, 100.0f, 140.0f, 190.0f, 240.0f, 300.0f};
 
-i32 BombInf::release_cancel_in_radius()
-{
-    AnmVm *vm = get_vm_or_clear(anm_id);
-    if (vm == NULL)
-    {
-        return 0;
-    }
-    D3DXVECTOR3 pos = vm->world_pos();
-    g_BulletManager->cancel_radius_as_bomb(&pos, vm->scale.x, 4);
-    g_LaserManager->cancel_in_radius(&pos, vm->scale.x, 4, 1);
-    return 0;
-}
-
 // FUNCTION: TH16 0x40e0f0
 i32 BombAllSubInf::begin()
 {
@@ -106,7 +93,15 @@ i32 BombAllSubInf::method_c(i32 a, i32 b)
 // FUNCTION: TH16 0x40e3c0
 i32 BombAllSubInf::method_10()
 {
-    return release_cancel_in_radius();
+    AnmVm *vm = get_vm_or_clear(anm_id);
+    if (vm == NULL)
+    {
+        return 0;
+    }
+    D3DXVECTOR3 pos = vm->world_pos();
+    g_BulletManager->cancel_radius_as_bomb(&pos, vm->scale.x, 4);
+    g_LaserManager->cancel_in_radius(&pos, vm->scale.x, 4, 1);
+    return 0;
 }
 
 // FUNCTION: TH16 0x40e480
@@ -178,7 +173,15 @@ i32 BombAyaSubInf::method_c(i32 a, i32 b)
 // FUNCTION: TH16 0x40efa0
 i32 BombAyaSubInf::method_10()
 {
-    return release_cancel_in_radius();
+    AnmVm *vm = get_vm_or_clear(anm_id);
+    if (vm == NULL)
+    {
+        return 0;
+    }
+    D3DXVECTOR3 pos = vm->world_pos();
+    g_BulletManager->cancel_radius_as_bomb(&pos, vm->scale.x, 4);
+    g_LaserManager->cancel_in_radius(&pos, vm->scale.x, 4, 1);
+    return 0;
 }
 
 // FUNCTION: TH16 0x40f060
@@ -241,7 +244,15 @@ i32 BombCirnoSubInf::method_c(i32 a, i32 b)
 // FUNCTION: TH16 0x40f860
 i32 BombCirnoSubInf::method_10()
 {
-    return release_cancel_in_radius();
+    AnmVm *vm = get_vm_or_clear(anm_id);
+    if (vm == NULL)
+    {
+        return 0;
+    }
+    D3DXVECTOR3 pos = vm->world_pos();
+    g_BulletManager->cancel_radius_as_bomb(&pos, vm->scale.x, 4);
+    g_LaserManager->cancel_in_radius(&pos, vm->scale.x, 4, 1);
+    return 0;
 }
 
 // FUNCTION: TH16 0x40f920
@@ -309,7 +320,15 @@ i32 BombMarisaSubInf::method_c(i32 a, i32 b)
 // FUNCTION: TH16 0x410480
 i32 BombMarisaSubInf::method_10()
 {
-    return release_cancel_in_radius();
+    AnmVm *vm = get_vm_or_clear(anm_id);
+    if (vm == NULL)
+    {
+        return 0;
+    }
+    D3DXVECTOR3 pos = vm->world_pos();
+    g_BulletManager->cancel_radius_as_bomb(&pos, vm->scale.x, 4);
+    g_LaserManager->cancel_in_radius(&pos, vm->scale.x, 4, 1);
+    return 0;
 }
 
 // FUNCTION: TH16 0x410540
@@ -379,7 +398,15 @@ i32 BombReimuSubInf::method_c(i32 a, i32 b)
 // FUNCTION: TH16 0x411790
 i32 BombReimuSubInf::method_10()
 {
-    return release_cancel_in_radius();
+    AnmVm *vm = get_vm_or_clear(anm_id);
+    if (vm == NULL)
+    {
+        return 0;
+    }
+    D3DXVECTOR3 pos = vm->world_pos();
+    g_BulletManager->cancel_radius_as_bomb(&pos, vm->scale.x, 4);
+    g_LaserManager->cancel_in_radius(&pos, vm->scale.x, 4, 1);
+    return 0;
 }
 
 // FUNCTION: TH16 0x411850
