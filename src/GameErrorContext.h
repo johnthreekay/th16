@@ -15,3 +15,5 @@ struct GameErrorContext
     const char *log(const char *fmt, ...);
     const char *fatal(const char *fmt, ...);
 };
+
+extern GameErrorContext g_GameErrorContext;

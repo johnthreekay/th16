@@ -5,6 +5,9 @@
 #include "CriticalSections.h"
 #include "GameErrorContext.h"
 
+// GLOBAL: TH16 0x4a30a8
+GameErrorContext g_GameErrorContext;
+
 // FUNCTION: TH16 0x4029d0
 const char *GameErrorContext::log(const char *fmt, ...)
 {
