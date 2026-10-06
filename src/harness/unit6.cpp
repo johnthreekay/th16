@@ -3,6 +3,7 @@
 // so globals whose readers are not decompiled yet are read here.
 #include "../Supervisor.h"
 #include "../UpdateFunc.h"
+#include "../Globals.h"
 
 int harness_unit6_read_globals()
 {
@@ -40,3 +41,13 @@ void harness_register(UpdateFunc *f, int priority)
     g_UpdateFuncRegistry->register_on_tick(f, priority);
     g_UpdateFuncRegistry->register_on_draw(f, priority);
 }
+
+// Like ItemManager::on_tick_1d__body, PauseMenu and the season gauge.
+f32 harness_globals(i32 amount)
+{
+    g_Globals.add_to_score(amount);
+    g_Globals.add_to_score(10);
+    g_Globals.add_power(amount);
+    return get_season_gauge_fill_ratio();
+}
+

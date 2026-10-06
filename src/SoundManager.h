@@ -41,7 +41,11 @@ struct SoundManager
     // Members that do not use this; LTCG dropped it.
     static i32 update_sound_thread();
     static void tick_bgm_fade();
-    static void __stdcall play_sound_centered(i32 id, i32 unused);
+    // The second argument is 0 at every call site; LTCG folded it, so
+    // callers push whatever register is handy.
+    HARNESS_CALLED void play_sound_centered(i32 id, i32 unused);
 };
 
 extern SoundManager g_SoundManager;
+
+void play_sound_centered_stub(i32 id, i32 unused);

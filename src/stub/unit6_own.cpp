@@ -21,8 +21,7 @@ void SoundManager::modify_bgm(i32 command, i32 arg, const char *name)
 {
 }
 
-// STUB: TH16 0x45e150
-void __stdcall SoundManager::play_sound_centered(i32 id, i32 unused)
+void play_sound_centered_stub(i32 id, i32 unused)
 {
 }
 
