@@ -4,11 +4,6 @@
 // GLOBAL: TH16 0x4c0f48
 AnmManager *g_AnmManager;
 
-// STUB: TH16 0x465a80
-void AnmManager::flush_sprites()
-{
-}
-
 // STUB: TH16 0x468490
 void AnmManager::draw_vm(AnmVm *vm)
 {
@@ -41,10 +36,5 @@ i32 AnmManager::sub_46d690()
 
 // STUB: TH16 0x42bcf0
 void Gui::sub_42bcf0(i32 unk, i32 kind)
-{
-}
-
-// STUB: TH16 0x45edb0
-void AnmLoaded::set_sprite(AnmVm *vm, i32 sprite)
 {
 }

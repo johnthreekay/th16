@@ -2,6 +2,7 @@
 
 #include <d3dx9math.h>
 
+#include "ZunAngle.h"
 #include "ZunMath.h"
 #include "ZunTimer.h"
 #include "decomp.h"
@@ -38,6 +39,7 @@ struct InterpFloat2
     i32 method;
 
     void reset_timer();
+    D3DXVECTOR2 step();
 };
 
 struct InterpFloat3
@@ -53,6 +55,26 @@ struct InterpFloat3
 
     // 0x406200
     void reset_timer();
+    // 0x406e10
+    D3DXVECTOR3 step();
+};
+
+// An InterpFloat whose values are angles kept in [-pi, pi] (ExpHP:
+// zInterpFloat, used for AnmVm::rotate_2d_i).
+struct InterpAngle
+{
+    ZunAngle initial;
+    ZunAngle goal;
+    ZunAngle bezier_1;
+    ZunAngle bezier_2;
+    ZunAngle current;
+    ZunTimer time;
+    i32 end_time;
+    i32 method;
+
+    // The same code as InterpFloat::reset, but a separate function.
+    void reset_time();
+    ZunAngle step();
 };
 
 struct InterpInt
@@ -65,31 +87,8 @@ struct InterpInt
     ZunTimer time;
     i32 end_time;
     i32 method;
-};
 
-// Three ints, copied as a whole (ExpHP: zInt3). Indexing keeps the
-// array syntax InterpInt3's fields had before.
-struct Int3
-{
-    i32 x;
-    i32 y;
-    i32 z;
-
-    Int3()
-    {
-    }
-
-    Int3(i32 x, i32 y, i32 z)
-    {
-        this->x = x;
-        this->y = y;
-        this->z = z;
-    }
-
-    i32 &operator[](i32 i)
-    {
-        return (&x)[i];
-    }
+    i32 step();
 };
 
 struct InterpInt3
@@ -102,6 +101,8 @@ struct InterpInt3
     ZunTimer time;
     i32 end_time;
     i32 method;
+
+    Int3 step();
 };
 
 struct InterpStrange1

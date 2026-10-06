@@ -16,11 +16,6 @@ i32 SoundManager::update_sound_thread()
     return 0;
 }
 
-// STUB: TH16 0x45ed00
-void SoundManager::modify_bgm(i32 command, i32 arg, const char *name)
-{
-}
-
 void play_sound_centered_stub(i32 id, i32 unused)
 {
 }

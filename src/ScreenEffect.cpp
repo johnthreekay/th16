@@ -52,7 +52,7 @@ HARNESS_CALLED void screen_effect_draw_rect(ZunRect *rect, D3DCOLOR color)
     g_AnmManager->render_cache_184fbb6 = 0xff;
     g_AnmManager->render_cache_184fbc0 = 0;
     g_AnmManager->render_cache_184fbb0 = -1;
-    g_AnmManager->render_cache_184fbb4 = 10;
+    g_AnmManager->last_blend_mode = 10;
     g_AnmManager->render_cache_184fbb7 = 0xff;
     g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
     g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
