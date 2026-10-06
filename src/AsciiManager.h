@@ -77,6 +77,7 @@ class AsciiInf : public TaskInf
     void create_number(Float3 *pos, u32 value);
     // The same with a last digit drawn after the separators (value * 10 + digit).
     void create_number_with_digit(Float3 *pos, u32 value, u32 digit);
+    void draw_string(AsciiStr *str);
     i32 draw_group(i32 group);
     i32 draw_group_1();
 

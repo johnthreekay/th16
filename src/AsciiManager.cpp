@@ -237,3 +237,69 @@ int __fastcall AsciiInf::on_draw_2_callback(void *arg)
 {
     return ((AsciiInf *)arg)->draw_group_1();
 }
+
+// FUNCTION: TH16 0x4080b0
+int __fastcall AsciiInf::on_draw_3_callback(void *arg)
+{
+    AsciiInf *ascii = (AsciiInf *)arg;
+    g_Supervisor.current_camera = &g_Supervisor.cameras[0];
+    Supervisor::swap_transform_matrices(&g_Supervisor.cameras[0]);
+    g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
+    g_Supervisor.current_camera_index = 0;
+    int result = ascii->draw_group(2);
+    g_Supervisor.current_camera = &g_Supervisor.cameras[2];
+    Supervisor::swap_transform_matrices(&g_Supervisor.cameras[2]);
+    g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
+    g_Supervisor.current_camera_index = 2;
+    return result;
+}
+
+// TODO: register allocation differs (the original keeps this in a stack slot); draw_string is still a stub.
+// FUNCTION: TH16 0x408560
+i32 AsciiInf::draw_group(i32 group)
+{
+    AsciiStr *str = strings;
+    for (i32 i = 0; i < num_strings; i++, str++)
+    {
+        if (str->render_group == group)
+        {
+            draw_string(str);
+        }
+    }
+    g_AnmManager->flush_sprites();
+    g_Supervisor.current_camera = &g_Supervisor.cameras[2];
+    if (g_AnmManager != NULL)
+    {
+        g_AnmManager->flush_sprites();
+    }
+    g_Supervisor.d3d_device->SetTransform(D3DTS_VIEW, &g_Supervisor.cameras[2].view_matrix);
+    g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &g_Supervisor.cameras[2].projection_matrix);
+    if (g_AnmManager != NULL)
+    {
+        g_AnmManager->unk_d0 = g_Supervisor.cameras[2].unk_fc[0];
+        g_AnmManager->unk_d4 = g_Supervisor.cameras[2].unk_fc[1];
+    }
+    g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
+    g_Supervisor.current_camera_index = 2;
+    return 1;
+}
+
+// Group 1 is drawn with layer kind 2 coordinates on the first camera.
+// FUNCTION: TH16 0x408ef0
+i32 AsciiInf::draw_group_1()
+{
+    g_Supervisor.current_camera = &g_Supervisor.cameras[0];
+    Supervisor::swap_transform_matrices(&g_Supervisor.cameras[0]);
+    g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
+    g_Supervisor.current_camera_index = 0;
+    g_AnmManager->flush_sprites();
+    vm_1.flags_hi = vm_1.flags_hi & ~ANM_VM_FLAG_HI_LAYER_KIND_MASK | ANM_VM_FLAG_HI_LAYER_KIND_2;
+    draw_group(1);
+    vm_1.flags_hi &= ~ANM_VM_FLAG_HI_LAYER_KIND_MASK;
+    g_AnmManager->flush_sprites();
+    g_Supervisor.current_camera = &g_Supervisor.cameras[2];
+    Supervisor::swap_transform_matrices(&g_Supervisor.cameras[2]);
+    g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
+    g_Supervisor.current_camera_index = 2;
+    return 1;
+}

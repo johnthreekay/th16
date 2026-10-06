@@ -28,22 +28,22 @@ void AnmLoaded::set_sprite(AnmVm *vm, i32 sprite)
     vm->sprite_id = sprite;
 }
 
-// STUB: TH16 0x408560
-i32 AsciiInf::draw_group(i32 group)
+// STUB: TH16 0x408650
+void AsciiInf::draw_string(AsciiStr *str)
 {
-    return group;
+    str->font_id = 0;
 }
 
-// STUB: TH16 0x408ef0
-i32 AsciiInf::draw_group_1()
+// STUB: TH16 0x465a80
+void AnmManager::flush_sprites()
 {
-    return 1;
+    unk_d0 = 0.0f;
 }
 
-// STUB: TH16 0x4080b0
-int __fastcall AsciiInf::on_draw_3_callback(void *arg)
+// STUB: TH16 0x43c710
+void __stdcall Supervisor::swap_transform_matrices(Camera *camera)
 {
-    return arg != 0;
+    camera->camera_index = 0;
 }
 
 // STUB: TH16 0x46efa0

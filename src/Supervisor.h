@@ -27,6 +27,28 @@ struct Config
     u8 unk_24[0x68 - 0x24];
 };
 
+// A view of the scene with its matrices and viewport. Layout from
+// ExpHP's th-re-data (zCamera).
+struct Camera
+{
+    f32 position[3];
+    f32 facing[3];
+    f32 up[3];
+    f32 facing_normalized[3];
+    f32 unk_30[3];
+    f32 rocking_vector_1[3];
+    f32 rocking_vector_2[3];
+    f32 field_of_view;
+    i32 window_resolution[2];
+    D3DMATRIX view_matrix;
+    D3DMATRIX projection_matrix;
+    D3DVIEWPORT9 viewport;
+    i32 camera_index;
+    f32 unk_fc[2];
+    f32 unk_104[3];
+    u8 sky[0x12c - 0x110];
+};
+
 // Owns the Direct3D/DirectInput objects and global game state. ZUN's name
 // for it in older games was MotherInf (per ExpHP).
 struct Supervisor
@@ -39,13 +61,19 @@ struct Supervisor
     IDirectInputDevice8A *joystick;
     u8 unk_28[0x1d0 - 0x28];
     Config config;
-    u8 unk_238[0x730 - 0x238];
+    Camera cameras[4];
+    // One of cameras; set together with current_camera_index.
+    Camera *current_camera;
+    i32 current_camera_index;
+    u8 unk_6f0[0x730 - 0x6f0];
     u32 flags;
     u8 unk_734[0x998 - 0x734];
     ThreadInf thread;
     u8 unk_9b4[0xa40 - 0x9b4];
 
     u32 read_joypad(u32 input);
+    // Callers never pass this; LTCG dropped it.
+    static void __stdcall swap_transform_matrices(Camera *camera);
 };
 
 enum SupervisorFlags
