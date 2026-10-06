@@ -22,6 +22,7 @@ static_assert(offsetof(CSound, m_manager) == 0x7c, "CSound layout");
 static_assert(sizeof(CStreamingSound) == 0xa0, "CStreamingSound layout");
 static_assert(offsetof(CStreamingSound, m_dwNotifySize) == 0x94, "CStreamingSound layout");
 static_assert(offsetof(SoundManager, bgm_file_offset) == 0x5670, "SoundManager layout");
+static_assert(sizeof(DSBUFFERDESC) == sizeof(((CSound *)0)->m_desc), "CSound layout");
 
 #define SAFE_RELEASE(p) \
     { \
@@ -207,6 +208,49 @@ __forceinline HRESULT CSound::fill_buffer_inline(LPDIRECTSOUNDBUFFER pDSB, BOOL 
     }
 
     pDSB->Unlock(pDSLockedBuffer, dwDSLockedBufferSize, NULL, 0);
+
+    return S_OK;
+}
+
+// FUNCTION: TH16 0x470250
+HARNESS_CALLED HRESULT CSoundManager::SetPrimaryBufferFormat(DWORD dwPrimaryChannels, DWORD dwPrimaryFreq,
+                                                            DWORD dwPrimaryBitRate)
+{
+    HRESULT hr;
+    LPDIRECTSOUNDBUFFER pDSBPrimary = NULL;
+
+    if (m_pDS == NULL)
+    {
+        return CO_E_NOTINITIALIZED;
+    }
+
+    DSBUFFERDESC dsbd;
+    ZeroMemory(&dsbd, sizeof(DSBUFFERDESC));
+    dsbd.dwSize = sizeof(DSBUFFERDESC);
+    dsbd.dwFlags = DSBCAPS_PRIMARYBUFFER;
+    dsbd.dwBufferBytes = 0;
+    dsbd.lpwfxFormat = NULL;
+
+    if (FAILED(hr = m_pDS->CreateSoundBuffer(&dsbd, &pDSBPrimary, NULL)))
+    {
+        return hr;
+    }
+
+    WAVEFORMATEX wfx;
+    ZeroMemory(&wfx, sizeof(WAVEFORMATEX));
+    wfx.wFormatTag = WAVE_FORMAT_PCM;
+    wfx.nChannels = (WORD)dwPrimaryChannels;
+    wfx.nSamplesPerSec = dwPrimaryFreq;
+    wfx.wBitsPerSample = (WORD)dwPrimaryBitRate;
+    wfx.nBlockAlign = wfx.wBitsPerSample / 8 * wfx.nChannels;
+    wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
+
+    if (FAILED(hr = pDSBPrimary->SetFormat(&wfx)))
+    {
+        return hr;
+    }
+
+    SAFE_RELEASE(pDSBPrimary);
 
     return S_OK;
 }
@@ -408,6 +452,7 @@ LPDIRECTSOUNDBUFFER CSound::GetFreeBuffer()
     }
 }
 
+// TODO: the original has 8 more bytes of frame and saves esi/edi up front.
 // FUNCTION: TH16 0x471120
 HRESULT CSound::Play(DWORD dwPriority, DWORD dwFlags, DWORD offset)
 {
@@ -502,6 +547,7 @@ HRESULT CSound::Stop(BOOL close_file)
     return hr;
 }
 
+// TODO: the original reloads m_pWaveFile after SetFilePointer (alias analysis differs) and has a 4-byte frame.
 // FUNCTION: TH16 0x4712f0
 HRESULT CSound::Pause()
 {
@@ -525,6 +571,7 @@ HRESULT CSound::Pause()
     return hr;
 }
 
+// TODO: the original adds m_paused_total from memory and has a 4-byte frame.
 // FUNCTION: TH16 0x471380
 HRESULT CSound::Unpause()
 {
@@ -740,6 +787,112 @@ HRESULT CStreamingSound::Reset(DWORD offset)
     return m_apDSBuffer[0]->SetCurrentPosition(0L);
 }
 
+// get_play_time's body, which LTCG also inlined into switch_track.
+static __forceinline double play_time(CStreamingSound *sound)
+{
+    double time = get_runtime() - (sound->m_start_time + sound->m_paused_total);
+    ThBgmFormat *track = sound->m_pWaveFile->m_track;
+    double end = track->total_size / (track->format.nSamplesPerSec / 8.0) / track->format.wBitsPerSample /
+                 track->format.nChannels;
+    double loop = (track->total_size - track->intro_size) / (double)track->format.nSamplesPerSec /
+                  (track->format.wBitsPerSample / 8.0) / track->format.nChannels;
+    while (time >= end)
+    {
+        time -= loop;
+    }
+    return time;
+}
+
+// FUNCTION: TH16 0x470bb0
+HRESULT CStreamingSound::recreate_buffers(ThBgmFormat *track)
+{
+    DWORD i;
+
+    m_playing = FALSE;
+    for (i = 0; i < m_dwNumBuffers; i++)
+    {
+        SAFE_RELEASE(m_apDSBuffer[i]);
+    }
+    SAFE_DELETE_ARRAY(m_apDSBuffer);
+
+    LPDIRECTSOUNDNOTIFY pDSNotify = NULL;
+    m_apDSBuffer = new LPDIRECTSOUNDBUFFER[m_dwNumBuffers];
+    DSBUFFERDESC dsbd = *(DSBUFFERDESC *)m_desc;
+    dsbd.lpwfxFormat = &track->format;
+    for (i = 0; i < m_dwNumBuffers; i++)
+    {
+        if (FAILED(((IDirectSound8 *)m_manager->m_pDS)->CreateSoundBuffer(&dsbd, &m_apDSBuffer[i], NULL)))
+        {
+            return E_FAIL;
+        }
+        if (FAILED(m_apDSBuffer[i]->QueryInterface(IID_IDirectSoundNotify, (VOID **)&pDSNotify)))
+        {
+            return E_FAIL;
+        }
+
+        DSBPOSITIONNOTIFY *aPosNotify = new DSBPOSITIONNOTIFY[8];
+        if (aPosNotify == NULL)
+        {
+            return E_OUTOFMEMORY;
+        }
+        for (DWORD j = 0; j < 8; j++)
+        {
+            aPosNotify[j].dwOffset = (m_dwNotifySize * j) + m_dwNotifySize - 1;
+            aPosNotify[j].hEventNotify = m_hNotifyEvent;
+        }
+
+        if (FAILED(pDSNotify->SetNotificationPositions(8, aPosNotify)))
+        {
+            SAFE_RELEASE(pDSNotify);
+            SAFE_DELETE_ARRAY(aPosNotify);
+            return E_FAIL;
+        }
+        SAFE_RELEASE(pDSNotify);
+        SAFE_DELETE_ARRAY(aPosNotify);
+    }
+    return S_OK;
+}
+
+// FUNCTION: TH16 0x471b00
+HRESULT CStreamingSound::switch_track(ThBgmFormat *track)
+{
+    double time = play_time(this);
+    m_pWaveFile->m_track = track;
+    seek(time);
+    return S_OK;
+}
+
+// TODO: the original aligns its frame to 8 bytes (whole-program double spill threshold, see README).
+// FUNCTION: TH16 0x471bd0
+HARNESS_CALLED double CStreamingSound::get_play_time()
+{
+    return play_time(this);
+}
+
+// TODO: the original restores esi and edi after the critical section, ours before.
+// FUNCTION: TH16 0x471c90
+HARNESS_CALLED void CStreamingSound::seek(double seconds)
+{
+    ENTER_CS(CS_BGM_STREAM);
+    m_apDSBuffer[0]->Stop();
+    ThBgmFormat *track = m_pWaveFile->m_track;
+    i32 offset = (i32)(track->format.nSamplesPerSec * seconds) * (track->format.wBitsPerSample / 8) *
+                     track->format.nChannels -
+                 track->format.nBlockAlign;
+    if (offset < 0)
+    {
+        offset = 0;
+    }
+    recreate_buffers(track);
+    Reset(offset);
+    m_pWaveFile->m_dwSize = m_pWaveFile->m_ck.cksize;
+    FillBufferWithSound(m_apDSBuffer[0], m_pWaveFile->m_track->total_size != 0, offset);
+    Play(m_play_priority, m_play_flags, offset);
+    m_start_time -= seconds;
+    LEAVE_CS(CS_BGM_STREAM);
+}
+
+// TODO: our build drops the log call with the error message; the original keeps it.
 // FUNCTION: TH16 0x4717e0
 HRESULT CWaveFile::open_file(const char *filename, ThBgmFormat *track)
 {

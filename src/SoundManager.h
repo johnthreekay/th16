@@ -121,7 +121,18 @@ struct BgmStream
     void destroy();
 };
 
-struct CSoundManager;
+class CStreamingSound;
+
+// The DirectSound sample's CSoundManager.
+struct CSoundManager
+{
+    struct IDirectSound8 *m_pDS;
+
+    // 0x470250. Every caller asks for 44.1 kHz 16-bit stereo; LTCG folded
+    // the arguments.
+    HARNESS_CALLED HRESULT SetPrimaryBufferFormat(DWORD dwPrimaryChannels, DWORD dwPrimaryFreq,
+                                                  DWORD dwPrimaryBitRate);
+};
 
 // The DirectSound sample's CSound with ZUN's fades, pausing and track
 // switching. Its doubles are only 4-aligned: MSVC would otherwise pad the
@@ -206,6 +217,15 @@ class CStreamingSound : public CSound
     HARNESS_CALLED HRESULT HandleWaveStreamNotification(BOOL bLoopedPlay);
     // 0x471720
     HRESULT Reset(DWORD offset);
+    // 0x470bb0. Creates the buffers again in the format of a track.
+    HRESULT recreate_buffers(ThBgmFormat *track);
+    // 0x471b00. Switches to another track, continuing at the same time.
+    HRESULT switch_track(ThBgmFormat *track);
+    // 0x471bd0. Seconds into the track, counting from the loop start after
+    // the first loop.
+    HARNESS_CALLED double get_play_time();
+    // 0x471c90. Restarts the track the given number of seconds in.
+    HARNESS_CALLED void seek(double seconds);
 };
 
 inline void BgmStream::set_volume(i32 volume)
