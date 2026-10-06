@@ -48,3 +48,25 @@ ItemManager *harness_item_manager()
 {
     return g_ItemManager;
 }
+
+// Like LaserCurveInf's run_ex (0x438d89), which appends with an int field
+// converted to float.
+LaserCurveNode *harness_laser_curve_append(LaserCurveInf *curve, i32 n)
+{
+    curve->append_node((f32)n);
+    return curve->append_node((f32)(n + 1));
+}
+
+// Like the player's two timers around 0x445649.
+void harness_timer_sub(Timer *a, Timer *b)
+{
+    *a -= 0xe;
+    *b -= 0x77;
+}
+
+// Like ItemManager's on_tick body (0x42fe19), which collects PIV items with
+// a value from a table indexed by item type.
+void harness_item_collect_piv(Item *item, f32 *values, i32 type)
+{
+    item->collect_piv(values[type]);
+}

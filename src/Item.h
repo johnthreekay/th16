@@ -42,6 +42,9 @@ struct Item
     ~Item();
     // Puts the item back on the front of its free list.
     void release();
+    // Adds value * 100 to the PIV, capped at its maximum. Works on
+    // g_Globals only; LTCG drops this (ExpHP: Globals::collect_piv).
+    HARNESS_CALLED void collect_piv(f32 value);
 };
 
 struct ItemManagerInner

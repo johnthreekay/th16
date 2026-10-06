@@ -180,6 +180,19 @@ class LaserInfiniteInf : public LaserDataInf
     virtual i32 check_graze_or_kill(i32 a);
 };
 
+struct LaserCurveNode
+{
+    LaserCurveNode *next;
+    LaserCurveNode *prev;
+    f32 unk_8;
+    f32 unk_c;
+    u8 unk_10[0x3c - 0x10];
+
+    LaserCurveNode()
+    {
+    }
+};
+
 struct LaserCurveInner
 {
     u8 data[0x358];
@@ -197,7 +210,10 @@ class LaserCurveInf : public LaserDataInf
     LaserCurveInner inner;
     AnmVm vm_92c;
     AnmVm vm_f28;
-    u8 unk_1524[0x1568 - 0x1524];
+    void *unk_1524;
+    void *unk_1528;
+    // Head of a list of heap nodes; never a real node itself.
+    LaserCurveNode nodes;
 
     LaserCurveInf();
 
@@ -217,6 +233,8 @@ class LaserCurveInf : public LaserDataInf
     virtual i32 method_40();
     virtual i32 method_44();
     virtual i32 method_60();
+
+    HARNESS_CALLED LaserCurveNode *append_node(f32 value);
 };
 
 struct LaserBeamInner

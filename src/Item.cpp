@@ -132,3 +132,13 @@ void Item::release()
     head->next = &node;
     node.prev = head;
 }
+
+// FUNCTION: TH16 0x430dc0
+HARNESS_CALLED void Item::collect_piv(f32 value)
+{
+    g_Globals.piv += (i32)(value * 100.0f);
+    if (g_Globals.piv > g_Globals.max_piv)
+    {
+        g_Globals.piv = g_Globals.max_piv;
+    }
+}

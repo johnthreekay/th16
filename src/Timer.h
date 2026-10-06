@@ -61,6 +61,9 @@ struct Timer
         previous = -1;
     }
 
+    // Count back by the given number of frames, scaled like tick().
+    void operator-=(i32 frames);
+
     // Advance by one frame, scaled by the speed multiplier unless it is
     // close enough to 1.
     void tick()

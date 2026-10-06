@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "Laser.h"
 
 // Placeholder for 0x4370a0 (not decompiled yet).
@@ -24,10 +26,27 @@ i32 LaserCurveInf::on_draw()
     return unit5_placeholder(this);
 }
 
-// Placeholder for 0x437760 (not decompiled yet).
+// FUNCTION: TH16 0x437760
 i32 LaserCurveInf::on_destroy()
 {
-    return unit5_placeholder(this);
+    LaserCurveNode *node = nodes.next;
+    while (node != NULL)
+    {
+        LaserCurveNode *next = node->next;
+        delete node;
+        node = next;
+    }
+    if (unk_1528 != NULL)
+    {
+        free(unk_1528);
+        unk_1528 = NULL;
+    }
+    if (unk_1524 != NULL)
+    {
+        free(unk_1524);
+        unk_1524 = NULL;
+    }
+    return 0;
 }
 
 // Placeholder for 0x439d60 (not decompiled yet).
@@ -88,4 +107,20 @@ i32 LaserCurveInf::method_44()
 i32 LaserCurveInf::method_60()
 {
     return unit5_placeholder(this);
+}
+
+// FUNCTION: TH16 0x431190
+HARNESS_CALLED LaserCurveNode *LaserCurveInf::append_node(f32 value)
+{
+    LaserCurveNode *node = &nodes;
+    while (node->next != NULL)
+    {
+        node = node->next;
+    }
+    node->next = new LaserCurveNode;
+    node->unk_c = value;
+    node->next->unk_8 = value;
+    node->next->next = NULL;
+    node->next->prev = node;
+    return node->next;
 }
