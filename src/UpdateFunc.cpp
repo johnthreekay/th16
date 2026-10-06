@@ -34,7 +34,7 @@ UpdateFuncRegistry::~UpdateFuncRegistry()
 // UpdateFuncRegistry::`scalar deleting destructor'
 
 // FUNCTION: TH16 0x401300
-int UpdateFuncRegistry::register_on_tick(UpdateFunc *f, int priority)
+HARNESS_CALLED int UpdateFuncRegistry::register_on_tick(UpdateFunc *f, int priority)
 {
     UpdateFuncRegistry *registry = g_UpdateFuncRegistry;
     int result = 0;
@@ -72,7 +72,7 @@ int UpdateFuncRegistry::register_on_tick(UpdateFunc *f, int priority)
 }
 
 // FUNCTION: TH16 0x4013b0
-int UpdateFuncRegistry::register_on_draw(UpdateFunc *f, int priority)
+HARNESS_CALLED int UpdateFuncRegistry::register_on_draw(UpdateFunc *f, int priority)
 {
     UpdateFuncRegistry *registry = g_UpdateFuncRegistry;
     int result = 0;
@@ -224,7 +224,7 @@ done:
 }
 
 // FUNCTION: TH16 0x401730
-UpdateFunc *UpdateFuncRegistry::create_func(UpdateFuncCallback function)
+HARNESS_CALLED UpdateFunc *UpdateFuncRegistry::create_func(UpdateFuncCallback function)
 {
     // The original keeps every constructor store and then overwrites them,
     // and never folds the two flag updates together. Writing through a

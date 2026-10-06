@@ -55,6 +55,8 @@ struct AnmManager
     // Members that do not use this; LTCG dropped it (ret N, no ecx).
     static void __stdcall interrupt_tree(AnmId id, i32 interrupt);
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *path);
+    // Frees ANM files marked for unloading; nonzero while one is still busy.
+    static i32 sub_46d690();
 };
 
 extern AnmManager *g_AnmManager;

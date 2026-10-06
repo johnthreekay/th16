@@ -90,7 +90,21 @@ struct Supervisor
     void sub_43c630();
     void sub_43c6a0();
 
+    int switch_gamemodes();
+    // Members that do not use this; LTCG dropped it.
+    static void read_keyboard_input();
+    int initialize();
+    HARNESS_CALLED i32 start_thread(ThreadStart start, void *arg);
+    i32 play_bgm_wav(i32 arg, const char *name);
+    i32 play_bgm(i32 arg, i32 track);
+    i32 stop_bgm();
+    HARNESS_CALLED i32 fade_out_bgm(f32 seconds);
+
+    static int __fastcall on_tick(void *arg);
+    static int __fastcall on_registration(void *arg);
+    static int __fastcall on_draw_01(void *arg);
     static int __fastcall on_draw_0e(void *arg);
+    static int __fastcall on_draw_0f(void *arg);
     static int __fastcall on_draw_19(void *arg);
     static int __fastcall on_draw_1a(void *arg);
     static int __fastcall on_draw_2b(void *arg);
@@ -130,3 +144,9 @@ extern AnmId g_anm_ids_4c0f4c[3];
 extern i32 g_unk_4a6ef0;
 // When set, Supervisor::on_draw_1a calls it instead of drawing.
 extern void (*g_draw_hook_4a6ee8)();
+// Counted down once per frame by Supervisor::on_tick.
+extern i32 g_unk_4d9d20;
+// The game speed multiplier. ECL changes it (slowing down final boss
+// deaths), and much code changes it temporarily so that different objects
+// see time pass differently.
+extern f32 g_game_speed;

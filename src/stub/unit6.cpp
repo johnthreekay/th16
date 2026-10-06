@@ -35,3 +35,9 @@ AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *path)
 {
     return NULL;
 }
+
+// STUB: TH16 0x46d690
+i32 AnmManager::sub_46d690()
+{
+    return 0;
+}

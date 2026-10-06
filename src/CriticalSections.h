@@ -7,6 +7,8 @@ enum
     CS_UPDATE_FUNC_REGISTRY = 0,
     CS_FILE = 2,
     CS_GAME_ERROR_CONTEXT = 3,
+    // Guards restarting g_Supervisor.thread.
+    CS_SUPERVISOR_THREAD = 6,
     CS_RNG = 10,
     CS_COUNT = 14,
 };

@@ -6,6 +6,11 @@
 
 #include "Input.h"
 
+#include "CriticalSections.h"
+#include "Scorefile.h"
+#include "SoundManager.h"
+#include "UpdateFunc.h"
+
 // GLOBAL: TH16 0x4c10d0
 Supervisor g_Supervisor;
 
@@ -366,4 +371,181 @@ void Supervisor::release_surfaces()
         g_Supervisor.back_buffer = NULL;
     }
     g_Supervisor.arcade_surface_0 = NULL;
+}
+
+// GLOBAL: TH16 0x4d9d20
+i32 g_unk_4d9d20;
+// GLOBAL: TH16 0x4a5788
+f32 g_game_speed;
+
+// FUNCTION: TH16 0x43b3d0
+int __fastcall Supervisor::on_tick(void *arg)
+{
+    Supervisor *s = (Supervisor *)arg;
+
+    if ((s->flags & 0x180) == 0x80 && !s->thread.should_run)
+    {
+        g_Supervisor.gamemode_to_switch_to = 3;
+    }
+    SoundManager::update_sound_thread();
+    SoundManager::tick_bgm_fade();
+    read_keyboard_input();
+    if (AnmManager::sub_46d690())
+    {
+        return UPDATE_FUNC_EXIT_SUCCESS;
+    }
+    if (g_unk_4d9d20 != 0)
+    {
+        g_unk_4d9d20--;
+    }
+    if (s->unk_9b4 != 0)
+    {
+        return s->unk_9b4 == 2 ? UPDATE_FUNC_EXIT_SUCCESS : UPDATE_FUNC_CONTINUE;
+    }
+    int result = s->switch_gamemodes();
+    if (result == 1)
+    {
+        g_game_2d_origin_x = g_resolution_x / 2;
+        g_game_2d_origin_y = (g_resolution_y - 448) / 2;
+        return 1;
+    }
+    return result;
+}
+
+// FUNCTION: TH16 0x43ba40
+int Supervisor::initialize()
+{
+    UpdateFunc *f;
+    int result;
+
+    g_Supervisor.gamemode_current = -2;
+    g_Supervisor.gamemode_to_switch_to = 0;
+    g_Supervisor.unk_6fc = 0;
+
+    f = g_UpdateFuncRegistry->create_func(on_tick);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = &g_Supervisor;
+    f->on_registration = on_registration;
+    result = g_UpdateFuncRegistry->register_on_tick(f, 1);
+    if (result != 0)
+    {
+        return result;
+    }
+
+    f = g_UpdateFuncRegistry->create_func(on_draw_01);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = &g_Supervisor;
+    g_UpdateFuncRegistry->register_on_draw(f, 1);
+
+    f = g_UpdateFuncRegistry->create_func(on_draw_0e);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = &g_Supervisor;
+    g_UpdateFuncRegistry->register_on_draw(f, 0xe);
+
+    f = g_UpdateFuncRegistry->create_func(on_draw_0f);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = &g_Supervisor;
+    g_UpdateFuncRegistry->register_on_draw(f, 0xf);
+
+    f = g_UpdateFuncRegistry->create_func(on_draw_19);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = &g_Supervisor;
+    g_UpdateFuncRegistry->register_on_draw(f, 0x19);
+
+    f = g_UpdateFuncRegistry->create_func(on_draw_1a);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = &g_Supervisor;
+    g_UpdateFuncRegistry->register_on_draw(f, 0x1a);
+
+    f = g_UpdateFuncRegistry->create_func(on_draw_2b);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = &g_Supervisor;
+    g_UpdateFuncRegistry->register_on_draw(f, 0x2b);
+
+    f = g_UpdateFuncRegistry->create_func(on_draw_2c);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = &g_Supervisor;
+    g_UpdateFuncRegistry->register_on_draw(f, 0x2c);
+
+    f = g_UpdateFuncRegistry->create_func(on_draw_38);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = &g_Supervisor;
+    g_UpdateFuncRegistry->register_on_draw(f, 0x38);
+
+    f = g_UpdateFuncRegistry->create_func(on_draw_39);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = &g_Supervisor;
+    g_UpdateFuncRegistry->register_on_draw(f, 0x39);
+
+    f = g_UpdateFuncRegistry->create_func(on_draw_55);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = &g_Supervisor;
+    g_UpdateFuncRegistry->register_on_draw(f, 0x55);
+
+    g_Supervisor.d3d_device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &g_Supervisor.back_buffer);
+    return 0;
+}
+
+// TODO: the original stores ".wav" as an immediate (no literal in .rdata);
+// ours copies it from a literal.
+// FUNCTION: TH16 0x43c370
+i32 Supervisor::play_bgm_wav(i32 arg, const char *name)
+{
+    char path[256];
+
+    strcpy(path, name);
+    strcat(path, ".wav");
+    g_SoundManager.modify_bgm(BGM_PLAY_WAV, arg, path);
+    return 1;
+}
+
+// FUNCTION: TH16 0x43c3f0
+i32 Supervisor::play_bgm(i32 arg, i32 track)
+{
+    if (g_Supervisor.config.flags_2c & 0x10)
+    {
+        g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+    }
+    g_SoundManager.modify_bgm(BGM_PLAY, arg, "dummy");
+    g_Scorefile->bgm_unlocked[track] = 1;
+    return 0;
+}
+
+// FUNCTION: TH16 0x43c440
+i32 Supervisor::stop_bgm()
+{
+    if (g_Supervisor.config.flags_2c & 0x10)
+    {
+        g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+    }
+    else
+    {
+        g_SoundManager.modify_bgm(BGM_STOP, 0, "dummy");
+    }
+    return 0;
+}
+
+// FUNCTION: TH16 0x43c470
+HARNESS_CALLED i32 Supervisor::fade_out_bgm(f32 seconds)
+{
+    if (g_game_speed != 0.0f && !(g_game_speed > 1.0f))
+    {
+        seconds /= g_game_speed;
+    }
+    g_SoundManager.modify_bgm(BGM_FADE_OUT, seconds, "");
+    return 0;
+}
+
+// FUNCTION: TH16 0x43c5b0
+HARNESS_CALLED i32 Supervisor::start_thread(ThreadStart start, void *arg)
+{
+    ENTER_CS(CS_SUPERVISOR_THREAD);
+    g_Supervisor.thread.restart(start, arg);
+    LEAVE_CS(CS_SUPERVISOR_THREAD);
+    return 0;
+}
+
+// FUNCTION: TH16 0x43dce0
+void debug_log_43dce0(const char *fmt, ...)
+{
 }
