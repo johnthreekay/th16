@@ -10,3 +10,9 @@ void harness_enemy_manager_boss(int index, EnemyInf *enemy, int value)
     g_EnemyManager->set_boss_bit(value);
     g_EnemyManager->set_boss_id(index, enemy);
 }
+
+// Like EnemyInf::~EnemyInf (0x41ba10).
+void harness_enemy_remove(EnemyInf *enemy)
+{
+    g_EnemyManager->remove_from_active_list(enemy);
+}

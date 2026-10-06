@@ -1,4 +1,5 @@
 #include "Enemy.h"
+#include "stub/unit4_extern.h"
 
 static_assert(sizeof(PosVel) == 0x44, "PosVel size");
 static_assert(sizeof(EnemyBulletShooter) == 0x380, "EnemyBulletShooter size");
@@ -27,7 +28,8 @@ EnemyData::EnemyData()
 {
 }
 
-// TODO: the memset arguments for drops are pushed a few stores later in the original.
+// TODO: the memset arguments for drops are pushed a few stores later in the original, and
+// next_enemy_id is read twice. The latter changed once set_boss_id got its harness caller.
 // FUNCTION: TH16 0x41b580
 EnemyInf::EnemyInf(const char *sub_name)
 {
@@ -157,6 +159,120 @@ BOOL EnemyManager::is_enemy_alive(int id)
 // FUNCTION: TH16 0x41a9c0
 EnemyInf *EnemyManager::find_enemy_by_id(int id)
 {
+    EnemyInf *enemy = NULL;
+    if (id == 0)
+    {
+        return NULL;
+    }
+    EnemyList *node = g_EnemyManager->active_enemy_list_head;
+    while (node != NULL)
+    {
+        enemy = node->entry;
+        if (enemy->enemy_id == id)
+        {
+            return enemy;
+        }
+        node = node->next;
+    }
+    return enemy;
+}
+
+// FUNCTION: TH16 0x41ade0
+HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
+{
+    EnemyList *node = &enemy->enemy.node_in_global_storage;
+    if (active_enemy_list_head == node)
+    {
+        active_enemy_list_head = enemy->enemy.node_in_global_storage.next;
+    }
+    if (active_enemy_list_tail == node)
+    {
+        active_enemy_list_tail = enemy->enemy.node_in_global_storage.prev;
+    }
+    if (unk_188 == node)
+    {
+        unk_188 = enemy->enemy.node_in_global_storage.next;
+    }
+    if (node->next != NULL)
+    {
+        node->next->prev = node->prev;
+    }
+    if (node->prev != NULL)
+    {
+        node->prev->next = node->next;
+    }
+    node->next = NULL;
+    node->prev = NULL;
+    if (!(enemy->enemy.flags_high & 4))
+    {
+        enemy_count_real--;
+    }
+}
+
+// TODO: register allocation differs in the inlined Timer::tick (the original keeps 1.0f in xmm2).
+// FUNCTION: TH16 0x41b3d0
+int EnemyManager::update()
+{
+    inner.unk_a0[0] = 0;
+    inner.unk_a0[1] = 0;
+    EnemyList *next;
+    for (EnemyList *node = active_enemy_list_head; node != NULL; node = next)
+    {
+        next = node->next;
+        if (!(node->entry->enemy.flags_low & 0x2000000) && node->entry->on_tick() == 0)
+        {
+            node->entry->enemy.flags_low &= ~0x40000;
+        }
+        else
+        {
+            delete node->entry;
+        }
+    }
+    if (g_Player->damage_multiplier > 1.01f)
+    {
+        g_Player->flags_1664c |= 0x20;
+    }
+    else
+    {
+        g_Player->flags_1664c &= ~0x20;
+    }
+    g_Player->damage_multiplier = 1.0f;
+    inner.time_in_stage.tick();
+    return UPDATE_FUNC_CONTINUE;
+}
+
+// FUNCTION: TH16 0x41b4f0
+int __fastcall EnemyManager::on_tick_callback(EnemyManager *mgr)
+{
+    if (g_GameThread == NULL)
+    {
+        return UPDATE_FUNC_CONTINUE;
+    }
+    if (g_GameThread->flag_0 | g_GameThread->flag_2)
+    {
+        return UPDATE_FUNC_CONTINUE;
+    }
+    if (g_GameThread->flag_10)
+    {
+        return UPDATE_FUNC_CONTINUE;
+    }
+    if (g_GameThread->flag_1)
+    {
+        return UPDATE_FUNC_CONTINUE;
+    }
+    return mgr->update();
+}
+
+// FUNCTION: TH16 0x41b530
+int __fastcall EnemyManager::on_draw_callback(EnemyManager *mgr)
+{
+    return UPDATE_FUNC_CONTINUE;
+}
+
+// FUNCTION: TH16 0x41b540
+EnemyInf *EnemyRef::get()
+{
+    i32 id = this->id;
     EnemyInf *enemy = NULL;
     if (id == 0)
     {

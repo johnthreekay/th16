@@ -227,6 +227,7 @@ class EnemyInf : public SptInf
     i32 unk_5748;
 
     EnemyInf(const char *sub_name);
+    int on_tick();
     virtual ~EnemyInf();
 };
 
@@ -244,7 +245,7 @@ struct EnemyManagerInner
     i32 next_enemy_id;
     i32 last_enemy_id;
     Timer time_in_stage;
-    u8 unk_a0[8];
+    i32 unk_a0[2];
 };
 
 // Owns every enemy (ExpHP: zEnemyManager).
@@ -265,10 +266,22 @@ struct EnemyManager
     i32 enemy_count_real;
 
     int get_enemy_count();
-    void set_boss_id(int index, EnemyInf *enemy);
-    void set_boss_bit(int value);
+    HARNESS_CALLED void set_boss_id(int index, EnemyInf *enemy);
+    HARNESS_CALLED void set_boss_bit(int value);
+    HARNESS_CALLED void remove_from_active_list(EnemyInf *enemy);
+    DECOMP_NOINLINE int update();
+    static int __fastcall on_tick_callback(EnemyManager *mgr);
+    static int __fastcall on_draw_callback(EnemyManager *mgr);
     BOOL is_enemy_alive(int id);
     EnemyInf *find_enemy_by_id(int id);
+};
+
+// An enemy referred to by id; 0 means none.
+struct EnemyRef
+{
+    i32 id;
+
+    EnemyInf *get();
 };
 
 extern EnemyManager *g_EnemyManager;
