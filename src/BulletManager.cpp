@@ -161,7 +161,7 @@ i32 BulletManager::on_draw_body()
                 b->vm1.pos = b->pos;
                 if (b->vm1.flags_hi & ANM_VM_AUTO_ROTATE)
                 {
-                    b->vm1.rotation.z = normalize_angle(b->angle + ZUN_PI / 2);
+                    b->vm1.rotation.z = wrap_angle(b->angle + ZUN_PI / 2);
                     b->vm1.flags_lo |= ANM_VM_ROTATION_CHANGED;
                 }
                 if (b->flags & BULLET_FLAG_SCALED)
@@ -175,7 +175,7 @@ i32 BulletManager::on_draw_body()
             b->vm0.entity_pos = b->pos;
             if (b->vm0.flags_hi & ANM_VM_AUTO_ROTATE)
             {
-                b->vm0.rotation.z = normalize_angle(b->angle + ZUN_PI / 2);
+                b->vm0.rotation.z = wrap_angle(b->angle + ZUN_PI / 2);
                 b->vm0.flags_lo |= ANM_VM_ROTATION_CHANGED;
             }
             if (b->flags & BULLET_FLAG_SCALED)

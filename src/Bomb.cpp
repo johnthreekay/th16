@@ -366,13 +366,13 @@ void BombInf::draw()
             release_bonus_pos.y -= 32.0f;
         }
         u32 colors[7] = {0x60606060, 0xa0b0b080, 0xb0b8b880, 0xc0c0c080, 0xd0d0d080, 0xe0e0e080, 0xffffff30};
-        AsciiManager *ascii = g_AsciiManager;
+        AsciiInf *ascii = g_AsciiManager;
         ascii->color.d3d = colors[release_bonus_level];
         ascii->group = 1;
         ascii->font_id = 2;
         ascii->align_h = 0;
         ascii->align_v = 2;
-        ascii->sprintf(&release_bonus_pos, "+%d", (i32)release_bonus_shown / 10 * 10);
+        ascii->create_stringf(&release_bonus_pos, "+%d", (i32)release_bonus_shown / 10 * 10);
         g_AsciiManager->color.d3d = 0xffffffff;
         g_AsciiManager->color.a = 0xff;
         g_AsciiManager->font_id = 0;

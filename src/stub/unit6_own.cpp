@@ -82,9 +82,6 @@ int PauseMenu::on_draw()
 #include "../AsciiManager.h"
 #include "../PopupManager.h"
 
-// GLOBAL: TH16 0x4a6d98
-AsciiManager *g_AsciiManager;
-
 // STUB: TH16 0x449ea0
 int PopupManager::on_tick()
 {

@@ -14,11 +14,6 @@
 // GLOBAL: TH16 0x4a6ef8
 Player *g_Player;
 
-// STUB: TH16 0x407b20
-void AnmLoaded::copy_vm(AnmVm *vm, i32 script)
-{
-}
-
 // STUB: TH16 0x42c600
 void Gui::update_season_gauge()
 {

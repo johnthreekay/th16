@@ -22,7 +22,10 @@ struct Config
     // Analog stick dead zones (DirectInput axis units).
     i16 deadzone_x;
     i16 deadzone_y;
-    u8 unk_20[0x24 - 0x20];
+    u8 unk_20[0x23 - 0x20];
+    // Window size option; 0, 1, 2 pick ascii.anm, ascii_960.anm,
+    // ascii_1280.anm.
+    u8 window_size;
     // Frames skipped per drawn frame (FpsCounter counts them as drawn).
     u8 frame_skip;
     u8 unk_25[0x2c - 0x25];

@@ -31,3 +31,15 @@ HARNESS_CALLED void ZunTimer::operator--(int)
 {
     decrement(1.0f);
 }
+
+// FUNCTION: TH16 0x406190
+HARNESS_CALLED void ZunTimer::operator++(int)
+{
+    tick();
+}
+
+// FUNCTION: TH16 0x406490
+HARNESS_CALLED void ZunTimer::set_value(i32 time)
+{
+    set(time);
+}

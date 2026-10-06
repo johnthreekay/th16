@@ -12,16 +12,20 @@ struct MenuHelper
     i32 stack_selection[0x10];
     i32 stack_num_choices[0x10];
     i32 stack_depth;
-    u8 unk_90[0xd0 - 0x90];
-    i32 unk_d0;
-    i32 unk_d4;
+    // Choices the cursor skips over.
+    i32 disabled[0x10];
+    // Nonzero: moving past either end wraps around.
+    i32 wraps;
+    i32 num_disabled;
 
     MenuHelper()
     {
         stack_depth = 0;
         next_selection = 0;
-        unk_d4 = 0;
-        unk_d0 = 1;
+        num_disabled = 0;
+        wraps = 1;
         num_choices = 999;
     }
+
+    i32 move_cursor(i32 delta);
 };

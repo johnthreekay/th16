@@ -35,4 +35,11 @@ template <class T> struct ZunList
         }
         last->insert_after(node);
     }
+
+    // Takes the node out of its list. Only ZunList<void> defines it
+    // (ZunList.cpp): the original has one copy (0x405610) for every list,
+    // and ZunList<void> stands for ExpHP's untyped zLinkedList.
+    void unlink();
 };
+
+template <> void ZunList<void>::unlink();

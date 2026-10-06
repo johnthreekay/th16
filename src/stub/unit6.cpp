@@ -57,11 +57,6 @@ void Gui::sub_42bcf0(i32 unk, i32 kind)
 {
 }
 
-// STUB: TH16 0x4090f0
-void AnmVm::wipe()
-{
-}
-
 // STUB: TH16 0x45edb0
 void AnmLoaded::set_sprite(AnmVm *vm, i32 sprite)
 {

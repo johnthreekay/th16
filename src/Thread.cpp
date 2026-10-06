@@ -2,6 +2,7 @@
 
 #include "Thread.h"
 
+// FUNCTION: TH16 0x402f20
 ThreadInf::~ThreadInf()
 {
     join_if_running();

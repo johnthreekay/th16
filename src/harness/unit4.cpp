@@ -45,20 +45,6 @@ void harness_fps_counter_delete()
     delete g_FpsCounter;
 }
 
-void unit4_opaque(void *p);
-
-// Placeholder for AsciiManager::drawf_debug (0x4084f0, another unit), built
-// with /GL on purpose: when the callee is opaque, LTCG gives callers that
-// pass it the address of a local a /GS cookie the original does not have.
-// Variadic, so it is never inlined.
-// STUB: TH16 0x4084f0
-void AsciiManager::drawf_debug(Float3 *pos, const char *fmt, ...)
-{
-    // Opaque, so callers still assume this may change any global.
-    unit4_opaque(this);
-    color.d3d = (D3DCOLOR)(pos->x + fmt[0]);
-}
-
 // Like the dialogue skip check at 0x42b043.
 int harness_input_hold_time()
 {

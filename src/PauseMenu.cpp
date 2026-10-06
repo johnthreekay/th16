@@ -14,7 +14,7 @@ void PauseMenu::set_state(i32 state)
     unk_1f4 = 0;
     time_in_current_menu.reset();
     time_since_pause_or_unpause.reset();
-    menu_34.unk_d4 = 0;
+    menu_34.num_disabled = 0;
 }
 
 // FUNCTION: TH16 0x43e200

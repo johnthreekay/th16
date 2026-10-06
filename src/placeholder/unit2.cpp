@@ -13,18 +13,6 @@
 
 void placeholder_sink(int a, float b);
 
-// STUB: TH16 0x406190
-HARNESS_CALLED void ZunTimer::operator++(int)
-{
-    tick();
-}
-
-// STUB: TH16 0x406490
-HARNESS_CALLED void ZunTimer::set_value(i32 value)
-{
-    set(value);
-}
-
 // STUB: TH16 0x45e1f0
 HARNESS_CALLED void SoundManager::play_sound_at_position(i32 id, f32 x)
 {

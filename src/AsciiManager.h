@@ -1,37 +1,95 @@
 #pragma once
 
+#include <d3d9.h>
+
 #include "AnmManager.h"
+#include "AnmVm.h"
 #include "UpdateFunc.h"
 #include "ZunMath.h"
 #include "types.h"
 
-// Only the parts decompiled code needs so far; layout from ExpHP's
-// th-re-data.
-struct AsciiManager
+// Base of the game's task objects. The name is ZUN's, from RTTI; it has no
+// vtable of its own in the executable.
+class TaskInf
 {
-    u8 unk_0[8];
+  public:
+    // Size of the whole object (AsciiInf: 0x19254, TitleInf: 0x5e00).
+    virtual u32 get_size() = 0;
+};
+
+// One line of text drawn with the ASCII font. Layout from ExpHP's
+// th-re-data (zAsciiStr).
+struct AsciiStr
+{
+    char text[0x100];
+    Float3 pos;
+    D3DCOLOR color;
+    Float2 scale;
+    i32 unk_118;
+    i32 unk_11c;
+    i32 font_id;
+    i32 draw_shadows;
+    i32 render_group;
+    i32 remaining_time;
+    i32 align_h;
+    i32 align_v;
+};
+
+// Draws the debug and HUD text. ExpHP calls it AsciiManager; the name is
+// ZUN's, from RTTI. Layout from ExpHP's th-re-data (zAsciiManager).
+class AsciiInf : public TaskInf
+{
+  public:
+    u32 flags;
     UpdateFunc *on_tick_func;
     UpdateFunc *on_draw_func_1;
-    u8 unk_10[0x1920c - 0x10];
-    // Applies to strings added from now on.
+    AnmVm vm_1;
+    AnmVm vm_2;
+    AsciiStr strings[0x140];
+    i32 num_strings;
+    // Settings copied into each new string.
     ZunColor color;
-    u8 unk_19210[0x19224 - 0x19210];
+    Float2 scale;
+    i32 unk_19218;
+    i32 unk_1921c;
+    i32 draw_shadows;
     i32 font_id;
     i32 group;
     i32 duration;
     i32 align_h;
     i32 align_v;
-    u8 unk_19238[0x19240 - 0x19238];
+    i32 character_spacing_for_font_0;
+    i32 num_ticks_alive;
     AnmLoaded *ascii_anm;
     AnmId unk_19244;
     AnmId now_loading_id;
     UpdateFunc *on_draw_func_2;
     UpdateFunc *on_draw_func_3;
 
-    // 0x408260. Variadic, so __cdecl with this pushed first.
-    void sprintf(Float3 *pos, const char *fmt, ...);
-    // 0x4084f0. Like sprintf, for debug text.
-    void drawf_debug(Float3 *pos, const char *fmt, ...);
+    AsciiInf();
+    ~AsciiInf();
+    virtual u32 get_size();
+    i32 initialize();
+    void tick();
+    void create_string(Float3 *pos, const char *text);
+    // Variadic, so __cdecl with this pushed first (ExpHP:
+    // ascii_sprintf_408260).
+    void create_stringf(Float3 *pos, const char *fmt, ...);
+    // The same in the debug font (ExpHP: AsciiManager::drawf_debug).
+    void create_debug_stringf(Float3 *pos, const char *fmt, ...);
+    // Score-style number with thousands separators.
+    void create_number(Float3 *pos, u32 value);
+    // The same with a last digit drawn after the separators (value * 10 + digit).
+    void create_number_with_digit(Float3 *pos, u32 value, u32 digit);
+    void draw_string(AsciiStr *str);
+    i32 draw_group(i32 group);
+    i32 draw_group_1();
+
+    // UpdateFunc callbacks; the argument is the AsciiInf.
+    static int __fastcall on_tick_callback(void *arg);
+    static int __fastcall on_draw_1_callback(void *arg);
+    static int __fastcall on_draw_2_callback(void *arg);
+    static int __fastcall on_draw_3_callback(void *arg);
 };
 
-extern AsciiManager *g_AsciiManager;
+extern AsciiInf *g_AsciiManager;

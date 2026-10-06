@@ -49,3 +49,9 @@ f32 Rng::randf_neg_pi_to_pi()
     __asm finit;
     return (f32)rand_u32() / ((f32)0xffffffff / ZUN_2PI) - ZUN_PI;
 }
+
+// FUNCTION: TH16 0x406320
+HARNESS_CALLED f32 Rng::randf_neg_1_to_1_times_pi()
+{
+    return randf_neg_1_to_1() * ZUN_PI;
+}

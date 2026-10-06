@@ -51,11 +51,6 @@ int SptResourceInf::load_ecl_data(void *data)
     return 0;
 }
 
-// Not a game function: lets placeholders in src/harness/ look opaque.
-void unit4_opaque(void *p)
-{
-}
-
 // STUB: TH16 0x45b130
 double LTCG_VECTORCALL get_runtime()
 {

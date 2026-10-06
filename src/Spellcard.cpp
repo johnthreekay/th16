@@ -109,7 +109,7 @@ i32 Spellcard::on_draw_body()
         return 1;
     }
     D3DXVECTOR3 pos;
-    AsciiManager *ascii = g_AsciiManager;
+    AsciiInf *ascii = g_AsciiManager;
     pos.y = 35.0f;
     pos.z = 0.0f;
     ascii->font_id = 2;
@@ -118,13 +118,13 @@ i32 Spellcard::on_draw_body()
     if (flags & SPELLCARD_CAPTURABLE)
     {
         pos.x = 266.0f;
-        ascii->sprintf(&pos, "%8d", bonus);
+        ascii->create_stringf(&pos, "%8d", bonus);
     }
     else
     {
         // "$" is the font's "bonus failed" glyph.
         pos.x = 282.0f;
-        ascii->sprintf(&pos, "$");
+        ascii->create_stringf(&pos, "$");
     }
     pos.x = 360.0f;
     pos.y = 35.0f;
@@ -133,18 +133,18 @@ i32 Spellcard::on_draw_body()
     i32 captures = g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id].captures[practice];
     if (captures >= 100)
     {
-        g_AsciiManager->sprintf(&pos, "MASTER");
+        g_AsciiManager->create_stringf(&pos, "MASTER");
     }
     else
     {
         i32 attempts = g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id].attempts[practice];
         if (attempts >= 100)
         {
-            g_AsciiManager->sprintf(&pos, "%.2d/99+", captures);
+            g_AsciiManager->create_stringf(&pos, "%.2d/99+", captures);
         }
         else
         {
-            g_AsciiManager->sprintf(&pos, "%.2d/%.2d", captures, attempts);
+            g_AsciiManager->create_stringf(&pos, "%.2d/%.2d", captures, attempts);
         }
     }
     g_AsciiManager->font_id = 0;

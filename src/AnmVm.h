@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include <d3d9.h>
+#include <d3dx9math.h>
 
 #include "Interp.h"
 #include "ZunList.h"
@@ -49,9 +50,19 @@ enum AnmVmFlagsHi
     // Rotate the sprite to the owner's movement angle.
     ANM_VM_AUTO_ROTATE = 1 << 7,
     ANM_VM_CREATED_BY_GAME = 1 << 10,
+    ANM_VM_FLAG_HI_4000 = 1 << 14,
+    ANM_VM_FLAG_HI_8000 = 1 << 15,
+    // world_pos and get_slowdown_factor stop walking up the parents at a VM
+    // with this.
     ANM_VM_NO_PARENT_POS = 1 << 16,
+    // Two bits of layer kind: LAYER_SET for layers 3-19, LAYER_UI for
+    // layers 20-23, neither for the rest.
     ANM_VM_LAYER_SET = 1 << 18,
     ANM_VM_LAYER_UI = 1 << 19,
+    ANM_VM_LAYER_KIND_MASK = ANM_VM_LAYER_SET | ANM_VM_LAYER_UI,
+    // Three bits; set_layer sets it to 1 for layers 20-31 and 36-42.
+    ANM_VM_COORD_MODE_MASK = 7 << 20,
+    ANM_VM_COORD_MODE_1 = 1 << 20,
     ANM_VM_ROTATE_WITH_PARENT = 1 << 23,
 };
 
@@ -66,7 +77,7 @@ struct AnmVm
 {
     ZunTimer interrupt_return_time;
     i32 interrupt_return_offset;
-    u32 layer;
+    i32 layer;
     i32 anm_loaded_index;
     i32 sprite_id;
     i32 script_id;
@@ -96,9 +107,9 @@ struct AnmVm
     InterpFloat v_vel_i;
     Float2 uv_quad_of_sprite[4];
     Float2 uv_scroll_vel;
-    D3DMATRIX matrix_3d0;
-    D3DMATRIX matrix_410;
-    D3DMATRIX matrix_450;
+    D3DXMATRIX matrix_3d0;
+    D3DXMATRIX matrix_410;
+    D3DXMATRIX matrix_450;
     i32 pending_interrupt;
     i32 time_of_last_sprite_set;
     i32 unk_498;
@@ -155,28 +166,26 @@ struct AnmVm
     Float3 rotation_related;
 
     // Callers compile with EH cleanup for this, which LTCG then removes
-    // because it sees the body cannot throw. The stand-in body lives in
-    // src/placeholder/ (built with /GL) until 0x4093f0 is decompiled.
-    AnmVm();
+    // because it sees the body cannot throw.
+    DECOMP_NOINLINE AnmVm();
+    // Inlined into every owner's destructor; the original also has an
+    // out-of-line copy at 0x4093b0.
+    ~AnmVm();
+    // Resets the VM, keeping layer, fast_id and entity_pos (ExpHP:
+    // AnmVm::initialize).
     void wipe();
     // 0x40e490. Position including entity_pos and every parent's.
     Float3 world_pos();
     // 0x45f980
     void run();
-
-    // Inlined into every owner's destructor; the original also has an
-    // out-of-line copy at 0x4093b0.
-    ~AnmVm()
-    {
-        if (ins_508_extra_data != NULL)
-        {
-            free(ins_508_extra_data);
-        }
-        ins_508_extra_data = NULL;
-        ins_508_extra_data_size = 0;
-        id.id = 0;
-        instr_offset = -1;
-    }
+    HARNESS_CALLED f32 get_slowdown_factor();
+    void alloc_extra_data(u32 size);
+    void set_layer(i32 layer);
+    void set_alpha1_time(i32 end_time, i32 method, u8 initial, u8 goal);
+    // Clears the suffix except for the fields that identify the VM.
+    void wipe_suffix();
+    // Switches to another sprite of the same file, changing only the UVs.
+    void set_sprite_uvs(i32 sprite);
 
     void interrupt(i32 n)
     {

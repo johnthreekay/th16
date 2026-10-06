@@ -25,7 +25,7 @@ f32 LTCG_VECTORCALL add_normalize_angle(f32 a, f32 b)
 }
 
 // FUNCTION: TH16 0x402d90
-f32 LTCG_VECTORCALL normalize_angle(f32 a)
+DECOMP_NOINLINE f32 LTCG_VECTORCALL normalize_angle(f32 a)
 {
     i32 i = 0;
     while (a > ZUN_PI)
@@ -45,4 +45,19 @@ f32 LTCG_VECTORCALL normalize_angle(f32 a)
         }
     }
     return a;
+}
+
+// FUNCTION: TH16 0x4054d0
+void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm
+    {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp dword ptr [eax]
+        fmul radius
+        fstp dword ptr [eax + 4]
+    }
 }

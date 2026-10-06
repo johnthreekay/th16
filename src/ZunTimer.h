@@ -33,11 +33,18 @@ struct ZunTimer
         control &= ~ZUN_TIMER_INITIALIZED;
     }
 
-    void initialize()
+    // Back to frame 0 with no previous frame, leaving speed_index and
+    // control alone (AnmVm::wipe uses it right after a memset).
+    void clear()
     {
         current = 0;
         previous = -999999;
         current_f = 0.0f;
+    }
+
+    void initialize()
+    {
+        clear();
         speed_index = 0;
         control |= ZUN_TIMER_INITIALIZED;
     }
@@ -76,6 +83,22 @@ struct ZunTimer
 
     // Count back by the given number of frames, scaled like tick().
     void operator-=(i32 frames);
+
+    // Advance by a number of frames, scaled like tick().
+    void operator+=(f32 frames)
+    {
+        f32 *speed = this->speed();
+        previous = current;
+        if (speed != NULL && !(*speed > 0.99f && *speed < 1.01f))
+        {
+            current_f += *speed * frames;
+        }
+        else
+        {
+            current_f += frames;
+        }
+        current = (i32)current_f;
+    }
 
     // The speed multiplier this timer follows; resets a bad index to the
     // game speed.

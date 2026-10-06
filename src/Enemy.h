@@ -5,6 +5,7 @@
 #include "AnmVm.h"
 #include "Ecl.h"
 #include "Interp.h"
+#include "PosVel.h"
 #include "UpdateFunc.h"
 #include "ZunList.h"
 #include "ZunTimer.h"
@@ -12,22 +13,6 @@
 #include "types.h"
 
 class EnemyInf;
-
-// Position and movement state (ExpHP: zPosVel).
-struct PosVel
-{
-    D3DXVECTOR3 pos;
-    u8 unk_c[0xc];
-    f32 speed;
-    f32 angle;
-    f32 radial_dist;
-    f32 radial_speed;
-    f32 unk_28;
-    f32 unk_2c;
-    f32 unk_30;
-    D3DXVECTOR3 velocity;
-    u32 flags;
-};
 
 // ExpHP: zEnemyList.
 typedef ZunList<EnemyInf> EnemyList;

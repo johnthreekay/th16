@@ -8,17 +8,35 @@
 // Only the parts decompiled code needs so far. Layouts from ExpHP's
 // th-re-data.
 
+// A sprite of a loaded .anm file (ExpHP: zAnmLoadedSprite).
+struct AnmLoadedSprite
+{
+    i32 unk_0;
+    i32 image_file_num_in_anm;
+    i32 image_file_num_in_all;
+    Float2 start_pixel_inclusive;
+    Float2 end_pixel_exclusive;
+    f32 bitmap_height;
+    f32 bitmap_width;
+    Float2 uv_start;
+    Float2 uv_end;
+    f32 sprite_height;
+    f32 sprite_width;
+    Float2 unk_3c;
+};
+
 // One loaded ANM file.
 struct AnmLoaded
 {
     i32 slot_num;
     char name[0x104];
     void *anm_file;
+    // One prototype VM per script.
     AnmVm *vms;
     i32 entry_count;
     i32 script_count;
     i32 sprite_count;
-    void *sprites;
+    AnmLoadedSprite *sprites;
     u8 **scripts;
     void *d3d;
     i32 load_wait;
