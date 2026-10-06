@@ -904,3 +904,33 @@ AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
     }
     return id;
 }
+
+// FUNCTION: TH16 0x46b7d0
+AnmManager::~AnmManager()
+{
+    ZunList<AnmVm> *node = world_list_head;
+    while (node != NULL)
+    {
+        ZunList<AnmVm> *next = node->next;
+        destroy_possibly_managed_vm(node->entry);
+        node = next;
+    }
+    node = ui_list_head;
+    while (node != NULL)
+    {
+        ZunList<AnmVm> *next = node->next;
+        destroy_possibly_managed_vm(node->entry);
+        node = next;
+    }
+    node = snapshot_list_head.next;
+    while (node != NULL)
+    {
+        ZunList<AnmVm> *next = node->next;
+        destroy_possibly_managed_snapshot_vm(node->entry);
+        node = next;
+    }
+}
+
+// The compiler-generated AnmFastVm::~AnmFastVm (0x46b790) and
+// AnmFastVm::AnmFastVm (0x46b770) cannot be annotated yet: build.py only
+// supports scalar deleting destructors as SYNTHETIC.

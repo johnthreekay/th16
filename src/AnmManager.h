@@ -208,6 +208,9 @@ struct AnmManager
     volatile i32 last_discriminator;
     u8 unk_1c7fd88[0x1c7fd90 - 0x1c7fd88];
 
+    // 0x46b7d0. Destroys every VM still alive.
+    ~AnmManager();
+
     void flush_sprites();
     void draw_vm(AnmVm *vm);
     // 0x46efa0
