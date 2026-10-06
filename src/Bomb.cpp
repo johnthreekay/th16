@@ -219,6 +219,8 @@ void BombInf::destroy_all()
     g_SubseasonBomb = NULL;
 }
 
+// TODO: the season level loop is not strength-reduced to a pointer here as
+// in the original, so the player pointer lands in edx instead of edi.
 // FUNCTION: TH16 0x40db20
 i32 BombInf::activate()
 {
@@ -230,16 +232,15 @@ i32 BombInf::activate()
     timer = 0;
     if (!is_season)
     {
-        i32 bombs = g_Globals.bombs - 1;
-        if (bombs < 0)
+        g_Globals.bombs--;
+        if (g_Globals.bombs < 0)
         {
-            bombs = 0;
+            g_Globals.bombs = 0;
         }
-        else if (bombs > 8)
+        else if (g_Globals.bombs > 8)
         {
-            bombs = 8;
+            g_Globals.bombs = 8;
         }
-        g_Globals.bombs = bombs;
         if (g_Gui != NULL)
         {
             g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
@@ -294,6 +295,8 @@ i32 BombInf::activate()
     return 0;
 }
 
+// TODO: the inlined tick stores current_f before the join in its else path;
+// the original sinks both stores to the join.
 // FUNCTION: TH16 0x40dd00
 i32 BombInf::update()
 {
@@ -346,6 +349,8 @@ i32 BombInf::can_activate()
     return 1;
 }
 
+// TODO: the inlined decrement lacks the original's multiply by 1.0f (see
+// Timer::operator--).
 // FUNCTION: TH16 0x40de30
 void BombInf::draw()
 {
