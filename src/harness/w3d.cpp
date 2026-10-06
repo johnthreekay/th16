@@ -3,6 +3,7 @@
 // depends on how the rest of the game calls them.
 #include "../AnmManager.h"
 #include "../MainMenu.h"
+#include "../Player.h"
 #include "../Supervisor.h"
 #include "../ReplayManager.h"
 #include "../Scorefile.h"
@@ -72,4 +73,24 @@ i32 *harness_w3d_unk_4d9d90()
 i32 harness_w3d_scorefile(i32 difficulty, Scorefile *scorefile, i32 character)
 {
     return g_Scorefile->any_cleared() + g_Scorefile->all_cleared(difficulty) + scorefile->has_cleared(character);
+}
+
+// GameThread creates the player (0x42ce15) and deletes it in its
+// destructor (0x42d439).
+void harness_w3d_player(i32 create)
+{
+    if (create)
+    {
+        Player::create();
+    }
+    else if (g_Player != NULL)
+    {
+        delete g_Player;
+    }
+}
+
+// Player::initialize (0x441025) takes the cached .sht files back.
+ShtFile *harness_w3d_cached_sht()
+{
+    return (ShtFile *)((u8 *)g_cached_sht_file + (u32)g_cached_sht_file_subseason);
 }

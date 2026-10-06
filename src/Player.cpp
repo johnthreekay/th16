@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <stddef.h>
 #include <math.h>
 #include <string.h>
 
@@ -10,6 +12,8 @@
 #include "AnmManager.h"
 #include "SoundManager.h"
 #include "Spellcard.h"
+#include "Globals.h"
+#include "UpdateFunc.h"
 
 // FUNCTION: TH16 0x440d50
 void Player::set_shoot_key_short_timer(i32 time)
@@ -264,4 +268,63 @@ HARNESS_CALLED void Player::set_position_subpixel(Int2 *pos)
     inner.main_options[1].should_instajump = 1;
     inner.main_options[2].should_instajump = 1;
     inner.main_options[3].should_instajump = 1;
+}
+
+// GLOBAL: TH16 0x4a6f00
+ShtFile *g_cached_sht_file;
+// GLOBAL: TH16 0x4a6efc
+ShtFile *g_cached_sht_file_subseason;
+
+static_assert(offsetof(Player, inner) == 0x610, "Player::inner");
+static_assert(offsetof(Player, snapshot_inner) == 0x166a0, "Player::snapshot_inner");
+static_assert(offsetof(Player, sht_file) == 0x2c788, "Player::sht_file");
+static_assert(sizeof(Player) == 0x2c828, "Player");
+
+// FUNCTION: TH16 0x440ec0
+PlayerInner::PlayerInner()
+{
+}
+
+// FUNCTION: TH16 0x441a50
+Player::~Player()
+{
+    g_UpdateFuncRegistry->unregister_locked(on_tick);
+    g_UpdateFuncRegistry->unregister_locked(on_draw);
+    g_Player = NULL;
+    if (g_Globals.flags_lo_45c & 1)
+    {
+        g_AnmManager->disable_vms_from_anm_file(anm_file);
+        g_AnmManager->disable_vms_from_anm_file(subseason_anm_file);
+        g_cached_sht_file = sht_file;
+        g_cached_sht_file_subseason = sht_file_subseason;
+    }
+    else
+    {
+        g_AnmManager->unload_anm(9);
+        if (sht_file != NULL)
+        {
+            free(sht_file);
+            sht_file = NULL;
+        }
+        g_cached_sht_file = NULL;
+        g_AnmManager->unload_anm(0x1e);
+        if (sht_file_subseason != NULL)
+        {
+            free(sht_file_subseason);
+            sht_file_subseason = NULL;
+        }
+        g_cached_sht_file_subseason = NULL;
+    }
+}
+
+// FUNCTION: TH16 0x441c60
+Player *Player::create()
+{
+    Player *player = new Player;
+    if (player->initialize() != 0)
+    {
+        delete player;
+        return NULL;
+    }
+    return player;
 }

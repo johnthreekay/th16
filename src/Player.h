@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 #include <d3dx9math.h>
 
 #include "AnmManager.h"
@@ -24,7 +26,10 @@ struct Int2
 struct PlayerOption
 {
     i32 active;
-    u8 unk_4[0x54 - 0x4];
+    // Some array of a type with a constructor lies in here: without one,
+    // PlayerInner's constructor unrolls the loops over the options.
+    D3DXVECTOR3 unk_4[2];
+    u8 unk_1c[0x54 - 0x1c];
     Int2 scaled_preferred_pos;
     Int2 scaled_cur_pos;
     Int2 scaled_preferred_pos_rel_to_player;
@@ -129,6 +134,9 @@ struct PlayerInner
     f32 speed_multiplier;
     u8 unk_1607c[0x16090 - 0x1607c];
 
+    // 0x440ec0. Only the members' constructors; out of line, as the
+    // original calls it for both of Player's copies and a global one.
+    PlayerInner();
     // 0x4440e0
     void repopulate_options();
 };
@@ -199,6 +207,9 @@ struct ShtFile
     ShtShooter shooters[1];
 };
 
+struct Player;
+extern Player *g_Player;
+
 struct Player
 {
     u8 unk_0[0x4];
@@ -209,7 +220,7 @@ struct Player
     AnmVm vm;
     PlayerInner inner;
     // LoLK leftover (ExpHP: __lolk_snapshot_inner).
-    u8 unk_166a0[0x2c730 - 0x166a0];
+    PlayerInner snapshot_inner;
     BoundingBox3 hurtbox;
     D3DXVECTOR3 hurtbox_halfsize;
     D3DXVECTOR3 item_attract_box_unfocused_halfsize;
@@ -227,6 +238,18 @@ struct Player
     // Set every frame by the winter release.
     f32 damage_multiplier;
     u8 unk_2c7d0[0x2c828 - 0x2c7d0];
+
+    Player()
+    {
+        memset(this, 0, sizeof(Player));
+        g_Player = this;
+    }
+    // 0x441a50
+    ~Player();
+    // 0x441c60 (ExpHP: Player::operator new).
+    static Player *create();
+    // 0x440fb0. Loads the shot type and sets up the player; 0 on success.
+    i32 initialize();
 
     // 0x4449b0. Returns the index of the new damage source plus one.
     HARNESS_CALLED i32 create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 time, i32 damage);
@@ -279,7 +302,9 @@ struct Player
     HARNESS_CALLED i32 check_hit_circle(Float3 *pos, f32 radius, i32 graze_only);
 };
 
-extern Player *g_Player;
+// .sht files kept by ~Player when the next Player reuses them.
+extern ShtFile *g_cached_sht_file;
+extern ShtFile *g_cached_sht_file_subseason;
 
 inline PlayerDamageSource *PlayerBullet::damage_source()
 {
