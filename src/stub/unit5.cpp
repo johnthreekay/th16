@@ -6,6 +6,7 @@
 #include "../AnmVm.h"
 #include "../FileSystem.h"
 #include "../Globals.h"
+#include "../Gui.h"
 #include "../Laser.h"
 #include "../Supervisor.h"
 #include "../Timer.h"
@@ -35,11 +36,15 @@ AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *name)
     return NULL;
 }
 
-// Opaque work for the placeholder laser methods below their real bodies.
-i32 laser_placeholder(void *laser)
+// Opaque work for unit 5's placeholder methods (functions in its range that
+// are not decompiled yet but must exist in a /GL file).
+i32 unit5_placeholder(void *object)
 {
-    return laser != NULL;
+    return object != NULL;
 }
+
+// GLOBAL: TH16 0x4d9d90
+i32 g_unk_4d9d90;
 
 // STUB: TH16 0x46d770
 void AnmLoaded::release()
@@ -56,4 +61,12 @@ i32 __stdcall Supervisor::start_thread(void (*function)(), void *arg)
 u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size, i32 not_in_archive)
 {
     return NULL;
+}
+
+// GLOBAL: TH16 0x4a6dcc
+Gui *g_Gui;
+
+// STUB: TH16 0x42c390
+void Gui::update_bombs(i32 bombs, i32 fragments)
+{
 }

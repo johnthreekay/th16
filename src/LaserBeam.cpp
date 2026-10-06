@@ -48,5 +48,5 @@ void LaserBeamInf::run_ex()
 // Placeholder for 0x43a860 (not decompiled yet).
 i32 LaserBeamInf::initialize(void *params)
 {
-    return laser_placeholder(this);
+    return unit5_placeholder(this);
 }

@@ -28,7 +28,13 @@ struct AnmLoaded
 // Loads and runs every ANM file. Only the parts this code uses so far.
 struct AnmManager
 {
-    u8 unk_0[0x184f4f0];
+    u8 unk_0[0xc0];
+    // Cleared every frame by GameThread's on_draw.
+    i32 unk_c0;
+    i32 unk_c4;
+    i32 unk_c8;
+    i32 unk_cc;
+    u8 unk_d0[0x184f4f0 - 0xd0];
     // Indexed by the slot given to preload_anm.
     AnmLoaded *loaded_anms[0x20];
 

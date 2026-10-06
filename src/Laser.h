@@ -257,7 +257,7 @@ class LaserBeamInf : public LaserDataInf
 // Placeholder virtual methods (not decompiled yet) live in the laser .cpp
 // files rather than in src/stub/: with only the trivial LaserDataInf bodies
 // visible, LTCG would speculatively devirtualize calls through the vtable.
-i32 laser_placeholder(void *laser);
+i32 unit5_placeholder(void *object);
 
 enum LaserKind
 {
