@@ -4,6 +4,9 @@
 // GLOBAL: TH16 0x4df508
 JOYCAPSA g_joypad_caps;
 
+// GLOBAL: TH16 0x4a50b0
+u32 g_hardware_input;
+
 // FUNCTION: TH16 0x401850
 i32 get_joypad_capabilities()
 {

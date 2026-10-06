@@ -62,6 +62,11 @@ struct Globals
     // Season power at which level i begins (index 7 is a copy of the
     // maximum).
     i32 season_level_thresholds[8];
+    u8 unk_c8[0x45c - 0xc8];
+    u32 flags_lo_45c : 4;
+    // 2: spell practice.
+    u32 game_mode : 2;
+    u32 flags_hi_45c : 26;
 
     // Members that do not use this; LTCG dropped it. The item code passes
     // an argument these never read (callers push whatever is in ecx).
@@ -73,6 +78,7 @@ struct Globals
 
     // Returns whether the power level changed.
     i32 add_power(i32 amount);
+    void set_game_mode(u32 mode);
     // amount is divided by 10; also awards score extends.
     HARNESS_CALLED void add_to_score(i32 amount);
 

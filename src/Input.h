@@ -12,3 +12,7 @@ extern JOYCAPSA g_joypad_caps;
 // capabilities; 1 (and a log line) if neither does.
 i32 get_joypad_capabilities();
 void clear_all_keydown_states();
+
+// The buttons held this frame, straight from the devices (replays do not
+// overwrite it).
+extern u32 g_hardware_input;

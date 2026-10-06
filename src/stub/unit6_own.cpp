@@ -121,3 +121,26 @@ int __fastcall LoadingThread::on_draw(void *arg)
 {
     return 1;
 }
+
+#include "../GameThread.h"
+
+// GLOBAL: TH16 0x4a6dd4
+GameThread *g_GameThread;
+
+// STUB: TH16 0x447760
+int ReplayManager::initialize(i32 mode, const char *filename)
+{
+    return 0;
+}
+
+// STUB: TH16 0x448c10
+int ReplayManager::read_replay_file(const char *filename)
+{
+    return 0;
+}
+
+// STUB: TH16 0x4482f0
+int __fastcall ReplayManager::on_draw_47_body(void *arg)
+{
+    return 1;
+}

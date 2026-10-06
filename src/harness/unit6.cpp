@@ -55,3 +55,23 @@ f32 harness_globals(i32 amount)
     return get_season_gauge_fill_ratio();
 }
 
+
+#include "../ReplayManager.h"
+#include "../Scorefile.h"
+
+// Like GameThread::thread_start, PauseMenu and MainMenu.
+void harness_replay(i32 mode, const char *filename)
+{
+    ReplayManager::destroy(ReplayManager::create(mode));
+    ReplayManager::destroy(ReplayManager::create_from_file(filename));
+    ReplayManager::destroy(ReplayManager::create_from_file(g_current_replay_filename));
+    g_Globals.set_game_mode(mode);
+    g_Globals.set_game_mode(0);
+    g_ReplayManager->new_chunk(mode);
+    g_ReplayManager->free_chunks(mode);
+}
+
+u32 harness_checksum(ScorefileSection *section, i32 size)
+{
+    return section->compute_checksum(0x5318) + section->compute_checksum(size);
+}
