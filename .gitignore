@@ -1,11 +1,11 @@
 # Toolchain, Wine prefix and downloads (scripts/setup.py)
-/prefix/
+/prefix
 # Original game files are never committed
-/orig/
+/orig
 /build/
 __pycache__/
 *.pyc
-.venv/
+/.venv
 # reccmp: per-user paths and build locations
 /reccmp-user.yml
 /reccmp-build.yml
