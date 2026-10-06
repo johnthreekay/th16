@@ -254,6 +254,18 @@ int __fastcall AsciiInf::on_draw_3_callback(void *arg)
     return result;
 }
 
+// FUNCTION: TH16 0x409040
+void AnmVm::set_sprite_uvs(i32 sprite)
+{
+    AnmLoaded *anm = g_AnmManager->preloaded[anm_loaded_index];
+    AnmLoadedSprite *s = &anm->sprites[sprite];
+    sprite_id = sprite;
+    uv_quad_of_sprite[0].x = uv_quad_of_sprite[2].x = s->uv_start.x;
+    uv_quad_of_sprite[1].x = uv_quad_of_sprite[3].x = s->uv_end.x;
+    uv_quad_of_sprite[0].y = uv_quad_of_sprite[1].y = s->uv_start.y;
+    uv_quad_of_sprite[2].y = uv_quad_of_sprite[3].y = s->uv_end.y;
+}
+
 // TODO: register allocation differs (the original keeps this in a stack slot); draw_string is still a stub.
 // FUNCTION: TH16 0x408560
 i32 AsciiInf::draw_group(i32 group)
