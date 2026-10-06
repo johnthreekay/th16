@@ -21,13 +21,13 @@ int PopupManager::initialize()
 
     ascii_anm = g_AsciiManager->ascii_anm;
 
-    f = g_UpdateFuncRegistry->create_func(on_tick);
+    f = g_UpdateFuncRegistry->create_func([](void *arg) -> int { return ((PopupManager *)arg)->on_tick(); });
     f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
     g_UpdateFuncRegistry->register_on_tick(f, 0x14);
     on_tick_func = f;
 
-    f = g_UpdateFuncRegistry->create_func(on_draw);
+    f = g_UpdateFuncRegistry->create_func([](void *arg) -> int { return ((PopupManager *)arg)->on_draw(); });
     f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
     g_UpdateFuncRegistry->register_on_draw(f, 0x2f);

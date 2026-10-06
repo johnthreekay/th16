@@ -28,8 +28,10 @@ struct LoadingThread
     static LoadingThread *create();
 
     static unsigned __stdcall thread_start(void *arg);
-    static int __fastcall on_tick(void *arg);
-    static int __fastcall on_draw(void *arg);
+    // Registered through capture-less lambdas whose fastcall invokers
+    // become jmp thunks (ExpHP's "__stub" functions).
+    DECOMP_NOINLINE int on_tick();
+    int on_draw();
 };
 
 extern LoadingThread *g_LoadingThread;

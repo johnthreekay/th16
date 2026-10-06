@@ -40,8 +40,8 @@ struct PauseMenu
     void set_state(i32 state);
     void set_unk_1f4(i32 value);
 
-    static int __fastcall on_tick(void *arg);
-    static int __fastcall on_draw(void *arg);
+    int on_tick();
+    int on_draw();
 };
 
 extern PauseMenu *g_PauseMenu;

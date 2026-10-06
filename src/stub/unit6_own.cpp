@@ -67,15 +67,14 @@ ReplayManager::~ReplayManager()
 {
 }
 
-// The original's callbacks are jmp thunks to the real functions.
-// STUB: TH16 0x43e720
-int __fastcall PauseMenu::on_tick(void *arg)
+// STUB: TH16 0x43e5f0
+int PauseMenu::on_tick()
 {
     return 1;
 }
 
-// STUB: TH16 0x43ef10
-int __fastcall PauseMenu::on_draw(void *arg)
+// STUB: TH16 0x43edc0
+int PauseMenu::on_draw()
 {
     return 1;
 }
@@ -86,14 +85,14 @@ int __fastcall PauseMenu::on_draw(void *arg)
 // GLOBAL: TH16 0x4a6d98
 AsciiManager *g_AsciiManager;
 
-// STUB: TH16 0x44a440
-int __fastcall PopupManager::on_tick(void *arg)
+// STUB: TH16 0x449ea0
+int PopupManager::on_tick()
 {
     return 1;
 }
 
-// STUB: TH16 0x44a450
-int __fastcall PopupManager::on_draw(void *arg)
+// STUB: TH16 0x44a000
+int PopupManager::on_draw()
 {
     return 1;
 }
@@ -116,8 +115,8 @@ unsigned __stdcall LoadingThread::thread_start(void *arg)
     return 0;
 }
 
-// STUB: TH16 0x43b3c0
-int __fastcall LoadingThread::on_draw(void *arg)
+// STUB: TH16 0x43b300
+int LoadingThread::on_draw()
 {
     return 1;
 }

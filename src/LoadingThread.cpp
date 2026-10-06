@@ -20,13 +20,13 @@ int LoadingThread::initialize()
 {
     UpdateFunc *f;
 
-    f = g_UpdateFuncRegistry->create_func(on_tick);
+    f = g_UpdateFuncRegistry->create_func([](void *arg) -> int { return ((LoadingThread *)arg)->on_tick(); });
     f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
     g_UpdateFuncRegistry->register_on_tick(f, 3);
     on_tick_func = f;
 
-    f = g_UpdateFuncRegistry->create_func(on_draw);
+    f = g_UpdateFuncRegistry->create_func([](void *arg) -> int { return ((LoadingThread *)arg)->on_draw(); });
     f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
     g_UpdateFuncRegistry->register_on_draw(f, 0x44);
@@ -49,11 +49,9 @@ LoadingThread *LoadingThread::create()
 }
 
 // FUNCTION: TH16 0x43b290
-int __fastcall LoadingThread::on_tick(void *arg)
+int LoadingThread::on_tick()
 {
-    LoadingThread *t = (LoadingThread *)arg;
-
-    if (t->flags & 2)
+    if (flags & 2)
     {
         g_Supervisor.setup_special_anms();
         g_unk_4d9d90 = 1;
@@ -63,7 +61,7 @@ int __fastcall LoadingThread::on_tick(void *arg)
         g_AsciiManager->on_draw_func_3->flags |= UPDATE_FUNC_ACTIVE;
         g_Supervisor.flags &= ~0x2000;
         g_Supervisor.gamemode_to_switch_to = 4;
-        t->flags &= ~2;
+        flags &= ~2;
     }
     return 1;
 }

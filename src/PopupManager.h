@@ -41,8 +41,8 @@ struct PopupManager
     int initialize();
     static PopupManager *create();
 
-    static int __fastcall on_tick(void *arg);
-    static int __fastcall on_draw(void *arg);
+    int on_tick();
+    int on_draw();
 };
 
 extern PopupManager *g_PopupManager;
