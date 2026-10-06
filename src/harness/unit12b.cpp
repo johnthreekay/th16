@@ -1,10 +1,12 @@
 // Stand-in callers for unit 12b (0x401000-0x411860, second pass) functions
 // whose shape depends on code not decompiled yet.
 #include "../BulletManager.h"
+#include "../Collision.h"
 #include "../EffectManager.h"
 #include "../Input.h"
 #include "../Player.h"
 #include "../Stage.h"
+#include "../ZunMath.h"
 
 // The menus (0x45108b, 0x452801) read the keyboard into global buffers.
 i32 harness_get_keyboard_state(u8 *keys)
@@ -48,4 +50,19 @@ i32 harness_create_tracked_effect(i32 effect, D3DXVECTOR3 *pos)
 void harness_rect_damage_source(D3DXVECTOR3 *pos, f32 w, f32 h, f32 angle, i32 a, i32 b)
 {
     g_Player->create_rect_damage_source(pos, w, h, angle, a, b);
+}
+
+// Bullets (0x416eb6, 0x416f0b) and the player (0x445c30) test circles
+// against rectangles.
+i32 harness_collision(f32 *a, f32 *b, f32 angle, f32 r)
+{
+    return collision_test_circle_rect(a[0], a[1], b[0], b[1], angle, a[2], b[2], r) +
+           collision_test_circle_rect(b[0], b[1], a[0], a[1], r, b[2], a[2], angle);
+}
+
+// Most callers of the out-of-line sinf/cosf (PosVel, the ANM code, ...)
+// do not align their stack frames, so the copies realign their own.
+f32 harness_sin_cos(f32 x)
+{
+    return zun_sinf(x) + zun_cosf(x) + zun_floorf(x) + zun_atan2f(x, x + 1.0f);
 }

@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "ZunMath.h"
 
 // FUNCTION: TH16 0x402d30
@@ -60,4 +62,30 @@ void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp dword ptr [eax + 4]
     }
+}
+
+// FUNCTION: TH16 0x4054f0
+HARNESS_CALLED f32 zun_cosf(f32 x)
+{
+    return cosf(x);
+}
+
+// FUNCTION: TH16 0x405510
+HARNESS_CALLED f32 zun_sinf(f32 x)
+{
+    return sinf(x);
+}
+
+// TODO: the original aligns the frame to 64 bytes for its double.
+// FUNCTION: TH16 0x405260
+HARNESS_CALLED f32 zun_floorf(f32 x)
+{
+    return floorf(x);
+}
+
+// TODO: the original aligns the frame to 8 bytes for its double.
+// FUNCTION: TH16 0x4052a0
+HARNESS_CALLED f32 zun_atan2f(f32 y, f32 x)
+{
+    return atan2f(y, x);
 }
