@@ -123,6 +123,12 @@ i32 g_early_arcade_offset_y;
 i32 g_arcade_height;
 // GLOBAL: TH16 0x4d9d44
 i32 g_arcade_width;
+// GLOBAL: TH16 0x4d9d1c
+u32 g_unk_4d9d1c;
+// GLOBAL: TH16 0x4d9d48
+i32 g_arcade_hud_origin_x;
+// GLOBAL: TH16 0x4d9d4c
+i32 g_arcade_hud_origin_y;
 // GLOBAL: TH16 0x4d9d50
 i32 g_game_2d_origin_x;
 // GLOBAL: TH16 0x4d9d54
@@ -227,6 +233,100 @@ HARNESS_CALLED void Supervisor::swap_transform_matrices(Camera *camera)
     {
         g_AnmManager->camera_unk_fc = camera->unk_fc;
     }
+}
+
+// The tanf from the CRT headers stays out of line (0x43dc90).
+DECOMP_NOINLINE float __CRTDECL tanf(float);
+
+// TODO: the original builds the three vectors after the tanf call (eye and at from one packed x, y); ours stores the constants up front.
+// FUNCTION: TH16 0x43c780
+void __stdcall camera_update_43c780(Camera *camera)
+{
+    f32 x = camera->viewport.X + camera->viewport.Width * 0.5f;
+    f32 y = camera->viewport.Height * 0.5f + camera->viewport.Y;
+    f32 half_height = camera->viewport.Height / 2;
+    f32 z = half_height / tanf(camera->field_of_view * 0.5f);
+    D3DXVECTOR3 up(0.0f, -1.0f, 0.0f);
+    D3DXVECTOR3 eye(x, y, z);
+    D3DXVECTOR3 at(x, y, 0.0f);
+    D3DXMatrixLookAtLH((D3DXMATRIX *)&camera->view_matrix, &eye, &at, &up);
+    D3DXMatrixPerspectiveFovLH((D3DXMATRIX *)&camera->projection_matrix, camera->field_of_view,
+                               (f32)camera->viewport.Width / (f32)camera->viewport.Height, 1.0f, 10000.0f);
+}
+
+// FUNCTION: TH16 0x43c940
+void __stdcall camera_apply_43c940(Camera *camera)
+{
+    if (g_AnmManager != NULL)
+    {
+        g_AnmManager->flush_sprites();
+    }
+    D3DXVECTOR3 eye = camera->rocking_vector_1 + camera->position;
+    D3DXVECTOR3 facing = camera->facing_normalized;
+    D3DXVECTOR3 at = facing + eye;
+    D3DXMatrixLookAtLH((D3DXMATRIX *)&camera->view_matrix, &eye, &at, &camera->up);
+    D3DXMatrixPerspectiveFovLH((D3DXMATRIX *)&camera->projection_matrix, camera->field_of_view,
+                               (f32)camera->viewport.Width / (f32)camera->viewport.Height, 30.0f, 8000.0f);
+    g_Supervisor.d3d_device->SetTransform(D3DTS_VIEW, &camera->view_matrix);
+    g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &camera->projection_matrix);
+    D3DXVec3Cross(&camera->unk_30, &facing, &camera->up);
+    D3DXVec3Normalize(&camera->unk_30, &camera->unk_30);
+    if (g_AnmManager != NULL)
+    {
+        g_AnmManager->camera_unk_fc = camera->unk_fc;
+    }
+}
+
+// FUNCTION: TH16 0x43cb10
+void Supervisor::setup_cameras()
+{
+    cameras[2].position = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    cameras[2].facing = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    cameras[2].up = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
+    cameras[2].field_of_view = ZUN_PI / 6.0f;
+    cameras[2].viewport.X = 0;
+    cameras[2].viewport.Y = 0;
+    cameras[2].viewport.Width = g_resolution_x;
+    cameras[2].viewport.Height = g_resolution_y;
+    if ((g_unk_4d9d1c & 0x3c) == 8)
+    {
+        cameras[2].viewport.Height = 960;
+    }
+    cameras[2].rocking_vector_1 = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    cameras[2].rocking_vector_2 = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    cameras[2].viewport.MinZ = 0.0f;
+    cameras[2].viewport.MaxZ = 1.0f;
+    cameras[2].camera_index = 2;
+    cameras[2].window_resolution[0] = g_resolution_x;
+    cameras[2].window_resolution[1] = g_resolution_y;
+    camera_update_43c780(&cameras[2]);
+
+    cameras[0] = cameras[2];
+    cameras[0].camera_index = 0;
+    cameras[0].viewport.X = (i32)(g_screen_coord_scale * 32.0f);
+    cameras[0].viewport.Y = (i32)(g_screen_coord_scale * 16.0f);
+    cameras[0].viewport.Width = (i32)(g_screen_coord_scale * 384.0f);
+    cameras[0].viewport.Height = (i32)(g_screen_coord_scale * 448.0f);
+    camera_update_43c780(&cameras[0]);
+
+    cameras[1] = cameras[0];
+    cameras[1].camera_index = 1;
+    cameras[1].viewport.X = (i32)(g_screen_coord_scale * 128.0f);
+    cameras[1].viewport.Y = (i32)(g_screen_coord_scale * 16.0f);
+    cameras[1].viewport.Width = (i32)(g_screen_coord_scale * 384.0f);
+    cameras[1].viewport.Height = (i32)(g_screen_coord_scale * 448.0f);
+    camera_update_43c780(&cameras[1]);
+
+    cameras[3] = cameras[0];
+    cameras[3].camera_index = 3;
+    cameras[3].viewport.X = (i32)((g_resolution_x - 408.0f) * 0.5f);
+    cameras[3].viewport.Y = (i32)((g_resolution_y - 472.0f) * 0.5f);
+    cameras[3].viewport.Width = 408;
+    cameras[3].viewport.Height = 472;
+    camera_update_43c780(&cameras[3]);
+
+    g_arcade_hud_origin_x = g_resolution_x / 2;
+    g_arcade_hud_origin_y = (i32)(g_screen_coord_scale * 16.0f);
 }
 
 // FUNCTION: TH16 0x43d400

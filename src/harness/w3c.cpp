@@ -7,6 +7,25 @@
 #include "../Player.h"
 #include "../Supervisor.h"
 
+void w3c_stub_sink(void *p);
+
+// The window code passes the addresses of the globals just before these to
+// SystemParametersInfo (0x45a70d). In ZUN's code they are probably all
+// members of one struct, so stores through pointers may alias the screen
+// size: Supervisor::setup_cameras reloads it after every store.
+void harness_w3c_expose_screen_globals()
+{
+    w3c_stub_sink(&g_resolution_x);
+    w3c_stub_sink(&g_resolution_y);
+    w3c_stub_sink(&g_unk_4d9d1c);
+}
+
+// The HUD code reads these; without a reader LTCG drops the stores.
+i32 harness_w3c_read_hud_origin()
+{
+    return g_arcade_hud_origin_x + g_arcade_hud_origin_y;
+}
+
 // Like Fog's initialize at 0x418d8a.
 void harness_w3c_fog_create_vms(Fog *fog, i32 count)
 {

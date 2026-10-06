@@ -105,6 +105,8 @@ struct Supervisor
     void release_surfaces();
     void sub_43c630();
     void sub_43c6a0();
+    // 0x43cb10. Sets up the four cameras for the window size.
+    void setup_cameras();
 
     int switch_gamemodes();
     void setup_special_anms();
@@ -167,6 +169,13 @@ extern f32 g_screen_coord_scale;
 // Size of the arcade region (384x448 unscaled).
 extern i32 g_arcade_height;
 extern i32 g_arcade_width;
+// Half the window width and the scaled top of the arcade region, for HUD
+// elements drawn at full resolution (ExpHP: ARCADE_HUD_ORIGIN_X/Y).
+extern i32 g_arcade_hud_origin_x;
+extern i32 g_arcade_hud_origin_y;
+// Unknown flags; setup_cameras makes camera 2 960 pixels high when the
+// bits 0x3c are 8.
+extern u32 g_unk_4d9d1c;
 // Where game coordinate (0, 0) is on the arcade surface.
 extern i32 g_game_2d_origin_x;
 extern i32 g_game_2d_origin_y;
