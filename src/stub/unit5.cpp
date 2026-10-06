@@ -4,8 +4,10 @@
 
 #include "../AnmManager.h"
 #include "../AnmVm.h"
+#include "../FileSystem.h"
 #include "../Globals.h"
 #include "../Laser.h"
+#include "../Supervisor.h"
 #include "../Timer.h"
 
 // GLOBAL: TH16 0x4a5788
@@ -37,4 +39,21 @@ AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *name)
 i32 laser_placeholder(void *laser)
 {
     return laser != NULL;
+}
+
+// STUB: TH16 0x46d770
+void AnmLoaded::release()
+{
+}
+
+// STUB: TH16 0x43c5b0
+i32 __stdcall Supervisor::start_thread(void (*function)(), void *arg)
+{
+    return 0;
+}
+
+// STUB: TH16 0x402440
+u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size, i32 not_in_archive)
+{
+    return NULL;
 }

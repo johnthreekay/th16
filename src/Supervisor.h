@@ -42,6 +42,10 @@ struct Supervisor
     u8 unk_9b4[0xa40 - 0x9b4];
 
     u32 read_joypad(u32 input);
+    // Runs a loader function on `thread`. A member reaching the supervisor
+    // through g_Supervisor in the original (LTCG dropped this, and folded
+    // arg, which is always NULL); static __stdcall gives the same call shape.
+    static i32 __stdcall start_thread(void (*function)(), void *arg);
 };
 
 enum SupervisorFlags
