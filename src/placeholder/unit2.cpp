@@ -6,6 +6,8 @@
 // it converted the real functions. Each body hands its arguments to an
 // opaque stub so the calls cannot be optimized away.
 #include "../AnmManager.h"
+#include "../BulletManager.h"
+#include "../Player.h"
 #include "../SoundManager.h"
 #include "../Timer.h"
 
@@ -18,6 +20,12 @@ SoundManager g_SoundManager;
 HARNESS_CALLED void Timer::operator++(int)
 {
     tick();
+}
+
+// STUB: TH16 0x406490
+HARNESS_CALLED void Timer::set_value(i32 value)
+{
+    set(value);
 }
 
 // STUB: TH16 0x45e150
@@ -36,4 +44,17 @@ HARNESS_CALLED void SoundManager::play_sound_at_position(i32 id, f32 x)
 HARNESS_CALLED void AnmManager::delete_vm(AnmId id)
 {
     placeholder_sink(id.id, 0.0f);
+}
+
+// STUB: TH16 0x416d20
+HARNESS_CALLED void BulletManager::cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode)
+{
+    placeholder_sink(mode, radius + pos->x);
+}
+
+// STUB: TH16 0x4449b0
+HARNESS_CALLED i32 Player::create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 unk_2, i32 damage)
+{
+    placeholder_sink(unk_2 + damage, radius + unk + pos->x);
+    return unk_2;
 }

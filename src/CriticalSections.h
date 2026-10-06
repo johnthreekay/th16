@@ -7,6 +7,7 @@ enum
     CS_UPDATE_FUNC_REGISTRY = 0,
     CS_FILE = 2,
     CS_GAME_ERROR_CONTEXT = 3,
+    CS_ANM_MANAGER = 9,
     CS_RNG = 10,
     CS_COUNT = 14,
 };

@@ -252,7 +252,14 @@ i32 BombInf::activate()
     {
         started_during_spell = 0;
     }
-    g_SoundManager.play_sound_at_position(is_season ? 77 : 44, g_Player->inner.pos.x);
+    if (is_season)
+    {
+        g_SoundManager.play_sound_at_position(77, g_Player->inner.pos.x);
+    }
+    else
+    {
+        g_SoundManager.play_sound_at_position(44, g_Player->inner.pos.x);
+    }
     begin();
     if (is_season)
     {
@@ -369,7 +376,7 @@ void BombInf::draw()
         g_AsciiManager->align_h = 1;
         g_AsciiManager->align_v = 1;
     }
-    release_bonus_timer.decrement(1);
+    release_bonus_timer.decrement(1.0f);
 }
 
 // FUNCTION: TH16 0x40e040
@@ -379,4 +386,67 @@ void BombInf::start_release_cooldown()
     release_bonus_level = season_level;
     release_bonus_timer = 180;
     timer = -45;
+}
+
+// FUNCTION: TH16 0x40ebe0
+i32 BombAyaAInf::on_draw()
+{
+    return 1;
+}
+
+// FUNCTION: TH16 0x40ebf0
+i32 BombAyaAInf::method_c(i32 a, i32 b)
+{
+    return 0;
+}
+
+// FUNCTION: TH16 0x40ec00
+void BombAyaAInf::method_14()
+{
+}
+
+// FUNCTION: TH16 0x40f490
+i32 BombCirnoAInf::on_draw()
+{
+    return 1;
+}
+
+// FUNCTION: TH16 0x40f4a0
+i32 BombCirnoAInf::method_c(i32 a, i32 b)
+{
+    return 0;
+}
+
+// FUNCTION: TH16 0x40f4b0
+void BombCirnoAInf::method_14()
+{
+}
+
+// FUNCTION: TH16 0x40fe60
+i32 BombMarisaAInf::on_draw()
+{
+    return 1;
+}
+
+// FUNCTION: TH16 0x40fe70
+i32 BombMarisaAInf::method_c(i32 a, i32 b)
+{
+    return 0;
+}
+
+// FUNCTION: TH16 0x4100f0
+void BombMarisaAInf::method_14()
+{
+}
+
+// FUNCTION: TH16 0x411260
+i32 BombReimuAInf::on_draw()
+{
+    return 1;
+}
+
+// FUNCTION: TH16 0x411270
+i32 BombReimuAInf::method_c(i32 a, i32 b)
+{
+    return 0;
 }

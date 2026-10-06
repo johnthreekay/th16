@@ -73,23 +73,38 @@ struct Timer
     {
         f32 *speed = this->speed();
         previous = current;
-        if (speed != NULL && (*speed <= 0.99f || *speed >= 1.01f))
+        if (speed != NULL && !(*speed > 0.99f && *speed < 1.01f))
         {
             current_f += *speed;
             current = (i32)current_f;
         }
         else
         {
-            current++;
             current_f += 1.0f;
+            current++;
         }
     }
 
     // 0x406490
-    void set_value(i32 value);
+    HARNESS_CALLED void set_value(i32 value);
     // 0x406190. The int is C++'s postfix marker; LTCG drops it but keeps
     // the stack slot.
     HARNESS_CALLED void operator++(int);
-    // Every caller passes 1; LTCG folds it in but keeps the stack slot.
-    HARNESS_CALLED void decrement(i32 n);
+    void decrement(f32 n)
+    {
+        f32 *speed = this->speed();
+        previous = current;
+        if (speed != NULL && !(*speed > 0.99f && *speed < 1.01f))
+        {
+            current_f -= *speed * n;
+        }
+        else
+        {
+            current_f -= n;
+        }
+        current = (i32)current_f;
+    }
+
+    // 0x40d490
+    HARNESS_CALLED void operator--(int);
 };

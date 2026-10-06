@@ -6,5 +6,12 @@
 // pass 1.
 void harness_timer_decrement(Timer *t)
 {
-    t->decrement(1);
+    (*t)--;
+}
+
+// Timer::set_value is called with many different values (0x40dc23 passes
+// 60), so LTCG must not fold its argument.
+void harness_timer_set_value(Timer *t, i32 value)
+{
+    t->set_value(value);
 }

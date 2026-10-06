@@ -62,6 +62,10 @@ class BombInf
     virtual i32 method_10();
     virtual void method_14();
 
+    // Shared by the releases' method_10: cancels bullets and lasers inside
+    // the release.
+    i32 release_cancel_in_radius();
+
     i32 initialize(i32 is_season);
     i32 update();
     void draw();
@@ -79,51 +83,101 @@ class BombInf
 // VTABLE: TH16 0x491e3c
 class BombReimuAInf : public BombInf
 {
+  public:
+    virtual i32 on_draw();
+    virtual i32 method_c(i32 a, i32 b);
 };
 
 // VTABLE: TH16 0x491e04
 class BombCirnoAInf : public BombInf
 {
+  public:
+    virtual i32 on_draw();
+    virtual i32 method_c(i32 a, i32 b);
+    virtual void method_14();
 };
 
 // VTABLE: TH16 0x491de8
 class BombAyaAInf : public BombInf
 {
+  public:
+    virtual i32 on_draw();
+    virtual i32 method_c(i32 a, i32 b);
+    virtual void method_14();
 };
 
 // VTABLE: TH16 0x491e20
 class BombMarisaAInf : public BombInf
 {
+  public:
+    virtual i32 on_draw();
+    virtual i32 method_c(i32 a, i32 b);
+    virtual void method_14();
 };
 
 // Spring release.
 // VTABLE: TH16 0x491dcc
 class BombReimuSubInf : public BombInf
 {
+  public:
+    virtual i32 begin();
+    virtual i32 on_tick();
+    virtual i32 on_draw();
+    virtual i32 method_c(i32 a, i32 b);
+    virtual i32 method_10();
+    virtual void method_14();
 };
 
 // Summer release.
 // VTABLE: TH16 0x491d94
 class BombCirnoSubInf : public BombInf
 {
+  public:
+    virtual i32 begin();
+    virtual i32 on_tick();
+    virtual i32 on_draw();
+    virtual i32 method_c(i32 a, i32 b);
+    virtual i32 method_10();
+    virtual void method_14();
 };
 
 // Autumn release.
 // VTABLE: TH16 0x491d78
 class BombAyaSubInf : public BombInf
 {
+  public:
+    virtual i32 begin();
+    virtual i32 on_tick();
+    virtual i32 on_draw();
+    virtual i32 method_c(i32 a, i32 b);
+    virtual i32 method_10();
+    virtual void method_14();
 };
 
 // Winter release.
 // VTABLE: TH16 0x491db0
 class BombMarisaSubInf : public BombInf
 {
+  public:
+    virtual i32 begin();
+    virtual i32 on_tick();
+    virtual i32 on_draw();
+    virtual i32 method_c(i32 a, i32 b);
+    virtual i32 method_10();
+    virtual void method_14();
 };
 
 // Doyou (all seasons) release.
 // VTABLE: TH16 0x491d5c
 class BombAllSubInf : public BombInf
 {
+  public:
+    virtual i32 begin();
+    virtual i32 on_tick();
+    virtual i32 on_draw();
+    virtual i32 method_c(i32 a, i32 b);
+    virtual i32 method_10();
+    virtual void method_14();
 };
 
 extern BombInf *g_MainBomb;
