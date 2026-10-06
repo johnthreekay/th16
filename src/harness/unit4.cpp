@@ -22,3 +22,9 @@ int harness_enemy_find_closest(D3DXVECTOR3 *pos, f32 max_dist)
 {
     return g_EnemyManager->find_closest(pos, max_dist).id;
 }
+
+// Like the game thread's setup, which creates the enemy manager.
+void harness_enemy_manager_create(const char *ecl_filename)
+{
+    EnemyManager::create(ecl_filename);
+}

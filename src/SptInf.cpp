@@ -1,4 +1,7 @@
 #include "Ecl.h"
+#include "Enemy.h"
+#include "GameErrorContext.h"
+#include "stub/unit4_extern.h"
 
 // FUNCTION: TH16 0x41a3f0
 int SptResourceInf::load_includes(void *data)
@@ -97,3 +100,55 @@ SptInf::~SptInf()
 {
     free_all_async();
 }
+
+// FUNCTION: TH16 0x41a860
+int EclResourceInf::load_file(const char *filename)
+{
+    strcpy(g_ecl_path, "");
+    strcat(g_ecl_path, filename);
+    if (SptResourceInf::load_ecl_data(file_read_all(g_ecl_path, NULL, 0)) < 0)
+    {
+        return -1;
+    }
+    return 0;
+}
+
+// FUNCTION: TH16 0x41b040
+int EclResourceInf::load_includes(void *data)
+{
+    u32 *header = (u32 *)data;
+    if (header[0] != 'MINA')
+    {
+        return 0;
+    }
+    char *name = (char *)&header[2];
+    for (u32 i = 0; i < header[1]; i++)
+    {
+        g_EnemyManager->anim_statement_anms[2 + i] = AnmManager::preload_anm(i + 10, name);
+        if (g_EnemyManager->anim_statement_anms[2 + i] == NULL)
+        {
+            g_GameErrorContext.log("\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
+            return -1;
+        }
+        name += strlen(name) + 1;
+    }
+    int misalign = (name - (char *)data) % 4;
+    if (misalign != 0)
+    {
+        name += 4 - misalign;
+    }
+    header = (u32 *)name;
+    if (header[0] == 'ILCE')
+    {
+        name = (char *)&header[2];
+        for (u32 i = 0; i < header[1]; i++)
+        {
+            load_file(name);
+            name += strlen(name) + 1;
+        }
+    }
+    return 0;
+}
+
+// GLOBAL: TH16 0x4dfc50
+char g_ecl_path[0x104];

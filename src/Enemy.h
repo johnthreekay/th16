@@ -257,6 +257,11 @@ struct EnemyManagerInner
     i32 unk_a0[2];
 };
 
+
+
+struct EnemyManager;
+extern EnemyManager *g_EnemyManager;
+
 // Owns every enemy (ExpHP: zEnemyManager).
 struct EnemyManager
 {
@@ -267,13 +272,28 @@ struct EnemyManager
     EnemyManagerInner snapshot_inner;
     EnemyList *unk_15c;
     u8 unk_160[4];
-    void *anim_statement_anms[6];
+    struct AnmLoaded *anim_statement_anms[6];
     EclResourceInf *file_manager;
     EnemyList *active_enemy_list_head;
     EnemyList *active_enemy_list_tail;
     EnemyList *unk_188;
     i32 enemy_count_real;
 
+    EnemyManager()
+    {
+        memset(this, 0, sizeof(*this));
+        flags |= 2;
+        inner.last_enemy_id = inner.next_enemy_id;
+        g_EnemyManager = this;
+        if (++inner.next_enemy_id == 0)
+        {
+            ++inner.next_enemy_id;
+        }
+    }
+    ~EnemyManager();
+    static HARNESS_CALLED EnemyManager *create(const char *ecl_filename);
+    int initialize(const char *ecl_filename);
+    void destroy_all();
     int get_enemy_count();
     HARNESS_CALLED void set_boss_id(int index, EnemyInf *enemy);
     HARNESS_CALLED void set_boss_bit(int value);

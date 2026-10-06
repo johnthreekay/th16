@@ -55,3 +55,40 @@ f32 *EclRunContext::get_float_arg_ptr(int index)
 {
     return NULL;
 }
+
+// GLOBAL: TH16 0x4c0f48
+AnmManager *g_AnmManager;
+
+// GLOBAL: TH16 0x4a6dac
+BulletManager *g_BulletManager;
+
+// GLOBAL: TH16 0x4a6db8
+EffectManager *g_EffectManager;
+
+// STUB: TH16 0x46d020
+AnmLoaded *__stdcall AnmManager::preload_anm(int slot, const char *filename)
+{
+    return NULL;
+}
+
+// STUB: TH16 0x46d770
+AnmLoaded::~AnmLoaded()
+{
+}
+
+// STUB: TH16 0x402440
+u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size_out, i32 flag)
+{
+    return NULL;
+}
+
+// STUB: TH16 0x474530
+int SptResourceInf::load_ecl_data(void *data)
+{
+    return 0;
+}
+
+// STUB: TH16 0x4185b0
+void EnemyManager::destroy_all()
+{
+}

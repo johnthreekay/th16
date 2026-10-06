@@ -1,5 +1,8 @@
 #pragma once
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "Interp.h"
 #include "decomp.h"
 #include "types.h"
@@ -104,6 +107,19 @@ class SptResourceInf
     u8 unk_90[0x1090 - 0x90];
     SptResourceTail tail;
 
+    SptResourceInf()
+    {
+        memset(this, 0, sizeof(*this));
+    }
+    ~SptResourceInf()
+    {
+        if (subroutines != NULL)
+        {
+            free(subroutines);
+            subroutines = NULL;
+        }
+    }
+
     int find_sub_by_name(const char *name) throw();
 
     virtual int load_ecl_data(void *data);
@@ -119,6 +135,9 @@ class EclResourceInf : public SptResourceInf
     virtual int load_includes(void *data);
     virtual int load_file(const char *filename);
 };
+
+// Scratch buffer for building ECL file paths.
+extern char g_ecl_path[0x104];
 
 // VTABLE: TH16 0x4921c4
 // ECL virtual machine base class (ExpHP: zEclVm). The name is ZUN's, from

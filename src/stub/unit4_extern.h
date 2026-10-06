@@ -4,6 +4,7 @@
 // code touches. Only the fields used here are named; offsets follow
 // ExpHP's th-re-data. To be replaced by the real headers when merged.
 
+#include "../decomp.h"
 #include "../types.h"
 
 // ExpHP: zGameThread.
@@ -29,5 +30,59 @@ struct Player
     u8 unk_2c7d0[0x2c828 - 0x2c7d0];
 };
 
+// ExpHP: zAnmLoaded.
+struct AnmLoaded
+{
+    u8 unk_0[0x13c];
+
+    ~AnmLoaded();
+};
+
+// ExpHP: zAnmManager.
+struct AnmManager
+{
+    u8 unk_0[0x184f4f0];
+    AnmLoaded *loaded[0x1f];
+
+    // Reaches the manager through g_AnmManager (LTCG dropped this).
+    static AnmLoaded *__stdcall preload_anm(int slot, const char *filename);
+
+    void unload_anm(int slot)
+    {
+        if (slot < 0 || slot >= sizeof(loaded) / sizeof(loaded[0]))
+        {
+            return;
+        }
+        if (loaded[slot] != NULL)
+        {
+            // A plain delete reads loaded[slot] once; the original reads it
+            // again for operator delete.
+            loaded[slot]->~AnmLoaded();
+            operator delete(loaded[slot], sizeof(AnmLoaded));
+            loaded[slot] = NULL;
+        }
+    }
+};
+
+// ExpHP: zBulletManager.
+struct BulletManager
+{
+    u8 unk_0[0x1403b24];
+    AnmLoaded *bullet_anm;
+};
+
+// ExpHP: zEffectManager.
+struct EffectManager
+{
+    u8 unk_0[0xc];
+    AnmLoaded *effect_anm;
+};
+
+// Reads a whole file (from the archive if present) into a new allocation.
+u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size_out, i32 flag);
+
 extern GameThread *g_GameThread;
 extern Player *g_Player;
+extern AnmManager *g_AnmManager;
+extern BulletManager *g_BulletManager;
+extern EffectManager *g_EffectManager;

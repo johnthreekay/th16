@@ -91,7 +91,7 @@ struct UpdateFuncRegistry
     ~UpdateFuncRegistry();
 
     // TH06 equivalent: Chain::CreateElem
-    UpdateFunc *create_func(UpdateFuncCallback function);
+    DECOMP_NOINLINE UpdateFunc *create_func(UpdateFuncCallback function);
     // TH06 equivalent: Chain::AddToCalcChain
     int register_on_tick(UpdateFunc *f, int priority);
     // TH06 equivalent: Chain::AddToDrawChain

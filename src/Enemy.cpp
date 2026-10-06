@@ -1,4 +1,5 @@
 #include "Enemy.h"
+#include "CriticalSections.h"
 #include "stub/unit4_extern.h"
 
 static_assert(sizeof(PosVel) == 0x44, "PosVel size");
@@ -175,6 +176,84 @@ EnemyInf *EnemyManager::find_enemy_by_id(int id)
         node = node->next;
     }
     return enemy;
+}
+
+// TODO: create_func/register_on_* still get this in ecx here (LTCG drops it in the original),
+// and the inlined UpdateFunc constructor keeps its stores in the original.
+// FUNCTION: TH16 0x41ae70
+int EnemyManager::initialize(const char *ecl_filename)
+{
+    anim_statement_anms[0] = g_BulletManager->bullet_anm;
+    anim_statement_anms[1] = g_EffectManager->effect_anm;
+    file_manager = new EclResourceInf;
+    file_manager->load_file(ecl_filename);
+
+    UpdateFunc *f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_callback);
+    f->flags &= ~UPDATE_FUNC_ACTIVE;
+    f->arg = this;
+    g_UpdateFuncRegistry->register_on_tick(f, 0x1a);
+    on_tick = f;
+
+    // create_func, inlined here in the original.
+    f = new UpdateFunc();
+    f->flags |= UPDATE_FUNC_HEAP_ALLOCATED;
+    f->function = (UpdateFuncCallback)on_draw_callback;
+    f->on_registration = NULL;
+    f->on_cleanup = NULL;
+    f->flags &= ~UPDATE_FUNC_ACTIVE;
+    f->arg = this;
+    g_UpdateFuncRegistry->register_on_draw(f, 0x17);
+    on_draw = f;
+
+    inner.time_in_stage.initialize();
+    inner.time_in_stage.set(0);
+    inner.enemy_limit = 99999;
+    return 0;
+}
+
+// Probably an inline UpdateFuncRegistry member in ZUN's code.
+static inline void unregister_locked(UpdateFuncRegistry *registry, UpdateFunc *f)
+{
+    if (f != NULL)
+    {
+        ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
+        registry->unregister(f);
+        LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
+    }
+}
+
+// FUNCTION: TH16 0x41b1a0
+EnemyManager::~EnemyManager()
+{
+    destroy_all();
+    unregister_locked(g_UpdateFuncRegistry, on_tick);
+    unregister_locked(g_UpdateFuncRegistry, on_draw);
+    for (int i = 0; i < 0x20; i++)
+    {
+        if (file_manager->file_data_pointers[i] != NULL)
+        {
+            free(file_manager->file_data_pointers[i]);
+        }
+    }
+    delete file_manager;
+    file_manager = NULL;
+    for (int i = 0; i < 6; i++)
+    {
+        g_AnmManager->unload_anm(i + 10);
+    }
+    g_EnemyManager = NULL;
+}
+
+// FUNCTION: TH16 0x41b340
+HARNESS_CALLED EnemyManager *EnemyManager::create(const char *ecl_filename)
+{
+    EnemyManager *mgr = new EnemyManager();
+    if (mgr->initialize(ecl_filename) != 0)
+    {
+        delete mgr;
+        return NULL;
+    }
+    return mgr;
 }
 
 // FUNCTION: TH16 0x41ade0
