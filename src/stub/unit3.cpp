@@ -69,15 +69,3 @@ i32 Bullet::sub_4124b0(i32 arg)
 {
     return 0;
 }
-
-// STUB: TH16 0x412860
-i32 BulletManager::on_tick_body()
-{
-    return 1;
-}
-
-// STUB: TH16 0x412a60
-i32 BulletManager::on_draw_body()
-{
-    return 1;
-}

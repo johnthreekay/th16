@@ -5,6 +5,7 @@
 #include "GameErrorContext.h"
 #include "GameThread.h"
 #include "UpdateFunc.h"
+#include "ZunMath.h"
 
 // GLOBAL: TH16 0x4a6dac
 BulletManager *g_BulletManager;
@@ -144,4 +145,95 @@ i32 __fastcall BulletManager::on_draw_callback(BulletManager *self)
         return 1;
     }
     return self->on_draw_body();
+}
+
+// FUNCTION: TH16 0x412a60
+i32 BulletManager::on_draw_body()
+{
+    for (i32 i = 0; i < BULLET_LAYER_COUNT; i++)
+    {
+        for (Bullet *b = layer_heads[i]; b != NULL; b = b->next_in_layer)
+        {
+            // A byte read, which the compiler does not merge with the later
+            // updates of flags_lo. ZUN's flags may well be bitfields.
+            if (*(u8 *)&b->vm1.flags_lo & ANM_VM_VISIBLE)
+            {
+                b->vm1.pos = b->pos;
+                if (b->vm1.flags_hi & ANM_VM_AUTO_ROTATE)
+                {
+                    b->vm1.rotation.z = normalize_angle(b->angle + ZUN_PI / 2);
+                    b->vm1.flags_lo |= ANM_VM_ROTATION_CHANGED;
+                }
+                if (b->flags & BULLET_FLAG_SCALED)
+                {
+                    b->vm1.flags_lo |= ANM_VM_SCALE_CHANGED;
+                    b->vm1.scale_2.x = b->scale;
+                    b->vm1.scale_2.y = b->scale;
+                }
+                g_AnmManager->draw_vm(&b->vm1);
+            }
+            b->vm0.entity_pos = b->pos;
+            if (b->vm0.flags_hi & ANM_VM_AUTO_ROTATE)
+            {
+                b->vm0.rotation.z = normalize_angle(b->angle + ZUN_PI / 2);
+                b->vm0.flags_lo |= ANM_VM_ROTATION_CHANGED;
+            }
+            if (b->flags & BULLET_FLAG_SCALED)
+            {
+                b->vm0.flags_lo |= ANM_VM_SCALE_CHANGED;
+                b->vm0.scale_2.x = b->scale;
+                b->vm0.scale_2.y = b->scale;
+            }
+            g_AnmManager->draw_vm(&b->vm0);
+        }
+    }
+    return 1;
+}
+
+// TODO: the original aligns the stack (and esp, -8) and keeps 1.0f in xmm2
+// across the loop; the inlined Timer::increment differs a little too.
+// FUNCTION: TH16 0x412860
+i32 BulletManager::on_tick_body()
+{
+    Bullet *b;
+    b = iter_first();
+    bullet_count = 0;
+    for (i32 i = BULLET_LAYER_COUNT - 1; i >= 0; i--)
+    {
+        layer_heads[i] = NULL;
+    }
+    for (i32 i = BULLET_LAYER_COUNT - 1; i >= 0; i--)
+    {
+        layer_tails[i] = NULL;
+    }
+    for (; b != NULL; b = iter_advance())
+    {
+        if (g_GameThread == NULL || !(g_GameThread->flags & GAME_THREAD_FLAG_400))
+        {
+            if (b->flags & BULLET_FLAG_100 && ((b->state == BULLET_STATE_2 && b->timer_144c.current >= 8) || b->state == BULLET_STATE_1))
+            {
+                b->sub_4124b0(1);
+            }
+            else if (b->on_tick() != 0)
+            {
+                continue;
+            }
+        }
+        if (!(b->flags & BULLET_FLAG_NO_DRAW))
+        {
+            if (layer_heads[b->layer] != NULL)
+            {
+                layer_tails[b->layer]->next_in_layer = b;
+            }
+            else
+            {
+                layer_heads[b->layer] = b;
+            }
+            layer_tails[b->layer] = b;
+            b->next_in_layer = NULL;
+        }
+        bullet_count++;
+        b->timer_144c.increment();
+    }
+    return 1;
 }

@@ -67,8 +67,8 @@ struct Timer
         previous = current;
         if (speed == NULL || (*speed > 0.99f && *speed < 1.01f))
         {
-            current++;
             current_f += 1.0f;
+            current++;
         }
         else
         {

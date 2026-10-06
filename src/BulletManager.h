@@ -141,6 +141,21 @@ struct BulletManager
     static void destroy_all();
     void reset_lists();
 
+    // Walk the tick list with iter_current/iter_next, so that the bullet
+    // being ticked can unlink itself.
+    Bullet *iter_first()
+    {
+        iter_current = tick_list_head.next;
+        iter_next = iter_current != NULL ? iter_current->next : NULL;
+        return iter_current != NULL ? iter_current->entry : NULL;
+    }
+    Bullet *iter_advance()
+    {
+        iter_current = iter_next;
+        iter_next = iter_current != NULL ? iter_current->next : NULL;
+        return iter_current != NULL ? iter_current->entry : NULL;
+    }
+
     static i32 __fastcall on_tick_callback(BulletManager *self);
     static i32 __fastcall on_draw_callback(BulletManager *self);
     i32 on_tick_body();
