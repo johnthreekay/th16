@@ -85,7 +85,9 @@ struct Globals
     i32 unk_21c;
     i32 unk_220;
     i32 unk_224;
-    u8 unk_228[0x45c - 0x228];
+    i32 hiscore;
+    i32 hiscore_continues;
+    u8 unk_230[0x45c - 0x230];
     u32 flags_lo_45c : 4;
     // 2: spell practice.
     u32 game_mode : 2;

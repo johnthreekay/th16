@@ -3,6 +3,7 @@
 #include "../AnmVm.h"
 #include "../Gui.h"
 #include "../PosVel.h"
+#include "../Spellcard.h"
 
 // Like the ECL anm scale instruction at 0x42354a.
 void harness_anm_vm_scale_to(AnmVm *vm, i32 time, i32 method, f32 x, f32 y)
@@ -23,4 +24,28 @@ void harness_posvel_set_ellipse_angle(PosVel *pv, f32 angle)
 void harness_gui_release_msg()
 {
     g_Gui->release_msg();
+}
+
+// Like the dialogue script's textbox instructions at 0x42a63a and 0x42a833.
+void harness_gui_msg_textbox(GuiMsgVm *msg, i32 kind, f32 x, f32 y, f32 width)
+{
+    msg->set_textbox(kind, x, y, width);
+    msg->set_textbox_width(kind, width);
+    msg->set_textbox(kind + 1, y, x, width * 2.0f);
+    msg->set_textbox_width(kind + 2, x);
+}
+
+// Like the HUD code at 0x42dc6c.
+void harness_gui_sub_42c1b0()
+{
+    g_Gui->sub_42c1b0();
+}
+
+// Like Gui::on_draw_2 at 0x4292dd.
+i32 harness_spellcard_decode_time_code()
+{
+    i32 seconds;
+    i32 hundredths;
+    g_Spellcard->decode_time_code(&seconds, &hundredths);
+    return seconds + hundredths;
 }

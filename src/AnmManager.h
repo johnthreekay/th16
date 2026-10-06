@@ -56,6 +56,8 @@ struct AnmLoaded
     // 0x406380. Creates a VM running the script at the origin; also stores
     // the VM in *out if out is not NULL.
     AnmId create_effect(i32 script, i32 layer, AnmVm **out);
+    // 0x42c920. Like create_effect, for the UI list.
+    AnmId create_ui_effect(i32 script, i32 unused, AnmVm **out);
     // 0x426160. Like create_vm at the origin, but inserted at the front of
     // the world list.
     AnmId create_vm_front(i32 script, i32 layer, i32 unused);
@@ -129,6 +131,8 @@ struct AnmManager
     static AnmVm *allocate_vm();
     // 0x46e7d0. Reaches the manager through g_AnmManager.
     static AnmId __stdcall insert_in_world_list_back(AnmVm *vm);
+    // 0x46e940. Reaches the manager through g_AnmManager.
+    static AnmId __stdcall insert_in_ui_list_back(AnmVm *vm);
     // 0x46e890. Reaches the manager through g_AnmManager.
     static AnmId __stdcall insert_in_world_list_front(AnmVm *vm);
 
@@ -166,4 +170,15 @@ inline AnmVm *get_vm_or_clear(AnmId &id)
         id.id = 0;
     }
     return vm;
+}
+
+// The first descendant of the VM running the script, or NULL if the VM is
+// gone (forgetting the id then).
+inline AnmVm *find_child_of(AnmId &id, i32 script)
+{
+    if (get_vm_or_clear(id) == NULL)
+    {
+        return NULL;
+    }
+    return get_vm_or_clear(id)->search_children(script, 0);
 }

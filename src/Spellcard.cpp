@@ -152,3 +152,18 @@ i32 Spellcard::on_draw_body()
     g_AsciiManager->color.a = 0xff;
     return 1;
 }
+
+// FUNCTION: TH16 0x426840
+HARNESS_CALLED void Spellcard::decode_time_code(i32 *seconds, i32 *hundredths)
+{
+    if (is_time_code_bad())
+    {
+        *seconds = 999;
+        *hundredths = 99;
+    }
+    else
+    {
+        *seconds = (time_code / 100 % 1000 + 934) % 1000;
+        *hundredths = (time_code % 100 + 67) % 100;
+    }
+}

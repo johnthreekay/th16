@@ -2,6 +2,14 @@
 
 #include "types.h"
 
+// ExpHP: zTableStageDataArrayItem.
+struct StageBoss
+{
+    u8 unk_0[0x24];
+    // front.anm script of the boss marker, minus 0xa4.
+    i32 marker_script;
+};
+
 // The current stage's entry of the stage table: file names and music.
 // Layout from ExpHP's th-re-data (zTableStageData).
 struct StageData
@@ -15,7 +23,8 @@ struct StageData
     const char *msg_files[4];
     const char *logo_anm_filename;
     i32 music_ids[2];
-    u8 unk_30[0xd4 - 0x30];
+    i32 unk_30;
+    StageBoss bosses[4];
 };
 
 extern StageData *g_stage_data;

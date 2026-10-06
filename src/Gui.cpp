@@ -9,6 +9,7 @@
 #include "Globals.h"
 #include "Gui.h"
 #include "StageData.h"
+#include "Supervisor.h"
 #include "UpdateFunc.h"
 
 // GLOBAL: TH16 0x4a6dd0
@@ -264,4 +265,405 @@ i32 __fastcall Gui::on_draw_1_callback(Gui *self)
 i32 __fastcall Gui::on_draw_2_callback(Gui *self)
 {
     return self->on_draw_2_body();
+}
+
+// TODO: the original aligns its frame to 8 bytes and adds two of the
+// vector components the other way round.
+// FUNCTION: TH16 0x42b480
+void GuiMsgVm::update_callout(AnmVm *vm)
+{
+    i32 script = textbox_kind + 0xb4;
+    if (get_vm_or_clear(textbox) == NULL)
+    {
+        return;
+    }
+    AnmVm *bubble = get_vm_or_clear(textbox)->search_children(script, 0);
+    if (bubble == NULL)
+    {
+        return;
+    }
+    Float3 pos;
+    pos = bubble->pos + bubble->entity_pos + bubble->pos_2;
+    bubble->transform_coords(&pos);
+    f32 scale = 2.0f / g_screen_coord_scale;
+    pos.x *= scale;
+    pos.y *= scale;
+    if (active_side >= 1)
+    {
+        if (bubble->scale.x < 1.0f)
+        {
+            pos.x += bubble->scale.x * 32.0f - 6.0f;
+        }
+        else
+        {
+            pos.x += 26.0f;
+        }
+    }
+    else
+    {
+        pos.x -= 36.0f;
+    }
+    vm->entity_pos = pos;
+}
+
+// FUNCTION: TH16 0x42b5f0
+i32 __fastcall Gui::textbox_on_draw(AnmVm *vm)
+{
+    g_Gui->msg->update_callout(vm);
+    return 0;
+}
+
+// FUNCTION: TH16 0x42b610
+void GuiMsgVm::hide()
+{
+    AnmManager *anm = g_AnmManager;
+    AnmVm *vm = anm->get_vm_with_id(player_face);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+    for (i32 i = 0; i < 4; i++)
+    {
+        vm = anm->get_vm_with_id(enemy_faces[i]);
+        if (vm != NULL)
+        {
+            vm->clear_flag_lo_2_tree_inline();
+        }
+    }
+    vm = anm->get_vm_with_id(id_54);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(text_line_1);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(text_line_2);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(furigana_1);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(furigana_2);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(intro);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(id_70);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(textbox);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+}
+
+// FUNCTION: TH16 0x42b820
+void GuiMsgVm::show()
+{
+    AnmManager *anm = g_AnmManager;
+    AnmVm *vm = anm->get_vm_with_id(player_face);
+    if (vm != NULL)
+    {
+        vm->set_flag_lo_2_tree_inline();
+    }
+    for (i32 i = 0; i < 4; i++)
+    {
+        vm = anm->get_vm_with_id(enemy_faces[i]);
+        if (vm != NULL)
+        {
+            vm->set_flag_lo_2_tree_inline();
+        }
+    }
+    vm = anm->get_vm_with_id(id_54);
+    if (vm != NULL)
+    {
+        vm->set_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(text_line_1);
+    if (vm != NULL)
+    {
+        vm->set_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(text_line_2);
+    if (vm != NULL)
+    {
+        vm->set_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(furigana_1);
+    if (vm != NULL)
+    {
+        vm->set_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(furigana_2);
+    if (vm != NULL)
+    {
+        vm->set_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(intro);
+    if (vm != NULL)
+    {
+        vm->set_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(id_70);
+    if (vm != NULL)
+    {
+        vm->set_flag_lo_2_tree_inline();
+    }
+    vm = anm->get_vm_with_id(textbox);
+    if (vm != NULL)
+    {
+        vm->set_flag_lo_2_tree_inline();
+    }
+}
+
+// FUNCTION: TH16 0x42ba30
+HARNESS_CALLED void GuiMsgVm::set_textbox(i32 kind, f32 x, f32 y, f32 width)
+{
+    delete_vm_and_clear(textbox);
+    Float3 pos(x, y, 0.0f);
+    textbox = g_Gui->front_anm->create_vm(kind + 0xe4, &pos, 0.0f, -1, 0);
+    find_child_of(textbox, kind + 0xb4)->float_vars[0] = width;
+    find_child_of(textbox, kind + 0xd4)->float_vars[0] = width;
+    textbox_kind = kind;
+}
+
+// FUNCTION: TH16 0x42bb30
+HARNESS_CALLED void GuiMsgVm::set_textbox_width(i32 kind, f32 width)
+{
+    width += 16.0f;
+    find_child_of(textbox, kind + 0xb4)->float_vars[0] = width;
+    find_child_of(textbox, kind + 0xd4)->float_vars[0] = width;
+}
+
+// TODO: the original aligns its frame to 8 bytes, which LTCG adds for
+// Gui::sub_42bcf0's sake.
+// FUNCTION: TH16 0x42bc10
+void Gui::update_score()
+{
+    Gui *gui = g_Gui;
+    if (g_Globals.score != gui->current_score)
+    {
+        u32 step = (g_Globals.score - gui->current_score) >> 5;
+        if (step >= 0x8d55e)
+        {
+            step = 0x8d55e;
+        }
+        else if (step == 0)
+        {
+            step = 1;
+        }
+        if (gui->score_step < (i32)step)
+        {
+            gui->score_step = step;
+        }
+        if (gui->score_step > (i32)(g_Globals.score - gui->current_score))
+        {
+            gui->score_step = g_Globals.score - gui->current_score;
+        }
+        gui->current_score += gui->score_step;
+        if (gui->current_score >= (i32)g_Globals.score)
+        {
+            gui->score_step = 0;
+        }
+    }
+    if (g_Globals.hiscore < gui->current_score)
+    {
+        g_Globals.hiscore = gui->current_score;
+        g_Globals.hiscore_continues = g_Globals.continues_used;
+        g_Globals.flags_lo_45c |= 4;
+        if (!(g_Globals.flags_lo_45c & 4))
+        {
+            gui->sub_42bcf0(0, 3);
+        }
+    }
+}
+
+// FUNCTION: TH16 0x42c1b0
+HARNESS_CALLED void Gui::sub_42c1b0()
+{
+    AnmManager::interrupt_tree(ids_11c[1], 1);
+    AnmManager::interrupt_tree(ids_11c[2], 1);
+    flags_1ac &= ~0x100;
+    timer_1b0.reset();
+}
+
+// FUNCTION: TH16 0x42c240
+void show_stage_logo()
+{
+    if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & 1))
+    {
+        g_Gui->stage_logo_anm->create_effect(0, -1, NULL);
+    }
+}
+
+// FUNCTION: TH16 0x42c280
+void Gui::update_lives(i32 lives, u32 fragments)
+{
+    if (life_counter_vms[0] == NULL)
+    {
+        return;
+    }
+    i32 i;
+    for (i = 0; i < lives; i++)
+    {
+        life_counter_vms[i]->interrupt(2);
+    }
+    if (i < sizeof(life_counter_vms) / sizeof(life_counter_vms[0]))
+    {
+        i16 progress = fragments * 5 / get_score_extend_quota();
+        life_counter_vms[i]->interrupt(progress + 7);
+        for (i++; i < sizeof(life_counter_vms) / sizeof(life_counter_vms[0]); i++)
+        {
+            life_counter_vms[i]->interrupt(3);
+        }
+    }
+}
+
+// FUNCTION: TH16 0x42c390
+void Gui::update_bombs(i32 bombs, i16 fragments)
+{
+    if (bomb_counter_vms[0] == NULL)
+    {
+        return;
+    }
+    i32 i;
+    for (i = 0; i < bombs; i++)
+    {
+        bomb_counter_vms[i]->interrupt(2);
+    }
+    if (i < sizeof(bomb_counter_vms) / sizeof(bomb_counter_vms[0]))
+    {
+        bomb_counter_vms[i]->interrupt(fragments + 7);
+        for (i++; i < sizeof(bomb_counter_vms) / sizeof(bomb_counter_vms[0]); i++)
+        {
+            bomb_counter_vms[i]->interrupt(3);
+        }
+    }
+}
+
+// TODO: the original tests the script again after adding 0xa4 instead of
+// using the add's flags.
+// FUNCTION: TH16 0x42c480
+void Gui::show_boss_marker()
+{
+    if (get_vm_or_clear(boss_id_d8) != NULL)
+    {
+        return;
+    }
+    i32 script;
+    if (g_Globals.chapter >= 0x29)
+    {
+        script = g_stage_data->bosses[0].marker_script;
+    }
+    else
+    {
+        script = g_stage_data->bosses[1].marker_script;
+    }
+    if (script >= 0)
+    {
+        script += 0xa4;
+        if (script >= 0)
+        {
+            boss_id_d8 = front_anm->create_effect(script, -1, NULL);
+        }
+    }
+}
+
+// FUNCTION: TH16 0x42c4f0
+void Gui::sub_42c4f0()
+{
+    AnmManager::interrupt_tree(ids_11c[4], 1);
+    flags_1ac = flags_1ac & ~0x1000 | 0x800;
+    timer_1b0.reset();
+}
+
+// FUNCTION: TH16 0x42c580
+void Gui::sub_42c580()
+{
+    AnmVm *vm = g_AnmManager->get_vm_with_id(g_Gui->ids_11c[4]);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+}
+
+// FUNCTION: TH16 0x42c5c0
+void Gui::sub_42c5c0()
+{
+    AnmVm *vm = g_AnmManager->get_vm_with_id(g_Gui->ids_11c[4]);
+    if (vm != NULL)
+    {
+        vm->set_flag_lo_2_tree_inline();
+    }
+}
+
+// FUNCTION: TH16 0x42c890
+void __fastcall anm_vm_interrupt_4_run(AnmVm *vm)
+{
+    vm->interrupt(4);
+    vm->run();
+}
+
+// FUNCTION: TH16 0x42c8c0
+void __fastcall anm_vm_interrupt_4(AnmVm *vm)
+{
+    vm->interrupt(4);
+}
+
+// FUNCTION: TH16 0x42c8f0
+void __fastcall anm_vm_interrupt_5(AnmVm *vm)
+{
+    vm->interrupt(5);
+}
+
+// FUNCTION: TH16 0x42c920
+AnmId AnmLoaded::create_ui_effect(i32 script, i32 unused, AnmVm **out)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    vm_count++;
+    AnmVm *vm = AnmManager::allocate_vm();
+    if (out != NULL)
+    {
+        *out = vm;
+    }
+    copy_vm(vm, script);
+    vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+    vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    vm->rotation.z = 0.0f;
+    vm->run();
+    vm->mode_of_create_child = 4;
+    AnmId id;
+    id = AnmManager::insert_in_ui_list_back(vm);
+    vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return id;
+}
+
+// FUNCTION: TH16 0x418440
+void __fastcall anm_vm_interrupt_3_run(AnmVm *vm)
+{
+    vm->interrupt(3);
+    vm->run();
+}
+
+// FUNCTION: TH16 0x418470
+void __fastcall anm_vm_interrupt_2_run(AnmVm *vm)
+{
+    vm->interrupt(2);
+    vm->run();
 }

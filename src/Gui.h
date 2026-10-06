@@ -70,6 +70,15 @@ struct GuiMsgVm
     GuiMsgVm(void *script);
     // 0x4264a0
     ~GuiMsgVm();
+    // Moves vm (the speech bubble's tail) next to the bubble.
+    void update_callout(AnmVm *vm);
+    // Hide and show every face and text VM.
+    void hide();
+    void show();
+    // Replaces the speech bubble. LTCG passes x, y and width in xmm1-3.
+    HARNESS_CALLED void set_textbox(i32 kind, f32 x, f32 y, f32 width);
+    // LTCG passes the width in xmm1.
+    HARNESS_CALLED void set_textbox_width(i32 kind, f32 width);
 };
 
 // One of the three boss life bars.
@@ -159,9 +168,22 @@ struct Gui
     i32 on_tick_body();
     i32 on_draw_2_body();
 
-    void update_lives(i32 lives, i32 fragments);
+    void update_lives(i32 lives, u32 fragments);
     // 0x42c390
-    void update_bombs(i32 bombs, i32 fragments);
+    void update_bombs(i32 bombs, i16 fragments);
+    // Shows the boss marker unless it is already up.
+    void show_boss_marker();
+    void sub_42c4f0();
+    // Only called through g_Gui, which LTCG put in place of this.
+    HARNESS_CALLED void sub_42c1b0();
+    // Creates the textbox VM (0x426780) and the stage clear bonus (0x42c070).
+    static void create_vm_110();
+    static void show_stage_clear_bonus();
+    static void sub_42c580();
+    static void sub_42c5c0();
+    // Counts the shown score up towards the real one.
+    static void update_score();
+    static i32 __fastcall textbox_on_draw(AnmVm *vm);
     // Shows a HUD notice (2: full power, 4: extend). Its callers in the
     // original keep the stack 8-byte aligned for it (LTCG moved the
     // alignment out of the callee).
@@ -173,6 +195,16 @@ struct Gui
 extern Gui *g_Gui;
 // The dialogue file kept loaded across a stage restart.
 extern MsgFile *g_msg_file_cache;
+
+// ECL instruction 554: shows the stage logo.
+void show_stage_logo();
+
+// Small ANM helpers the HUD code calls.
+void __fastcall anm_vm_interrupt_2_run(AnmVm *vm);
+void __fastcall anm_vm_interrupt_3_run(AnmVm *vm);
+void __fastcall anm_vm_interrupt_4_run(AnmVm *vm);
+void __fastcall anm_vm_interrupt_4(AnmVm *vm);
+void __fastcall anm_vm_interrupt_5(AnmVm *vm);
 
 // Debug logging, compiled out of the release build (0x42c9f0).
 void debug_log(const char *fmt, ...);

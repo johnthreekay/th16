@@ -202,6 +202,13 @@ struct AnmVm
     void fade_rgb1(i32 end_time, i32 method, ZunColor *goal);
     // 0x426020. LTCG passes x in xmm3.
     HARNESS_CALLED void scale_to(i32 end_time, i32 method, f32 x, f32 y);
+    // 0x406a70. Scales a position by the screen scale and applies the
+    // parents' rotation.
+    Float3 *transform_coords(Float3 *pos);
+    // 0x406c40
+    void get_own_transformed_pos(Float3 *out);
+    // 0x46f510. The nth descendant (depth first) running the given script.
+    AnmVm *search_children(i32 script, i32 nth);
     // 0x46f380 and 0x46f3b0 (ExpHP: set/clear_ins_316_flag_recursively).
     void set_flag_lo_2_tree();
     void clear_flag_lo_2_tree();

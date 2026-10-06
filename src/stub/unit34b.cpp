@@ -44,3 +44,21 @@ i32 Gui::on_tick_body()
 {
     return 1;
 }
+
+
+// STUB: TH16 0x46f510
+AnmVm *AnmVm::search_children(i32 script, i32 nth)
+{
+    return NULL;
+}
+
+// STUB: TH16 0x46e940
+AnmId __stdcall AnmManager::insert_in_ui_list_back(AnmVm *vm)
+{
+    return vm->id;
+}
+
+// STUB: TH16 0x406c40
+void AnmVm::get_own_transformed_pos(Float3 *out)
+{
+}
