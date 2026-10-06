@@ -40,6 +40,10 @@ struct InputState
 
 extern InputState g_InputState;
 
+// Per button: frames until InputState::update repeats it in unk_8c (ExpHP
+// has no name).
+extern i32 g_input_repeat_time[0x20];
+
 // Game buttons in g_hardware_input and the replay input words.
 enum InputButton
 {
