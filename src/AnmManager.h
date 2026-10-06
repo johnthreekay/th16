@@ -14,11 +14,16 @@ typedef i32 AnmId;
 // One running ANM script.
 struct AnmVm
 {
-    u8 unk_0[0x28];
+    u8 unk_0[0x1c];
+    i32 anm_loaded_index;
+    i32 sprite_id;
+    i32 script_id;
     i32 instr_offset;
     u8 unk_2c[0x520 - 0x2c];
     D3DCOLOR color_1;
-    u8 unk_524[0x538 - 0x524];
+    u8 unk_524[0x530 - 0x524];
+    u32 flags_lo;
+    u32 flags_hi;
     AnmId id;
     u8 unk_53c[0x5b8 - 0x53c];
     // Allocated by ANM instruction 508.
@@ -27,6 +32,7 @@ struct AnmVm
     u8 unk_5c0[0x5fc - 0x5c0];
 
     AnmVm();
+    void wipe();
     ~AnmVm()
     {
         if (ins_508_extra_data != NULL)
@@ -40,7 +46,22 @@ struct AnmVm
     }
 };
 
-struct AnmLoaded;
+// One loaded ANM file.
+struct AnmLoaded
+{
+    i32 slot_num;
+    char name[0x104];
+    u8 unk_108[0x13c - 0x108];
+
+    void set_sprite(AnmVm *vm, i32 sprite);
+
+    void init_vm_with_sprite(AnmVm *vm, i32 sprite)
+    {
+        vm->wipe();
+        vm->anm_loaded_index = slot_num;
+        set_sprite(vm, sprite);
+    }
+};
 
 struct AnmManager
 {

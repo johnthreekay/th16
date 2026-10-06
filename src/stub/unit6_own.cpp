@@ -79,3 +79,21 @@ int __fastcall PauseMenu::on_draw(void *arg)
 {
     return 1;
 }
+
+#include "../AsciiManager.h"
+#include "../PopupManager.h"
+
+// GLOBAL: TH16 0x4a6d98
+AsciiManager *g_AsciiManager;
+
+// STUB: TH16 0x44a440
+int __fastcall PopupManager::on_tick(void *arg)
+{
+    return 1;
+}
+
+// STUB: TH16 0x44a450
+int __fastcall PopupManager::on_draw(void *arg)
+{
+    return 1;
+}

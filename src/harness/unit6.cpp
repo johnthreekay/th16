@@ -5,11 +5,12 @@
 #include "../UpdateFunc.h"
 #include "../Globals.h"
 #include "../PauseMenu.h"
+#include "../PopupManager.h"
 
 int harness_unit6_read_globals()
 {
     return g_unk_4a6ef0 + g_arcade_width + g_arcade_height + g_game_2d_origin_x + g_game_2d_origin_y +
-           (int)g_PauseMenu;
+           (int)g_PauseMenu + (int)g_PopupManager;
 }
 
 static unsigned __stdcall harness_thread_proc(void *arg)
