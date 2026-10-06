@@ -45,8 +45,8 @@ struct Timer
     {
         initialize();
         current = t;
-        current_f = (f32)t;
         previous = t - 1;
+        current_f = (f32)t;
     }
 
     void reset()

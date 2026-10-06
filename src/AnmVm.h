@@ -87,7 +87,7 @@ struct InterpInt3
 
 // The shared interpolation curves (linear, ease in/out, ...): the fraction
 // of the way from initial to goal at time t of end_time.
-f32 LTCG_VECTORCALL interp_common_methods(i32 method, f32 t, f32 end_time);
+HARNESS_CALLED f32 interp_common_methods(i32 method, f32 t, f32 end_time);
 
 struct AnmVm;
 

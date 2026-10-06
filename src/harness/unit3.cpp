@@ -2,6 +2,7 @@
 // unit 3 needs called the way the original calls them.
 #include "../EffectManager.h"
 #include "../Ending.h"
+#include "../AnmVm.h"
 #include "../Spellcard.h"
 #include "../UpdateFunc.h"
 
@@ -30,4 +31,11 @@ void *harness_unit3_read_globals(int i)
         return g_Ending;
     }
     return NULL;
+}
+
+// Like Bullet::on_tick and AnmVm::step_interpolators, which step their
+// interpolators through InterpFloat::step (float result in xmm0).
+f32 harness_unit3_interp_step(InterpFloat *interp)
+{
+    return interp->step();
 }

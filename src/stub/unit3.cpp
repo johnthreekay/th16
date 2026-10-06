@@ -33,12 +33,6 @@ u32 g_hardware_input;
 // GLOBAL: TH16 0x4a51c4
 u32 g_hardware_input_held_4a51c4;
 
-// STUB: TH16 0x4033f0
-f32 LTCG_VECTORCALL interp_common_methods(i32 method, f32 t, f32 end_time)
-{
-    return t / end_time;
-}
-
 // STUB: TH16 0x4093f0
 AnmVm::AnmVm() LTCG_NOTHROW
 {
