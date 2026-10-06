@@ -274,11 +274,16 @@ def main():
     objs = compile_all(BUILD / "obj")
     include = keepalive_symbols()
     exe = BUILD / "th16.exe"
-    rc, out = tc.run("link", LFLAGS + [f"/INCLUDE:{s}" for _, s, keep in include if not keep] + [
+    link_args = LFLAGS + [f"/INCLUDE:{s}" for _, s, keep in include if not keep] + [
         f"/OUT:{tc.winpath(exe)}", f"/PDB:{tc.winpath(exe.with_suffix('.pdb'))}",
         f"/MAP:{tc.winpath(exe.with_suffix('.map'))}",
         *[tc.winpath(o) for o in objs], *LIBS,
-    ])
+    ]
+    # Wine caps a command line at 32767 characters, which the object list
+    # and /INCLUDE options outgrew; link reads them from a response file.
+    rsp = BUILD / "link.rsp"
+    rsp.write_text("\n".join(f'"{a}"' if " " in a else a for a in link_args) + "\n")
+    rc, out = tc.run("link", [f"@{tc.winpath(rsp)}"])
     out = "\n".join(l for l in out.splitlines() if l.strip() not in ("Generating code", "Finished generating code"))
     if out.strip():
         print(out)
