@@ -10,6 +10,25 @@
 // GLOBAL: TH16 0x4a6ee0
 LaserManager *g_LaserManager;
 
+// GLOBAL: TH16 0x49f2e0
+BulletTypeInfo g_bullet_types[BULLET_TYPE_COUNT];
+
+// This file's copy of ZunMath.h's sincosmul, which TH16 keeps once per
+// object file. A static of its own so that it can be annotated.
+// FUNCTION: TH16 0x43ad00
+static void __fastcall laser_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
+
 // FUNCTION: TH16 0x42cb00
 void LaserManager::destroy_all()
 {
@@ -190,7 +209,7 @@ LaserDataInf::LaserDataInf()
 // FUNCTION: TH16 0x431050
 void LaserLineInf::get_point(f32 distance, Float3 *out)
 {
-    sincosmul(out, angle, distance);
+    laser_sincosmul(out, angle, distance);
     *out += position;
 }
 
@@ -210,21 +229,21 @@ LaserLineInf::LaserLineInf()
 // FUNCTION: TH16 0x4311f0
 void LaserCurveInf::get_point(f32 distance, Float3 *out)
 {
-    sincosmul(out, angle, distance);
+    laser_sincosmul(out, angle, distance);
     *out += position;
 }
 
 // FUNCTION: TH16 0x431250
 void LaserInfiniteInf::get_point(f32 distance, Float3 *out)
 {
-    sincosmul(out, angle, distance);
+    laser_sincosmul(out, angle, distance);
     *out += position;
 }
 
 // FUNCTION: TH16 0x4312b0
 void LaserBeamInf::get_point(f32 distance, Float3 *out)
 {
-    sincosmul(out, angle, distance);
+    laser_sincosmul(out, angle, distance);
     *out += position;
 }
 

@@ -34,6 +34,25 @@ void Player::interrupt_options()
     inner.unk_16074 = 0;
 }
 
+// The counterpart of interrupt_options, used when a game starts. Works on
+// g_Player.
+// FUNCTION: TH16 0x42ca80
+HARNESS_CALLED void Player::resume_options()
+{
+    inner.flags |= 2;
+    for (i32 i = 0; i < 4; i++)
+    {
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b0, 3);
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b4, 3);
+    }
+    for (i32 i = 0; i < 8; i++)
+    {
+        AnmManager::interrupt_tree(inner.subseason_options[i].anm_id_b0, 3);
+        AnmManager::interrupt_tree(inner.subseason_options[i].anm_id_b4, 3);
+    }
+    inner.unk_16074 = 0;
+}
+
 // FUNCTION: TH16 0x440e40
 HARNESS_CALLED void Player::set_position(f32 x, f32 y)
 {

@@ -174,3 +174,21 @@ struct BulletManager
 };
 
 extern BulletManager *g_BulletManager;
+
+// Per bullet type (lasers use it too): its ANM script and the sprite of each
+// color. ExpHP has zBulletType at 0x118 bytes; the table at 0x49f2e0 has a
+// stride of 0x114.
+struct BulletTypeInfo
+{
+    i32 script;
+    // [color][0] is the color's sprite. Types whose sprites[0][0] is
+    // negative keep the sprite their script sets.
+    i32 sprites[16][4];
+    f32 hitbox_radius;
+    i32 unk_108;
+    i32 unk_10c;
+    i32 unk_110;
+};
+
+#define BULLET_TYPE_COUNT 44
+extern BulletTypeInfo g_bullet_types[BULLET_TYPE_COUNT];

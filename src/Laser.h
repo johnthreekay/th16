@@ -49,7 +49,9 @@ class LaserDataInf
     ZunTimer timer_5a0;
     ZunTimer timer_5b4;
     i32 countdown_5c8;
-    u8 unk_5cc[0x5d4 - 0x5cc];
+    // Index into g_bullet_types, and the color within it.
+    i32 bullet_type;
+    i32 bullet_color;
 
     LaserDataInf();
 
@@ -133,6 +135,10 @@ class LaserLineInf : public LaserDataInf
     virtual i32 method_44();
     virtual i32 method_50();
     virtual LaserDataInf *clone();
+
+    // Sprite mapping callback 2 of the line laser VMs: the sprite of the
+    // laser's color (ExpHP: AnmVm::on_sprite_set__2).
+    static i32 __fastcall on_sprite_set(AnmVm *vm, i32 sprite);
 };
 
 // Parameters of an infinite laser, filled in by ECL before the laser is
@@ -248,6 +254,10 @@ class LaserCurveInf : public LaserDataInf
     virtual i32 method_60();
 
     HARNESS_CALLED LaserCurveNode *append_node(f32 value);
+
+    // Sprite mapping callback 3: one sprite per color, from 0x20c on (ExpHP:
+    // AnmVm::on_sprite_set__3).
+    static i32 __fastcall on_sprite_set(AnmVm *vm, i32 sprite);
 };
 
 struct LaserBeamInner

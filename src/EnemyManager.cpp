@@ -24,6 +24,15 @@ EnemyInf *EnemyManager::get_boss(i32 i)
     return e;
 }
 
+// FUNCTION: TH16 0x42ca00
+HARNESS_CALLED i32 EnemyManager::reset_for_stage(i32 unused)
+{
+    inner.time_in_stage.reset();
+    active_enemy_list_head = NULL;
+    active_enemy_list_tail = NULL;
+    return 0;
+}
+
 // TODO: the original keeps g_AnmManager in a register across the loop; LTCG
 // knows the (here undecompiled) callee leaves it alone.
 // FUNCTION: TH16 0x4185b0

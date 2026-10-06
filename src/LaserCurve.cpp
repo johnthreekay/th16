@@ -138,3 +138,9 @@ HARNESS_CALLED LaserCurveNode *LaserCurveInf::append_node(f32 value)
     node->next->prev = node;
     return node->next;
 }
+
+// FUNCTION: TH16 0x43a840
+i32 __fastcall LaserCurveInf::on_sprite_set(AnmVm *vm, i32 sprite)
+{
+    return ((LaserCurveInf *)vm->associated_game_entity)->bullet_color + 0x20c;
+}

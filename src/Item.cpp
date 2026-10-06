@@ -23,6 +23,22 @@ const i32 g_item_anm_scripts[17][2] = {
 
 i32 unit5_placeholder(void *object);
 
+// This file's copy of ZunMath.h's sincosmul, which TH16 keeps once per
+// object file. A static of its own so that it can be annotated.
+// FUNCTION: TH16 0x430df0
+static void __fastcall item_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
+
 // FUNCTION: TH16 0x42f0b0
 ItemManager::ItemManager()
 {
@@ -264,7 +280,7 @@ Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f32 angle, f32 s
             item->item_type = type;
             item->unk_c58 = type;
             item->position = *pos;
-            sincosmul(&item->velocity, angle, speed);
+            item_sincosmul(&item->velocity, angle, speed);
             item->velocity.z = 0.0f;
             item->time = 0;
             item->angle = angle;
@@ -302,7 +318,7 @@ Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f32 angle, f32 s
                 g_Globals.item_spawn_count++;
             }
             i32 anm_type = type != 15 ? type : 6;
-            sincosmul(&item->velocity, angle, speed);
+            item_sincosmul(&item->velocity, angle, speed);
             item->velocity.z = 0.0f;
             item->time.set_value(0);
             item->speed = 0.0f;

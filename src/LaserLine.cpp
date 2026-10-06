@@ -1,5 +1,16 @@
 #include "Laser.h"
 
+// FUNCTION: TH16 0x431fa0
+i32 __fastcall LaserLineInf::on_sprite_set(AnmVm *vm, i32 sprite)
+{
+    LaserLineInf *laser = (LaserLineInf *)vm->associated_game_entity;
+    if (g_bullet_types[laser->bullet_type].sprites[0][0] >= 0)
+    {
+        return g_bullet_types[laser->bullet_type].sprites[laser->bullet_color][sprite];
+    }
+    return sprite;
+}
+
 // FUNCTION: TH16 0x433850
 i32 LaserLineInf::on_destroy()
 {

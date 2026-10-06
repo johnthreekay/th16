@@ -84,6 +84,10 @@ struct EnemyManager
     BOOL is_enemy_alive(int id);
     EnemyInf *find_enemy_by_id(int id);
     HARNESS_CALLED struct EnemyRef find_closest(D3DXVECTOR3 *pos, f32 max_dist);
+    // 0x42ca00. Restarts the stage timer and forgets the enemy list, for
+    // GameThread's thread_start. Called as g_EnemyManager->, with an
+    // argument it ignores.
+    HARNESS_CALLED i32 reset_for_stage(i32 unused);
 };
 
 // An enemy referred to by id; 0 means none.
