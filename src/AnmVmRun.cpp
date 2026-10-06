@@ -1,7 +1,14 @@
+#include <stddef.h>
+
 #include "AnmManager.h"
 #include "AnmVm.h"
 #include "Rng.h"
 #include "Supervisor.h"
+
+static_assert(offsetof(AnmVm, rotation_related) == 0x5f0, "AnmVm layout");
+static_assert(sizeof(AnmVm) == 0x5fc, "AnmVm layout");
+static_assert(sizeof(InterpInt3) == 0x58, "InterpInt3 layout");
+static_assert(sizeof(InterpAngle) == 0x30, "InterpAngle layout");
 
 // FUNCTION: TH16 0x45f2d0
 HARNESS_CALLED f32 AnmVm::get_float_var(f32 value)

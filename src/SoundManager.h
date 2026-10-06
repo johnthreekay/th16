@@ -155,7 +155,7 @@ struct SoundManager
     u8 *sound_file_data[SOUND_FILE_COUNT];
     u8 unk_22e0[0x23e0 - 0x22e0];
     BgmCommandEntry bgm_commands[0x1f];
-    u8 unk_4594[0x5660 - 0x4594];
+    u8 unk_4454[0x5660 - 0x4454];
     BgmStream *bgm_stream;
     u8 unk_5664[0x5668 - 0x5664];
     HANDLE bgm_event;

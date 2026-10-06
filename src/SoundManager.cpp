@@ -1,5 +1,6 @@
 #include <dsound.h>
 
+#include <stddef.h>
 #include <string.h>
 
 #include "CriticalSections.h"
@@ -31,6 +32,16 @@ SoundEffectData g_sound_effect_table[SOUND_EFFECT_COUNT] = {
     {71, 60, -400, 0, 0, 1}, {72, 61, -500, 0, 0, 1}, {73, 62, -500, 0, 0, 1}, {74, 63, 0, 100, 0, 1},
     {75, 64, 0, 100, 0, 1}, {77, 66, 0, 100, 0, 1},
 };
+
+static_assert(offsetof(SoundManager, bgm_format) == 0x1980, "SoundManager layout");
+static_assert(offsetof(SoundManager, sound_buffers) == 0x1a84, "SoundManager layout");
+static_assert(offsetof(SoundManager, bgm_commands) == 0x23e0, "SoundManager layout");
+static_assert(offsetof(SoundManager, bgm_stream) == 0x5660, "SoundManager layout");
+static_assert(offsetof(SoundManager, init_thread) == 0x5674, "SoundManager layout");
+static_assert(sizeof(SoundManager) == 0x5698, "SoundManager layout");
+static_assert(offsetof(BgmStream, refilling) == 0x9c, "BgmStream layout");
+static_assert(sizeof(ThBgmFormat) == 0x34, "ThBgmFormat layout");
+static_assert(sizeof(SoundEffectData) == 0x14, "SoundEffectData layout");
 
 // GLOBAL: TH16 0x491a00
 const char *const g_sound_file_names[SOUND_FILE_COUNT] = {

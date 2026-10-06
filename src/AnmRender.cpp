@@ -1,5 +1,14 @@
+#include <stddef.h>
+
 #include "AnmManager.h"
 #include "Supervisor.h"
+
+static_assert(offsetof(AnmManager, last_blend_mode) == 0x184fbb4, "AnmManager layout");
+static_assert(offsetof(AnmManager, last_color_op) == 0x184fbbb, "AnmManager layout");
+static_assert(offsetof(AnmManager, unrendered_sprite_count) == 0x184fc18, "AnmManager layout");
+static_assert(offsetof(AnmManager, sprite_write_cursor) == 0x1bcfc1c, "AnmManager layout");
+static_assert(offsetof(AnmManager, primitive_write_cursor) == 0x1c6fc28, "AnmManager layout");
+static_assert(sizeof(RenderVertex144) == 0x1c, "RenderVertex144 layout");
 
 // GLOBAL: TH16 0x4df830
 RenderVertex144 g_sprite_temp_buffer[4];
