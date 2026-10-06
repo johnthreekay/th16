@@ -37,3 +37,9 @@ f32 *EnemyInf::get_float_global_ptr(int var)
 {
     return (f32 *)unit8b_placeholder_sink(this, var);
 }
+
+// STUB: TH16 0x472030
+HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
+{
+    return unit8b_placeholder_sink(this, (int)(speed * 2.0f));
+}

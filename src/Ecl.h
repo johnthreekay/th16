@@ -46,6 +46,17 @@ struct EclRawInstr
     EclStackItem args[1];
 };
 
+// One extra argument of the call instructions: the type of the value as
+// written ('f'/'g' float, else int), the type the callee wants ('f' float,
+// else int), and the value.
+struct EclCallArg
+{
+    char type_from;
+    char type_to;
+    u8 unk_2[2];
+    EclStackItem value;
+};
+
 // ExpHP: zEclStack.
 struct EclStack
 {
@@ -96,6 +107,14 @@ struct EclRunContext
     HARNESS_CALLED f32 pop_float_arg(int index);
     i32 pop_int_arg_given_value(int index, i32 value);
     HARNESS_CALLED f32 pop_float_arg_given_value(int index, f32 value);
+
+    // 0x471db0. Starts dest at the subroutine named by the current
+    // instruction's string argument, passing it the arguments after
+    // argument index start; -1 when there is no such subroutine.
+    HARNESS_CALLED i32 call_sub(EclRunContext *dest, i32 start, i32 unused);
+    // 0x472030. Runs this context's instructions for one frame at the
+    // given speed; nonzero once it has finished.
+    HARNESS_CALLED i32 ecl_run(f32 speed);
 
     // The instruction at cur_location, NULL when there is none.
     EclRawInstr *current_instr();
@@ -199,6 +218,13 @@ class SptInf
     DECOMP_NOINLINE SptInf();
     void free_all_async();
     void reset_run_context();
+    // 0x474430. Starts a new async context running the subroutine named by
+    // the current instruction.
+    i32 create_async(i32 id, i32 start);
+    // 0x473bc0 (ExpHP: Enemy::ecl_run). Runs the main context and every
+    // async for one frame, freeing asyncs that have finished; -1 once the
+    // main context has finished.
+    HARNESS_CALLED i32 run_ecl(f32 speed);
     // 0x4744e0. The async with the given id, NULL when there is none.
     EclRunContextList *lookup_async(i32 id);
     // 0x474890 (ExpHP: Enemy::load_sub_by_name). Restarts the current

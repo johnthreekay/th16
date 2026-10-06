@@ -100,3 +100,15 @@ AnmId harness_unit8b_restore_snapshot(AnmId id)
 {
     return g_AnmManager->restore_snapshot(id);
 }
+
+// EnemyInf::on_tick runs its VM at the game speed (varies).
+i32 harness_unit8b_run_ecl(SptInf *vm, f32 speed)
+{
+    return vm->run_ecl(speed);
+}
+
+// ECL's call instructions (0x472030) start the arguments at index 0.
+i32 harness_unit8b_call_sub(EclRunContext *ctx, EclRunContext *dest)
+{
+    return ctx->call_sub(dest, 0, 0);
+}
