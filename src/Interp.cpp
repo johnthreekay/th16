@@ -284,8 +284,67 @@ D3DXVECTOR2 InterpFloat2::step()
     else if (method == 8)
     {
         f32 t = time.current_f / (f32)end_time;
-        current = t * t * (3.0f - 2.0f * t) * goal + (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f) * initial +
-                  (1.0f - t) * (1.0f - t) * t * bezier_1 + (t - 1.0f) * t * t * bezier_2;
+        f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
+        f32 c_goal = t * t * (3.0f - 2.0f * t);
+        f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
+        f32 c_bezier_2 = (t - 1.0f) * t * t;
+        current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+    }
+    else
+    {
+        f32 x = interp_common_methods(method, time.current_f, (f32)end_time);
+        current = (goal - initial) * x + initial;
+    }
+    return current;
+}
+
+// TODO: the original frame has an extra 4-byte slot and saves ebx/edi up front; method 7/17 temporaries are laid out differently.
+// FUNCTION: TH16 0x464590
+Int3 InterpInt3::step()
+{
+    if (end_time > 0)
+    {
+        time.tick();
+        if (time.current >= end_time)
+        {
+            time.set(end_time);
+            end_time = 0;
+            if (method == 7 || method == 17)
+            {
+                return initial;
+            }
+            return goal;
+        }
+    }
+    else if (end_time == 0)
+    {
+        if (method == 7 || method == 17)
+        {
+            return initial;
+        }
+        return goal;
+    }
+    if (method == 7)
+    {
+        Int3 tmp = initial;
+        initial = tmp + goal;
+        current = initial;
+    }
+    else if (method == 17)
+    {
+        Int3 tmp = initial;
+        initial = tmp + bezier_2;
+        bezier_2 = goal + bezier_2;
+        current = initial;
+    }
+    else if (method == 8)
+    {
+        f32 t = time.current_f / (f32)end_time;
+        f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
+        f32 c_goal = t * t * (3.0f - 2.0f * t);
+        f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
+        f32 c_bezier_2 = (t - 1.0f) * t * t;
+        current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
     }
     else
     {
