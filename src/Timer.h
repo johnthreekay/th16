@@ -72,17 +72,19 @@ struct Timer
     void tick()
     {
         f32 *speed = this->speed();
-        previous = current;
+        i32 cur = current;
+        previous = cur;
         if (speed != NULL && !(*speed > 0.99f && *speed < 1.01f))
         {
             current_f += *speed;
-            current = (i32)current_f;
+            cur = (i32)current_f;
         }
         else
         {
             current_f += 1.0f;
-            current++;
+            cur++;
         }
+        current = cur;
     }
 
     // 0x406490
