@@ -289,7 +289,6 @@ i32 SoundManager::reset()
     return 0;
 }
 
-// TODO: the original stores the new slot's pan before its count, keeping i in eax.
 // FUNCTION: TH16 0x45e150
 HARNESS_CALLED void SoundManager::play_sound_centered(i32 id, i32 unused)
 {
@@ -316,8 +315,8 @@ HARNESS_CALLED void SoundManager::play_sound_centered(i32 id, i32 unused)
         return;
     }
     queued_ids[i] = id;
-    queued_counts[i] = 1;
     queued_pans[i][0] = 0;
+    queued_counts[i] = 1;
     sound_buffers[id].unk_4 = unk;
 }
 
