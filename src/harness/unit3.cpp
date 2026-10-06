@@ -39,3 +39,9 @@ f32 harness_unit3_interp_step(InterpFloat *interp)
 {
     return interp->step();
 }
+
+// Like the menus' spell practice code, which counts the cards of a difficulty.
+i32 harness_unit3_count_spells(i32 difficulty)
+{
+    return count_spells_of_difficulty(difficulty);
+}

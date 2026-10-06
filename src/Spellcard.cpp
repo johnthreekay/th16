@@ -71,3 +71,27 @@ i32 __fastcall Spellcard::on_draw_callback(Spellcard *self)
 {
     return self->on_draw_body();
 }
+
+// FUNCTION: TH16 0x417530
+i32 Spellcard::is_time_code_bad()
+{
+    i32 a = time_code % 100;
+    i32 b = time_code / 100 % 1000;
+    a = (a + 67) % 100;
+    b = (b + 934) % 1000;
+    return time_code / 100000 - 22 != b + a;
+}
+
+// FUNCTION: TH16 0x4176d0
+HARNESS_CALLED i32 count_spells_of_difficulty(i32 difficulty)
+{
+    i32 count = 0;
+    for (i32 i = 0; i < 0x77; i++)
+    {
+        if (g_spell_difficulty[i] == difficulty)
+        {
+            count++;
+        }
+    }
+    return count;
+}

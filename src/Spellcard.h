@@ -45,7 +45,9 @@ struct Spellcard
     i32 unk_88;
     i32 ticks;
     i32 unk_90;
-    u8 unk_94[0xa8 - 0x94];
+    u8 unk_94[0xa4 - 0x94];
+    // Capture time, encoded with a check value against tampering.
+    i32 time_code;
     D3DXVECTOR3 boss_pos;
     u8 unk_b4[0xbc - 0xb4];
 
@@ -58,6 +60,11 @@ struct Spellcard
     i32 on_draw_body();
     static i32 __fastcall on_tick_callback(Spellcard *self);
     static i32 __fastcall on_draw_callback(Spellcard *self);
+    i32 is_time_code_bad();
 };
+
+// Difficulty (0-3, 4 for Extra) of each spell card.
+extern i8 g_spell_difficulty[0x78];
+HARNESS_CALLED i32 count_spells_of_difficulty(i32 difficulty);
 
 extern Spellcard *g_Spellcard;
