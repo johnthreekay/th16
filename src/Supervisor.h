@@ -99,7 +99,9 @@ struct Supervisor
     int switch_gamemodes();
     void setup_special_anms();
     // Members that do not use this; LTCG dropped it.
-    static void read_keyboard_input();
+    // 0x401d50. Reads keyboard and pad into g_hardware_input and returns
+    // the buttons held.
+    static u32 read_keyboard_input();
     int initialize();
     // Runs a loader function on `thread`. Every caller passes NULL for arg,
     // which LTCG folds; the loaders themselves are plain void functions.
@@ -127,6 +129,8 @@ enum SupervisorFlags
 {
     // Read the pad through DirectInput rather than joyGetPosEx.
     SUPERVISOR_USE_DIRECTINPUT_PAD = 1 << 11,
+    // Read the keyboard through DirectInput rather than GetKeyboardState.
+    SUPERVISOR_USE_DIRECTINPUT_KEYBOARD = 1 << 10,
     // Picks the game mode after the ending (2 if set, else 16).
     SUPERVISOR_FLAG_2000 = 1 << 13,
 };

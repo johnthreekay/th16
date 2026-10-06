@@ -30,11 +30,6 @@ void BgmStream::set_volume(i32 volume)
 {
 }
 
-// STUB: TH16 0x401d50
-void Supervisor::read_keyboard_input()
-{
-}
-
 // STUB: TH16 0x43ce10
 int Supervisor::switch_gamemodes()
 {
