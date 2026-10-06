@@ -745,3 +745,33 @@ int EnemyData::on_tick()
     }
     return 0;
 }
+
+// TODO: the original frame has 4 more bytes (as in other functions with Float3 temporaries).
+// FUNCTION: TH16 0x41c1f0
+void EnemyData::update_final_pos()
+{
+    final_pos.velocity = abs_pos.pos + rel_pos.pos - final_pos.pos;
+    final_pos.step();
+    if (flags_low & 0x20000)
+    {
+        f32 half = move_limit_size.x * 0.5f;
+        if (move_limit_center.x - half > final_pos.pos.x)
+        {
+            final_pos.pos.x = move_limit_center.x - half;
+        }
+        else if (final_pos.pos.x > move_limit_center.x + half)
+        {
+            final_pos.pos.x = move_limit_center.x + half;
+        }
+        half = move_limit_size.y * 0.5f;
+        if (move_limit_center.y - half > final_pos.pos.y)
+        {
+            final_pos.pos.y = move_limit_center.y - half;
+        }
+        else if (final_pos.pos.y > move_limit_center.y + half)
+        {
+            final_pos.pos.y = move_limit_center.y + half;
+        }
+        abs_pos.pos = final_pos.pos - rel_pos.pos;
+    }
+}

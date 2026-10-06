@@ -189,6 +189,9 @@ struct EnemyData
     int step_interpolators();
     int step_logic();
     void update_fog();
+    // 0x41c1f0. Moves final_pos to abs_pos + rel_pos, then keeps it inside
+    // the movement limit.
+    void update_final_pos();
     i32 get_int_arg(int index);
     i32 *get_int_arg_ptr(int index);
     f32 get_float_arg(int index);
