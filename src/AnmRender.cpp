@@ -1,6 +1,9 @@
 #include "AnmManager.h"
 #include "Supervisor.h"
 
+// GLOBAL: TH16 0x4df830
+RenderVertex144 g_sprite_temp_buffer[4];
+
 // FUNCTION: TH16 0x464f10
 void AnmManager::setup_render_state_for_vm(AnmVm *vm)
 {
@@ -167,4 +170,32 @@ i32 AnmManager::write_sprite(RenderVertex144 *vertices)
     sprite_write_cursor += 6;
     unrendered_sprite_count++;
     return 0;
+}
+
+// FUNCTION: TH16 0x4671b0
+void AnmManager::draw_vm__mode_5(AnmVm *vm)
+{
+    render_sub_466f00(vm);
+    render_sprite_2d(vm, 0);
+    g_sprite_temp_buffer[3].pos.w = 1.0f;
+    g_sprite_temp_buffer[2].pos.w = 1.0f;
+    g_sprite_temp_buffer[1].pos.w = 1.0f;
+    g_sprite_temp_buffer[0].pos.w = 1.0f;
+}
+
+// TODO: the original reserves a dead 4-byte local (push ecx/pop ecx).
+// FUNCTION: TH16 0x468c00
+void AnmVm::write_sprite_corners(Float3 *corners)
+{
+    switch ((flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
+    {
+    case 1:
+        write_sprite_corners__with_z_rot(this, &corners[0], &corners[1], &corners[2], &corners[3]);
+        break;
+    case 0:
+    case 2:
+    case 3:
+        write_sprite_corners__without_rot(this, &corners[0], &corners[1], &corners[2], &corners[3]);
+        break;
+    }
 }

@@ -55,6 +55,8 @@ enum AnmVmFlagsLo
     // set_alpha2_time switch to 1, color_2).
     ANM_VM_COLOR_MODE_MASK = 3 << 17,
     ANM_VM_COLOR_MODE_1 = 1 << 17,
+    // Five bits of render mode (how the sprite is projected and drawn).
+    ANM_VM_RENDER_MODE_SHIFT = 25,
     // Two bits of texture addressing along v: wrap, clamp, mirror.
     ANM_VM_ADDRESS_V_SHIFT = 30,
 };
@@ -263,6 +265,12 @@ struct AnmVm
     void set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
     // Advances every running interpolator and applies its value.
     void step_interpolators();
+    // Screen positions of the sprite's corners, by render mode.
+    void write_sprite_corners(Float3 *corners);
+    // 0x465c40, 0x4660b0
+    static void __stdcall write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c,
+                                                            Float3 *d);
+    static void __stdcall write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d);
 
     void interrupt(i32 n)
     {

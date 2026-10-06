@@ -136,6 +136,12 @@ struct AnmManager
     i32 write_sprite(RenderVertex144 *vertices);
     // Empties both vertex batches.
     HARNESS_CALLED void reset_vertex_buffers();
+    // 0x466f00. Fills g_sprite_temp_buffer for a VM drawn in 2D.
+    void render_sub_466f00(AnmVm *vm);
+    // 0x465280. Draws the quad in g_sprite_temp_buffer for a VM.
+    i32 render_sprite_2d(AnmVm *vm, i32 unk);
+    // Render mode 5.
+    void draw_vm__mode_5(AnmVm *vm);
     // 0x46efa0
     AnmVm *get_vm_with_id(AnmId id);
     // 0x46f1c0. Marks the VM and its children for deletion. Reaches the
@@ -172,6 +178,9 @@ struct AnmManager
 };
 
 extern AnmManager *g_AnmManager;
+
+// The quad being built by the draw functions.
+extern RenderVertex144 g_sprite_temp_buffer[4];
 
 // Deletes the VM (if still alive) and forgets the id.
 inline void delete_vm_and_clear(AnmId &id)
