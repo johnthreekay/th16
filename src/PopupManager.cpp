@@ -117,7 +117,7 @@ int PopupManager::on_tick()
 }
 
 // FUNCTION: TH16 0x44a460
-void PopupManager::generate_small_score_popup(Float3 *pos, i32 value, D3DCOLOR color)
+HARNESS_CALLED void PopupManager::generate_small_score_popup(Float3 *pos, i32 value, D3DCOLOR color)
 {
     PopupManager *mgr = g_PopupManager;
     if (mgr->next_index >= 10)

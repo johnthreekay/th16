@@ -56,7 +56,7 @@ struct PopupManager
 
     // Shows value rising from pos in one of the first 10 strings. Works on
     // g_PopupManager; LTCG dropped this.
-    void generate_small_score_popup(Float3 *pos, i32 value, D3DCOLOR color);
+    HARNESS_CALLED void generate_small_score_popup(Float3 *pos, i32 value, D3DCOLOR color);
 };
 
 extern PopupManager *g_PopupManager;

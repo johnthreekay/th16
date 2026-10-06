@@ -6,7 +6,10 @@
 
 #include "BulletManager.h"
 #include "EffectManager.h"
+#include "Player.h"
+#include "PopupManager.h"
 #include "SoundManager.h"
+#include "ZunList.h"
 
 // GLOBAL: TH16 0x4a6ddc
 ItemManager *g_ItemManager;
@@ -187,4 +190,120 @@ i32 Item::spawn_effect()
         }
     }
     return 0;
+}
+
+// TODO: the original reserves 8 bytes of unused locals and saves esi up
+// front; ours shrink-wraps the push of esi into the normal-item branch.
+// FUNCTION: TH16 0x430960
+Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f32 angle, f32 speed, i32 unk_6,
+                              i32 force_autocollect)
+{
+    ItemManager *mgr = g_ItemManager;
+    Item *item;
+    mgr->total_items_created++;
+    if (type == 9 || type == 10 || type == 11 || type == 12 || type == 13 || type == 14 || type == 16)
+    {
+        item = (Item *)mgr->inner.cancel_freelist.next;
+        if (item != NULL)
+        {
+            item->unk_c64 = mgr->unk_1c972e8;
+            if (mgr->unk_1c972e4 >= 0x400)
+            {
+                item->intangibility_frames = mgr->total_items_created % 32 + 16;
+            }
+            else if (mgr->unk_1c972e4 >= 0x200)
+            {
+                item->intangibility_frames = mgr->total_items_created % 16 + 8;
+            }
+            else if (mgr->unk_1c972e4 >= 0x100)
+            {
+                item->intangibility_frames = mgr->total_items_created % 8 + 4;
+            }
+            else
+            {
+                item->intangibility_frames = mgr->total_items_created % 4;
+            }
+            item->state = 6;
+            item->item_type = type;
+            item->unk_c58 = type;
+            item->position = *pos;
+            sincosmul(&item->velocity, angle, speed);
+            item->velocity.z = 0.0f;
+            item->time = 0;
+            item->angle = angle;
+            item->speed = speed;
+            item->force_autocollect = force_autocollect;
+            if (item->node.next != NULL)
+            {
+                item->node.next->prev = item->node.prev;
+            }
+            if (item->node.prev != NULL)
+            {
+                item->node.prev->next = item->node.next;
+            }
+            item->node.next = NULL;
+            item->node.prev = NULL;
+        }
+    }
+    else
+    {
+        item = (Item *)mgr->inner.normal_freelist.next;
+        if (item != NULL)
+        {
+            item->state = 1;
+            item->position = *pos;
+            if (item->position.x <= -192.0f)
+            {
+                item->position.x = -192.0f;
+            }
+            else if (item->position.x >= 192.0f)
+            {
+                item->position.x = 192.0f;
+            }
+            if (type == 15)
+            {
+                g_Globals.item_spawn_count++;
+            }
+            i32 anm_type = type != 15 ? type : 6;
+            sincosmul(&item->velocity, angle, speed);
+            item->velocity.z = 0.0f;
+            item->time.set_value(0);
+            item->speed = 0.0f;
+            item->speed_towards_player = 0.0f;
+            item->intangibility_frames = 0;
+            item->item_type = anm_type;
+            item->spawn_effect();
+            item->unk_c58 = 0;
+            g_BulletManager->bullet_anm->copy_vm_and_run(&item->vm, g_item_anm_scripts[anm_type][0]);
+            g_BulletManager->bullet_anm->copy_vm_and_run(&item->vm_2, g_item_anm_scripts[anm_type][1]);
+            item->force_autocollect = force_autocollect;
+            item->vm.color_1.d3d = 0xffffffff;
+            ((ZunList<void> *)&item->node)->unlink();
+        }
+    }
+    return item;
+}
+
+// TODO: the original realigns its frame to 8 bytes (ebx frame, 8 bytes of
+// locals), like add_power's other callers; see Globals::add_to_score.
+// FUNCTION: TH16 0x4303a0
+void Item::collect_full_power()
+{
+    if (g_Globals.power >= g_Globals.max_power)
+    {
+        i32 piv = g_Globals.piv + 10000;
+        if (piv > g_Globals.max_piv)
+        {
+            piv = g_Globals.max_piv;
+        }
+        g_Globals.piv = piv;
+        g_PopupManager->generate_small_score_popup(&position, 100, 0xff40ff40);
+        g_SoundManager.play_sound_at_position(0xd, position.x);
+    }
+    if (g_Globals.add_power(g_Globals.max_power))
+    {
+        g_Player->inner.repopulate_options();
+        g_PopupManager->generate_small_score_popup(&position, -1, 0xffffff40);
+        g_SoundManager.play_sound_at_position(0xd, position.x);
+    }
 }

@@ -49,6 +49,8 @@ struct Item
     i32 init_anm();
     // The flash and sound of a life, bomb or season item appearing.
     i32 spawn_effect();
+    // Collection of the full power item (ExpHP: Globals::collect_furu_powah).
+    void collect_full_power();
 };
 
 // ANM scripts of each item type: the item and its offscreen arrow.
@@ -88,6 +90,11 @@ struct ItemManager
     static i32 __fastcall on_tick_callback(ItemManager *mgr);
     static i32 __fastcall on_draw_1_callback(ItemManager *mgr);
     static i32 __fastcall on_draw_2_callback(ItemManager *mgr);
+
+    // Takes an item from the free list for its kind (bullet cancel items
+    // have their own) and launches it. Works on g_ItemManager; LTCG dropped
+    // this. unk_3 and unk_6 are never read.
+    Item *spawn_item(i32 type, Float3 *pos, i32 unk_3, f32 angle, f32 speed, i32 unk_6, i32 force_autocollect);
 };
 
 extern ItemManager *g_ItemManager;
