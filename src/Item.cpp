@@ -307,3 +307,131 @@ void Item::collect_full_power()
         g_SoundManager.play_sound_at_position(0xd, position.x);
     }
 }
+
+// TODO: the original takes piv % 10 with idiv and keeps both roundings, and
+// realigns its frame to 8 bytes (see collect_full_power).
+// FUNCTION: TH16 0x430100
+void Item::collect_power()
+{
+    f32 player_y = g_Player->inner.pos.y;
+    i32 value;
+    if (g_Globals.power >= g_Globals.max_power)
+    {
+        i32 line = item_collect_line();
+        if ((f32)line >= player_y || state == 4)
+        {
+            value = g_Globals.piv / 100;
+            value -= value % 10;
+            value = value / 10 * 10;
+            if (value <= 0)
+            {
+                value = 10;
+            }
+            g_PopupManager->generate_small_score_popup(&position, value, 0xffffff00);
+            g_Globals.unk_d8++;
+            g_Globals.unk_d0 += value;
+            g_Globals.last_collect_pos = g_Player->inner.pos;
+            g_PopupManager->generate_small_score_popup(&position, value, -1);
+        }
+        else
+        {
+            i32 base = g_Globals.piv / 100;
+            base -= base % 10;
+            value = base * 3 / 4 - base * 3 / 4 * ((i32)player_y - line) / 450;
+            value = value / 10 * 10;
+            if (value <= 0)
+            {
+                value = 10;
+            }
+            g_PopupManager->generate_small_score_popup(&position, value, -1);
+            g_PopupManager->generate_small_score_popup(&position, value, -1);
+        }
+    }
+    else
+    {
+        if (g_Globals.add_power(1))
+        {
+            g_Player->inner.repopulate_options();
+            g_PopupManager->generate_small_score_popup(&position, -1, 0xffffff40);
+            g_SoundManager.play_sound_at_position(0xd, position.x);
+        }
+        value = 100;
+    }
+    g_Globals.add_to_score(value);
+    if ((f32)item_collect_line() >= player_y || state == 4)
+    {
+        g_Globals.unk_d8++;
+        g_Globals.unk_d0 += value;
+        g_Globals.last_collect_pos = g_Player->inner.pos;
+    }
+}
+
+// TODO: the original realigns its frame to 8 bytes (see collect_full_power).
+// FUNCTION: TH16 0x4304a0
+void Item::collect_big_power()
+{
+    f32 player_y = g_Player->inner.pos.y;
+    i32 value;
+    if (g_Globals.power >= g_Globals.max_power)
+    {
+        value = 20000;
+        g_Globals.add_to_score(20000);
+        g_PopupManager->generate_small_score_popup(&position, 20000, 0xff808080);
+        g_SoundManager.play_sound_at_position(0xd, position.x);
+    }
+    else
+    {
+        value = 100;
+        if (g_Globals.add_power(g_Globals.power_per_level))
+        {
+            g_Player->inner.repopulate_options();
+            g_SoundManager.play_sound_at_position(0xd, position.x);
+            g_PopupManager->generate_small_score_popup(&position, -1, 0xffffff40);
+        }
+    }
+    g_Globals.add_to_score(value);
+    if ((f32)item_collect_line() >= player_y || state == 4)
+    {
+        g_Globals.unk_d8++;
+        g_Globals.unk_d0 += value;
+        g_Globals.last_collect_pos = g_Player->inner.pos;
+    }
+}
+
+// TODO: the original takes piv % 10 with idiv and keeps both roundings
+// (ours folds them into one division), so registers differ.
+// FUNCTION: TH16 0x430620
+void Item::collect_point()
+{
+    i32 line = item_collect_line();
+    Player *player = g_Player;
+    i32 value;
+    if ((f32)line >= player->inner.pos.y || state == 4)
+    {
+        value = g_Globals.piv / 100;
+        value -= value % 10;
+        value = value / 10 * 10;
+        if (value <= 0)
+        {
+            value = 10;
+        }
+        g_PopupManager->generate_small_score_popup(&position, value, 0xffffff00);
+        g_Globals.unk_d8++;
+        g_Globals.unk_d0 += value;
+        g_Globals.last_collect_pos = player->inner.pos;
+    }
+    else
+    {
+        i32 base = g_Globals.piv / 100;
+        base -= base % 10;
+        value = base * 3 / 4 - base * 3 / 4 * ((i32)player->inner.pos.y - line) / 450;
+        value = value / 10 * 10;
+        if (value <= 0)
+        {
+            value = 10;
+        }
+        g_PopupManager->generate_small_score_popup(&position, value, -1);
+    }
+    g_Globals.add_to_score(value);
+    g_Globals.num_point_items_collected++;
+}

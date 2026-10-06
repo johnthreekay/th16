@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AnmVm.h"
+#include "Globals.h"
 #include "UpdateFunc.h"
 #include "ZunMath.h"
 #include "ZunTimer.h"
@@ -51,7 +52,17 @@ struct Item
     i32 spawn_effect();
     // Collection of the full power item (ExpHP: Globals::collect_furu_powah).
     void collect_full_power();
+    void collect_power();
+    void collect_big_power();
+    void collect_point();
 };
+
+// The point of collection: items collected above this line, or while
+// everything is being auto-collected (state 4), are worth the most.
+inline i32 item_collect_line()
+{
+    return g_Globals.character == 3 ? 148 : 128;
+}
 
 // ANM scripts of each item type: the item and its offscreen arrow.
 extern const i32 g_item_anm_scripts[17][2];
