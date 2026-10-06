@@ -118,26 +118,23 @@ int EnemyManager::get_enemy_count()
     return count;
 }
 
-// TODO: the original reserves an unused stack slot (push ecx).
 // FUNCTION: TH16 0x41a910
-void EnemyManager::set_boss_id(int index, EnemyInf *enemy)
+HARNESS_CALLED void EnemyManager::set_boss_id(int index, EnemyInf *enemy)
 {
-    EnemyManager *mgr = g_EnemyManager;
     if (enemy != NULL)
     {
-        mgr->inner.boss_ids[index] = enemy->enemy_id;
+        inner.boss_ids[index] = enemy->enemy_id;
     }
     else
     {
-        mgr->inner.boss_ids[index] = 0;
+        inner.boss_ids[index] = 0;
     }
 }
 
-// TODO: the original reserves an unused stack slot (push ecx).
 // FUNCTION: TH16 0x41a950
-void EnemyManager::set_boss_bit(int value)
+HARNESS_CALLED void EnemyManager::set_boss_bit(int value)
 {
-    g_EnemyManager->inner.boss_bit = value;
+    inner.boss_bit = value;
 }
 
 // FUNCTION: TH16 0x41a980
