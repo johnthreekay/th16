@@ -17,7 +17,15 @@ struct PopupString
     D3DCOLOR color;
     ZunTimer time;
     u8 unk_34[0x3c - 0x34];
-    i32 unk_3c;
+    union
+    {
+        i32 unk_3c;
+        struct
+        {
+            u8 active;
+            u8 num_digits;
+        };
+    };
     u8 unk_40[0x48 - 0x40];
 };
 
@@ -45,6 +53,10 @@ struct PopupManager
     int on_draw();
     static int __fastcall on_tick_thunk(void *arg);
     static int __fastcall on_draw_thunk(void *arg);
+
+    // Shows value rising from pos in one of the first 10 strings. Works on
+    // g_PopupManager; LTCG dropped this.
+    void generate_small_score_popup(Float3 *pos, i32 value, D3DCOLOR color);
 };
 
 extern PopupManager *g_PopupManager;

@@ -4,8 +4,19 @@
 #include "Globals.h"
 #include "Item.h"
 
+#include "BulletManager.h"
+#include "EffectManager.h"
+#include "SoundManager.h"
+
 // GLOBAL: TH16 0x4a6ddc
 ItemManager *g_ItemManager;
+
+// GLOBAL: TH16 0x4917f8
+const i32 g_item_anm_scripts[17][2] = {
+    {-1, -1}, {112, 134}, {113, 135}, {114, 136}, {115, 137}, {116, 138},
+    {117, 139}, {118, 140}, {119, 141}, {120, -1}, {121, -1}, {122, -1},
+    {123, -1}, {124, -1}, {125, -1}, {-1, -1}, {129, -1},
+};
 
 i32 unit5_placeholder(void *object);
 
@@ -140,4 +151,40 @@ HARNESS_CALLED void Item::collect_piv(f32 value)
     {
         g_Globals.piv = g_Globals.max_piv;
     }
+}
+
+// FUNCTION: TH16 0x430c90
+i32 Item::init_anm()
+{
+    if (item_type == 16)
+    {
+        state = 3;
+        g_BulletManager->bullet_anm->copy_vm_and_run(&vm, g_Globals.subseason + 0x81);
+    }
+    else
+    {
+        state = 2;
+        g_BulletManager->bullet_anm->copy_vm_and_run(&vm, g_item_anm_scripts[item_type][0]);
+    }
+    vm_2.flags_lo &= ~ANM_VM_VISIBLE;
+    vm_2.instr_offset = -1;
+    return 0;
+}
+
+// FUNCTION: TH16 0x430d10
+i32 Item::spawn_effect()
+{
+    if (item_type == 4 || item_type == 6 || item_type == 15 || item_type == 5 || item_type == 7)
+    {
+        g_EffectManager->effect_anm->create_vm(0x65, &position, 0.0f, -1, 0);
+        if (item_type == 4 || item_type == 5)
+        {
+            g_SoundManager.play_sound_centered(0x4a, 0);
+        }
+        else
+        {
+            g_SoundManager.play_sound_centered(0x30, 0);
+        }
+    }
+    return 0;
 }

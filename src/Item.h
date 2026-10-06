@@ -45,7 +45,14 @@ struct Item
     // Adds value * 100 to the PIV, capped at its maximum. Works on
     // g_Globals only; LTCG drops this (ExpHP: Globals::collect_piv).
     HARNESS_CALLED void collect_piv(f32 value);
+    // Starts the item's sprite scripts for its type.
+    i32 init_anm();
+    // The flash and sound of a life, bomb or season item appearing.
+    i32 spawn_effect();
 };
+
+// ANM scripts of each item type: the item and its offscreen arrow.
+extern const i32 g_item_anm_scripts[17][2];
 
 struct ItemManagerInner
 {

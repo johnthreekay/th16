@@ -2,6 +2,7 @@
 
 #include "AsciiManager.h"
 #include "PopupManager.h"
+#include "Supervisor.h"
 
 // GLOBAL: TH16 0x4a6f10
 PopupManager *g_PopupManager;
@@ -72,4 +73,83 @@ int __fastcall PopupManager::on_tick_thunk(void *arg)
 int __fastcall PopupManager::on_draw_thunk(void *arg)
 {
     return ((PopupManager *)arg)->on_draw();
+}
+
+// TODO: the original addresses each string through its timer's current
+// field and assigns the hoisted float constants to other xmm registers.
+// FUNCTION: TH16 0x449ea0
+int PopupManager::on_tick()
+{
+    PopupString *str = strings;
+    for (i32 i = 0; i < 13; i++, str++)
+    {
+        if (str->active)
+        {
+            str->pos.y -= str->unk_18 * g_game_speed;
+            str->unk_18 *= 0.95f;
+            str->time.tick();
+            if (str->time.current > 60)
+            {
+                str->active = 0;
+            }
+        }
+    }
+    for (i32 i = 13; i < 18; i++, str++)
+    {
+        if (str->active)
+        {
+            str->time.tick();
+            if (str->time.current > 60)
+            {
+                i32 alpha = (str->color >> 24) - 4;
+                if (alpha <= 0)
+                {
+                    str->active = 0;
+                }
+                else
+                {
+                    str->color = (str->color & 0xffffff) | (alpha << 24);
+                }
+            }
+        }
+    }
+    return 1;
+}
+
+// FUNCTION: TH16 0x44a460
+void PopupManager::generate_small_score_popup(Float3 *pos, i32 value, D3DCOLOR color)
+{
+    PopupManager *mgr = g_PopupManager;
+    if (mgr->next_index >= 10)
+    {
+        mgr->next_index = 0;
+    }
+    PopupString *str = &mgr->strings[mgr->next_index];
+    i32 n = 0;
+    str->active = 1;
+    if (value >= 0)
+    {
+        while (value != 0)
+        {
+            str->digits[n] = value % 10;
+            n++;
+            value /= 10;
+        }
+        if (n == 0)
+        {
+            str->digits[0] = 0;
+            n = 1;
+        }
+    }
+    else
+    {
+        str->digits[0] = 10;
+        n = 1;
+    }
+    str->num_digits = n;
+    str->color = color;
+    str->time.reset();
+    str->pos = *pos;
+    str->unk_18 = 1.0f;
+    mgr->next_index++;
 }
