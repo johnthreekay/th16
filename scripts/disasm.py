@@ -60,9 +60,17 @@ def main():
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
     md.detail = True
 
+    text = next(sec for sec in pe.sections if sec.Name.rstrip(b"\0") == b".text")
+    text_lo = base + text.VirtualAddress
+    text_hi = text_lo + text.Misc_VirtualSize
+
     def label(value):
         if value in names:
             return names[value]
+        if text_lo <= value < text_hi:
+            # Code addresses only get exact names; the nearest name before an
+            # unknown function is usually some other function.
+            return None
         for delta in range(1, 0x40):
             if value - delta in names:
                 return f"{names[value - delta]}+{delta:#x}"

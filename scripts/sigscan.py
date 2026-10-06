@@ -74,8 +74,8 @@ def constant_size(symbol):
 
 
 def paired_constants(orig, ours, map_path, pairs_path, md):
-    """Original addresses of the constants (__real@..., __xmm@...) that our
-    annotated functions use.
+    """Original addresses of the constants (__real@..., __xmm@..., string
+    literals) that our annotated functions use.
 
     Each (original, ours) pair from build/functions.txt is disassembled in
     lockstep. Where an operand names a constant in our build, the original's
@@ -94,12 +94,24 @@ def paired_constants(orig, ours, map_path, pairs_path, md):
             if x.mnemonic != y.mnemonic or x.size != y.size:
                 break
             for xo, yo in zip(x.operands, y.operands):
-                if yo.type != capstone.x86.X86_OP_MEM or xo.type != capstone.x86.X86_OP_MEM:
+                if xo.type != yo.type:
                     continue
-                ov, rv = xo.mem.disp & 0xFFFFFFFF, yo.mem.disp & 0xFFFFFFFF
+                if yo.type == capstone.x86.X86_OP_MEM:
+                    ov, rv = xo.mem.disp & 0xFFFFFFFF, yo.mem.disp & 0xFFFFFFFF
+                elif yo.type == capstone.x86.X86_OP_IMM:
+                    ov, rv = xo.imm & 0xFFFFFFFF, yo.imm & 0xFFFFFFFF
+                else:
+                    continue
                 name = syms.get(rv)
-                size = constant_size(name) if name else None
-                if size is None:
+                if not name:
+                    continue
+                if name.startswith("??_C@_0"):
+                    # Narrow string literal: compare up to the terminator.
+                    end = rimg.find(b"\0", rv - rbase)
+                    size = end - (rv - rbase) + 1
+                else:
+                    size = constant_size(name)
+                if size is None or not obase <= ov < obase + len(oimg):
                     continue
                 if oimg[ov - obase:ov - obase + size] == rimg[rv - rbase:rv - rbase + size]:
                     found.setdefault(name, ov)
@@ -300,7 +312,8 @@ def main():
             rows |= {(addr, name, "global") for name, addr in globals_found.items()}
             if args.pairs:
                 consts = paired_constants(orig, ours, args.map, args.pairs, md)
-                rows |= {(addr, name, "float" if name.startswith("__real@") else "global")
+                kinds = {"__real@": "float", "??_C@_0": "string"}
+                rows |= {(addr, name, next((k for p, k in kinds.items() if name.startswith(p)), "global"))
                          for name, addr in consts.items()}
             # The entry stub is too small to scan for, but both entry points
             # are the CRT's WinMainCRTStartup.
