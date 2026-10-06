@@ -178,6 +178,13 @@ inline void delete_vm_and_clear(AnmId &id)
     id.id = 0;
 }
 
+// The same with delete_vm inlined, as LTCG does in some loops.
+inline void delete_vm_inline_and_clear(AnmId &id)
+{
+    g_AnmManager->delete_vm_inline(id);
+    id.id = 0;
+}
+
 // Looks the VM up and forgets the id if it is gone.
 inline AnmVm *get_vm_or_clear(AnmId &id)
 {

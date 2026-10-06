@@ -18,7 +18,7 @@ Supervisor g_Supervisor;
 i16 g_pad_mapping[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 // FUNCTION: TH16 0x4018e0
-u32 Supervisor::read_joypad(u32 input)
+HARNESS_CALLED u32 Supervisor::read_joypad(u32 input)
 {
     if (!(g_Supervisor.flags & SUPERVISOR_USE_DIRECTINPUT_PAD))
     {

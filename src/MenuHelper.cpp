@@ -39,3 +39,32 @@ i32 MenuHelper::move_cursor(i32 delta)
     }
     return next_selection;
 }
+
+// FUNCTION: TH16 0x402de0
+void MenuHelper::push()
+{
+    stack_selection[stack_depth] = next_selection;
+    stack_num_choices[stack_depth] = num_choices;
+    stack_depth++;
+    num_disabled = 0;
+    if (stack_depth >= 0x10)
+    {
+        stack_depth = 0xf;
+    }
+}
+
+// FUNCTION: TH16 0x402e20
+void MenuHelper::pop()
+{
+    stack_depth--;
+    if (stack_depth < 0)
+    {
+        stack_depth = 0;
+        next_selection = 0;
+        num_disabled = 0;
+        return;
+    }
+    next_selection = stack_selection[stack_depth];
+    num_choices = stack_num_choices[stack_depth];
+    num_disabled = 0;
+}

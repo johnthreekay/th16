@@ -28,4 +28,8 @@ struct MenuHelper
     }
 
     i32 move_cursor(i32 delta);
+    // 0x402de0. Enters a submenu, saving the cursor.
+    void push();
+    // 0x402e20. Back to the parent menu's cursor.
+    void pop();
 };

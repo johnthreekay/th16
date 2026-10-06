@@ -31,7 +31,7 @@ void PosVel::update_secondary_fields()
     }
 }
 
-// TODO: ours aligns the frame for sinf/cosf, adds pos+velocity the other way round, misses a tail merge.
+// TODO: adds pos+velocity the other way round and misses a tail merge.
 // FUNCTION: TH16 0x403110
 void PosVel::step()
 {
@@ -54,8 +54,8 @@ void PosVel::step()
         ZunAngle a = angle - ellipse_angle;
         from_polar(&offset, normalize_angle(a.value), radial_dist);
         f32 x = ellipse_ratio * offset.x;
-        f32 s = sinf(ellipse_angle.value);
-        f32 c = cosf(ellipse_angle.value);
+        f32 s = zun_sinf(ellipse_angle.value);
+        f32 c = zun_cosf(ellipse_angle.value);
         Float3 rotated;
         rotated.x = c * x - offset.y * s;
         rotated.y = offset.y * c + s * x;
@@ -70,16 +70,16 @@ void PosVel::step()
         ZunAngle side;
         side.value = wrap_angle(ellipse_angle.value + ZUN_PI / 2);
         Float3 offset;
-        from_polar(&offset, normalize_angle(side.value), sinf(wave_angle.value) * radial_dist * g_game_speed);
+        from_polar(&offset, normalize_angle(side.value), zun_sinf(wave_angle.value) * radial_dist * g_game_speed);
         offset.z = 0.0f;
         pos = center + offset;
-        angle = atan2f(pos.y - prev.y, pos.x - prev.x);
+        angle = zun_atan2f(pos.y - prev.y, pos.x - prev.x);
         break;
     }
     }
     // Snap to hundredths of a pixel.
-    pos.x = floorf(pos.x * 100.0f) / 100.0f;
-    pos.y = floorf(pos.y * 100.0f) / 100.0f;
+    pos.x = zun_floorf(pos.x * 100.0f) / 100.0f;
+    pos.y = zun_floorf(pos.y * 100.0f) / 100.0f;
 }
 
 // FUNCTION: TH16 0x4033d0
