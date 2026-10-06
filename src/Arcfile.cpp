@@ -474,3 +474,12 @@ void *Pbg::File::read_whole(u32 max_size)
     seek(pos, FILE_BEGIN);
     return data;
 }
+
+// The destructors are inline in Arcfile.h; these are the deleting
+// destructors their vtables point to.
+
+// SYNTHETIC: TH16 0x4576b0
+// Pbg::File::`scalar deleting destructor'
+
+// SYNTHETIC: TH16 0x457af0
+// Pbg::IFile::`scalar deleting destructor'
