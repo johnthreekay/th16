@@ -1,35 +1,4 @@
-#include <math.h>
-
 #include "AnmVm.h"
-#include "ZunMath.h"
-
-// STUB: TH16 0x4033f0
-// Placeholder (the real function is outside unit 3), compiled with /GL and
-// kept out of line so that LTCG gives it the original's register convention:
-// method in ecx, t in xmm1, end_time in xmm2. The original has some thirty
-// curves.
-HARNESS_CALLED f32 interp_common_methods(i32 method, f32 t, f32 end_time)
-{
-    if (end_time == 0.0f)
-    {
-        return 1.0f;
-    }
-    t /= end_time;
-    switch (method)
-    {
-    case 1:
-        return t * t;
-    case 2:
-        return t * t * t;
-    case 4:
-        return 1.0f - (1.0f - t) * (1.0f - t);
-    case 9:
-        // Some of the real curves call into the CRT, which matters to
-        // the callers' register allocation.
-        return sinf(t * ZUN_PI / 2);
-    }
-    return t;
-}
 
 // FUNCTION: TH16 0x417180
 void InterpFloat::reset()

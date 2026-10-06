@@ -1,6 +1,9 @@
 #include <string.h>
 
 #include "AnmManager.h"
+#include "AsciiManager.h"
+#include "Globals.h"
+#include "Scorefile.h"
 #include "Spellcard.h"
 #include "UpdateFunc.h"
 
@@ -94,4 +97,62 @@ HARNESS_CALLED i32 count_spells_of_difficulty(i32 difficulty)
         }
     }
     return count;
+}
+
+// FUNCTION: TH16 0x417d70
+i32 Spellcard::on_draw_body()
+{
+    if (!(flags & SPELLCARD_ACTIVE))
+    {
+        return 1;
+    }
+    AnmVm *vm = g_AnmManager->get_vm_with_id(text_anm_ids[2]);
+    if (vm == NULL)
+    {
+        text_anm_ids[2].id = 0;
+        return 1;
+    }
+    D3DXVECTOR3 pos;
+    AsciiManager *ascii = g_AsciiManager;
+    pos.y = 35.0f;
+    pos.z = 0.0f;
+    ascii->font_id = 2;
+    ascii->group = 2;
+    ascii->color.a = vm->color_1.a;
+    if (flags & SPELLCARD_CAPTURABLE)
+    {
+        pos.x = 266.0f;
+        ascii->add_formatted_string(&pos, "%8d", bonus);
+    }
+    else
+    {
+        // "$" is the font's "bonus failed" glyph.
+        pos.x = 282.0f;
+        ascii->add_formatted_string(&pos, "$");
+    }
+    pos.x = 360.0f;
+    pos.y = 35.0f;
+    pos.z = 0.0f;
+    i32 practice = (g_game_flags_4a5bec & 0x30) == 0x20;
+    i32 captures = g_Scorefile->characters[g_character + g_subshot].spells[spell_id].captures[practice];
+    if (captures >= 100)
+    {
+        g_AsciiManager->add_formatted_string(&pos, "MASTER");
+    }
+    else
+    {
+        i32 attempts = g_Scorefile->characters[g_character + g_subshot].spells[spell_id].attempts[practice];
+        if (attempts >= 100)
+        {
+            g_AsciiManager->add_formatted_string(&pos, "%.2d/99+", captures);
+        }
+        else
+        {
+            g_AsciiManager->add_formatted_string(&pos, "%.2d/%.2d", captures, attempts);
+        }
+    }
+    g_AsciiManager->font_id = 0;
+    g_AsciiManager->group = 0;
+    g_AsciiManager->color.a = 0xff;
+    return 1;
 }

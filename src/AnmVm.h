@@ -20,6 +20,19 @@ struct AnmId
     }
 };
 
+// A D3DCOLOR whose channels can be reached one by one.
+union ZunColor
+{
+    D3DCOLOR d3d;
+    struct
+    {
+        u8 b;
+        u8 g;
+        u8 r;
+        u8 a;
+    };
+};
+
 // Interpolated values: initial and goal plus two bezier control values,
 // stepped by a timer. Layouts from ExpHP (zInterpFloat etc.).
 struct InterpFloat
@@ -149,9 +162,9 @@ struct AnmVm
     D3DXVECTOR3 pos_2;
     D3DXVECTOR3 last_rendered_quad_in_surface_space[4];
     i32 mode_of_create_child;
-    D3DCOLOR color_1;
-    D3DCOLOR color_2;
-    D3DCOLOR mixed_inherited_color;
+    ZunColor color_1;
+    ZunColor color_2;
+    ZunColor mixed_inherited_color;
     u8 font_dims[2];
     u8 unk_52e[2];
     u32 flags_lo;

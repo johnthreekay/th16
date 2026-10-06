@@ -3,6 +3,9 @@
 // inside, so calls to them stay opaque like calls to the real code.
 #include "../AnmManager.h"
 #include "../AnmVm.h"
+#include "../AsciiManager.h"
+#include "../Globals.h"
+#include "../Scorefile.h"
 #include "../BulletManager.h"
 #include "../Ending.h"
 #include "../EnemyManager.h"
@@ -42,6 +45,21 @@ u32 g_hardware_input_pressed;
 
 // GLOBAL: TH16 0x491700
 i8 g_spell_difficulty[0x78];
+
+// GLOBAL: TH16 0x4a6d98
+AsciiManager *g_AsciiManager;
+
+// GLOBAL: TH16 0x4a6f0c
+Scorefile *g_Scorefile;
+
+// GLOBAL: TH16 0x4a57a4
+i32 g_character;
+
+// GLOBAL: TH16 0x4a57a8
+i32 g_subshot;
+
+// GLOBAL: TH16 0x4a5bec
+u32 g_game_flags_4a5bec;
 
 // GLOBAL: TH16 0x4a51c4
 u32 g_hardware_input_held_4a51c4;
@@ -94,12 +112,6 @@ void AnmManager::draw_vm(AnmVm *vm)
 
 // STUB: TH16 0x417930
 i32 Spellcard::on_tick_body()
-{
-    return 1;
-}
-
-// STUB: TH16 0x417d70
-i32 Spellcard::on_draw_body()
 {
     return 1;
 }
