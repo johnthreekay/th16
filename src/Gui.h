@@ -124,7 +124,9 @@ struct Gui
     AnmId id_110;
     u8 unk_114[0x11c - 0x114];
     AnmId ids_11c[5];
-    u8 unk_130[0x150 - 0x130];
+    u8 unk_130[0x14c - 0x130];
+    // Set by sub_42bcf0's notices.
+    i32 unk_14c;
     AnmId id_150;
     ZunTimer time_in_stage;
     UpdateFunc *on_draw_2;
@@ -189,7 +191,7 @@ struct Gui
     // Shows a HUD notice (2: full power, 4: extend). Its callers in the
     // original keep the stack 8-byte aligned for it (LTCG moved the
     // alignment out of the callee).
-    void sub_42bcf0(i32 unk, i32 kind);
+    HARNESS_CALLED void sub_42bcf0(i32 unk, i32 kind);
     // 0x42c600
     static void update_season_gauge();
 };

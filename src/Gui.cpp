@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "AnmManager.h"
+#include "AsciiManager.h"
 #include "BulletManager.h"
 #include "EnemyManager.h"
 #include "GameThread.h"
@@ -507,6 +508,112 @@ void Gui::update_score()
         {
             gui->sub_42bcf0(0, 3);
         }
+    }
+}
+
+// Shows a HUD notice: kind 0 is the spell card bonus (unk is the amount),
+// 1 bonus failed, 2 full power, 3 hiscore, 4 extend. Every caller passes
+// 0-4, which is how the original's jump table goes without a bounds check;
+// the __assume reproduces that.
+// TODO: in the digit loop the original keeps the manager in ebx and spills the counter; ours does the reverse.
+// FUNCTION: TH16 0x42bcf0
+HARNESS_CALLED void Gui::sub_42bcf0(i32 unk, i32 kind)
+{
+    switch (kind)
+    {
+    case 0:
+    {
+        delete_vm_and_clear(id_c8);
+        id_c8 = front_anm->create_effect(0x3d, -1, NULL);
+        i32 divisor = 10000000;
+        i32 rest = unk;
+        i32 shown = 0;
+        AnmManager *anm;
+        AnmVm *vm;
+        for (i32 i = 0; i < 8; i++)
+        {
+            delete_vm_and_clear(ids_a0[i]);
+            ids_a0[i] = g_AsciiManager->ascii_anm->create_effect(i + 4, -1, NULL);
+            anm = g_AnmManager;
+            i32 digit = rest / divisor;
+            rest = rest % divisor;
+            if (digit != 0)
+            {
+                shown = 1;
+            }
+            vm = anm->get_vm_with_id(ids_a0[i]);
+            if (vm != NULL)
+            {
+                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, digit + 0xef);
+            }
+            if (!shown)
+            {
+                vm = anm->get_vm_with_id(ids_a0[i]);
+                if (vm != NULL)
+                {
+                    vm->clear_flag_lo_2_tree_inline();
+                }
+            }
+            else
+            {
+                vm = anm->get_vm_with_id(ids_a0[i]);
+                if (vm != NULL)
+                {
+                    vm->set_flag_lo_2_tree_inline();
+                }
+            }
+            divisor /= 10;
+        }
+        delete_vm_and_clear(ids_a0[8]);
+        if (unk >= 1000000)
+        {
+            ids_a0[8] = g_AsciiManager->ascii_anm->create_effect(0xc, -1, NULL);
+            anm = g_AnmManager;
+            vm = anm->get_vm_with_id(ids_a0[8]);
+            if (vm != NULL)
+            {
+                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, 0xfd);
+            }
+        }
+        delete_vm_and_clear(ids_a0[9]);
+        if (unk >= 1000)
+        {
+            ids_a0[9] = g_AsciiManager->ascii_anm->create_effect(0xd, -1, NULL);
+            anm = g_AnmManager;
+            vm = anm->get_vm_with_id(ids_a0[9]);
+            if (vm != NULL)
+            {
+                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, 0xfd);
+            }
+        }
+        unk_14c = 1;
+        ids_11c[3] = front_anm->create_effect(0x60, -1, NULL);
+        break;
+    }
+    case 1:
+        delete_vm_and_clear(id_c8);
+        id_c8 = front_anm->create_effect(0x3e, -1, NULL);
+        unk_14c = 1;
+        ids_11c[3] = front_anm->create_effect(0x60, -1, NULL);
+        break;
+    case 2:
+        delete_vm_and_clear(id_cc);
+        id_cc = front_anm->create_effect(0x3f, -1, NULL);
+        break;
+    case 3:
+        delete_vm_and_clear(id_cc);
+        id_cc = front_anm->create_effect(0x40, -1, NULL);
+        break;
+    case 4:
+        delete_vm_and_clear(id_cc);
+        id_cc = front_anm->create_effect(0x41, -1, NULL);
+        break;
+    case 6:
+        delete_vm_and_clear(id_c8);
+        id_c8 = front_anm->create_effect(0x42, -1, NULL);
+        break;
+    default:
+        __assume(0);
     }
 }
 

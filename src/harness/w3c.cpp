@@ -2,6 +2,7 @@
 // whose shape depends on how they are called.
 #include "../EnemyManager.h"
 #include "../Fog.h"
+#include "../Gui.h"
 #include "../HelpManual.h"
 #include "../Player.h"
 #include "../Supervisor.h"
@@ -25,6 +26,26 @@ void harness_w3c_help_manual_pages(HelpManual *manual, i32 count)
         pos.x += 640.0f;
     }
     manual->page_vms[9] = manual->help_anm->create_ui_vm(9, &pos, 0);
+}
+
+// Like Spellcard::spell_end at 0x418377 and 0x418408 (capture bonus or
+// bonus failed).
+void harness_w3c_gui_spell_bonus(i32 captured, i32 bonus)
+{
+    if (captured)
+    {
+        g_Gui->sub_42bcf0(bonus, 0);
+    }
+    else
+    {
+        g_Gui->sub_42bcf0(0, 1);
+    }
+}
+
+// Like ItemManager's on_tick at 0x42fded.
+void harness_w3c_gui_notice_4()
+{
+    g_Gui->sub_42bcf0(0, 4);
 }
 
 // Like GameThread::thread_start at 0x42d0a9.
