@@ -116,6 +116,9 @@ struct AnmLoaded
     AnmId create_effect(i32 script, i32 layer, AnmVm **out);
     // 0x42c920. Like create_effect, for the UI list.
     AnmId create_ui_effect(i32 script, i32 unused, AnmVm **out);
+    // 0x418fe0. create_ui_effect without the out pointer. Every caller
+    // passes the same unused second argument.
+    HARNESS_CALLED AnmId create_ui_vm(i32 script, i32 unused);
     // 0x426160. Like create_vm at the origin, but inserted at the front of
     // the world list.
     AnmId create_vm_front(i32 script, i32 layer, i32 unused);
