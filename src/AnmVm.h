@@ -43,6 +43,9 @@ enum AnmVmFlagsLo
     // Rotation or scale changed; the matrix needs a rebuild.
     ANM_VM_ROTATION_CHANGED = 1 << 2,
     ANM_VM_SCALE_CHANGED = 1 << 3,
+    ANM_VM_UV_SCALE_CHANGED = 1 << 4,
+    // pos_i moves pos_2 instead of pos.
+    ANM_VM_POS_I_TO_POS_2 = 1 << 10,
     ANM_VM_FLAG_LO_800 = 1 << 11,
     ANM_VM_FLAG_LO_1000 = 1 << 12,
     // Two bits: which of color_1/color_2 to draw with (set_rgb2_time and
@@ -145,7 +148,7 @@ struct AnmVm
     InterpInt3 rgb1_i;
     InterpInt alpha1_i;
     InterpFloat3 rotate_i;
-    InterpFloat rotate_2d_i;
+    InterpAngle rotate_2d_i;
     InterpFloat2 scale_i;
     InterpFloat2 op_434_i;
     InterpFloat2 uv_scale_i;
@@ -249,6 +252,8 @@ struct AnmVm
     void set_alpha2_time(i32 end_time, i32 method, u8 initial, u8 goal);
     void set_rgb2_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
     void set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
+    // Advances every running interpolator and applies its value.
+    void step_interpolators();
 
     void interrupt(i32 n)
     {

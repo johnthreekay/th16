@@ -54,3 +54,11 @@ void harness_sound_misc(i32 id)
     g_SoundManager.stop_sound(id);
     g_SoundManager.stop_sound(-1);
 }
+
+// Like AnmVm::run (0x45f980), which steps the interpolators every frame and
+// resets rotate_2d_i's timer from instruction 437.
+void harness_anm_step_interpolators(AnmVm *vm)
+{
+    vm->step_interpolators();
+    vm->rotate_2d_i.reset_time();
+}

@@ -2,6 +2,7 @@
 
 #include <d3dx9math.h>
 
+#include "ZunAngle.h"
 #include "ZunMath.h"
 #include "ZunTimer.h"
 #include "decomp.h"
@@ -51,6 +52,27 @@ struct InterpFloat3
     ZunTimer time;
     i32 end_time;
     i32 method;
+
+    // 0x406e10
+    D3DXVECTOR3 step();
+};
+
+// An InterpFloat whose values are angles kept in [-pi, pi] (ExpHP:
+// zInterpFloat, used for AnmVm::rotate_2d_i).
+struct InterpAngle
+{
+    ZunAngle initial;
+    ZunAngle goal;
+    ZunAngle bezier_1;
+    ZunAngle bezier_2;
+    ZunAngle current;
+    ZunTimer time;
+    i32 end_time;
+    i32 method;
+
+    // The same code as InterpFloat::reset, but a separate function.
+    void reset_time();
+    ZunAngle step();
 };
 
 struct InterpInt

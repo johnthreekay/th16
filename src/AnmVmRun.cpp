@@ -277,3 +277,75 @@ void AnmVm::set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor 
     rgb1_i.goal = b;
     rgb1_i.time = 0;
 }
+
+// TODO: /GS cookie from the stubbed InterpFloat3/InterpAngle steps, and the 8-byte frame alignment InterpFloat2::step has too.
+// FUNCTION: TH16 0x463b30
+void AnmVm::step_interpolators()
+{
+    if (pos_i.end_time != 0)
+    {
+        if (!(flags_lo & ANM_VM_POS_I_TO_POS_2))
+        {
+            pos = pos_i.step();
+        }
+        else
+        {
+            pos_2 = pos_i.step();
+        }
+    }
+    if (rgb1_i.end_time != 0)
+    {
+        Int3 c = rgb1_i.step();
+        color_1.r = c.z;
+        color_1.g = c.y;
+        color_1.b = c.x;
+    }
+    if (alpha1_i.end_time != 0)
+    {
+        color_1.a = alpha1_i.step();
+    }
+    if (scale_i.end_time != 0)
+    {
+        scale = scale_i.step();
+        flags_lo |= ANM_VM_SCALE_CHANGED;
+    }
+    if (op_434_i.end_time != 0)
+    {
+        scale_2 = op_434_i.step();
+        flags_lo |= ANM_VM_SCALE_CHANGED;
+    }
+    if (uv_scale_i.end_time != 0)
+    {
+        uv_scale = uv_scale_i.step();
+        flags_lo |= ANM_VM_UV_SCALE_CHANGED;
+    }
+    if (rotate_i.end_time != 0)
+    {
+        rotation = rotate_i.step();
+        flags_lo |= ANM_VM_ROTATION_CHANGED;
+    }
+    if (rotate_2d_i.end_time != 0)
+    {
+        rotation.z = rotate_2d_i.step().value;
+        flags_lo |= ANM_VM_ROTATION_CHANGED;
+    }
+    if (rgb2_i.end_time != 0)
+    {
+        Int3 c = rgb2_i.step();
+        color_2.r = c.z;
+        color_2.g = c.y;
+        color_2.b = c.x;
+    }
+    if (alpha2_i.end_time != 0)
+    {
+        color_2.a = alpha2_i.step();
+    }
+    if (u_vel_i.end_time != 0)
+    {
+        uv_scroll_vel.x = u_vel_i.step();
+    }
+    if (v_vel_i.end_time != 0)
+    {
+        uv_scroll_vel.y = v_vel_i.step();
+    }
+}

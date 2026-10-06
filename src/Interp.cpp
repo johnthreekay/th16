@@ -353,3 +353,9 @@ Int3 InterpInt3::step()
     }
     return current;
 }
+
+// FUNCTION: TH16 0x464040
+void InterpAngle::reset_time()
+{
+    time.reset();
+}
