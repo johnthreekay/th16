@@ -158,6 +158,7 @@ HARNESS_CALLED void *Ending::load_script(const char *filename)
     return data;
 }
 
+// TODO: the original frame has 4 more bytes (see show_now_loading).
 // FUNCTION: TH16 0x4191f0
 i32 Ending::initialize()
 {
@@ -262,6 +263,7 @@ HARNESS_CALLED void AsciiInf::hide_now_loading()
     now_loading_id.id = 0;
 }
 
+// TODO: the original frame has an unused 4-byte slot that ours lacks.
 // FUNCTION: TH16 0x41a390
 HARNESS_CALLED void AsciiInf::show_now_loading(f32 x, f32 y)
 {
@@ -270,6 +272,8 @@ HARNESS_CALLED void AsciiInf::show_now_loading(f32 x, f32 y)
 
 #define ENDING_NEXT_INSTR(instr) ((EndingInstr *)((u8 *)(instr) + (instr)->size + 4))
 
+// TODO: register allocation: the original never uses ebx (spills this instead), and play_bgm*
+// get this in ecx here (LTCG dropped it in the original).
 // FUNCTION: TH16 0x4199f0
 i32 EndingChildF0::run()
 {
