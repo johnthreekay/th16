@@ -191,6 +191,10 @@ struct EnemyData
 // Damage hooks ECL can install (EnemyData::func_from_ecl_flag_ext_dmg).
 typedef int(__fastcall *EnemyExtDamageFunc)(EnemyData *enemy, int damage);
 
+// Per-frame hooks ECL can install (EnemyData::func_from_ecl_func_set); a
+// nonzero result ends the enemy's tick.
+typedef int(__fastcall *EnemyFuncSetFunc)(EnemyData *enemy);
+
 // VTABLE: TH16 0x4921a8
 // An enemy: an ECL VM plus its state (ExpHP: zEnemy). The name is ZUN's,
 // from RTTI.

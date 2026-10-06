@@ -74,7 +74,12 @@ struct Bullet
     u8 unk_c44[4];
     // Position in BulletManager::bullets.
     i32 index;
-    u8 unk_c4c[0xc68 - 0xc4c];
+    // 1 while the bullet is active; ECL's funcset 1 cancels bullets near
+    // the player by setting 2.
+    i32 unk_c4c;
+    u8 unk_c50[0xc60 - 0xc50];
+    i32 unk_c60;
+    u8 unk_c64[0xc68 - 0xc64];
     u32 active_ex_flags;
     u8 unk_c6c[0xc72 - 0xc6c];
     u16 state;

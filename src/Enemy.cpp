@@ -6,6 +6,8 @@
 #include "EffectManager.h"
 #include "EnemyManager.h"
 #include "GameThread.h"
+#include "Globals.h"
+#include "Gui.h"
 #include "Item.h"
 #include "Laser.h"
 #include "Player.h"
@@ -444,6 +446,52 @@ HARNESS_CALLED EnemyRef EnemyManager::find_closest(D3DXVECTOR3 *pos, f32 max_dis
     return ref;
 }
 
+// ECL funcset 1 (the snowman card): cancels the bullets within
+// ecl_float_vars[0] of the player.
+// TODO: ours jumps straight out of the loop when iter_current is NULL; the original goes through
+// the "entry or NULL" join and tests again.
+// FUNCTION: TH16 0x4252d0
+int __fastcall ecl_funcset_cancel_near_player(EnemyData *enemy)
+{
+    BulletManager *mgr = g_BulletManager;
+    Bullet *b = mgr->iter_first();
+    while (b != NULL)
+    {
+        if (b->unk_c4c == 1)
+        {
+            f32 dy = g_Player->inner.pos.y - b->pos.y;
+            f32 dx = g_Player->inner.pos.x - b->pos.x;
+            if (enemy->ecl_float_vars[0] * enemy->ecl_float_vars[0] > dx * dx + dy * dy)
+            {
+                b->unk_c60 = 8;
+                b->unk_c4c = 2;
+                b->active_ex_flags = 0;
+            }
+        }
+        b = mgr->iter_advance();
+    }
+    return 0;
+}
+
+// ECL funcset 2 (Okina's last spell): takes all power away.
+// FUNCTION: TH16 0x4253b0
+int __fastcall ecl_funcset_zero_power(EnemyData *enemy)
+{
+    g_Globals.season_power = 0;
+    if (g_Globals.season_power > g_Globals.max_season_power)
+    {
+        g_Globals.season_power = g_Globals.max_season_power;
+    }
+    g_Globals.power = 0;
+    if (g_Globals.power > g_Globals.max_power)
+    {
+        g_Globals.power = g_Globals.max_power;
+    }
+    g_Player->inner.repopulate_options();
+    Gui::update_season_gauge();
+    return 0;
+}
+
 // FUNCTION: TH16 0x4253f0
 int __fastcall ecl_ext_damage_stored(EnemyData *enemy, int damage)
 {
@@ -575,3 +623,6 @@ HARNESS_CALLED LaserDataInf *LaserManager::find_by_id(i32 id, i32 unused)
     }
     return NULL;
 }
+
+// GLOBAL: TH16 0x4917b8
+EnemyFuncSetFunc const g_ecl_func_sets[3] = {NULL, ecl_funcset_cancel_near_player, ecl_funcset_zero_power};
