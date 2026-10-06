@@ -7,6 +7,7 @@
 #include "../FileSystem.h"
 #include "../Globals.h"
 #include "../Gui.h"
+#include "../Item.h"
 #include "../Laser.h"
 #include "../Supervisor.h"
 #include "../Timer.h"
@@ -19,16 +20,6 @@ f32 *const g_timer_speed_ptrs[] = {&g_game_speed, NULL};
 
 // GLOBAL: TH16 0x4c0f48
 AnmManager *g_AnmManager;
-
-// 0x4093b0. Nothing destroys an AnmVm yet, so the linker drops this.
-AnmVm::~AnmVm()
-{
-}
-
-// STUB: TH16 0x4093f0
-AnmVm::AnmVm()
-{
-}
 
 // STUB: TH16 0x46d020
 AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *name)
@@ -69,4 +60,15 @@ Gui *g_Gui;
 // STUB: TH16 0x42c390
 void Gui::update_bombs(i32 bombs, i32 fragments)
 {
+}
+
+// STUB: TH16 0x4184a0
+void ItemManager::destroy_all()
+{
+}
+
+// STUB: TH16 0x4307a0
+i32 ItemManager::on_draw_body(i32 layer)
+{
+    return 1;
 }
