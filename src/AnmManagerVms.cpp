@@ -670,3 +670,63 @@ i32 AnmManager::destroy_possibly_managed_snapshot_vm(AnmVm *vm)
     delete vm;
     return 0;
 }
+
+// FUNCTION: TH16 0x46ed60
+AnmId AnmLoaded::create_managed_child(i32 script, AnmVm *parent, i32 mode)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    vm_count++;
+    AnmVm *vm = g_AnmManager->allocate_vm();
+    vm->layer = parent->layer;
+    vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+    vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    copy_vm(vm, script);
+    vm->flags_hi = (vm->flags_hi & ~ANM_VM_FLAG_HI_2000000) | (parent->flags_hi & ANM_VM_FLAG_HI_2000000);
+    vm->unk_5b0 = parent;
+    vm->parent = parent->parent != NULL ? parent->parent : parent;
+    vm->run();
+    vm->mode_of_create_child = mode;
+    AnmId id;
+    if ((mode & 6) == 6)
+    {
+        id = g_AnmManager->insert_in_ui_list_front(vm);
+    }
+    else if (mode & 4)
+    {
+        id = g_AnmManager->insert_in_ui_list_back(vm);
+    }
+    else if (mode & 2)
+    {
+        id = g_AnmManager->insert_in_world_list_front(vm);
+    }
+    else
+    {
+        id = g_AnmManager->insert_in_world_list_back(vm);
+    }
+    parent->list_of_children.insert_after(&vm->node_as_child);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return id;
+}
+
+// FUNCTION: TH16 0x46eea0
+AnmId AnmLoaded::create_managed_root(i32 script, AnmVm *like, i32 unused)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    vm_count++;
+    AnmVm *vm = g_AnmManager->allocate_vm();
+    copy_vm(vm, script);
+    vm->layer = like->layer;
+    vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+    vm->flags_hi = (vm->flags_hi & ~ANM_VM_FLAG_HI_2000000) | (like->flags_hi & ANM_VM_FLAG_HI_2000000);
+    vm->entity_pos = like->entity_pos;
+    vm->rotation.x = like->rotation.x;
+    vm->rotation.y = like->rotation.y;
+    vm->rotation.z = like->rotation.z;
+    vm->pos_2 = like->pos;
+    vm->run();
+    vm->mode_of_create_child = 0;
+    AnmId id;
+    id = g_AnmManager->insert_in_world_list_back(vm);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return id;
+}

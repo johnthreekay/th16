@@ -83,6 +83,8 @@ enum AnmVmFlagsHi
     // The manager frees the VM at its next tick.
     ANM_VM_DELETE = 1 << 5,
     ANM_VM_FLAG_HI_40 = 1 << 6,
+    // Inherited from the parent by managed children.
+    ANM_VM_FLAG_HI_2000000 = 1 << 25,
     // A copy kept by lolk_store_snapshot_of_vm, not a live VM.
     ANM_VM_SNAPSHOT = 1 << 26,
 };
