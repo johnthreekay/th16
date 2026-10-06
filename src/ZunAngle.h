@@ -26,4 +26,9 @@ struct ZunAngle
     HARNESS_CALLED ZunAngle operator+(f32 delta) const;
     // Shortest signed difference.
     HARNESS_CALLED ZunAngle operator-(const ZunAngle &other) const;
+    // 0x4475f0 and 0x447650, used by InterpAngle::step. The second is an
+    // operator+ overload in ZUN's code most likely, but build.py cannot
+    // tell overloads apart.
+    HARNESS_CALLED ZunAngle operator*(f32 factor) const;
+    HARNESS_CALLED ZunAngle add(const ZunAngle &other) const;
 };

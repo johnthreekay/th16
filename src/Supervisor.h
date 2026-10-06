@@ -133,6 +133,9 @@ struct Supervisor
     static int __fastcall on_draw_38(void *arg);
     static int __fastcall on_draw_39(void *arg);
     static int __fastcall on_draw_55(void *arg);
+
+    // 0x43dcc0. Called once, when DirectInput setup fails.
+    DECOMP_NOINLINE void release_dinput();
 };
 
 enum SupervisorFlags

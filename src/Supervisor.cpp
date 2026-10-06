@@ -377,6 +377,16 @@ void Supervisor::release_surfaces()
     g_Supervisor.arcade_surface_0 = NULL;
 }
 
+// FUNCTION: TH16 0x43dcc0
+void Supervisor::release_dinput()
+{
+    if (dinput != NULL)
+    {
+        dinput->Release();
+        dinput = NULL;
+    }
+}
+
 // GLOBAL: TH16 0x4d9d20
 i32 g_unk_4d9d20;
 // GLOBAL: TH16 0x4d9d90

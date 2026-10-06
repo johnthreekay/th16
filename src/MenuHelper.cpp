@@ -68,3 +68,23 @@ void MenuHelper::pop()
     num_choices = stack_num_choices[stack_depth];
     num_disabled = 0;
 }
+
+// FUNCTION: TH16 0x440c00
+void MenuHelper::disable(i32 choice)
+{
+    disabled[num_disabled] = choice;
+    num_disabled++;
+again:
+    for (i32 i = 0; i < num_disabled; i++)
+    {
+        if (disabled[i] == next_selection)
+        {
+            next_selection++;
+            if (next_selection >= num_choices)
+            {
+                next_selection = 0;
+            }
+            goto again;
+        }
+    }
+}
