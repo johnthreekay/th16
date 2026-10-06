@@ -1,0 +1,83 @@
+// Placeholders for functions and globals that unit 3 (0x411860-0x41a3f0)
+// uses but that are not decompiled yet. Compiled without /GL: LTCG cannot see
+// inside, so calls to them stay opaque like calls to the real code.
+#include "../AnmManager.h"
+#include "../AnmVm.h"
+#include "../BulletManager.h"
+#include "../GameThread.h"
+#include "../Timer.h"
+
+// GLOBAL: TH16 0x4c0f48
+AnmManager *g_AnmManager;
+
+// GLOBAL: TH16 0x4a6dd4
+GameThread *g_GameThread;
+
+// GLOBAL: TH16 0x4a5788
+f32 g_game_speed;
+
+// GLOBAL: TH16 0x490eb0
+f32 *g_game_speed_ptrs[1] = {&g_game_speed};
+
+// GLOBAL: TH16 0x491b0c
+AnmVmSwitchFunc g_anm_on_switch_funcs[4];
+
+// STUB: TH16 0x4033f0
+f32 LTCG_VECTORCALL interp_common_methods(i32 method, f32 t, f32 end_time)
+{
+    return t / end_time;
+}
+
+// STUB: TH16 0x4093f0
+AnmVm::AnmVm() LTCG_NOTHROW
+{
+    memset(this, 0, sizeof(AnmVm));
+    sprite_id = -1;
+    instr_offset = -1;
+}
+
+// STUB: TH16 0x45f980
+i32 AnmVm::run()
+{
+    return 0;
+}
+
+// STUB: TH16 0x46d020
+AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *path)
+{
+    return NULL;
+}
+
+// STUB: TH16 0x46f270
+void AnmManager::disable_vms_from_anm_file(AnmLoaded *anm)
+{
+}
+
+// STUB: TH16 0x468490
+void AnmManager::draw_vm(AnmVm *vm)
+{
+}
+
+// STUB: TH16 0x411e70
+i32 Bullet::on_tick()
+{
+    return 0;
+}
+
+// STUB: TH16 0x4124b0
+i32 Bullet::sub_4124b0(i32 arg)
+{
+    return 0;
+}
+
+// STUB: TH16 0x412860
+i32 BulletManager::on_tick_body()
+{
+    return 1;
+}
+
+// STUB: TH16 0x412a60
+i32 BulletManager::on_draw_body()
+{
+    return 1;
+}
