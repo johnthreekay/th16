@@ -5,6 +5,7 @@
 #include "Bomb.h"
 #include "EffectManager.h"
 #include "Gui.h"
+#include "AnmManager.h"
 #include "SoundManager.h"
 #include "Spellcard.h"
 
@@ -162,4 +163,33 @@ void Player::die()
     inner.state = 4;
     inner.iframes = 6;
     anm_file->copy_vm_and_run(&vm, 0);
+}
+
+// TODO: the original keeps a stack slot (push ecx) around the call instead
+// of tail-jumping to on_tick_body.
+// FUNCTION: TH16 0x443720
+i32 __fastcall Player::on_tick_callback(Player *player)
+{
+    return player->on_tick_body();
+}
+
+// TODO: the original pushes the player (push ecx/pop ecx) as an unused
+// stack slot, like on_tick_callback.
+// FUNCTION: TH16 0x443730
+i32 __fastcall Player::on_draw_callback(Player *player)
+{
+    if (player->inner.state != 2)
+    {
+        player->vm.entity_pos = player->inner.pos;
+        player->vm.flags_hi = (player->vm.flags_hi & ~ANM_VM_LAYER_UI) | ANM_VM_LAYER_SET;
+        g_AnmManager->draw_vm(&player->vm);
+    }
+    return 1;
+}
+
+// FUNCTION: TH16 0x444070
+void Player::start_respawn()
+{
+    inner.time_in_state = 60;
+    inner.state = 1;
 }

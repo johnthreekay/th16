@@ -172,6 +172,12 @@ struct Player
     HARNESS_CALLED void set_position(f32 x, f32 y);
     // 0x443f10
     void die();
+    // Enters state 1 for 60 frames.
+    void start_respawn();
+    // 0x442560
+    i32 on_tick_body();
+    static i32 __fastcall on_tick_callback(Player *player);
+    static i32 __fastcall on_draw_callback(Player *player);
 
     // Members that reach the player through g_Player; LTCG dropped this.
     // Angle from pos to the player.
