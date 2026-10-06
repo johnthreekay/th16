@@ -202,10 +202,11 @@ i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     return bullet->unk_9c;
 }
 
+// Turns the effect up to 20 degrees either way.
 // FUNCTION: TH16 0x447270
 i32 __fastcall sht_on_hit_447270(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
 {
-    f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * (ZUN_PI / 9.0f));
+    f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * 0.34906584f);
     g_EffectManager->effect_anm->create_vm(0x98, &bullet->pos.pos, angle, -1, 0);
     return bullet->hit();
 }
@@ -236,7 +237,7 @@ i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
 // FUNCTION: TH16 0x447320
 i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
 {
-    f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * (ZUN_PI / 9.0f));
+    f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * 0.34906584f);
     AnmId id = g_EffectManager->effect_anm->create_vm(0x98, &bullet->pos.pos, angle, -1, 0);
     AnmVm *vm = g_AnmManager->get_vm_with_id(id);
     D3DXVECTOR2 initial(1.0f, 1.0f);
