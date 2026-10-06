@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include "CriticalSections.h"
 #include "decomp.h"
 
 struct UpdateFunc;
@@ -106,3 +107,16 @@ struct UpdateFuncRegistry
 };
 
 extern UpdateFuncRegistry *g_UpdateFuncRegistry;
+
+// Unregister under the registry's critical section; a no-op for NULL. Only
+// ever inlined, mostly into destructors.
+inline void unregister_update_func(UpdateFunc *f)
+{
+    UpdateFuncRegistry *registry = g_UpdateFuncRegistry;
+    if (f != NULL)
+    {
+        ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
+        registry->unregister(f);
+        LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
+    }
+}
