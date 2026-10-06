@@ -1,4 +1,5 @@
 // Stand-in callers for unit 1 (0x402e70-0x409490).
+#include "../AnmVm.h"
 #include "../CriticalSections.h"
 #include "../Interp.h"
 #include "../ZunMath.h"
@@ -21,4 +22,10 @@ void harness_leave_cs(int i)
 f32 harness_interp_ratio(i32 mode, i32 time, i32 end_time)
 {
     return interp_ratio(mode, (f32)time, (f32)end_time);
+}
+
+// Like the VM update loop around 0x45f980.
+f32 harness_anm_vm_slowdown(AnmVm *vm)
+{
+    return vm->get_slowdown_factor() * 2.0f;
 }
