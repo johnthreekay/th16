@@ -28,11 +28,8 @@ struct Int3
     Int3()
     {
     }
-    Int3(i32 x, i32 y, i32 z)
+    Int3(i32 x, i32 y, i32 z) : x(x), y(y), z(z)
     {
-        this->x = x;
-        this->y = y;
-        this->z = z;
     }
     Int3 operator+(const Int3 &o) const
     {

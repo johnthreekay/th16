@@ -298,7 +298,7 @@ D3DXVECTOR2 InterpFloat2::step()
     return current;
 }
 
-// TODO: the original frame has an extra 4-byte slot and saves ebx/edi up front; method 7/17 temporaries are laid out differently.
+// TODO: the timer tick adds current_f and the speed the other way round, and one lea swaps its operands.
 // FUNCTION: TH16 0x464590
 Int3 InterpInt3::step()
 {
