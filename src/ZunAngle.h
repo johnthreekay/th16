@@ -15,6 +15,13 @@ struct ZunAngle
     HARNESS_CALLED ZunAngle(f32 value);
 
     HARNESS_CALLED ZunAngle &operator=(f32 value);
+    // User-declared, which makes copies of structs holding a ZunAngle
+    // (PosVel) memberwise, as in the original, instead of block copies.
+    ZunAngle &operator=(const ZunAngle &other)
+    {
+        value = other.value;
+        return *this;
+    }
     HARNESS_CALLED ZunAngle &operator+=(f32 delta);
     HARNESS_CALLED ZunAngle operator+(f32 delta) const;
     // Shortest signed difference.

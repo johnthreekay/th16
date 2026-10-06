@@ -8,7 +8,26 @@
 
 struct RpyFrameInput
 {
-    u8 unk_0[6];
+    union
+    {
+        u8 unk_0[6];
+        struct
+        {
+            u16 input;
+            u16 input_rising;
+            u16 input_falling;
+        };
+    };
+};
+
+// The game state saved at the start of each stage of a replay. ExpHP:
+// zRpyGamestateSnapshot; only what decompiled code needs.
+struct RpyGamestate
+{
+    i16 stage;
+    i16 rng_state;
+    // Frames of input recorded for the stage.
+    i32 num_frames;
 };
 
 // A block of recorded input, 900 frames long. ExpHP: zRpyChunk.
@@ -34,7 +53,7 @@ struct ReplayStageData
     RpyFrameInput *input_current;
     u8 *fps_counts_begin;
     u8 *fps_counts_current;
-    void *gamestate_at_stage_begin;
+    RpyGamestate *gamestate_at_stage_begin;
     i32 frame_current;
     ZunList<ReplayStageData> node;
 
@@ -62,11 +81,15 @@ struct ReplayManager
     i32 flags_18;
     void *stage_gamestate_snapshots[8];
     ZunList<RpyChunk> recorded_chunks_by_stage[8];
-    RpyChunk *currently_recording_chunk;
+    ZunList<RpyChunk> *currently_recording_chunk;
     i32 num_chunks_recorded;
     ReplayStageData stages[8];
     void *rpy_thing_204;
-    i32 current_fps_during_playback;
+    union
+    {
+        i32 current_fps_during_playback;
+        u8 current_fps;
+    };
     i32 current_tick_num_in_stage;
     UpdateFunc *on_tick_22_func;
     i32 stage_num;
@@ -86,6 +109,10 @@ struct ReplayManager
     ZunList<RpyChunk> *new_chunk(i32 stage);
     void free_chunks(i32 stage);
 
+    int on_tick_record();
+    int on_tick_playback();
+    static int __fastcall on_tick_record_thunk(void *arg);
+    static int __fastcall on_tick_playback_thunk(void *arg);
     static int __fastcall on_tick_22(void *arg);
     static int __fastcall on_draw_47(void *arg);
     static int __fastcall on_draw_47_body(void *arg);

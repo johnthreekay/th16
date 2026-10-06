@@ -234,6 +234,9 @@ struct AnmVm
         }
     }
 
+    // 0x447550. Starts interpolating the scale from initial to goal.
+    void set_scale_interp(i32 end_time, i32 method, D3DXVECTOR2 *initial, D3DXVECTOR2 *goal);
+
     void interrupt(i32 n)
     {
         if (index_of_on_interrupt != 0)

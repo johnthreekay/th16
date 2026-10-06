@@ -31,9 +31,3 @@ HARNESS_CALLED void BulletManager::cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 r
     placeholder_sink(mode, radius + pos->x);
 }
 
-// STUB: TH16 0x4449b0
-HARNESS_CALLED i32 Player::create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 unk_2, i32 damage)
-{
-    placeholder_sink(unk_2 + damage + (int)this, radius + unk + pos->x);
-    return unk_2;
-}

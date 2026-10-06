@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AnmVm.h"
+#include "Globals.h"
 #include "UpdateFunc.h"
 #include "ZunMath.h"
 #include "ZunTimer.h"
@@ -61,7 +62,26 @@ struct Item
     // Adds value * 100 to the PIV, capped at its maximum. Works on
     // g_Globals only; LTCG drops this (ExpHP: Globals::collect_piv).
     HARNESS_CALLED void collect_piv(f32 value);
+    // Starts the item's sprite scripts for its type.
+    i32 init_anm();
+    // The flash and sound of a life, bomb or season item appearing.
+    i32 spawn_effect();
+    // Collection of the full power item (ExpHP: Globals::collect_furu_powah).
+    void collect_full_power();
+    void collect_power();
+    void collect_big_power();
+    void collect_point();
 };
+
+// The point of collection: items collected above this line, or while
+// everything is being auto-collected (state 4), are worth the most.
+inline i32 item_collect_line()
+{
+    return g_Globals.character == 3 ? 148 : 128;
+}
+
+// ANM scripts of each item type: the item and its offscreen arrow.
+extern const i32 g_item_anm_scripts[17][2];
 
 struct ItemManagerInner
 {
@@ -97,6 +117,11 @@ struct ItemManager
     static i32 __fastcall on_tick_callback(ItemManager *mgr);
     static i32 __fastcall on_draw_1_callback(ItemManager *mgr);
     static i32 __fastcall on_draw_2_callback(ItemManager *mgr);
+
+    // Takes an item from the free list for its kind (bullet cancel items
+    // have their own) and launches it. Works on g_ItemManager; LTCG dropped
+    // this. unk_3 and unk_6 are never read.
+    Item *spawn_item(i32 type, Float3 *pos, i32 unk_3, f32 angle, f32 speed, i32 unk_6, i32 force_autocollect);
 };
 
 extern ItemManager *g_ItemManager;

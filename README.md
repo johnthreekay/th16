@@ -185,6 +185,13 @@ decompiled code the surroundings it had in the original:
   (decomp.h) declares a stubbed constructor nothrow when it must not appear.
 - ExpHP's Supervisor layout is 4 bytes off at the start: `d3d` is at +4,
   `d3d_device` at +8 (0x4c10d8, hundreds of uses), `dinput` at +0xc.
+- Whether a function realigns its frame (`and esp, -8`) for a spilled
+  double, such as the argument of an inlined `atan2f`, depends on the whole
+  program: LTCG only does it once enough code spills doubles. The original
+  is past that point; our build sits near it, so removing double math
+  anywhere can flip `angle_to_player` and `zun_atan2f` back.
+  `harness_homing_angle` (src/harness/unit56b.cpp) stands in for the
+  undecompiled atan2f users.
 
 ### Known tooling gaps
 
