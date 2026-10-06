@@ -121,11 +121,6 @@ int LoadingThread::on_draw()
     return 1;
 }
 
-#include "../GameThread.h"
-
-// GLOBAL: TH16 0x4a6dd4
-GameThread *g_GameThread;
-
 // STUB: TH16 0x447760
 int ReplayManager::initialize(i32 mode, const char *filename)
 {

@@ -17,3 +17,6 @@ i32 LTCG_FASTCALL file_create(const char *path);
 i32 LTCG_FASTCALL file_open(const char *path);
 u8 *LTCG_FASTCALL file_read(i32 size);
 i32 file_close();
+// Reads a whole file (from the archive unless told otherwise) into a new
+// allocation; the size goes to *size if it is not NULL.
+u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size, i32 not_in_archive);

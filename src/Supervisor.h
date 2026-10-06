@@ -95,6 +95,8 @@ struct Supervisor
     // Members that do not use this; LTCG dropped it.
     static void read_keyboard_input();
     int initialize();
+    // Runs a loader function on `thread`. Every caller passes NULL for arg,
+    // which LTCG folds; the loaders themselves are plain void functions.
     HARNESS_CALLED i32 start_thread(ThreadStart start, void *arg);
     i32 play_bgm_wav(i32 arg, const char *name);
     i32 play_bgm(i32 arg, i32 track);

@@ -2,20 +2,8 @@
 
 #include <d3d9.h>
 
+#include "ZunMath.h"
 #include "types.h"
-
-struct Float2
-{
-    f32 x;
-    f32 y;
-};
-
-struct Float3
-{
-    f32 x;
-    f32 y;
-    f32 z;
-};
 
 // One of the Supervisor's four cameras. Layout from ExpHP's th-re-data.
 struct Camera

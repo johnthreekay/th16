@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ZunMath.h"
 #include "decomp.h"
 #include "types.h"
 
@@ -20,7 +21,8 @@ enum Difficulty
 
 // The game state that replays save and restore, starting at 0x4a5790
 // (the TH06 equivalent is part of GameManager). Field names from ExpHP's
-// th-re-data statics.
+// th-re-data statics; replays save the first 0x224 bytes (his
+// zReplaySavedGlobals).
 struct Globals
 {
     i32 stage_num;
@@ -62,7 +64,28 @@ struct Globals
     // Season power at which level i begins (index 7 is a copy of the
     // maximum).
     i32 season_level_thresholds[8];
-    u8 unk_c8[0x45c - 0xc8];
+    u8 unk_c8[0xd0 - 0xc8];
+    i32 unk_d0;
+    i32 unk_d4;
+    i32 unk_d8;
+    i32 unk_dc;
+    Float3 last_collect_pos;
+    i32 item_spawn_count;
+    i32 enemies_spawned_in_chapter;
+    i32 enemies_destroyed_in_chapter;
+    char music_filename[0x100];
+    u8 unk_1f8[0x200 - 0x1f8];
+    i32 unk_200;
+    i32 unk_204;
+    i32 unk_208;
+    i32 unk_20c;
+    i32 unk_210;
+    i32 unk_214;
+    i32 unk_218;
+    i32 unk_21c;
+    i32 unk_220;
+    i32 unk_224;
+    u8 unk_228[0x45c - 0x228];
     u32 flags_lo_45c : 4;
     // 2: spell practice.
     u32 game_mode : 2;
@@ -81,6 +104,8 @@ struct Globals
     void set_game_mode(u32 mode);
     // amount is divided by 10; also awards score extends.
     HARNESS_CALLED void add_to_score(i32 amount);
+    void reset_224();
+    void reset_for_new_game();
 
     i32 season_level()
     {

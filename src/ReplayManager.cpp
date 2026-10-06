@@ -47,7 +47,7 @@ int __fastcall ReplayManager::on_tick_22(void *arg)
     ReplayManager *replay = (ReplayManager *)arg;
 
     // Fast-forward: run the frame list again for 7 of every 8 frames.
-    if (g_GameThread != NULL && !(g_GameThread->flags & 4) && replay->mode == REPLAY_PLAYBACK &&
+    if (g_GameThread != NULL && !g_GameThread->flags.paused && replay->mode == REPLAY_PLAYBACK &&
         (g_hardware_input & 0x201) && replay->current_tick_num_in_stage % 8 != 0)
     {
         return UPDATE_FUNC_RESTART_FROM_FIRST;
@@ -58,7 +58,7 @@ int __fastcall ReplayManager::on_tick_22(void *arg)
 // FUNCTION: TH16 0x448e90
 int __fastcall ReplayManager::on_draw_47(void *arg)
 {
-    if (g_GameThread != NULL && (g_GameThread->flags & 4))
+    if (g_GameThread != NULL && g_GameThread->flags.paused)
     {
         return UPDATE_FUNC_CONTINUE;
     }

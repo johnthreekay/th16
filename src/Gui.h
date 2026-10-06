@@ -3,7 +3,7 @@
 #include "decomp.h"
 #include "types.h"
 
-// Only the parts unit 6 needs so far.
+// The HUD. Only the parts decompiled code calls so far.
 struct Gui
 {
     void update_lives(i32 lives, i32 fragments);

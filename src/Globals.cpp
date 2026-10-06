@@ -15,6 +15,44 @@ const i32 g_score_extend_quotas_standard[11] = {
     500000, 1000000, 2000000, 4000000, 7000000, 10000000, 15000000, 25000000, 50000000, 100000000, 1000000000,
 };
 
+// FUNCTION: TH16 0x42e520
+DECOMP_NOINLINE void Globals::reset_224()
+{
+    unk_224 = 0;
+    unk_200 = 0;
+    unk_204 = 0;
+    unk_208 = 0;
+    unk_20c = 0;
+    unk_210 = 0;
+    unk_214 = 0;
+    unk_218 = 0;
+    unk_21c = 0;
+    unk_220 = 0;
+}
+
+// FUNCTION: TH16 0x42e590
+void Globals::reset_for_new_game()
+{
+    num_point_items_collected = 0;
+    power = 0;
+    power_per_level = 1;
+    bombs = 3;
+    if (g_Gui != NULL)
+    {
+        g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
+    }
+    bomb_fragments = 0;
+    life_fragments = 0;
+    next_score_extend_index = 0;
+    unk_d0 = 0;
+    unk_d4 = 0;
+    unk_d8 = 0;
+    unk_dc = 0;
+    item_spawn_count = 0;
+    reset_224();
+    miss_count = 0;
+}
+
 // FUNCTION: TH16 0x43ddd0
 i32 get_score_extend_quota()
 {
