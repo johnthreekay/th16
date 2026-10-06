@@ -45,7 +45,15 @@ struct AnmLoaded
     i32 vm_count;
     u8 unk_138[0x13c - 0x138];
 
-    void set_sprite(AnmVm *vm, i32 sprite);
+    // Points the VM at a sprite: UVs, size and texture matrices. -1 if the
+    // file is not loaded.
+    i32 set_sprite(AnmVm *vm, i32 sprite);
+    // Resets the VM and points it at a script without running it; -1 (with
+    // the VM zeroed) if the script does not exist.
+    i32 init_script_vm(AnmVm *vm, i32 script);
+    // Starts a script on the VM and runs its first frame; zeroes the VM if
+    // the script does not exist or the file is still loading.
+    void set_vm_script(AnmVm *vm, i32 script);
     // 0x407b20
     void copy_vm(AnmVm *vm, i32 script);
     // 0x40d460

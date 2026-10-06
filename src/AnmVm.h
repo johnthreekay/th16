@@ -43,6 +43,8 @@ enum AnmVmFlagsLo
     // Rotation or scale changed; the matrix needs a rebuild.
     ANM_VM_ROTATION_CHANGED = 1 << 2,
     ANM_VM_SCALE_CHANGED = 1 << 3,
+    ANM_VM_FLAG_LO_800 = 1 << 11,
+    ANM_VM_FLAG_LO_1000 = 1 << 12,
 };
 
 enum AnmVmFlagsHi
@@ -64,6 +66,48 @@ enum AnmVmFlagsHi
     ANM_VM_COORD_MODE_MASK = 7 << 20,
     ANM_VM_COORD_MODE_1 = 1 << 20,
     ANM_VM_ROTATE_WITH_PARENT = 1 << 23,
+};
+
+// Variable numbers in ANM script arguments (names after ExpHP's truth).
+enum AnmVar
+{
+    ANM_VAR_I0 = 10000,
+    ANM_VAR_I1 = 10001,
+    ANM_VAR_I2 = 10002,
+    ANM_VAR_I3 = 10003,
+    ANM_VAR_F0 = 10004,
+    ANM_VAR_F1 = 10005,
+    ANM_VAR_F2 = 10006,
+    ANM_VAR_F3 = 10007,
+    ANM_VAR_I4 = 10008,
+    ANM_VAR_I5 = 10009,
+    ANM_VAR_RANDRAD_UNSAFE = 10010,
+    ANM_VAR_RANDF_UNSAFE = 10011,
+    ANM_VAR_RANDF2_UNSAFE = 10012,
+    ANM_VAR_POS_X = 10013,
+    ANM_VAR_POS_Y = 10014,
+    ANM_VAR_POS_Z = 10015,
+    ANM_VAR_CAMERA_X = 10016,
+    ANM_VAR_CAMERA_Y = 10017,
+    ANM_VAR_CAMERA_Z = 10018,
+    ANM_VAR_CAMERA_FACING_X = 10019,
+    ANM_VAR_CAMERA_FACING_Y = 10020,
+    ANM_VAR_CAMERA_FACING_Z = 10021,
+    ANM_VAR_RAND_UNSAFE = 10022,
+    ANM_VAR_ROT_X = 10023,
+    ANM_VAR_ROT_Y = 10024,
+    ANM_VAR_ROT_Z = 10025,
+    // z rotation including every parent's.
+    ANM_VAR_TOTAL_ROT_Z = 10026,
+    ANM_VAR_RAND_SCALE_ONE = 10027,
+    ANM_VAR_RAND_SCALE_PI = 10028,
+    ANM_VAR_NUM_CYCLES = 10029,
+    ANM_VAR_RANDRAD_SAFE = 10030,
+    ANM_VAR_RANDF_SAFE = 10031,
+    ANM_VAR_RANDF2_SAFE = 10032,
+    ANM_VAR_F4 = 10033,
+    ANM_VAR_F5 = 10034,
+    ANM_VAR_F6 = 10035,
 };
 
 struct AnmVm;
@@ -186,6 +230,15 @@ struct AnmVm
     void wipe_suffix();
     // Switches to another sprite of the same file, changing only the UVs.
     void set_sprite_uvs(i32 sprite);
+    // Script argument lookups: a variable number (AnmVar) gives the
+    // variable, anything else is returned as is.
+    HARNESS_CALLED f32 get_float_var(f32 value);
+    i32 get_int_var(i32 value);
+    f32 *get_float_var_ptr(f32 *value);
+    i32 *get_int_var_ptr(i32 *value);
+    // Rotation plus every parent's, in rotation_related. Wraps this VM's
+    // own rotation into [-pi, pi] on the way.
+    Float3 *get_total_rotation();
 
     void interrupt(i32 n)
     {
@@ -196,3 +249,6 @@ struct AnmVm
         pending_interrupt = n;
     }
 };
+
+// out = in / (640, 480), clamped at 0.
+void LTCG_FASTCALL divide_vec2_by_640_480(Float2 *out, Float2 *in);
