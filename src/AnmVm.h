@@ -45,10 +45,30 @@ enum AnmVmFlagsLo
     // Rotation or scale changed; the matrix needs a rebuild.
     ANM_VM_ROTATION_CHANGED = 1 << 2,
     ANM_VM_SCALE_CHANGED = 1 << 3,
+    ANM_VM_UV_SCALE_CHANGED = 1 << 4,
+    // Four bits of blend mode (AnmManager::setup_render_state_for_vm).
+    ANM_VM_BLEND_MODE_SHIFT = 5,
+    ANM_VM_BLEND_MODE_MASK = 0xf << 5,
+    // pos_i moves pos_2 instead of pos.
+    ANM_VM_POS_I_TO_POS_2 = 1 << 10,
+    ANM_VM_FLAG_LO_800 = 1 << 11,
+    ANM_VM_FLAG_LO_1000 = 1 << 12,
+    // Two bits: which of color_1/color_2 to draw with (set_rgb2_time and
+    // set_alpha2_time switch to 1, color_2).
+    ANM_VM_COLOR_MODE_MASK = 3 << 17,
+    ANM_VM_COLOR_MODE_1 = 1 << 17,
+    // Five bits of render mode (how the sprite is projected and drawn).
+    ANM_VM_RENDER_MODE_SHIFT = 25,
+    // Two bits of texture addressing along v: wrap, clamp, mirror.
+    ANM_VM_ADDRESS_V_SHIFT = 30,
 };
 
 enum AnmVmFlagsHi
 {
+    // Two bits of texture addressing along u: wrap, clamp, mirror.
+    ANM_VM_ADDRESS_U_MASK = 3 << 0,
+    // Point instead of linear filtering.
+    ANM_VM_FILTER_POINT_SHIFT = 11,
     // Rotate the sprite to the owner's movement angle.
     ANM_VM_AUTO_ROTATE = 1 << 7,
     ANM_VM_CREATED_BY_GAME = 1 << 10,
@@ -71,6 +91,48 @@ enum AnmVmFlagsHi
     ANM_VM_FLAG_HI_40 = 1 << 6,
     // Already gone; deleting it again does nothing.
     ANM_VM_FLAG_HI_4000000 = 1 << 26,
+};
+
+// Variable numbers in ANM script arguments (names after ExpHP's truth).
+enum AnmVar
+{
+    ANM_VAR_I0 = 10000,
+    ANM_VAR_I1 = 10001,
+    ANM_VAR_I2 = 10002,
+    ANM_VAR_I3 = 10003,
+    ANM_VAR_F0 = 10004,
+    ANM_VAR_F1 = 10005,
+    ANM_VAR_F2 = 10006,
+    ANM_VAR_F3 = 10007,
+    ANM_VAR_I4 = 10008,
+    ANM_VAR_I5 = 10009,
+    ANM_VAR_RANDRAD_UNSAFE = 10010,
+    ANM_VAR_RANDF_UNSAFE = 10011,
+    ANM_VAR_RANDF2_UNSAFE = 10012,
+    ANM_VAR_POS_X = 10013,
+    ANM_VAR_POS_Y = 10014,
+    ANM_VAR_POS_Z = 10015,
+    ANM_VAR_CAMERA_X = 10016,
+    ANM_VAR_CAMERA_Y = 10017,
+    ANM_VAR_CAMERA_Z = 10018,
+    ANM_VAR_CAMERA_FACING_X = 10019,
+    ANM_VAR_CAMERA_FACING_Y = 10020,
+    ANM_VAR_CAMERA_FACING_Z = 10021,
+    ANM_VAR_RAND_UNSAFE = 10022,
+    ANM_VAR_ROT_X = 10023,
+    ANM_VAR_ROT_Y = 10024,
+    ANM_VAR_ROT_Z = 10025,
+    // z rotation including every parent's.
+    ANM_VAR_TOTAL_ROT_Z = 10026,
+    ANM_VAR_RAND_SCALE_ONE = 10027,
+    ANM_VAR_RAND_SCALE_PI = 10028,
+    ANM_VAR_NUM_CYCLES = 10029,
+    ANM_VAR_RANDRAD_SAFE = 10030,
+    ANM_VAR_RANDF_SAFE = 10031,
+    ANM_VAR_RANDF2_SAFE = 10032,
+    ANM_VAR_F4 = 10033,
+    ANM_VAR_F5 = 10034,
+    ANM_VAR_F6 = 10035,
 };
 
 struct AnmVm;
@@ -104,7 +166,7 @@ struct AnmVm
     InterpInt3 rgb1_i;
     InterpInt alpha1_i;
     InterpFloat3 rotate_i;
-    InterpFloat rotate_2d_i;
+    InterpAngle rotate_2d_i;
     InterpFloat2 scale_i;
     InterpFloat2 op_434_i;
     InterpFloat2 uv_scale_i;
@@ -234,6 +296,35 @@ struct AnmVm
         }
     }
 
+    // 0x447550. Starts interpolating the scale from initial to goal.
+    void set_scale_interp(i32 end_time, i32 method, D3DXVECTOR2 *initial, D3DXVECTOR2 *goal);
+    // Script argument lookups: a variable number (AnmVar) gives the
+    // variable, anything else is returned as is.
+    HARNESS_CALLED f32 get_float_var(f32 value);
+    i32 get_int_var(i32 value);
+    f32 *get_float_var_ptr(f32 *value);
+    i32 *get_int_var_ptr(i32 *value);
+    // Rotation plus every parent's, in rotation_related. Wraps this VM's
+    // own rotation into [-pi, pi] on the way.
+    Float3 *get_total_rotation();
+    // Start interpolators (ExpHP's names; rgb1/rgb2 are swapped there).
+    void set_uv_scale_time(i32 end_time, i32 method, Float2 *initial, Float2 *goal);
+    void set_434_time(i32 end_time, i32 method, Float2 *initial, Float2 *goal);
+    void set_alpha2_time(i32 end_time, i32 method, u8 initial, u8 goal);
+    void set_rgb2_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
+    void set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
+    // Advances every running interpolator and applies its value.
+    void step_interpolators();
+    // Applies angular velocity, scale growth and UV scrolling for one frame
+    // (ExpHP: leaf_4630f0__flag_534_24_only).
+    void step_velocities();
+    // Screen positions of the sprite's corners, by render mode.
+    void write_sprite_corners(Float3 *corners);
+    // 0x465c40, 0x4660b0
+    static void __stdcall write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c,
+                                                            Float3 *d);
+    static void __stdcall write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d);
+
     void interrupt(i32 n)
     {
         if (index_of_on_interrupt != 0)
@@ -243,3 +334,6 @@ struct AnmVm
         pending_interrupt = n;
     }
 };
+
+// out = in / (640, 480), clamped at 0.
+void LTCG_FASTCALL divide_vec2_by_640_480(Float2 *out, Float2 *in);

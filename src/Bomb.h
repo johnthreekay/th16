@@ -70,6 +70,8 @@ class BombInf
     i32 activate();
     i32 can_activate();
     void start_release_cooldown();
+    // 0x42f090. Whether the bomb is running and younger than time frames.
+    i32 is_active_before(i32 time);
 
     static int __fastcall on_tick_callback(void *arg);
     static int __fastcall on_draw_callback(void *arg);

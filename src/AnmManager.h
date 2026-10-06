@@ -45,7 +45,15 @@ struct AnmLoaded
     i32 vm_count;
     u8 unk_138[0x13c - 0x138];
 
-    void set_sprite(AnmVm *vm, i32 sprite);
+    // Points the VM at a sprite: UVs, size and texture matrices. -1 if the
+    // file is not loaded.
+    i32 set_sprite(AnmVm *vm, i32 sprite);
+    // Resets the VM and points it at a script without running it; -1 (with
+    // the VM zeroed) if the script does not exist.
+    i32 init_script_vm(AnmVm *vm, i32 script);
+    // Starts a script on the VM and runs its first frame; zeroes the VM if
+    // the script does not exist or the file is still loading.
+    void set_vm_script(AnmVm *vm, i32 script);
     // 0x407b20
     void copy_vm(AnmVm *vm, i32 script);
     // 0x40d460
@@ -75,6 +83,21 @@ struct AnmLoaded
     void release();
 };
 
+// Vertex formats of the batched sprites and primitives (ExpHP:
+// zRenderVertex144, zRenderVertex044).
+struct RenderVertex144
+{
+    D3DXVECTOR4 pos;
+    D3DCOLOR diffuse;
+    Float2 uv;
+};
+
+struct RenderVertex044
+{
+    D3DXVECTOR4 pos;
+    D3DCOLOR diffuse;
+};
+
 // Loads and runs every ANM file.
 struct AnmManager
 {
@@ -89,26 +112,54 @@ struct AnmManager
     u8 unk_d8[0x184f4f0 - 0xd8];
     // Indexed by the slot given to preload_anm.
     AnmLoaded *loaded_anms[0x1f];
-    u8 unk_184f56c[0x184fbb0 - 0x184f56c];
+    D3DMATRIX matrix_184f56c;
+    AnmVm vm_184f5ac;
+    u8 unk_184fba8[0x184fbb0 - 0x184fba8];
     // The D3D state the sprite code last set, compared before setting it
-    // again. Code that draws without the sprite code resets these so the
-    // next sprite sets everything.
+    // again (so that it only changes, and flushes the batch, when needed).
+    // Code that draws without the sprite code resets these so the next
+    // sprite sets everything.
     i32 render_cache_184fbb0;
-    u8 render_cache_184fbb4;
+    u8 last_blend_mode;
     u8 render_cache_184fbb5;
     u8 render_cache_184fbb6;
     u8 render_cache_184fbb7;
     u8 render_cache_184fbb8;
     u8 unk_184fbb9;
-    u8 render_cache_184fbba;
-    u8 render_cache_184fbbb;
-    u8 render_cache_184fbbc;
-    u8 render_cache_184fbbd;
+    u8 last_filter_point;
+    u8 last_color_op;
+    u8 last_address_u;
+    u8 last_address_v;
     u8 unk_184fbbe[2];
     i32 render_cache_184fbc0;
+    u8 unk_184fbc4[0x184fc18 - 0x184fbc4];
+    // Sprites waiting for flush_sprites, six vertices each (ExpHP:
+    // zAnmVertexBuffers).
+    i32 unrendered_sprite_count;
+    RenderVertex144 sprite_vertex_data[0x20000];
+    RenderVertex144 *sprite_write_cursor;
+    RenderVertex144 *sprite_render_cursor;
+    i32 unrendered_primitive_count;
+    RenderVertex044 primitive_vertex_data[0x8000];
+    RenderVertex044 *primitive_write_cursor;
+    RenderVertex044 *primitive_render_cursor;
 
-    void flush_sprites();
+    // Never inlined in the original (over 100 call sites).
+    DECOMP_NOINLINE void flush_sprites();
     void draw_vm(AnmVm *vm);
+    // Sets blending, filtering and texture addressing for a VM, flushing
+    // the batch first when they change.
+    void setup_render_state_for_vm(AnmVm *vm);
+    // Adds a quad (as two triangles) to the sprite batch; 1 if it is full.
+    i32 write_sprite(RenderVertex144 *vertices);
+    // Empties both vertex batches.
+    HARNESS_CALLED void reset_vertex_buffers();
+    // 0x466f00. Fills g_sprite_temp_buffer for a VM drawn in 2D.
+    void render_sub_466f00(AnmVm *vm);
+    // 0x465280. Draws the quad in g_sprite_temp_buffer for a VM.
+    i32 render_sprite_2d(AnmVm *vm, i32 unk);
+    // Render mode 5.
+    void draw_vm__mode_5(AnmVm *vm);
     // 0x46efa0
     AnmVm *get_vm_with_id(AnmId id);
     // 0x46f1c0. Marks the VM and its children for deletion. Reaches the
@@ -170,6 +221,9 @@ struct AnmManager
 };
 
 extern AnmManager *g_AnmManager;
+
+// The quad being built by the draw functions.
+extern RenderVertex144 g_sprite_temp_buffer[4];
 
 // Deletes the VM (if still alive) and forgets the id.
 inline void delete_vm_and_clear(AnmId &id)

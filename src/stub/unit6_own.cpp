@@ -16,11 +16,6 @@ i32 SoundManager::update_sound_thread()
     return 0;
 }
 
-// STUB: TH16 0x45ed00
-void SoundManager::modify_bgm(i32 command, i32 arg, const char *name)
-{
-}
-
 void play_sound_centered_stub(i32 id, i32 unused)
 {
 }
@@ -76,12 +71,6 @@ int PauseMenu::on_draw()
 
 #include "../AsciiManager.h"
 #include "../PopupManager.h"
-
-// STUB: TH16 0x449ea0
-int PopupManager::on_tick()
-{
-    return 1;
-}
 
 // STUB: TH16 0x44a000
 int PopupManager::on_draw()

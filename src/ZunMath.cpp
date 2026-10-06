@@ -83,7 +83,6 @@ HARNESS_CALLED f32 zun_floorf(f32 x)
     return floorf(x);
 }
 
-// TODO: the original aligns the frame to 8 bytes for its double.
 // FUNCTION: TH16 0x4052a0
 HARNESS_CALLED f32 zun_atan2f(f32 y, f32 x)
 {

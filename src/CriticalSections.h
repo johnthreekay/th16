@@ -13,6 +13,8 @@ enum
     CS_SUPERVISOR_THREAD = 6,
     CS_ANM_MANAGER = 9,
     CS_RNG = 10,
+    // Guards SoundManager's BGM command queue.
+    CS_SOUND = 11,
     CS_COUNT = 14,
 };
 

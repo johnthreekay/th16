@@ -170,3 +170,13 @@ void AnmLoaded::copy_vm(AnmVm *dst, i32 script)
     dst->timer_1c = 0;
     dst->script_time = 0;
 }
+
+// FUNCTION: TH16 0x447550
+void AnmVm::set_scale_interp(i32 end_time, i32 method, D3DXVECTOR2 *initial, D3DXVECTOR2 *goal)
+{
+    scale_i.end_time = end_time;
+    scale_i.method = method;
+    scale_i.initial = *initial;
+    scale_i.goal = *goal;
+    scale_i.time.reset();
+}
