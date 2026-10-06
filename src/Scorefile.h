@@ -30,7 +30,11 @@ struct ScorefileCharacter
 struct Scorefile
 {
     ScorefileCharacter characters[5];
-    u8 unk_19f78[0x19fa6 - 0x19f78];
+    u8 unk_19f78[0x19f96 - 0x19f78];
+    // Per ending (e01-e08): bit 0 seen, bits 1-3 cleared on Normal, Hard,
+    // Lunatic. Entry 8 is set once any ending has been seen.
+    u8 endings_seen[9];
+    u8 unk_19f9f[0x19fa6 - 0x19f9f];
     // Set once a track has played, unlocking it in the music room.
     u8 bgm_unlocked[0x19fc8 - 0x19fa6];
     // Total of every character's play_time.

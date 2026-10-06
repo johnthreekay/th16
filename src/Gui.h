@@ -213,3 +213,7 @@ void __fastcall anm_vm_interrupt_5(AnmVm *vm);
 
 // Debug logging, compiled out of the release build (0x42c9f0).
 void debug_log(const char *fmt, ...);
+
+// 0x42bbe0. Decodes an obfuscated dialogue or ending string into a static
+// buffer.
+const char *LTCG_FASTCALL decode_msg_string(const char *src);

@@ -85,6 +85,29 @@ class AsciiInf : public TaskInf
     i32 draw_group(i32 group);
     i32 draw_group_1();
 
+    // 0x41a390. Shows the "now loading" animation at (x, y) (in 640x480
+    // coordinates) unless it is already up. Every caller goes through
+    // g_AsciiManager, so LTCG replaced this with the global; x and y arrive
+    // in xmm1 and xmm2.
+    HARNESS_CALLED void show_now_loading(f32 x, f32 y);
+    // 0x41a360. Ends the "now loading" animation.
+    HARNESS_CALLED void hide_now_loading();
+
+    // The two above as LTCG inlined them into some callers.
+    void show_now_loading_inline(f32 x, f32 y)
+    {
+        Float3 pos(x * 2.0f, y * 2.0f, 0.0f);
+        if (now_loading_id.id == 0)
+        {
+            now_loading_id = ascii_anm->create_vm(0x11, &pos, 0.0f, -1, 0);
+        }
+    }
+    void hide_now_loading_inline()
+    {
+        AnmManager::interrupt_tree(now_loading_id, 1);
+        now_loading_id.id = 0;
+    }
+
     // UpdateFunc callbacks; the argument is the AsciiInf.
     static int __fastcall on_tick_callback(void *arg);
     static int __fastcall on_draw_1_callback(void *arg);

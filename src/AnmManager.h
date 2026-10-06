@@ -272,8 +272,9 @@ struct AnmManager
         AnmVm *vm = get_vm_with_id(id);
         if (vm != NULL && !(vm->flags_hi & ANM_VM_FLAG_HI_4000000))
         {
-            vm->flags_hi = vm->flags_hi & ~ANM_VM_FLAG_HI_40 | ANM_VM_DELETE_PENDING;
-            for (ZunList<AnmVm> *node = vm->list_of_children.next; node != NULL; node = node->next)
+            vm->mark_for_deletion();
+            ZunList<AnmVm> *node = &vm->list_of_children;
+            while ((node = node->next) != NULL)
             {
                 mark_tree_for_delete(node->entry);
             }
@@ -288,6 +289,13 @@ struct AnmManager
     // 0x46f130. Like interrupt_tree, also running each VM once.
     DECOMP_NOINLINE static void __stdcall interrupt_tree_and_run(AnmId id, i32 interrupt);
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *path);
+    // 0x46d990. Renders printf-style text into the VM's texture (the
+    // ending and dialogue lines). Variadic, so __cdecl with this pushed
+    // first.
+    void draw_text(AnmVm *vm, D3DCOLOR color, i32 unk_10, i32 font, i32 x, i32 y, const char *fmt, ...);
+    // 0x46d720. unload_anm out of line; the ending's caller checks for a
+    // negative slot itself.
+    void unload_anm_46d720(i32 slot);
     // 0x46cf80. Loads a file into a slot without waiting for its textures.
     AnmLoaded *do_preload_anm(i32 slot, const char *path);
     // 0x46d1c0. Creates the textures of the next entry, or the prototype

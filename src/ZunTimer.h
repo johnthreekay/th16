@@ -65,6 +65,23 @@ struct ZunTimer
         previous = -1;
     }
 
+    // reset with everything spelled out, for big callers where LTCG inlined
+    // it but our build would not.
+    __forceinline void reset_inline()
+    {
+        if (!(control & ZUN_TIMER_INITIALIZED))
+        {
+            current = 0;
+            previous = -999999;
+            current_f = 0.0f;
+            speed_index = 0;
+            control |= ZUN_TIMER_INITIALIZED;
+        }
+        current = 0;
+        current_f = 0.0f;
+        previous = -1;
+    }
+
     void set(i32 time)
     {
         initialize_if_needed();

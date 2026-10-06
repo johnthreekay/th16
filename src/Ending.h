@@ -13,19 +13,43 @@ enum EndingChildFlags
     ENDING_CHILD_WAITING = 1 << 2,
 };
 
+// One instruction of an ending script (eNN.msg, staffN.msg): a time, an
+// opcode and size bytes of arguments.
+struct EndingInstr
+{
+    u16 time;
+    u8 opcode;
+    u8 size;
+    i32 args[1];
+};
+
 // Runs the ending script. ExpHP: zEndingChildF0.
 struct EndingChildF0
 {
     u8 unk_0[4];
     ZunTimer timer_4;
+    // Script time.
     ZunTimer timer_18;
+    // Counts down the waits of instructions 5 and 6.
     ZunTimer timer_2c;
+    // The five text lines.
     AnmId anm_ids[5];
-    u8 unk_54[0x70 - 0x54];
-    i32 anm_slot;
+    EndingInstr *instr;
+    u8 unk_58[0x70 - 0x58];
+    union
+    {
+        i32 anm_slot;
+        // The file the loading thread reads (instruction 7).
+        const char *anm_filename;
+    };
     u32 flags;
-    u8 unk_78[0x80 - 0x78];
-    AnmLoaded *anms[(0xd0 - 0x80) / 4];
+    // The text line instruction 3 writes next.
+    i32 line_index;
+    D3DCOLOR text_color;
+    // Indexed by anm_index.
+    AnmLoaded *anms[4];
+    // Pictures started by instruction 8.
+    AnmId vm_ids[16];
     ThreadInf thread;
     i32 anm_index;
 
@@ -61,6 +85,9 @@ struct Ending
     static Ending *create();
     static void destroy();
     i32 initialize();
+    // 0x419170. Reads a script file, replacing script_file. Every caller
+    // goes through g_Ending, so LTCG replaced this with the global.
+    HARNESS_CALLED void *load_script(const char *filename);
     i32 on_tick_body();
     static i32 __fastcall on_tick_callback(Ending *self);
     static i32 __fastcall on_draw_callback(Ending *self);
