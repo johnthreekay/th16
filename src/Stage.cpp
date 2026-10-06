@@ -62,6 +62,11 @@ Stage::Stage()
     flags |= 2;
 }
 
+// FUNCTION: TH16 0x409770
+StageInner::~StageInner()
+{
+}
+
 // FUNCTION: TH16 0x4097c0
 HARNESS_CALLED i32 Stage::load_data(const char *path, i32 unused)
 {

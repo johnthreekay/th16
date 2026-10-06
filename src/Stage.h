@@ -121,6 +121,9 @@ struct StageInner
     // Color passed to the ANM manager; the top byte flags a new value.
     u32 color_3344;
 
+    // Only destroys the VMs; Stage's unwind code calls it out of line.
+    ~StageInner();
+
     // 0x409490. Starts interpolating the fog from its current value.
     void set_sky_interp(i32 end_time, i32 method, CameraSky *goal);
     // 0x40b3b0
