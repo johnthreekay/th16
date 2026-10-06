@@ -58,3 +58,24 @@ int __fastcall Supervisor::on_draw_0f(void *arg)
 {
     return 1;
 }
+
+#include "../PauseMenu.h"
+#include "../ReplayManager.h"
+
+// STUB: TH16 0x447c80
+ReplayManager::~ReplayManager()
+{
+}
+
+// The original's callbacks are jmp thunks to the real functions.
+// STUB: TH16 0x43e720
+int __fastcall PauseMenu::on_tick(void *arg)
+{
+    return 1;
+}
+
+// STUB: TH16 0x43ef10
+int __fastcall PauseMenu::on_draw(void *arg)
+{
+    return 1;
+}

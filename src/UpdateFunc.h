@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include "CriticalSections.h"
 #include "decomp.h"
 
 struct UpdateFunc;
@@ -103,6 +104,19 @@ struct UpdateFuncRegistry
     void unregister_all_in_list(UpdateFunc *head);
     // TH06 equivalent: Chain::Cut
     DECOMP_NOINLINE void unregister(UpdateFunc *f);
+
+    // What owners' destructors do with their on_tick/on_draw functions.
+    // Always inlined in the original; the registry pointer is loaded before
+    // the NULL check.
+    void unregister_locked(UpdateFunc *f)
+    {
+        if (f != NULL)
+        {
+            ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
+            unregister(f);
+            LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
+        }
+    }
 };
 
 extern UpdateFuncRegistry *g_UpdateFuncRegistry;
