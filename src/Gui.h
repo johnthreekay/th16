@@ -76,9 +76,9 @@ struct GuiMsgVm
     void hide();
     void show();
     // Replaces the speech bubble. LTCG passes x, y and width in xmm1-3.
-    HARNESS_CALLED void set_textbox(i32 kind, f32 x, f32 y, f32 width);
+    HARNESS_CALLED void set_textbox(f32 x, f32 y, f32 width, i32 kind);
     // LTCG passes the width in xmm1.
-    HARNESS_CALLED void set_textbox_width(i32 kind, f32 width);
+    HARNESS_CALLED void set_textbox_width(f32 width, i32 kind);
 };
 
 // One of the three boss life bars.

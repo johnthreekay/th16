@@ -431,8 +431,10 @@ void GuiMsgVm::show()
     }
 }
 
+// TODO: the original keeps g_AnmManager in ebx across the lookups; LTCG
+// knows get_vm_with_id and search_children leave it alone.
 // FUNCTION: TH16 0x42ba30
-HARNESS_CALLED void GuiMsgVm::set_textbox(i32 kind, f32 x, f32 y, f32 width)
+HARNESS_CALLED void GuiMsgVm::set_textbox(f32 x, f32 y, f32 width, i32 kind)
 {
     delete_vm_and_clear(textbox);
     Float3 pos(x, y, 0.0f);
@@ -442,8 +444,10 @@ HARNESS_CALLED void GuiMsgVm::set_textbox(i32 kind, f32 x, f32 y, f32 width)
     textbox_kind = kind;
 }
 
+// TODO: the original keeps g_AnmManager in edi and the width in xmm1
+// across the lookups (LTCG knows the callees leave them alone).
 // FUNCTION: TH16 0x42bb30
-HARNESS_CALLED void GuiMsgVm::set_textbox_width(i32 kind, f32 width)
+HARNESS_CALLED void GuiMsgVm::set_textbox_width(f32 width, i32 kind)
 {
     width += 16.0f;
     find_child_of(textbox, kind + 0xb4)->float_vars[0] = width;
@@ -631,6 +635,8 @@ void __fastcall anm_vm_interrupt_5(AnmVm *vm)
     vm->interrupt(5);
 }
 
+// TODO: same frame difference as create_vm (4 more bytes, esi saved
+// before the critical section).
 // FUNCTION: TH16 0x42c920
 AnmId AnmLoaded::create_ui_effect(i32 script, i32 unused, AnmVm **out)
 {

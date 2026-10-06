@@ -29,10 +29,10 @@ void harness_gui_release_msg()
 // Like the dialogue script's textbox instructions at 0x42a63a and 0x42a833.
 void harness_gui_msg_textbox(GuiMsgVm *msg, i32 kind, f32 x, f32 y, f32 width)
 {
-    msg->set_textbox(kind, x, y, width);
-    msg->set_textbox_width(kind, width);
-    msg->set_textbox(kind + 1, y, x, width * 2.0f);
-    msg->set_textbox_width(kind + 2, x);
+    msg->set_textbox(x, y, width, kind);
+    msg->set_textbox_width(width, kind);
+    msg->set_textbox(y, x, width * 2.0f, kind + 1);
+    msg->set_textbox_width(x, kind + 2);
 }
 
 // Like the HUD code at 0x42dc6c.
