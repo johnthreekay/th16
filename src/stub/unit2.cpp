@@ -29,12 +29,6 @@ void AnmVm::run()
 {
 }
 
-// STUB: TH16 0x46e7d0
-AnmId __stdcall AnmManager::insert_in_world_list_back(AnmVm *vm)
-{
-    return vm->id;
-}
-
 // STUB: TH16 0x46f600
 AnmVm *AnmManager::allocate_vm()
 {

@@ -11,6 +11,14 @@ template <class T> struct ZunList
     ZunList<T> *prev;
     ZunList<T> *unk_c;
 
+    void init(T *e)
+    {
+        entry = e;
+        next = NULL;
+        prev = NULL;
+        unk_c = NULL;
+    }
+
     void insert_after(ZunList<T> *node)
     {
         if (next != NULL)

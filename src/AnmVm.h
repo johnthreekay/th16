@@ -14,6 +14,8 @@
 
 // Handle to a running VM, 0 when none. A class in ZUN's code: it is returned
 // through a hidden pointer and constructed to 0 before its owner's memset.
+struct AnmVm;
+
 struct AnmId
 {
     i32 id;
@@ -22,6 +24,20 @@ struct AnmId
     {
         id = 0;
     }
+
+    // 0x46f2e0 (ExpHP: anm_find_existing_or_clear_id). Looks the VM up and
+    // forgets the id if it is gone.
+    AnmVm *find_or_clear();
+    // 0x46f300 and 0x46f340. AnmVm::set/clear_ins_316_flag_recursively.
+    void set_ins_316_flag_recursively();
+    void clear_ins_316_flag_recursively();
+    // 0x46f3e0
+    void set_entity_pos(D3DXVECTOR3 *pos);
+    // 0x46f440. Stops the VM and replaces it with a new effect VM running
+    // the given script of the same file.
+    void replace_with_effect(i32 script);
+    // 0x46f5a0. The id of a descendant found by AnmVm::search_children.
+    HARNESS_CALLED AnmId search_children(i32 unk_49c, i32 n);
 };
 
 // A D3DCOLOR whose channels can be reached one by one.
@@ -64,6 +80,11 @@ enum AnmVmFlagsHi
     ANM_VM_COORD_MODE_MASK = 7 << 20,
     ANM_VM_COORD_MODE_1 = 1 << 20,
     ANM_VM_ROTATE_WITH_PARENT = 1 << 23,
+    // The manager frees the VM at its next tick.
+    ANM_VM_DELETE = 1 << 5,
+    ANM_VM_FLAG_HI_40 = 1 << 6,
+    // A copy kept by lolk_store_snapshot_of_vm, not a live VM.
+    ANM_VM_SNAPSHOT = 1 << 26,
 };
 
 struct AnmVm;
@@ -195,4 +216,20 @@ struct AnmVm
         }
         pending_interrupt = n;
     }
+
+    void mark_for_deletion()
+    {
+        flags_hi &= ~ANM_VM_FLAG_HI_40;
+        flags_hi |= ANM_VM_DELETE;
+    }
+
+    // 0x46f380 and 0x46f3b0. Set or clear flag bit 1 on the whole tree
+    // (ANM instruction 316).
+    HARNESS_CALLED_INLINABLE void set_ins_316_flag_recursively();
+    HARNESS_CALLED_INLINABLE void clear_ins_316_flag_recursively();
+    // 0x46f410. set_sprite through the file the VM came from.
+    void set_sprite(i32 sprite);
+    // 0x46f510. Depth-first search for the n-th descendant with the given
+    // unk_49c (-1 for any).
+    AnmVm *search_children(i32 unk_49c, i32 n);
 };

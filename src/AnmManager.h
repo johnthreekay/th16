@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AnmVm.h"
+#include "Thread.h"
 #include "ZunMath.h"
 #include "decomp.h"
 #include "types.h"
@@ -25,6 +26,20 @@ struct AnmLoadedSprite
     Float2 unk_3c;
 };
 
+// The texture of one entry of a loaded .anm file (ExpHP: zAnmLoadedD3D).
+struct AnmLoadedD3D
+{
+    IDirect3DTexture9 *texture;
+    void *src_data;
+    u32 src_data_size;
+    i32 bytes_per_pixel;
+    void *entry;
+    i32 flags;
+
+    // 0x46f490. Fills the top level of the texture with zeroes.
+    void clear_texture();
+};
+
 // One loaded ANM file.
 struct AnmLoaded
 {
@@ -38,7 +53,8 @@ struct AnmLoaded
     i32 sprite_count;
     AnmLoadedSprite *sprites;
     u8 **scripts;
-    void *d3d;
+    // One per entry.
+    AnmLoadedD3D *d3d;
     i32 load_wait;
     u8 unk_12c[0x134 - 0x12c];
     // Counts VMs created from this file.
@@ -53,6 +69,14 @@ struct AnmLoaded
     // 0x40e5c0. Creates a VM running the script at pos (entity_pos), with
     // the given z rotation, on the given layer unless negative.
     HARNESS_CALLED AnmId create_vm(i32 script, Float3 *pos, f32 rotation, i32 layer, i32 unused);
+    // 0x406380. A VM at the origin, on the given layer unless negative;
+    // stores the VM in *out_vm when that is not NULL.
+    AnmId create_effect(i32 script, i32 layer, AnmVm **out_vm);
+    // 0x46ed60. A child of parent; mode bits 1 and 2 pick the list (see
+    // AnmVm::mode_of_create_child).
+    AnmId create_managed_child(i32 script, AnmVm *parent, i32 mode);
+    // 0x46eea0. A root VM placed like the given one.
+    AnmId create_managed_root(i32 script, AnmVm *like, i32 unused);
 
     void init_vm_with_sprite(AnmVm *vm, i32 sprite)
     {
@@ -67,10 +91,50 @@ struct AnmLoaded
     void release();
 };
 
+// A VM from the manager's preallocated pool (ExpHP: zAnmFastVm).
+struct AnmFastVm
+{
+    AnmVm vm;
+    ZunList<AnmFastVm> freelist_node;
+    bool is_alive;
+    u8 unk_60d[3];
+    // Index in the pool; the low 13 bits of the VM's id.
+    i32 fast_id;
+};
+
+// One vertex of a textured sprite (ExpHP: zRenderVertex144).
+struct AnmSpriteVertex
+{
+    D3DXVECTOR4 pos;
+    D3DCOLOR color;
+    Float2 uv;
+};
+
+// One vertex of an untextured primitive (ExpHP: zRenderVertex044).
+struct AnmPrimitiveVertex
+{
+    D3DXVECTOR4 pos;
+    D3DCOLOR color;
+};
+
+// Batched vertices waiting for a draw call (ExpHP: zAnmVertexBuffers).
+struct AnmVertexBuffers
+{
+    i32 unrendered_sprite_count;
+    AnmSpriteVertex sprite_vertex_data[0x20000];
+    AnmSpriteVertex *sprite_write_cursor;
+    AnmSpriteVertex *sprite_render_cursor;
+    i32 unrendered_primitive_count;
+    AnmPrimitiveVertex primitive_vertex_data[0x8000];
+    AnmPrimitiveVertex *primitive_write_cursor;
+    AnmPrimitiveVertex *primitive_render_cursor;
+};
+
 // Loads and runs every ANM file.
 struct AnmManager
 {
-    u8 unk_0[0xc0];
+    ThreadInf thread;
+    u8 unk_1c[0xc0 - 0x1c];
     // Cleared every frame by GameThread's on_draw.
     i32 unk_c0;
     i32 unk_c4;
@@ -78,14 +142,36 @@ struct AnmManager
     i32 unk_cc;
     // Copied from the active camera by Supervisor::swap_transform_matrices.
     Float2 camera_unk_fc;
-    u8 unk_d8[0x184f4f0 - 0xd8];
+    i32 useless_count;
+    // VMs created for the game world and for the UI, in tick order.
+    ZunList<AnmVm> *world_list_head;
+    ZunList<AnmVm> *world_list_tail;
+    ZunList<AnmVm> *ui_list_head;
+    ZunList<AnmVm> *ui_list_tail;
+    AnmFastVm fast_array[0x1fff];
+    // Snapshots of VMs (ExpHP: __lolk_*), kept apart from the live ones.
+    i32 next_snapshot_fast_id;
+    i32 next_snapshot_discriminator;
+    ZunList<AnmVm> snapshot_list_head;
+    AnmFastVm snapshot_fast_array[0x1fff];
+    // Unused entries of fast_array.
+    ZunList<AnmFastVm> freelist_head;
+    u8 unk_184f4ec[4];
     // Indexed by the slot given to preload_anm.
     AnmLoaded *loaded_anms[0x1f];
+    D3DMATRIX matrix_184f56c;
+    AnmVm vm_184f5ac;
+    u8 unk_184fba8[0x184fc18 - 0x184fba8];
+    AnmVertexBuffers vertex_buffers;
+    AnmVm layer_list_dummy_heads[0x2b];
+    // The upper 19 bits of the next VM id.
+    volatile i32 last_discriminator;
+    u8 unk_1c7fd88[0x1c7fd90 - 0x1c7fd88];
 
     void flush_sprites();
     void draw_vm(AnmVm *vm);
     // 0x46efa0
-    AnmVm *get_vm_with_id(AnmId id);
+    DECOMP_NOINLINE AnmVm *get_vm_with_id(AnmId id);
     // 0x46f1c0. Marks the VM and its children for deletion. Reaches the
     // manager through g_AnmManager, so LTCG drops the unused this (ExpHP:
     // anm_unload_46f1c0).
@@ -100,8 +186,19 @@ struct AnmManager
     static i32 sub_46d690();
     // 0x46f600. Reaches the manager through g_AnmManager.
     static AnmVm *allocate_vm();
-    // 0x46e7d0. Reaches the manager through g_AnmManager.
-    static AnmId __stdcall insert_in_world_list_back(AnmVm *vm);
+    // 0x46e7d0 and the next three. Every caller goes through g_AnmManager,
+    // so LTCG replaced this with a load of the global (and kept its stack
+    // slot). They hand out the VM's new id.
+    HARNESS_CALLED AnmId insert_in_world_list_back(AnmVm *vm);
+    HARNESS_CALLED AnmId insert_in_world_list_front(AnmVm *vm);
+    HARNESS_CALLED AnmId insert_in_ui_list_back(AnmVm *vm);
+    HARNESS_CALLED AnmId insert_in_ui_list_front(AnmVm *vm);
+    static void __stdcall interrupt_tree_and_run(AnmId id, i32 interrupt);
+    // Marks the VM and its whole tree for deletion (ExpHP:
+    // AnmBehemoth::sub_46f220_recursive).
+    HARNESS_CALLED_INLINABLE void mark_tree_for_deletion(AnmVm *vm);
+    // get_vm_with_id for snapshots.
+    AnmVm *get_snapshot_vm_with_id(AnmId id);
 
     // Frees the ANM file in a slot, if one is loaded there.
     void unload_anm(i32 slot)

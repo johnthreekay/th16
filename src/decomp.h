@@ -36,3 +36,9 @@
 // the promise spelled out to keep callers shaped like the original. Remove
 // it once the callee is decompiled.
 #define LTCG_NOTHROW throw()
+
+// HARNESS_CALLED without the noinline: kept alive by harness callers, not
+// /INCLUDE, but LTCG may still inline it where it sees fit. The original
+// does that with small recursive functions, inlining one level into a
+// caller and keeping the out-of-line copy (build.py recognizes the name).
+#define HARNESS_CALLED_INLINABLE

@@ -19,12 +19,6 @@ HARNESS_CALLED void SoundManager::play_sound_at_position(i32 id, f32 x)
     placeholder_sink(id, x);
 }
 
-// STUB: TH16 0x46f1c0
-HARNESS_CALLED void AnmManager::delete_vm(AnmId id)
-{
-    placeholder_sink(id.id, 0.0f);
-}
-
 // STUB: TH16 0x416d20
 HARNESS_CALLED void BulletManager::cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode)
 {
