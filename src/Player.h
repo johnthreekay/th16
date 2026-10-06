@@ -44,7 +44,7 @@ struct PlayerOption
 
 struct PlayerBullet
 {
-    i32 unk_0;
+    u32 flags;
     i32 index_of_self;
     AnmId anm_id;
     ZunTimer timer_c;
@@ -52,7 +52,21 @@ struct PlayerBullet
     ZunTimer timer_34;
     PosVel pos;
     i32 state;
-    u8 unk_90[0xc0 - 0x90];
+    i32 unk_90;
+    i32 unk_94;
+    i32 unk_98;
+    i32 unk_9c;
+    i32 unk_a0;
+    i32 unk_a4;
+    i32 unk_a8;
+    // Which shooter of the .sht file fired it: index in the low byte,
+    // shooter array above it, 0xf0000 set for the season file.
+    i32 shooter_ref;
+    // Index of its damage source plus one, 0 for none.
+    i32 damage_source_index;
+    u8 unk_b4[0xc0 - 0xb4];
+
+    struct PlayerDamageSource *damage_source();
 };
 
 // Something that hurts enemies: player bullets, bombs, releases.
@@ -70,11 +84,13 @@ struct PlayerDamageSource
     i32 damage;
     i32 total_damage_dealt;
     i32 unk_7c;
-    u8 unk_80[0x4];
+    i32 unk_80;
     i32 unk_84;
-    i32 unk_88;
-    i32 unk_8c;
-    u8 unk_90[0x94 - 0x90];
+    // The player bullet this belongs to.
+    i32 bullet_index;
+    // Index into g_damage_source_hit_funcs.
+    i32 hit_func;
+    i32 unk_90;
 };
 
 struct PlayerInner
@@ -117,11 +133,48 @@ struct BoundingBox3
     D3DXVECTOR3 max_pos;
 };
 
-// A shot type's .sht file (ExpHP: zShtRawFile); only the header so far.
+// The shot type callbacks a .sht file refers to by index; loading the file
+// replaces the indices with these pointers.
+typedef i32(__fastcall *ShtBulletFunc)(PlayerBullet *bullet);
+typedef i32(__fastcall *ShtHitFunc)(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
+typedef i32(__fastcall *DamageSourceHitFunc)(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y);
+extern ShtBulletFunc const g_sht_on_init_funcs[7];
+extern ShtBulletFunc const g_sht_on_tick_funcs[8];
+extern ShtHitFunc const g_sht_on_hit_funcs[8];
+extern ShtBulletFunc g_sht_func_3_table[1];
+extern DamageSourceHitFunc const g_damage_source_hit_funcs[4];
+
+// One way of firing bullets in a .sht file (ExpHP: zShtShooter). The array
+// for each power level ends with a fire_rate of -1.
+struct ShtShooter
+{
+    i8 fire_rate;
+    u8 start_delay;
+    u16 damage;
+    Float2 offset_from_option;
+    Float2 hitbox;
+    f32 angle;
+    f32 speed;
+    i32 unk_1c;
+    u8 option;
+    u8 unk_21;
+    u8 anm;
+    u8 anm_hit;
+    i16 sfx_id;
+    u8 fire_rate_long;
+    u8 start_delay_long;
+    ShtBulletFunc func_on_init;
+    ShtBulletFunc func_on_tick;
+    ShtBulletFunc func_3;
+    ShtHitFunc func_on_hit;
+    u8 unk_38[0x58 - 0x38];
+};
+
+// A shot type's .sht file (ExpHP: zShtRawFile).
 struct ShtFile
 {
     i16 unk_0;
-    i16 sht_off_count;
+    u16 sht_off_count;
     f32 hitbox_radius;
     f32 grazebox_radius;
     f32 itembox_radius;
@@ -134,6 +187,10 @@ struct ShtFile
     i32 power_per_level;
     i32 max_damage;
     i32 unk_2c[5];
+    u8 option_pos[0x190 - 0x40];
+    // Offsets from shooters until the file is loaded.
+    ShtShooter *shooter_arrays[0xa];
+    ShtShooter shooters[1];
 };
 
 struct Player
@@ -170,6 +227,9 @@ struct Player
     void set_shoot_key_short_timer(i32 time);
     void interrupt_options();
     HARNESS_CALLED void set_position(f32 x, f32 y);
+    // Loads a .sht file and resolves its offsets and callbacks. Does not
+    // use this.
+    i32 read_sht_file(ShtFile **out, const char *path);
     // 0x443f10
     void die();
     // Enters state 1 for 60 frames.
@@ -190,3 +250,12 @@ struct Player
 };
 
 extern Player *g_Player;
+
+inline PlayerDamageSource *PlayerBullet::damage_source()
+{
+    if (damage_source_index == 0)
+    {
+        return NULL;
+    }
+    return &g_Player->inner.damage_sources[damage_source_index - 1];
+}

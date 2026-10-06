@@ -3,6 +3,7 @@
 #include "Player.h"
 
 #include "Bomb.h"
+#include "FileSystem.h"
 #include "EffectManager.h"
 #include "Gui.h"
 #include "AnmManager.h"
@@ -192,4 +193,26 @@ void Player::start_respawn()
 {
     inner.time_in_state = 60;
     inner.state = 1;
+}
+
+// FUNCTION: TH16 0x443790
+i32 Player::read_sht_file(ShtFile **out, const char *path)
+{
+    *out = (ShtFile *)file_read_all(path, NULL, 0);
+    if (*out == NULL)
+    {
+        return -1;
+    }
+    for (i32 i = 0; i < (*out)->sht_off_count; i++)
+    {
+        (*out)->shooter_arrays[i] = (ShtShooter *)((u8 *)(*out)->shooters + (u32)(*out)->shooter_arrays[i]);
+        for (ShtShooter *shooter = (*out)->shooter_arrays[i]; shooter->fire_rate >= 0; shooter++)
+        {
+            shooter->func_on_init = g_sht_on_init_funcs[(i32)shooter->func_on_init];
+            shooter->func_on_tick = g_sht_on_tick_funcs[(i32)shooter->func_on_tick];
+            shooter->func_3 = g_sht_func_3_table[(i32)shooter->func_3];
+            shooter->func_on_hit = g_sht_on_hit_funcs[(i32)shooter->func_on_hit];
+        }
+    }
+    return 0;
 }
