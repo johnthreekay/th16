@@ -1,7 +1,31 @@
 // Stand-in callers for wave 3, range C (0x42b480-0x43dc30), for functions
 // whose shape depends on how they are called.
 #include "../EnemyManager.h"
+#include "../Fog.h"
+#include "../HelpManual.h"
 #include "../Player.h"
+#include "../Supervisor.h"
+
+// Like Fog's initialize at 0x418d8a.
+void harness_w3c_fog_create_vms(Fog *fog, i32 count)
+{
+    for (i32 i = 0; i < fog->vm_count - 1; i++)
+    {
+        fog->vm_ids[i] = g_Supervisor.create_fog_vm(count, 0x3b);
+    }
+}
+
+// Like HelpManual::on_tick at 0x42eb62, 0x42ed5c and 0x42eec3.
+void harness_w3c_help_manual_pages(HelpManual *manual, i32 count)
+{
+    D3DXVECTOR3 pos(0.0f, 0.0f, 0.0f);
+    for (i32 i = 0; i < count; i++)
+    {
+        manual->page_vms[i] = manual->help_anm->create_ui_vm(i, &pos, 0);
+        pos.x += 640.0f;
+    }
+    manual->page_vms[9] = manual->help_anm->create_ui_vm(9, &pos, 0);
+}
 
 // Like GameThread::thread_start at 0x42d0a9.
 void harness_w3c_enemy_manager_reset()

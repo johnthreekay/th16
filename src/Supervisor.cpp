@@ -1,9 +1,15 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "Supervisor.h"
 
 #include <mmsystem.h>
 
+#include "Arcfile.h"
+#include "FileSystem.h"
+#include "Fog.h"
+#include "GameErrorContext.h"
 #include "Input.h"
 
 #include "CriticalSections.h"
@@ -356,6 +362,32 @@ int __fastcall Supervisor::on_draw_55(void *arg)
     return 1;
 }
 
+// TODO: the original schedules the int_vars store between the flags and/or, and moves eax before pop edi after the loop.
+// FUNCTION: TH16 0x43d8b0
+HARNESS_CALLED AnmId Supervisor::create_fog_vm(i32 count, i32 script)
+{
+    AnmId id = g_Supervisor.text_anm->create_effect(script, 0x22, NULL);
+    AnmVm *vm = get_vm_or_clear(id);
+    vm->alloc_extra_data(count * 2 * sizeof(RenderVertex144));
+    if (count > 2)
+    {
+        RenderVertex144 *vertices = (RenderVertex144 *)vm->ins_508_extra_data;
+        vm->int_vars[0] = count;
+        vm->flags_lo = (vm->flags_lo & ~(0x1f << ANM_VM_RENDER_MODE_SHIFT)) | (12 << ANM_VM_RENDER_MODE_SHIFT);
+        for (i32 i = 0; i < count * 2; i++)
+        {
+            vertices[i].pos.z = 0.0f;
+            vertices[i].pos.w = 1.0f;
+            vertices[i].diffuse = 0xffffffff;
+        }
+    }
+    else
+    {
+        vm->flags_lo &= ~(0x1f << ANM_VM_RENDER_MODE_SHIFT);
+    }
+    return id;
+}
+
 // FUNCTION: TH16 0x43dc30
 void Supervisor::release_surfaces()
 {
@@ -416,6 +448,28 @@ int __fastcall Supervisor::on_tick(void *arg)
         return 1;
     }
     return result;
+}
+
+// FUNCTION: TH16 0x43b480
+i32 Supervisor::open_data_files()
+{
+    char path[128];
+    i32 size;
+
+    if (g_Arcfile.open("th16.dat"))
+    {
+        sprintf(path, "th16_%.4x%c.ver", 0x100, 'a');
+        g_Supervisor.ver_file_data = file_read_all(path, &size, 0);
+        g_Supervisor.ver_file_size = size;
+        if (g_Supervisor.ver_file_data == NULL)
+        {
+            g_GameErrorContext.fatal("error : \x83" "f\x81[\x83^\x82\xcc\x83o\x81[\x83W\x83\x87\x83\x93\x82\xaa\x88\xe1\x82\xa2\x82\xdc\x82\xb7\r\n");
+            return -1;
+        }
+        return 0;
+    }
+    g_GameErrorContext.fatal("error : \x83" "f\x81[\x83^\x83t\x83@\x83" "C\x83\x8b\x82\xaa\x91\xb6\x8d\xdd\x82\xb5\x82\xdc\x82\xb9\x82\xf1\r\n");
+    return -1;
 }
 
 // FUNCTION: TH16 0x43ba40

@@ -148,7 +148,9 @@ struct Gui
     i32 unk_1d8;
     GuiBossBar boss_bars[3];
     AnmLoaded *front_anm;
-    u8 unk_2dc[0x2e4 - 0x2dc];
+    // Score awarded for clearing the stage (show_stage_clear_bonus).
+    i32 stage_clear_bonus;
+    u8 unk_2e0[0x2e4 - 0x2e0];
 
     Gui();
     ~Gui();

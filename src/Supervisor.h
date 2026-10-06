@@ -120,6 +120,13 @@ struct Supervisor
     i32 play_bgm(i32 arg, i32 track);
     i32 stop_bgm();
     HARNESS_CALLED i32 fade_out_bgm(f32 seconds);
+    // 0x43b480. Opens th16.dat and reads the version file from it, for
+    // on_registration.
+    static i32 open_data_files();
+    // 0x43d8b0. A text.anm effect VM (script 0x3b at the one call site,
+    // which LTCG folds) with vertices for count * 2 points as its extra
+    // data; render mode 12 when count > 2. Fog's initialize uses it.
+    HARNESS_CALLED AnmId create_fog_vm(i32 count, i32 script);
 
     static int __fastcall on_tick(void *arg);
     static int __fastcall on_registration(void *arg);

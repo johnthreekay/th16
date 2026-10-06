@@ -116,6 +116,9 @@ struct AnmLoaded
     AnmId create_effect(i32 script, i32 layer, AnmVm **out);
     // 0x42c920. Like create_effect, for the UI list.
     AnmId create_ui_effect(i32 script, i32 unused, AnmVm **out);
+    // 0x42efb0. Like create_vm at rotation 0, for the UI list. HelpManual,
+    // its only user, passes a constant for unused, which LTCG folds.
+    HARNESS_CALLED AnmId create_ui_vm(i32 script, D3DXVECTOR3 *pos, i32 unused);
     // 0x426160. Like create_vm at the origin, but inserted at the front of
     // the world list.
     AnmId create_vm_front(i32 script, i32 layer, i32 unused);

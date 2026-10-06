@@ -510,6 +510,51 @@ void Gui::update_score()
     }
 }
 
+// AnmLoaded::create_vm as LTCG inlined it into some callers.
+static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECTOR3 *pos, f32 rotation, i32 layer)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    anm->vm_count++;
+    AnmVm *vm = g_AnmManager->allocate_vm();
+    anm->copy_vm(vm, script);
+    vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+    if (layer >= 0)
+    {
+        vm->layer = layer;
+        if (layer <= 23)
+        {
+            vm->flags_hi &= ~ANM_VM_LAYER_UI;
+            vm->flags_hi |= ANM_VM_LAYER_SET;
+        }
+    }
+    if (pos == NULL)
+    {
+        vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    }
+    else
+    {
+        vm->entity_pos = *pos;
+    }
+    vm->rotation.z = rotation;
+    vm->run();
+    vm->mode_of_create_child = 0;
+    AnmId id;
+    id = g_AnmManager->insert_in_world_list_back(vm);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return id;
+}
+
+// FUNCTION: TH16 0x42c070
+void Gui::show_stage_clear_bonus()
+{
+    Gui *gui = g_Gui;
+    gui->ids_11c[1] = create_vm_inline(gui->front_anm, 0x78, NULL, 0.0f, -1);
+    gui->stage_clear_bonus = g_Globals.stage_num * 1000000;
+    g_Globals.add_to_score(gui->stage_clear_bonus);
+    gui->flags_1ac |= 0x100;
+    gui->timer_1b0.reset();
+}
+
 // FUNCTION: TH16 0x42c1b0
 HARNESS_CALLED void Gui::sub_42c1b0()
 {
