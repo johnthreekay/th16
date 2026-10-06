@@ -9,3 +9,5 @@ __pycache__/
 # reccmp: per-user paths and build locations
 /reccmp-user.yml
 /reccmp-build.yml
+# Agent worktrees
+/.claude/

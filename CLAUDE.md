@@ -43,3 +43,24 @@ Matching decomp of TH16 1.00a. See README.md for the toolchain evidence and work
 - reccmp must run through `scripts/compare.py` so its `cvdump.exe` uses the
   project Wine prefix instead of `~/.wine`.
 - Never commit anything from `orig/`, `prefix/` or `build/`.
+
+## Working in parallel (agent worktrees)
+
+Several agents may work at once, each in its own git worktree and branch,
+each owning one address range. In a fresh worktree run
+`python3 scripts/worktree_setup.py` first (links prefix/, orig/, .venv/),
+then build. List your functions with
+`TH_RE_DATA=~/.cache/claude-builds/th16-ref/th-re-data .venv/bin/python scripts/list_functions.py <lo> <hi>`.
+
+To keep branches mergeable:
+- New code goes in files named after the class or module (`src/Bullet.cpp`).
+- Placeholders for callees from other ranges go in `src/stub/<unit>.cpp`,
+  stand-in callers in `src/harness/<unit>.cpp` (one file per unit).
+- Shared headers (Supervisor.h, CriticalSections.h, decomp.h, types.h, ...):
+  only add. Never reorder, rename or delete existing items; to add a struct
+  field, split the padding array around it in place.
+- Do not change scripts/ or build flags; describe tooling problems instead.
+- A function that will not match after a reasonable number of attempts
+  stays in (functionally correct, still annotated) with a one-line
+  `// TODO:` comment saying what differs; move on.
+- Commit often. No em dashes in comments or commit messages.

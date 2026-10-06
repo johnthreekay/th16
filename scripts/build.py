@@ -188,9 +188,12 @@ def annotated_functions():
 
 
 def keepalive_symbols():
-    """[(original address, decorated symbol)] for every annotated function."""
+    """[(original address, decorated symbol, harness_called)] for every
+    annotated function, plus (None, symbol, False) for every function
+    defined in src/harness/ (stand-in callers stay alive the same way)."""
     sym_dir = BUILD / "sym"
     objs = compile_all(sym_dir, no_gl=True)
+    harness_objs = [o for o in objs if (sym_dir / "src" / "harness") in o.parents]
     decorated = sorted({n for o in objs for n in coff_functions(o)})
     qualified = undecorate(decorated)
     by_name = {}
@@ -202,6 +205,8 @@ def keepalive_symbols():
         if len(matches) != 1:
             sys.exit(f"{src}: {addr:#x} {name}: {len(matches)} matching symbols {matches}")
         include.append((addr, matches[0], harness_called))
+    for obj in harness_objs:
+        include.extend((None, sym, False) for sym in coff_functions(obj))
     return include
 
 
@@ -233,7 +238,7 @@ def write_function_map(include, map_path, out_path):
             ours[m.group(1)] = int(m.group(2), 16)
     with open(out_path, "w") as f:
         for addr, sym, _ in include:
-            if sym in ours:
+            if addr is not None and sym in ours:
                 f.write(f"{addr:#x} {ours[sym]:#x} {sym}\n")
         for addr, prefix in synthetic_functions():
             for sym, va in ours.items():
@@ -258,7 +263,7 @@ def main():
     if rc != 0:
         sys.exit("link failed")
     write_function_map(include, exe.with_suffix(".map"), BUILD / "functions.txt")
-    print(f"built {rel(exe)} ({len(include)} annotated functions)")
+    print(f"built {rel(exe)} ({sum(1 for a, _, _ in include if a is not None)} annotated functions)")
 
     (ROOT / "reccmp-build.yml").write_text(
         f"project: {ROOT}\ntargets:\n  TH16:\n    path: build/th16.exe\n    pdb: build/th16.pdb\n")
