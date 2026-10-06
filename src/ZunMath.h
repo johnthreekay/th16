@@ -18,6 +18,43 @@ f32 LTCG_VECTORCALL normalize_angle(f32 a);
 typedef D3DXVECTOR2 Float2;
 typedef D3DXVECTOR3 Float3;
 
+// Integer vector (ExpHP: zInt3), used for interpolated colors.
+struct Int3
+{
+    i32 x;
+    i32 y;
+    i32 z;
+
+    Int3()
+    {
+    }
+    Int3(i32 x, i32 y, i32 z)
+    {
+        this->x = x;
+        this->y = y;
+        this->z = z;
+    }
+    Int3 operator+(const Int3 &o) const
+    {
+        return Int3(x + o.x, y + o.y, z + o.z);
+    }
+    Int3 operator-(const Int3 &o) const
+    {
+        return Int3(x - o.x, y - o.y, z - o.z);
+    }
+    Int3 operator*(f32 f) const
+    {
+        return Int3((i32)(x * f), (i32)(y * f), (i32)(z * f));
+    }
+    Int3 &operator+=(const Int3 &o)
+    {
+        x += o.x;
+        y += o.y;
+        z += o.z;
+        return *this;
+    }
+};
+
 // out->x, out->y = radius * (cos angle, sin angle). TH06 equivalent:
 // sincosmul. TH16 keeps a separate out-of-line copy in each object file
 // that uses it (0x430df0, 0x43ad00, ...), which static reproduces. Those

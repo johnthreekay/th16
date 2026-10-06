@@ -49,6 +49,7 @@ i32 AnmLoaded::init_script_vm(AnmVm *vm, i32 script)
     return 0;
 }
 
+// TODO: the original reserves a dead 4-byte local (push ecx) and saves esi before the checks.
 // FUNCTION: TH16 0x45f160
 void AnmLoaded::set_vm_script(AnmVm *vm, i32 script)
 {

@@ -217,3 +217,63 @@ Float3 *AnmVm::get_total_rotation()
     }
     return &rotation_related;
 }
+
+// FUNCTION: TH16 0x464960
+void AnmVm::set_uv_scale_time(i32 end_time, i32 method, Float2 *initial, Float2 *goal)
+{
+    uv_scale_i.end_time = end_time;
+    uv_scale_i.method = method;
+    uv_scale_i.initial = *initial;
+    uv_scale_i.goal = *goal;
+    uv_scale_i.time = 0;
+}
+
+// FUNCTION: TH16 0x464a00
+void AnmVm::set_434_time(i32 end_time, i32 method, Float2 *initial, Float2 *goal)
+{
+    op_434_i.end_time = end_time;
+    op_434_i.method = method;
+    op_434_i.initial = *initial;
+    op_434_i.goal = *goal;
+    op_434_i.time = 0;
+}
+
+// FUNCTION: TH16 0x464aa0
+void AnmVm::set_alpha2_time(i32 end_time, i32 method, u8 initial, u8 goal)
+{
+    alpha2_i.end_time = end_time;
+    alpha2_i.method = method;
+    alpha2_i.initial = initial;
+    alpha2_i.goal = goal;
+    alpha2_i.time = 0;
+    flags_lo = flags_lo & ~ANM_VM_COLOR_MODE_MASK | ANM_VM_COLOR_MODE_1;
+}
+
+// TODO: the original loads both colors before storing either (y, z, x order) and keeps this in edi.
+// FUNCTION: TH16 0x464b40
+void AnmVm::set_rgb2_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal)
+{
+    rgb2_i.end_time = end_time;
+    rgb2_i.bezier_2 = rgb2_i.bezier_1 = Int3(0, 0, 0);
+    rgb2_i.method = method;
+    Int3 a(initial->b, initial->g, initial->r);
+    Int3 b(goal->b, goal->g, goal->r);
+    rgb2_i.initial = a;
+    rgb2_i.goal = b;
+    rgb2_i.time = 0;
+    flags_lo = flags_lo & ~ANM_VM_COLOR_MODE_MASK | ANM_VM_COLOR_MODE_1;
+}
+
+// TODO: same color load order difference as set_rgb2_time.
+// FUNCTION: TH16 0x464c60
+void AnmVm::set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal)
+{
+    rgb1_i.end_time = end_time;
+    rgb1_i.bezier_2 = rgb1_i.bezier_1 = Int3(0, 0, 0);
+    rgb1_i.method = method;
+    Int3 a(initial->b, initial->g, initial->r);
+    Int3 b(goal->b, goal->g, goal->r);
+    rgb1_i.initial = a;
+    rgb1_i.goal = b;
+    rgb1_i.time = 0;
+}

@@ -45,6 +45,10 @@ enum AnmVmFlagsLo
     ANM_VM_SCALE_CHANGED = 1 << 3,
     ANM_VM_FLAG_LO_800 = 1 << 11,
     ANM_VM_FLAG_LO_1000 = 1 << 12,
+    // Two bits: which of color_1/color_2 to draw with (set_rgb2_time and
+    // set_alpha2_time switch to 1, color_2).
+    ANM_VM_COLOR_MODE_MASK = 3 << 17,
+    ANM_VM_COLOR_MODE_1 = 1 << 17,
 };
 
 enum AnmVmFlagsHi
@@ -239,6 +243,12 @@ struct AnmVm
     // Rotation plus every parent's, in rotation_related. Wraps this VM's
     // own rotation into [-pi, pi] on the way.
     Float3 *get_total_rotation();
+    // Start interpolators (ExpHP's names; rgb1/rgb2 are swapped there).
+    void set_uv_scale_time(i32 end_time, i32 method, Float2 *initial, Float2 *goal);
+    void set_434_time(i32 end_time, i32 method, Float2 *initial, Float2 *goal);
+    void set_alpha2_time(i32 end_time, i32 method, u8 initial, u8 goal);
+    void set_rgb2_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
+    void set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
 
     void interrupt(i32 n)
     {

@@ -38,6 +38,7 @@ struct InterpFloat2
     i32 method;
 
     void reset_timer();
+    D3DXVECTOR2 step();
 };
 
 struct InterpFloat3
@@ -62,18 +63,22 @@ struct InterpInt
     ZunTimer time;
     i32 end_time;
     i32 method;
+
+    i32 step();
 };
 
 struct InterpInt3
 {
-    i32 initial[3];
-    i32 goal[3];
-    i32 bezier_1[3];
-    i32 bezier_2[3];
-    i32 current[3];
+    Int3 initial;
+    Int3 goal;
+    Int3 bezier_1;
+    Int3 bezier_2;
+    Int3 current;
     ZunTimer time;
     i32 end_time;
     i32 method;
+
+    Int3 step();
 };
 
 struct InterpStrange1
