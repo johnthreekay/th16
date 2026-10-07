@@ -12,7 +12,7 @@
 #include "Supervisor.h"
 #include "UpdateFunc.h"
 
-extern u32 g_hardware_input_pressed;
+#include "Input.h"
 
 static_assert(offsetof(GameWindow, is_app_active) == 0x10, "GameWindow layout");
 static_assert(offsetof(GameWindow, performance_frequency) == 0x1c, "GameWindow layout");

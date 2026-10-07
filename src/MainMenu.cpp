@@ -243,8 +243,6 @@ i32 __fastcall TitleInf::on_draw_thunk(void *arg)
     return ((TitleInf *)arg)->on_draw();
 }
 
-extern u32 g_hardware_input_repeat;
-extern u32 g_hardware_input_pressed;
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 
 // TODO: the original realigns its frame to 8 bytes; the volume clamps use al/ecx where ours uses cl/eax.

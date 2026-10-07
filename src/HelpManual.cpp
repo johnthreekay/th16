@@ -9,8 +9,7 @@
 #include "SoundManager.h"
 #include "Supervisor.h"
 
-extern u32 g_hardware_input_pressed;
-extern u32 g_hardware_input_repeat;
+#include "Input.h"
 
 // GLOBAL: TH16 0x4a6dd8
 HelpManual *g_HelpManual;

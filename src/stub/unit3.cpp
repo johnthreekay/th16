@@ -13,15 +13,7 @@ AnmVmSwitchFunc g_anm_on_switch_funcs[4];
 // GLOBAL: TH16 0x4c0f40
 i32 g_unk_4c0f40;
 
-// GLOBAL: TH16 0x4a50b8
-u32 g_hardware_input_repeat;
-
-// GLOBAL: TH16 0x4a50bc
-u32 g_hardware_input_pressed;
-
 // GLOBAL: TH16 0x491700
 i8 g_spell_difficulty[0x78];
 
-// GLOBAL: TH16 0x4a51c4
-u32 g_hardware_input_held_4a51c4;
 

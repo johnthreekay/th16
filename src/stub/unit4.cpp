@@ -7,5 +7,3 @@
 
 
 
-// GLOBAL: TH16 0x4a5244
-InputState g_InputState;

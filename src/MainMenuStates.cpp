@@ -20,8 +20,6 @@
 #include "StageData.h"
 #include "Supervisor.h"
 
-extern u32 g_hardware_input_repeat;
-extern u32 g_hardware_input_pressed;
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 extern i32 g_spell_practice_last_stage;
 extern i32 g_practice_last_stage;

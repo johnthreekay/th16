@@ -22,8 +22,4 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
 }
 
 
-// STUB: TH16 0x418650
-void InputState::update()
-{
-}
 
