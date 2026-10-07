@@ -29,7 +29,8 @@ struct RpyGamestate
     i16 rng_state;
     // Frames of input recorded for the stage.
     i32 num_frames;
-    u8 unk_8[0xc - 0x8];
+    // Bytes of input and fps data after the snapshot.
+    i32 data_size;
     // The player's position (Player::inner.pos_subpixel).
     i32 player_pos_subpixel[2];
     // The first 0x228 bytes of g_Globals.
@@ -59,7 +60,9 @@ struct RpyInfo
     // 2: spell practice.
     u16 flags_a;
     __time64_t timestamp;
-    u8 unk_14[0x84 - 0x14];
+    u8 unk_14[0x80 - 0x14];
+    // Stage snapshots stored after this.
+    i32 num_stages;
     i32 character;
     i32 subshot;
     i32 difficulty;
@@ -76,6 +79,17 @@ struct RpyInfo
 struct RpyHeader
 {
     u8 data[0x24];
+};
+
+// RpyHeader's fields as read_replay_file uses them.
+struct RpyFileHeader
+{
+    u32 magic;
+    u16 version;
+    u8 unk_6[0x1c - 0x6];
+    // Of the encrypted, compressed data after the header.
+    u32 compressed_size;
+    u32 size;
 };
 
 // A block of recorded input, 900 frames long. ExpHP: zRpyChunk.

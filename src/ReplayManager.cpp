@@ -1,6 +1,14 @@
 #include <stddef.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <direct.h>
 
 #include "GameThread.h"
+#include "Lzss.h"
+#include "GameWindow.h"
+#include "FileSystem.h"
+#include "Crypt.h"
 #include "Globals.h"
 #include "Input.h"
 #include "Player.h"
@@ -279,6 +287,69 @@ int ReplayManager::on_tick_playback()
 static_assert(offsetof(RpyInfo, timestamp) == 0xc, "RpyInfo::timestamp");
 static_assert(offsetof(RpyInfo, stage) == 0x90, "RpyInfo::stage");
 static_assert(sizeof(RpyInfo) == 0xa0, "RpyInfo");
+
+// TODO: the original's frame is 4 bytes smaller (size shares its stack slot with data).
+// FUNCTION: TH16 0x448c10
+int ReplayManager::read_replay_file(const char *filename)
+{
+    char path[0x1000];
+    u8 *data;
+    i32 size;
+
+    strcpy(this->filename, filename);
+    if (!(g_Globals.flags_hi_45c & 1))
+    {
+        _chdir(g_GameWindow.save_dir);
+        sprintf(path, "replay/%s", filename);
+        if (!file_exists(path) || file_open(path) != 0)
+        {
+            goto fail;
+        }
+        rpy_file = file_read(sizeof(RpyHeader));
+        if (((RpyFileHeader *)rpy_file)->magic != 0x72363174)
+        {
+            file_close();
+        fail:
+            _chdir(g_GameWindow.exe_dir);
+            return -1;
+        }
+        if (((RpyFileHeader *)rpy_file)->version != 2)
+        {
+            file_close();
+            goto fail;
+        }
+        data = file_read(((RpyFileHeader *)rpy_file)->compressed_size);
+        file_close();
+    }
+    else
+    {
+        rpy_file = file_read_all(filename, &size, 0);
+        data = (u8 *)rpy_file + sizeof(RpyHeader);
+    }
+    rpy_thing_204 = malloc(((RpyFileHeader *)rpy_file)->size);
+    zun_decrypt(data, ((RpyFileHeader *)rpy_file)->compressed_size, 0x5c, 0xe1, 0x400,
+                ((RpyFileHeader *)rpy_file)->compressed_size);
+    zun_decrypt(data, ((RpyFileHeader *)rpy_file)->compressed_size, 0x7d, 0x3a, 0x100,
+                ((RpyFileHeader *)rpy_file)->compressed_size);
+    lzss_decompress(data, ((RpyFileHeader *)rpy_file)->compressed_size, (u8 *)rpy_thing_204,
+                    ((RpyFileHeader *)rpy_file)->size);
+    info = (RpyInfo *)rpy_thing_204;
+    RpyGamestate *gamestate = (RpyGamestate *)((u8 *)rpy_thing_204 + 0xa0);
+    for (i32 i = 0; i < (info->num_stages >= 8 ? 6 : info->num_stages); i++)
+    {
+        stages[gamestate->stage].gamestate_at_stage_begin = gamestate;
+        stages[gamestate->stage].input_begin = (RpyFrameInput *)(gamestate + 1);
+        stages[gamestate->stage].fps_counts_begin =
+            (u8 *)(stages[gamestate->stage].input_begin + gamestate->num_frames);
+        gamestate = (RpyGamestate *)((u8 *)(gamestate + 1) + gamestate->data_size);
+    }
+    if (!(g_Globals.flags_hi_45c & 1) && data != NULL)
+    {
+        free(data);
+    }
+    _chdir(g_GameWindow.exe_dir);
+    return 0;
+}
 
 // FUNCTION: TH16 0x4483b0
 HARNESS_CALLED i32 ReplayManager::set_end_stage(i32 extra_stage)

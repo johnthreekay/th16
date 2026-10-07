@@ -45,8 +45,3 @@ int ReplayManager::initialize(i32 mode, const char *filename)
     return 0;
 }
 
-// STUB: TH16 0x448c10
-int ReplayManager::read_replay_file(const char *filename)
-{
-    return 0;
-}
