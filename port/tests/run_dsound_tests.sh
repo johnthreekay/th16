@@ -5,7 +5,8 @@
 #
 # <game dir> holds th16.dat and thbgm.dat (only read). With it, the sound
 # effects and thbgm.fmt are extracted into <build dir>/dsound-data and the
-# BGM stream test runs too. Audio never reaches a real device: the manual
+# BGM stream tests run too (the second one through the game's own
+# DSUtil.cpp). Audio never reaches a real device: the manual
 # tests use SDL's dummy driver and the real-time test writes the mix to
 # <build dir>/dsound-realtime.raw through the disk driver.
 set -eu
@@ -27,5 +28,6 @@ if [ ! -f "$data/thbgm.fmt" ]; then
 fi
 
 SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy "$test_bin" --data "$data" --bgm "$game/thbgm.dat"
+SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy "$build/th16_dsound_game_test" "$data" "$game/thbgm.dat"
 SDL_AUDIODRIVER=disk SDL_AUDIO_DRIVER=disk SDL_DISKAUDIOFILE="$build/dsound-realtime.raw" \
     "$test_bin" --data "$data" --realtime

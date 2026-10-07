@@ -2,9 +2,9 @@
 
 The game sources in `src/` compile and link with GCC and Clang, 32-bit
 (`-m32`) and 64-bit, against stand-in Windows/DirectX headers. The platform
-layer is stubbed: the binary starts, runs WinMain's setup until loading
-th16.cfg fails (CreateFileA is a stub), logs that and exits cleanly, in all
-four builds. The matching MSVC build is unaffected (see "Keeping the
+layer is stubbed except for audio (DirectSound over SDL2, see "Audio"): the
+binary starts, runs WinMain's setup until loading th16.cfg fails
+(CreateFileA is a stub), logs that and exits cleanly, in all four builds. The matching MSVC build is unaffected (see "Keeping the
 matching build").
 
 ## Building
@@ -20,6 +20,15 @@ cmake --build build-port/clang64
 `-DTH16_M32=ON` needs the 32-bit multilib (gcc-multilib / lib32 glibc and
 libstdc++). Build output stays under `build-port/` (ignored by git). Tested
 with Clang 23 and GCC 16 on Arch Linux; not yet built on macOS.
+
+The build needs SDL2 (found with `find_package(SDL2 CONFIG)`, target
+`SDL2::SDL2`; sdl2-compat 2.32 works), and the 32-bit SDL2 (lib32-sdl2 or
+lib32-sdl2-compat) for `-m32`. `TH16_M32` puts `-m32` into
+`CMAKE_CXX_FLAGS_INIT`, so that CMake sees a 32-bit compiler and finds the
+lib32 SDL2: configure 32-bit build directories made before that change
+again from scratch. The build also makes the audio tests
+(`th16_dsound_test`, `th16_dsound_game_test`, see "Audio"); `ctest` in a
+build directory runs the part that needs no game data.
 
 The CMake build compiles every `src/*.cpp` (the glob is not recursive, so
 `src/stub/`, `src/placeholder/` and `src/harness/` stay out) and `port/src/*.cpp`,
@@ -90,12 +99,14 @@ buffer, as in the original).
     IDirectInputDevice8A, the data formats and DIPROP ids.
     DirectInput8Create fails (the game falls back to GetKeyboardState and
     joyGetPosEx).
-  - `dsound_stubs.cpp`: stub classes for IDirectSound8, IDirectSoundBuffer,
-    IDirectSoundNotify. DirectSoundCreate8 fails (the game runs silent).
+  - `dsound_sdl.cpp`, `dsound_sdl.h`: DirectSound 8 as a software mixer on
+    one SDL audio device, complete for what the game uses (see "Audio").
   - `game_tables.cpp`: the game globals the matching build defines in
     `src/stub/` (see "Game data in src/stub/").
   - `layout_checks.cpp`: compile-time layout checks that stay on in the
     64-bit build (`TH16_PORT_CHECK`, defined in port_prelude.h).
+- `tests/`: the audio tests (see "Audio") and `th16dat.py`, a Python copy
+  of the game's th16.dat reader that lists and extracts files for tests.
 
 The interfaces in `include/` are C++ abstract classes with only the methods
 the game calls (plus a few obvious companions), in an order of our own: the
@@ -162,7 +173,8 @@ SDK's, so code and data that use them keep their meaning.
   init/load threads and the BGM thread (CreateThread; the BGM thread waits
   on an auto-reset event with MsgWaitForMultipleObjects and quits on a
   posted WM_QUIT), the screenshot writer (`_beginthread`). HANDLEs must be
-  waitable (WaitForSingleObject with timeouts) and closable.
+  waitable (WaitForSingleObject with timeouts) and closable. SetEvent is
+  also called by the audio mixer from SDL's audio thread (see "Audio").
 - Text: every string in the game is Shift-JIS bytes (literals are written
   as `\x` escapes; MSG/ending scripts, spell card names and menus come from
   the data files the same way). Keep them as bytes everywhere; convert
@@ -172,6 +184,105 @@ SDK's, so code and data that use them keep their meaning.
   section), `MessageBoxA`, the log. File names are ASCII.
 - Input: DIK_* scan codes (DirectInput keyboard, 256-byte state) and VK_*
   codes (GetKeyboardState fallback) are both used.
+
+## Audio
+
+`port/src/dsound_sdl.cpp` implements DirectSound 8 as a software mixer
+feeding one SDL device (44.1 kHz, signed 16-bit stereo, 512-frame periods),
+opened by the first `DirectSoundCreate8` and closed with the last
+`IDirectSound8`. If SDL cannot open a device, `DirectSoundCreate8` fails
+with `DSERR_NODRIVER` and the game runs silent, as on Windows without a
+sound card.
+
+What the game uses, and so what is implemented (SoundManager.cpp,
+DSUtil.cpp):
+
+- The primary buffer, only for `SetFormat(44.1 kHz, 16-bit, stereo)`. The
+  format is recorded (GetFormat returns it) but the mix format is fixed.
+  Its volume scales the mix.
+- Sound effects: one secondary buffer per effect, filled from the data chunk
+  of a `.wav` in th16.dat (22.05 kHz, 8-bit mono, 8-bit stereo, 16-bit mono
+  or 16-bit stereo), `DSBCAPS_CTRLVOLUME | DSBCAPS_CTRLPAN`, and
+  `DuplicateSoundBuffer` for effects sharing a file (shared memory, own
+  position, volume, pan). The game parses the RIFF chunks itself
+  (`get_wav_chunk`) and never calls `mmio*`: th16.exe imports none, and
+  ZUN's `CWaveFile` reads thbgm.dat with `CreateFileA`/`ReadFile`
+  (`MMCKINFO`/`MMIOINFO` only remain as fields). So there is no mmio layer.
+- A silent 0x8000-byte buffer that loops all session.
+- The BGM: `CStreamingSound`, a looping buffer of 8 half-second chunks with
+  a notification at the last byte of each, all on one auto-reset event. The
+  BGM thread refills the chunk that has just played from thbgm.dat
+  (`HandleWaveStreamNotification`), checking it against the play and write
+  cursors first. Fades are `SetVolume`. Seeks and track switches release the
+  buffer and create a new one.
+
+Semantics: `Lock` returns a copy of the region (two parts when it wraps
+and the caller asks for the second), `Unlock` writes it back, so the game
+never writes memory the mixer reads. The play cursor is where the mixer has
+read up to. The write cursor of a playing buffer is a mix period plus one
+frame ahead of it (what the next mix may read), and equal to it when
+stopped. A notification fires once the mixer has consumed its byte.
+`DSBPN_OFFSETSTOP` fires on `Stop` of a playing buffer and when a one-shot
+buffer ends (it then rewinds to 0, as DirectSound does). Volume and pan are
+hundredths of a decibel (`DSBVOLUME_MIN` is silence, a positive pan
+attenuates the left channel). Mono plays at full level on both channels.
+Other rates are resampled with linear interpolation, and a 44.1 kHz 16-bit
+stereo buffer at volume 0 comes out bit-exact. `SetFrequency`, `GetCaps`,
+`GetFormat` and the controls' `DSERR_CONTROLUNAVAIL` /
+`DSERR_INVALIDPARAM` checks are DirectSound's. Not implemented (unused):
+3D and effects buffers (`DSBCAPS_CTRL3D`, `DSBCAPS_CTRLFX` fail),
+writing the primary buffer, voice management (`DSBCAPS_LOCDEFER`
+priorities). Buffers are never lost.
+
+Threads: one mutex guards the buffer list and every buffer's state and
+data. The SDL callback mixes under it, and every DirectSound method takes
+it, so the game's threads (main, sound init, BGM) can call in at any time.
+
+Interface with the Win32 layer: the mixer signals notification events
+with plain `SetEvent(HANDLE)` on the handles the game created with
+`CreateEventA` (the BGM event is auto-reset). It calls it from SDL's audio
+thread while holding the mixer mutex (so that a stopped or released buffer
+never signals afterwards: the game closes the event right after stopping
+the stream). So `SetEvent` must be thread-safe and must not call back into
+DirectSound. The BGM thread then needs `MsgWaitForMultipleObjects(1,
+&event, FALSE, INFINITE, QS_ALLEVENTS)` to return `WAIT_OBJECT_0` for the
+event and `WAIT_OBJECT_0 + 1` for a message posted with
+`PostThreadMessageA` (`WM_QUIT` ends it). Streaming also uses `CreateFileA`,
+`ReadFile`, `SetFilePointer` (`FILE_BEGIN` up to 388 MB into thbgm.dat, and
+`FILE_CURRENT` with 0 to read the position when pausing) and `CloseHandle`
+on `INVALID_HANDLE_VALUE` (CWaveFile closes twice). `DirectSoundCreate8`
+runs on the sound init thread, so `SDL_InitSubSystem(SDL_INIT_AUDIO)` does
+too. That works on Linux.
+
+Tests (never play to a real device: they use SDL's `dummy` driver, or the
+`disk` driver writing to a file under the build directory):
+
+```
+port/tests/run_dsound_tests.sh build-port/clang64 "<game dir>"
+```
+
+- `th16_dsound_test`: unit tests in manual mode (`port_dsound_set_manual`:
+  no device, the test calls `port_dsound_mix` and compares every output
+  frame): looping, one-shot with interpolation and rewind, cursors, `Lock`
+  wrap-around and `DSBLOCK_*`, notifications, volume, pan, frequency,
+  duplicates, clamping. With `--data`: eight se_*.wav files of every format
+  loaded and played the way SoundManager does. With `--bgm`: a copy of
+  CStreamingSound refilling from thbgm.dat on its own thread. The output
+  must equal the track sample for sample until 10 s past the loop point.
+  `--realtime`: through SDL (refuses any driver but `disk` and `dummy`),
+  DirectSound created on another thread as in the game: 5 s of a stream
+  with two loop points, a tone at -6 dB and an effect, checked in the file
+  `SDL_DISKAUDIOFILE` names.
+- `th16_dsound_game_test <data dir> <thbgm.dat> [track]`: the game's own
+  DSUtil.cpp on the mixer (CreateStreaming as in open_bgm, BGM command 2's
+  steps, a thread like `bgm_thread_proc`): the title theme (th16_01.wav)
+  comes out bit-exact through its loop point, across `Pause`/`Unpause` and
+  after `seek`. The test provides the few Win32 calls DSUtil.cpp makes.
+
+All pass in the four builds, and under ThreadSanitizer (clang64 with
+`-fsanitize=thread`). The game itself does not reach DirectSound yet (it
+stops at th16.cfg). Once files, threads and events work, the title BGM
+should stream as in `th16_dsound_game_test`.
 
 ## Game data in src/stub/
 

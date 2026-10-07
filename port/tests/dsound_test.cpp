@@ -680,7 +680,7 @@ static void test_sound_effect(IDirectSound8 *ds, const std::string &dir, const c
     CHECK(memcmp(file.data(), "RIFF", 4) == 0);
     int32_t riff_size = *(int32_t *)(file.data() + 4);
     uint8_t *chunks = file.data() + 12;
-    int32_t chunk_size;
+    int32_t chunk_size = 0;
     WAVEFORMATEX wfx = *(WAVEFORMATEX *)wav_chunk(chunks, "fmt ", &chunk_size, riff_size - 12);
     uint8_t *samples = wav_chunk(chunks, "data", &chunk_size, riff_size - 12);
     CHECK(samples != NULL);
@@ -1131,9 +1131,9 @@ static void test_realtime(const std::string &data_dir)
     stream.run_thread();
     stream.start();
     std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    stream.stop();
     int refills = stream.refills;
     int skipped = stream.skipped;
-    stream.stop();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     // Then a looping tone at -6 dB for half a second, and an effect.
@@ -1157,7 +1157,7 @@ static void test_realtime(const std::string &data_dir)
     if (effect.size() > 44)
     {
         int32_t riff_size = *(int32_t *)(effect.data() + 4);
-        int32_t chunk_size;
+        int32_t chunk_size = 0;
         WAVEFORMATEX wfx = *(WAVEFORMATEX *)wav_chunk(effect.data() + 12, "fmt ", &chunk_size, riff_size - 12);
         uint8_t *samples = wav_chunk(effect.data() + 12, "data", &chunk_size, riff_size - 12);
         IDirectSoundBuffer *buffer = make_buffer(ds, DSBCAPS_CTRLVOLUME | DSBCAPS_CTRLPAN, wfx.nChannels,

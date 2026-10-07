@@ -115,19 +115,28 @@ find_package(Threads REQUIRED)
 find_package(SDL2 REQUIRED CONFIG)
 target_link_libraries(th16 PRIVATE SDL2::SDL2 Threads::Threads m)
 
-# The DirectSound mixer's test harness (tests/dsound_test.cpp): drives
-# dsound_sdl.cpp directly, without the game. See NOTES.md, "Audio".
+# Tests of the DirectSound mixer (see NOTES.md, "Audio"):
+# - th16_dsound_test (tests/dsound_test.cpp) drives dsound_sdl.cpp directly;
+# - th16_dsound_game_test (tests/dsound_game_test.cpp) runs the game's own
+#   BGM streaming code (src/DSUtil.cpp) on it.
 add_executable(th16_dsound_test tests/dsound_test.cpp src/dsound_sdl.cpp)
-target_include_directories(th16_dsound_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_compile_definitions(th16_dsound_test PRIVATE TH16_PORT)
-target_compile_options(th16_dsound_test PRIVATE
-    -include ${CMAKE_CURRENT_SOURCE_DIR}/include/port_prelude.h
-    -Wall -Wno-unknown-pragmas)
-if(TH16_M32)
-    target_compile_options(th16_dsound_test PRIVATE -m32 -msse2 -mfpmath=sse)
-    target_link_options(th16_dsound_test PRIVATE -m32)
-endif()
-target_link_libraries(th16_dsound_test PRIVATE SDL2::SDL2 Threads::Threads m)
+add_executable(th16_dsound_game_test tests/dsound_game_test.cpp src/dsound_sdl.cpp
+    ${TH16_ROOT}/src/DSUtil.cpp ${TH16_ROOT}/src/CriticalSections.cpp)
+foreach(test_target th16_dsound_test th16_dsound_game_test)
+    target_include_directories(${test_target} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${TH16_ROOT}/src)
+    target_compile_definitions(${test_target} PRIVATE TH16_PORT)
+    target_compile_options(${test_target} PRIVATE
+        -include ${CMAKE_CURRENT_SOURCE_DIR}/include/port_prelude.h
+        -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks -fsigned-char -ffp-contract=off
+        -Wall -Wno-unknown-pragmas -Wno-invalid-offsetof -Wno-parentheses -Wno-sign-compare
+        -Wno-mismatched-new-delete)
+    if(TH16_M32)
+        target_compile_options(${test_target} PRIVATE -m32 -msse2 -mfpmath=sse)
+        target_link_options(${test_target} PRIVATE -m32)
+    endif()
+    target_link_libraries(${test_target} PRIVATE SDL2::SDL2 Threads::Threads m)
+endforeach()
 
 # `ctest` runs the mixer tests that need no game data, on SDL's dummy driver
 # (tests/run_dsound_tests.sh runs the rest).
