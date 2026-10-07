@@ -1,4 +1,4 @@
-// The fog mesh that stages and enemies can carry.
+// The distortion mesh ("fog") that stages and enemies can carry.
 #include <stdlib.h>
 #include <string.h>
 
@@ -9,8 +9,15 @@
 static_assert(sizeof(Fog) == 0x1c, "Fog size");
 static_assert(sizeof(FogVertex) == 0x1c, "FogVertex size");
 
+// Columns of the grid; the strips run between neighbouring columns.
 #define FOG_STRIP_COUNT 17
+// text.anm script of the main VM and the strip VMs.
+#define FOG_TEXT_ANM_SCRIPT 0x3b
 
+// Allocates the grid and creates the VMs (the main VM on layer 0x22,
+// drawing through anm_effect_4_on_draw). Without the arcade surface to
+// sample there is no mesh. The id and VM pointer arrays are allocated one
+// byte short of 17 entries, room for the 16 strips.
 // TODO: the original pops each malloc's argument right after the call
 // (ours merges them), keeps this in ebx and the loop index in memory.
 // FUNCTION: TH16 0x418c70
@@ -29,7 +36,7 @@ Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
     vertices = malloc(num_points * sizeof(FogVertex));
     points = malloc(num_points * sizeof(D3DXVECTOR3));
     AnmId id;
-    id = g_Supervisor.text_anm->create_effect(0x3b, 0x22, NULL);
+    id = g_Supervisor.text_anm->create_effect(FOG_TEXT_ANM_SCRIPT, 0x22, NULL);
     AnmVm *vm = g_AnmManager->get_vm_with_id(id);
     if (vm == NULL)
     {
@@ -43,13 +50,15 @@ Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
     vm->associated_game_entity = this;
     for (i32 i = 0; i < strip_count - 1; i++)
     {
-        vm_ids[i] = g_Supervisor.create_fog_vm(points_per_strip, 0x3b);
+        vm_ids[i] = g_Supervisor.create_fog_vm(points_per_strip, FOG_TEXT_ANM_SCRIPT);
         vms[i] = get_vm_or_clear(vm_ids[i]);
         vms[i]->flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
         vms[i]->flags_hi &= ~ANM_VM_LAYER_KIND_MASK;
     }
 }
 
+// Spreads the grid evenly over the rectangle (in game area coordinates),
+// with texture coordinates that sample the screen at each point.
 // TODO: the original reloads pos.z inside the inner loop (ours keeps it in
 // ebx) and tests uv.x only after storing uv.y.
 // FUNCTION: TH16 0x418df0
@@ -94,6 +103,7 @@ HARNESS_CALLED void Fog::set_rect(f32 x, f32 y, f32 width, f32 height)
     update_vms();
 }
 
+// Each strip VM draws a triangle strip zigzagging between its two columns.
 // FUNCTION: TH16 0x418f40
 void Fog::update_vms()
 {

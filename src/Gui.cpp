@@ -1926,7 +1926,11 @@ i32 Gui::on_tick_body()
         hud_flags = hud_flags & ~GUI_BOSS_TIMER_AWAY | GUI_BOSS_TIMER_HIDDEN;
     }
 
-    // The life bars of the two bosses.
+    // The life bars of the two bosses: a ring around each that fills up
+    // (2.5% a frame) to the boss's life, with the life markers on it, faded
+    // while the player is close. No bar while the boss has 100000 life or
+    // more, any of enemy flags 0x31 or an invulnerability timer, or while
+    // dialogue runs.
     if (g_EnemyManager != NULL && !g_EnemyManager->inner.boss_bit)
     {
         for (i32 i = 0; i < 2; i++)
