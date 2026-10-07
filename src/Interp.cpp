@@ -505,6 +505,63 @@ Int3 InterpInt3::step()
     return current;
 }
 
+// TODO: the original frame is 4 bytes bigger (sub esp, 0x20); the code is otherwise identical.
+// FUNCTION: TH16 0x464080
+ZunAngle InterpAngle::step()
+{
+    if (end_time > 0)
+    {
+        time.tick();
+        if (time.current >= end_time)
+        {
+            time.set(end_time);
+            end_time = 0;
+            if (method == 7 || method == 17)
+            {
+                return initial;
+            }
+            return goal;
+        }
+    }
+    else if (end_time == 0)
+    {
+        if (method == 7 || method == 17)
+        {
+            return initial;
+        }
+        return goal;
+    }
+    if (method == 7)
+    {
+        ZunAngle tmp = initial;
+        initial.value = wrap_angle(goal.value + tmp.value);
+        current = initial;
+        return current;
+    }
+    else if (method == 17)
+    {
+        ZunAngle tmp = initial;
+        initial.value = wrap_angle(bezier_2.value + tmp.value);
+        bezier_2.value = wrap_angle(goal.value + bezier_2.value);
+        current = initial;
+        return current;
+    }
+    else if (method == 8)
+    {
+        f32 t = time.current_f / (f32)end_time;
+        current = (initial * ((t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f)))
+                      .add(goal * (t * t * (3.0f - 2.0f * t)))
+                      .add(bezier_1 * ((1.0f - t) * (1.0f - t) * t))
+                      .add(bezier_2 * ((t - 1.0f) * t * t));
+    }
+    else
+    {
+        f32 x = interp_common_methods(method, time.current_f, (f32)end_time);
+        current = ((goal - initial) * x).add(initial);
+    }
+    return current;
+}
+
 // FUNCTION: TH16 0x464040
 void InterpAngle::reset_time()
 {

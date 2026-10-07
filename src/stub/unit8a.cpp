@@ -9,12 +9,6 @@ D3DXVECTOR3 InterpFloat3::step()
     return current;
 }
 
-// STUB: TH16 0x464080
-ZunAngle InterpAngle::step()
-{
-    return current;
-}
-
 // STUB: TH16 0x465280
 i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 unk)
 {
