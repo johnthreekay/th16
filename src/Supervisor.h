@@ -76,7 +76,11 @@ struct Supervisor
     i32 gamemode_to_switch_to;
     i32 gamemode_prev;
     i32 unk_6fc;
-    u8 unk_700[0x728 - 0x700];
+    // Set by switch_gamemodes before it starts a game (0 for a replay
+    // restart).
+    i32 unk_700;
+    i32 unk_704;
+    u8 unk_708[0x728 - 0x708];
     // text.anm: dialogue text and furigana lines.
     struct AnmLoaded *text_anm;
     u8 unk_72c[0x730 - 0x72c];
@@ -94,7 +98,8 @@ struct Supervisor
     // th16_<version>.ver, read in on_registration.
     i32 ver_file_size;
     void *ver_file_data;
-    u8 unk_a24[0xa3c - 0xa24];
+    struct LoadingThread *loading_thread;
+    u8 unk_a28[0xa3c - 0xa28];
     D3DCOLOR background_color;
 
     u32 read_joypad(u32 input);
@@ -199,6 +204,8 @@ extern i32 g_unk_4a6ef0;
 extern void (*g_draw_hook_4a6ee8)();
 // Cleared with g_draw_hook_4a6ee8; read by on_draw_01.
 extern i32 g_unk_4a6eec;
+// Set to 3 by switch_gamemodes when it returns to the title screen (mode 16).
+extern i32 g_unk_4a6f1c;
 // Set once the loading screen is done.
 extern i32 g_unk_4d9d90;
 // Counted down once per frame by Supervisor::on_tick.

@@ -25,12 +25,6 @@ void BgmStream::set_volume(i32 volume)
 {
 }
 
-// STUB: TH16 0x43ce10
-int Supervisor::switch_gamemodes()
-{
-    return 0;
-}
-
 // STUB: TH16 0x43d140
 int __fastcall Supervisor::on_draw_01(void *arg)
 {

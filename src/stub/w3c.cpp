@@ -60,3 +60,19 @@ bool supervisor_458520()
 // Fonts 0x458db0 creates (only 1 is never deleted).
 // GLOBAL: TH16 0x4df904
 HFONT g_fonts_4df904[10];
+
+// STUB: TH16 0x44aee0
+TitleInf *TitleInf::create()
+{
+    return g_TitleInf;
+}
+
+// STUB: TH16 0x44af50
+void TitleInf::destroy()
+{
+}
+
+#include "../StageData.h"
+
+// GLOBAL: TH16 0x4a22d0
+StageData g_stage_table[8];

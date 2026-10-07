@@ -14,6 +14,9 @@ class TitleInf : public TaskInf
     // directly.
     ~TitleInf();
     virtual u32 get_size();
+    // 0x44aee0 (ExpHP: MainMenu::operator new) and 0x44af50.
+    static TitleInf *create();
+    static void destroy();
 };
 
 extern TitleInf *g_TitleInf;

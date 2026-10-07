@@ -14,6 +14,7 @@
 #include "EffectManager.h"
 #include "Ending.h"
 #include "GameThread.h"
+#include "Globals.h"
 #include "HelpManual.h"
 #include "LoadingThread.h"
 #include "ReplayManager.h"
@@ -23,6 +24,7 @@
 #include "FpsCounter.h"
 #include "Rng.h"
 #include "Scorefile.h"
+#include "StageData.h"
 #include "SoundManager.h"
 #include "UpdateFunc.h"
 
@@ -346,6 +348,149 @@ void Supervisor::setup_cameras()
 
     g_arcade_hud_origin_x = g_resolution_x / 2;
     g_arcade_hud_origin_y = (i32)(g_screen_coord_scale * 16.0f);
+}
+
+// GLOBAL: TH16 0x4a6f1c
+i32 g_unk_4a6f1c;
+
+// Returns 1 normally, 4 or 5 when the game is to quit.
+// FUNCTION: TH16 0x43ce10
+int Supervisor::switch_gamemodes()
+{
+    if (gamemode_current == gamemode_to_switch_to)
+    {
+        return 1;
+    }
+    ENTER_CS(CS_SUPERVISOR_GAMEMODE);
+    gamemode_prev = gamemode_current;
+    background_color = 0xff000000;
+    switch (gamemode_to_switch_to)
+    {
+    case 0:
+        gamemode_to_switch_to = 1;
+        loading_thread = LoadingThread::create();
+        if (loading_thread != NULL)
+        {
+            break;
+        }
+        gamemode_to_switch_to = 3;
+    case 3:
+        destroy_game_objects();
+        g_CriticalSections.leave(CS_SUPERVISOR_GAMEMODE);
+        return 4;
+    case 4:
+        switch (gamemode_current)
+        {
+        case 1:
+        case 2:
+            TitleInf::create();
+            break;
+        case 7:
+            GameThread::destroy();
+            TitleInf::create();
+            break;
+        case 15:
+            Ending::destroy();
+            TitleInf::create();
+            break;
+        }
+        break;
+    case 16:
+        switch (gamemode_current)
+        {
+        case 2:
+            break;
+        case 7:
+            GameThread::destroy();
+            break;
+        case 15:
+            Ending::destroy();
+            break;
+        default:
+            goto done;
+        }
+        gamemode_to_switch_to = 4;
+        g_unk_4a6f1c = 3;
+        TitleInf::create();
+        break;
+    case 7:
+        if (gamemode_current == 4)
+        {
+            TitleInf::destroy();
+        }
+        unk_700 = 1;
+        GameThread::create(0);
+        break;
+    case 13:
+        if (gamemode_current == 4)
+        {
+            TitleInf::destroy();
+        }
+        gamemode_to_switch_to = 7;
+        unk_700 = 1;
+        GameThread::create(1);
+        break;
+    case 12:
+    {
+        i32 replay_mode = g_GameThread->replay_mode;
+        unk_700 = 0;
+        if (gamemode_current == 7)
+        {
+            GameThread::destroy();
+        }
+        gamemode_to_switch_to = 7;
+        GameThread::create(replay_mode);
+        break;
+    }
+    case 10:
+        GameThread::destroy();
+        unk_700 = 1;
+        unk_704 = 0;
+        gamemode_to_switch_to = 7;
+        g_Globals.stage_num = g_Globals.weird_stage_num;
+        g_stage_data = &g_stage_table[g_Globals.stage_num];
+        GameThread::create(0);
+        break;
+    case 11:
+        GameThread::destroy();
+        unk_700 = 1;
+        unk_704 = 0;
+        gamemode_to_switch_to = 7;
+        g_Globals.stage_num = g_Globals.weird_stage_num;
+        g_stage_data = &g_stage_table[g_Globals.stage_num];
+        GameThread::create(1);
+        break;
+    case 19:
+        GameThread::destroy();
+        unk_700 = 1;
+        unk_704 = 1;
+        gamemode_to_switch_to = 7;
+        g_Globals.stage_num = g_Globals.weird_stage_num;
+        g_stage_data = &g_stage_table[g_Globals.stage_num];
+        GameThread::create(0);
+        break;
+    case 14:
+        GameThread::destroy();
+        unk_700 = 1;
+        gamemode_to_switch_to = 7;
+        GameThread::create(0);
+        break;
+    case 15:
+        if (gamemode_current == 7)
+        {
+            GameThread::destroy();
+        }
+        Ending::create();
+        break;
+    case 17:
+        destroy_game_objects();
+        g_CriticalSections.leave(CS_SUPERVISOR_GAMEMODE);
+        return 5;
+    }
+done:
+    gamemode_current = gamemode_to_switch_to;
+    LEAVE_CS(CS_SUPERVISOR_GAMEMODE);
+    return 1;
 }
 
 // FUNCTION: TH16 0x43d400

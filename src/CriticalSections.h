@@ -9,6 +9,8 @@ enum
     CS_UPDATE_FUNC_REGISTRY = 0,
     CS_FILE = 2,
     CS_GAME_ERROR_CONTEXT = 3,
+    // Held while Supervisor::switch_gamemodes switches.
+    CS_SUPERVISOR_GAMEMODE = 5,
     // Guards restarting g_Supervisor.thread.
     CS_SUPERVISOR_THREAD = 6,
     CS_ANM_MANAGER = 9,
@@ -26,7 +28,9 @@ struct CriticalSections
     bool enabled;
 
     // LEAVE_CS as a function. LTCG kept an out-of-line copy for a few
-    // callers (file loading among them) and folded `this` into it.
+    // callers (file loading among them) and folded `this` into it. Written
+    // against g_CriticalSections rather than this: our build stops folding
+    // `this` once callers in several objects pass it.
     void leave(int i);
 };
 

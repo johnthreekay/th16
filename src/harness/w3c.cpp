@@ -24,7 +24,7 @@ void harness_w3c_expose_screen_globals()
 // without a reader LTCG drops the stores.
 i32 harness_w3c_read_hud_origin()
 {
-    return g_arcade_hud_origin_x + g_arcade_hud_origin_y + g_unk_4a6eec;
+    return g_arcade_hud_origin_x + g_arcade_hud_origin_y + g_unk_4a6eec + g_unk_4a6f1c;
 }
 
 // Like Fog's initialize at 0x418d8a.

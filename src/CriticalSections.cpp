@@ -6,9 +6,9 @@ CriticalSections g_CriticalSections;
 // FUNCTION: TH16 0x405640
 HARNESS_CALLED void CriticalSections::leave(int i)
 {
-    if (enabled)
+    if (g_CriticalSections.enabled)
     {
-        LeaveCriticalSection(&cs[i]);
-        depth[i]--;
+        LeaveCriticalSection(&g_CriticalSections.cs[i]);
+        g_CriticalSections.depth[i]--;
     }
 }
