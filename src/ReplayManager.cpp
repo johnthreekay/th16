@@ -1,10 +1,15 @@
+#include <stddef.h>
+
 #include "GameThread.h"
 #include "Globals.h"
 #include "Input.h"
+#include "Player.h"
 #include "ReplayManager.h"
+#include "Rng.h"
 #include "Scorefile.h"
 #include "FpsCounter.h"
 #include "Supervisor.h"
+#include "AsciiManager.h"
 
 // GLOBAL: TH16 0x4a6f08
 ReplayManager *g_ReplayManager;
@@ -268,6 +273,162 @@ int ReplayManager::on_tick_playback()
         g_InputState.input_falling = 0;
     }
     current_tick_num_in_stage++;
+    return 1;
+}
+
+static_assert(offsetof(RpyInfo, timestamp) == 0xc, "RpyInfo::timestamp");
+static_assert(offsetof(RpyInfo, stage) == 0x90, "RpyInfo::stage");
+static_assert(sizeof(RpyInfo) == 0xa0, "RpyInfo");
+
+// FUNCTION: TH16 0x4483b0
+HARNESS_CALLED i32 ReplayManager::set_end_stage(i32 extra_stage)
+{
+    _time64(&info->timestamp);
+    info->stage = extra_stage != 0 ? extra_stage + 7 : g_Globals.stage_num;
+    return 0;
+}
+
+static_assert(sizeof(RpyGamestate) == 0x294, "RpyGamestate");
+static_assert(offsetof(RpyGamestate, globals) == 0x14, "RpyGamestate::globals");
+
+// FUNCTION: TH16 0x449030
+HARNESS_CALLED void ReplayManager::start_stage()
+{
+    if (mode == REPLAY_RECORDING)
+    {
+        stage_gamestate_snapshots[g_Globals.stage_num] = new RpyGamestate;
+        RpyGamestate *gamestate = (RpyGamestate *)stage_gamestate_snapshots[g_Globals.stage_num];
+        gamestate->rng_state = g_replay_safe_rng.seed;
+        g_replay_unsafe_rng.seed = gamestate->rng_state;
+        g_replay_safe_rng.generation_count = 0;
+        gamestate->stage = g_Globals.stage_num;
+        gamestate->flag_290 = g_Supervisor.unk_700;
+    }
+    else if (mode == REPLAY_PLAYBACK)
+    {
+        ReplayStageData *stage = &stages[g_Globals.stage_num];
+        RpyGamestate *gamestate = stage->gamestate_at_stage_begin;
+        stage->input_current = stage->input_begin;
+        stage->fps_counts_current = stage->fps_counts_begin;
+        stage->frame_current = -1;
+        g_replay_safe_rng.seed = gamestate->rng_state;
+        g_replay_unsafe_rng.seed = gamestate->rng_state;
+        g_replay_safe_rng.generation_count = 0;
+        memcpy(&g_Globals, gamestate->globals, sizeof(gamestate->globals));
+    }
+}
+
+// TODO: the original realigns its frame (and esp, -8; most likely for a
+// callee such as repopulate_options) and reads the stage before clearing
+// current_tick_num_in_stage in the recording branch.
+// FUNCTION: TH16 0x448eb0
+HARNESS_CALLED void ReplayManager::begin_stage()
+{
+    if (on_tick_func != NULL)
+    {
+        on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
+    }
+    if (on_tick_22_func != NULL)
+    {
+        on_tick_22_func->flags |= UPDATE_FUNC_ACTIVE;
+    }
+    if (on_draw_func != NULL)
+    {
+        on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+    }
+    clear_input_state();
+    if (mode == REPLAY_RECORDING)
+    {
+        RpyGamestate *gamestate = (RpyGamestate *)stage_gamestate_snapshots[g_Globals.stage_num];
+        free_chunks(g_Globals.stage_num);
+        currently_recording_chunk = new_chunk(g_Globals.stage_num);
+        if (g_Supervisor.unk_700 == 0)
+        {
+            memcpy(gamestate->globals, &g_Globals, sizeof(gamestate->globals));
+        }
+        gamestate->player_pos_subpixel[0] = g_Player->inner.pos_subpixel.x;
+        gamestate->player_pos_subpixel[1] = g_Player->inner.pos_subpixel.y;
+        current_tick_num_in_stage = 0;
+        stage_num = g_Globals.stage_num;
+        ((RpyGamestate *)stage_gamestate_snapshots[stage_num])->player_is_focused = g_Player->inner.is_focused;
+    }
+    else if (mode == REPLAY_PLAYBACK)
+    {
+        RpyGamestate *gamestate = stages[g_Globals.stage_num].gamestate_at_stage_begin;
+        stage_num = g_Globals.stage_num;
+        g_Player->set_position_subpixel((Int2 *)gamestate->player_pos_subpixel);
+        Player *player = g_Player;
+        player->inner.is_focused = gamestate->player_is_focused;
+        if (g_Globals.stage_num == 3)
+        {
+            unk_10 = 1;
+        }
+        ReplayStageData *stage = &stages[g_Globals.stage_num];
+        stage->frame_current = 0;
+        stage->input_current = stage->input_begin;
+        stage->fps_counts_current = stage->fps_counts_begin;
+        player->inner.repopulate_options();
+    }
+    current_tick_num_in_stage = 0;
+}
+
+// GLOBAL: TH16 0x4a5144
+i32 g_input_repeat_time[0x20];
+
+// FUNCTION: TH16 0x449120
+void clear_input_state()
+{
+    memset(g_input_repeat_time, 0, sizeof(g_input_repeat_time));
+    memset(g_InputState.hold_time, 0, 0x80);
+    g_InputState.hold_time[0x20] = 0;
+    g_InputState.input = 0;
+    g_InputState.input_prev = 0;
+    g_InputState.unk_8c = 0;
+    g_InputState.input_rising = 0;
+    g_InputState.input_falling = 0;
+    g_InputState.unk_9c = 0;
+}
+
+// TODO: register allocation in the unregister_locked blocks (the original
+// keeps each func in ebx and loads the registry inside the null check) and
+// our loops get alignment padding the original lacks.
+// FUNCTION: TH16 0x447c80
+ReplayManager::~ReplayManager()
+{
+    delete (RpyHeader *)rpy_file;
+    for (i32 i = 0; i < 8; i++)
+    {
+        free_chunks(i);
+    }
+    delete info;
+    info = NULL;
+    for (i32 i = 0; i < 8; i++)
+    {
+        delete (RpyGamestate *)stage_gamestate_snapshots[i];
+        stage_gamestate_snapshots[i] = NULL;
+    }
+    g_UpdateFuncRegistry->unregister_locked(on_tick_func);
+    g_UpdateFuncRegistry->unregister_locked(on_tick_22_func);
+    g_UpdateFuncRegistry->unregister_locked(on_draw_func);
+    if (g_ReplayManager == this)
+    {
+        g_ReplayManager = NULL;
+    }
+}
+
+// Shows the frame rate recorded in the replay while it plays back.
+// FUNCTION: TH16 0x4482f0
+int __fastcall ReplayManager::on_draw_47_body(void *arg)
+{
+    ReplayManager *replay = (ReplayManager *)arg;
+    if (g_GameThread != NULL && replay->mode != REPLAY_RECORDING && replay->mode == REPLAY_PLAYBACK)
+    {
+        D3DXVECTOR3 pos(383.0f, 450.0f, 0.0f);
+        f32 fps = replay->current_fps;
+        g_AsciiManager->color.d3d = fps < 30.0f ? 0xff5050ff : fps < 50.0f ? 0xffa0a0ff : 0xffffffff;
+        g_AsciiManager->create_stringf(&pos, "%3d", replay->current_fps);
+        g_AsciiManager->color.d3d = 0xffffffff;
+    }
     return 1;
 }
 

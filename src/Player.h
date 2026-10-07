@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 #include <d3dx9math.h>
 
 #include "AnmManager.h"
@@ -24,7 +26,10 @@ struct Int2
 struct PlayerOption
 {
     i32 active;
-    u8 unk_4[0x54 - 0x4];
+    // Some array of a type with a constructor lies in here: without one,
+    // PlayerInner's constructor unrolls the loops over the options.
+    D3DXVECTOR3 unk_4[2];
+    u8 unk_1c[0x54 - 0x1c];
     Int2 scaled_preferred_pos;
     Int2 scaled_cur_pos;
     Int2 scaled_preferred_pos_rel_to_player;
@@ -67,6 +72,9 @@ struct PlayerBullet
     u8 unk_b4[0xc0 - 0xb4];
 
     struct PlayerDamageSource *damage_source();
+    // 0x444e10. Fires the shooter ref names from this (free) bullet; 0 on
+    // success.
+    i32 create(i32 shooter_ref, i32 time, struct PlayerInner *inner);
     // 0x445e20. The default reaction to hitting an enemy: the bullet
     // stops being a damage source and plays its hit animation.
     i32 hit();
@@ -116,7 +124,10 @@ struct PlayerInner
     ZunTimer shoot_key_short_timer;
     ZunTimer shoot_key_long_timer;
     i32 num_main_options;
-    u8 unk_15fe8[0x16028 - 0x15fe8];
+    // Per option (8 main, then 8 season): nonzero while the option's
+    // laser is out, which stops it firing more (ExpHP: index 2 is Marisa's
+    // onscreen_laser_power_level).
+    i32 option_lasers[0x10];
     ZunTimer iframes;
     // 0x20: damage is multiplied this frame (EnemyManager::update).
     u32 flags;
@@ -129,6 +140,9 @@ struct PlayerInner
     f32 speed_multiplier;
     u8 unk_1607c[0x16090 - 0x1607c];
 
+    // 0x440ec0. Only the members' constructors; out of line, as the
+    // original calls it for both of Player's copies and a global one.
+    PlayerInner();
     // 0x4440e0
     void repopulate_options();
 };
@@ -155,7 +169,7 @@ extern DamageSourceHitFunc const g_damage_source_hit_funcs[4];
 struct ShtShooter
 {
     i8 fire_rate;
-    u8 start_delay;
+    i8 start_delay;
     i16 damage;
     Float2 offset_from_option;
     Float2 hitbox;
@@ -167,8 +181,8 @@ struct ShtShooter
     u8 anm;
     u8 anm_hit;
     i16 sfx_id;
-    u8 fire_rate_long;
-    u8 start_delay_long;
+    i8 fire_rate_long;
+    i8 start_delay_long;
     ShtBulletFunc func_on_init;
     ShtBulletFunc func_on_tick;
     ShtBulletFunc func_3;
@@ -188,8 +202,16 @@ struct ShtFile
     f32 move_speed_focused;
     f32 move_speed_diagonal;
     f32 move_speed_focused_diagonal;
-    i16 power_level_count;
-    i16 max_damage_u;
+    union
+    {
+        struct
+        {
+            i16 power_level_count;
+            i16 max_damage_u;
+        };
+        // How the code reads it.
+        i32 num_power_levels;
+    };
     i32 power_per_level;
     i32 max_damage;
     i32 unk_2c[5];
@@ -198,6 +220,9 @@ struct ShtFile
     ShtShooter *shooter_arrays[0xa];
     ShtShooter shooters[1];
 };
+
+struct Player;
+extern Player *g_Player;
 
 struct Player
 {
@@ -209,7 +234,7 @@ struct Player
     AnmVm vm;
     PlayerInner inner;
     // LoLK leftover (ExpHP: __lolk_snapshot_inner).
-    u8 unk_166a0[0x2c730 - 0x166a0];
+    PlayerInner snapshot_inner;
     BoundingBox3 hurtbox;
     D3DXVECTOR3 hurtbox_halfsize;
     D3DXVECTOR3 item_attract_box_unfocused_halfsize;
@@ -220,13 +245,33 @@ struct Player
     u8 unk_2c784[0x2c788 - 0x2c784];
     ShtFile *sht_file;
     ShtFile *sht_file_subseason;
-    u8 unk_2c790[0x2c798 - 0x2c790];
+    i32 unk_2c790;
+    u8 unk_2c794;
+    u8 unk_2c795[0x2c798 - 0x2c795];
     InterpFloat player_scale_i;
     // Only used while inner.flags has 0x10.
     f32 player_scale;
     // Set every frame by the winter release.
     f32 damage_multiplier;
-    u8 unk_2c7d0[0x2c828 - 0x2c7d0];
+    i32 unk_2c7d0;
+    i32 unk_2c7d4;
+    i32 unk_2c7d8;
+    u8 unk_2c7dc[0x2c828 - 0x2c7dc];
+
+    Player()
+    {
+        memset(this, 0, sizeof(Player));
+        g_Player = this;
+    }
+    // 0x441a50
+    ~Player();
+    // 0x441c60 (ExpHP: Player::operator new).
+    static Player *create();
+    // 0x440fb0. Loads the shot type and sets up the player; 0 on success.
+    i32 initialize();
+    // 0x441740 (ExpHP: Player::destroy). Puts the player back in its
+    // starting state for a new stage. Works on g_Player.
+    HARNESS_CALLED void reset();
 
     // 0x4449b0. Returns the index of the new damage source plus one.
     HARNESS_CALLED i32 create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 time, i32 damage);
@@ -262,6 +307,14 @@ struct Player
     }
     // 0x443f10
     void die();
+    // 0x445360. Fires one shooter if a bullet is free (and the option's
+    // laser is not out); -1 if creating the bullet failed.
+    i32 shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner);
+    // 0x445470. Fires every shooter of the current power and season level
+    // whose rate matches the shot key timers.
+    i32 do_shooting(i32 short_time, i32 long_time);
+    // 0x4455d0. Runs the shot key timers while the player is alive.
+    i32 tick_shooting_state();
     // Enters state 1 for 60 frames.
     void start_respawn();
     // 0x442560
@@ -270,6 +323,9 @@ struct Player
     static i32 __fastcall on_draw_callback(Player *player);
 
     // Members that reach the player through g_Player; LTCG dropped this.
+    // 0x444cf0. Counts a graze at pos: effect, popup, sound and a graze
+    // item flying away from the player.
+    HARNESS_CALLED void do_graze(Float3 *pos);
     // Angle from pos to the player.
     HARNESS_CALLED f32 angle_to_player(Float3 *pos);
     // Whether a rectangle (pos, size) or circle hits the player: 0 no, 1
@@ -277,9 +333,14 @@ struct Player
     // turns a hit into a graze.
     HARNESS_CALLED i32 check_hit_rect(Float3 *pos, Float3 *size, i32 graze_only);
     HARNESS_CALLED i32 check_hit_circle(Float3 *pos, f32 radius, i32 graze_only);
+    // 0x443af0. The same for a rectangle reaching length from pos along
+    // angle, width wide (lasers).
+    HARNESS_CALLED i32 check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only);
 };
 
-extern Player *g_Player;
+// .sht files kept by ~Player when the next Player reuses them.
+extern ShtFile *g_cached_sht_file;
+extern ShtFile *g_cached_sht_file_subseason;
 
 inline PlayerDamageSource *PlayerBullet::damage_source()
 {

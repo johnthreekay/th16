@@ -170,11 +170,29 @@ struct RenderVertex044
     D3DCOLOR diffuse;
 };
 
+// A request to copy part of the back buffer into the texture of a loaded
+// .anm entry (the pause menu's snapshot of the game screen). anm_slot < 0
+// marks a free entry.
+struct AnmScreenCopy
+{
+    i32 anm_slot;
+    i32 entry;
+    i32 src_x;
+    i32 src_y;
+    i32 src_width;
+    i32 src_height;
+    i32 dst_x;
+    i32 dst_y;
+    i32 dst_width;
+    i32 dst_height;
+};
+
 // Loads and runs every ANM file.
 struct AnmManager
 {
     ThreadInf thread;
-    u8 unk_1c[0xc0 - 0x1c];
+    u8 unk_1c[0x20 - 0x1c];
+    AnmScreenCopy screen_copies[4];
     // Cleared every frame by GameThread's on_draw.
     i32 unk_c0;
     i32 unk_c4;
@@ -279,6 +297,14 @@ struct AnmManager
             }
         }
     }
+
+    // 0x440c60. Queues a copy of the back buffer rectangle into an entry's
+    // texture; dropped when all four entries are in use.
+    DECOMP_NOINLINE i32 queue_screen_copy(i32 anm_slot, i32 entry, i32 src_x, i32 src_y, i32 src_width, i32 src_height,
+                          i32 dst_x, i32 dst_y, i32 dst_width, i32 dst_height);
+    // 0x440cd0. The same into the sprite a VM shows. Every caller goes
+    // through g_AnmManager.
+    HARNESS_CALLED i32 copy_screen_to_sprite(AnmId id, i32 src_x, i32 src_y, i32 src_width, i32 src_height);
 
     // 0x46f270 (ExpHP: AnmBehemoth::disable_vms_from_anm_file).
     void disable_vms_from_anm_file(AnmLoaded *anm);

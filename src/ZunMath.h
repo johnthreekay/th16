@@ -87,6 +87,8 @@ HARNESS_CALLED f32 zun_cosf(f32 x);
 // The same for floorf (0x405260) and atan2f (0x4052a0).
 HARNESS_CALLED f32 zun_floorf(f32 x);
 HARNESS_CALLED f32 zun_atan2f(f32 y, f32 x);
+// The same for tanf (0x43dc90), which the camera setup (0x43c858) calls.
+HARNESS_CALLED f32 zun_tanf(f32 x);
 
 // The loop of normalize_angle, for the many places that inline it. The
 // original inlines it everywhere; ours would call it from PosVel::step.

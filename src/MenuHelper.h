@@ -32,4 +32,7 @@ struct MenuHelper
     void push();
     // 0x402e20. Back to the parent menu's cursor.
     void pop();
+    // 0x440c00. Adds a choice the cursor skips, moving the cursor off it
+    // (and off any other disabled choice) if needed.
+    void disable(i32 choice);
 };

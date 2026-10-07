@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string.h>
+#include <time.h>
 
 #include "UpdateFunc.h"
 #include "ZunList.h"
@@ -28,6 +29,49 @@ struct RpyGamestate
     i16 rng_state;
     // Frames of input recorded for the stage.
     i32 num_frames;
+    u8 unk_8[0xc - 0x8];
+    // The player's position (Player::inner.pos_subpixel).
+    i32 player_pos_subpixel[2];
+    // The first 0x228 bytes of g_Globals.
+    u8 globals[0x228];
+    // Player::inner.is_focused.
+    i32 player_is_focused;
+    i32 unk_240[0x14];
+    // Supervisor::unk_700 when the stage began.
+    u32 flag_290 : 1;
+    u32 flags_290_hi : 31;
+
+    RpyGamestate()
+    {
+        memset(this, 0, sizeof(RpyGamestate));
+    }
+};
+
+// The replay's description, shown in the replay menu (ExpHP:
+// zRpyThingA0). Only what decompiled code needs. The timestamp is only
+// 4-byte aligned.
+#pragma pack(push, 4)
+struct RpyInfo
+{
+    u8 unk_0[0xc];
+    __time64_t timestamp;
+    u8 unk_14[0x84 - 0x14];
+    i32 character;
+    i32 subshot;
+    i32 difficulty;
+    // The stage the replay ends on; 8 and up for the extra stage.
+    i32 stage;
+    i32 continues_used;
+    i32 spell_id;
+    i32 subseason;
+};
+#pragma pack(pop)
+
+// The start of a .rpy file as the replay manager builds it (ExpHP:
+// zRpyRawFile; "t16r", version 2).
+struct RpyHeader
+{
+    u8 data[0x24];
 };
 
 // A block of recorded input, 900 frames long. ExpHP: zRpyChunk.
@@ -78,7 +122,11 @@ struct ReplayManager
     i32 mode;
     i32 unk_10;
     void *rpy_file;
-    i32 flags_18;
+    union
+    {
+        i32 flags_18;
+        RpyInfo *info;
+    };
     void *stage_gamestate_snapshots[8];
     ZunList<RpyChunk> recorded_chunks_by_stage[8];
     ZunList<RpyChunk> *currently_recording_chunk;
@@ -116,7 +164,22 @@ struct ReplayManager
     static int __fastcall on_tick_22(void *arg);
     static int __fastcall on_draw_47(void *arg);
     static int __fastcall on_draw_47_body(void *arg);
+
+    // 0x449030. Saves the game state at the start of a stage, or restores
+    // it during playback. Every caller goes through g_ReplayManager.
+    HARNESS_CALLED void start_stage();
+    // 0x448eb0. Activates the replay's callbacks and records or replays
+    // the player's state for the new stage. Every caller goes through
+    // g_ReplayManager.
+    HARNESS_CALLED void begin_stage();
+
+    // 0x4483b0. Dates the replay and records the stage it ends on (the
+    // extra stage as 8 and up). Every caller goes through g_ReplayManager.
+    HARNESS_CALLED i32 set_end_stage(i32 extra_stage);
 };
+
+// 0x449120. Clears the game's button state (not the hardware's).
+void clear_input_state();
 
 extern ReplayManager *g_ReplayManager;
 extern char g_current_replay_filename[0x100];

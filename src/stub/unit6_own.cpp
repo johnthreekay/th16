@@ -52,11 +52,6 @@ int __fastcall Supervisor::on_draw_0f(void *arg)
 #include "../PauseMenu.h"
 #include "../ReplayManager.h"
 
-// STUB: TH16 0x447c80
-ReplayManager::~ReplayManager()
-{
-}
-
 // STUB: TH16 0x43e5f0
 int PauseMenu::on_tick()
 {
@@ -112,10 +107,4 @@ int ReplayManager::initialize(i32 mode, const char *filename)
 int ReplayManager::read_replay_file(const char *filename)
 {
     return 0;
-}
-
-// STUB: TH16 0x4482f0
-int __fastcall ReplayManager::on_draw_47_body(void *arg)
-{
-    return 1;
 }

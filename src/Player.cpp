@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <stddef.h>
 #include <math.h>
 #include <string.h>
 
@@ -10,6 +12,11 @@
 #include "AnmManager.h"
 #include "SoundManager.h"
 #include "Spellcard.h"
+#include "Globals.h"
+#include "Item.h"
+#include "PopupManager.h"
+#include "Input.h"
+#include "UpdateFunc.h"
 
 // FUNCTION: TH16 0x440d50
 void Player::set_shoot_key_short_timer(i32 time)
@@ -264,4 +271,311 @@ HARNESS_CALLED void Player::set_position_subpixel(Int2 *pos)
     inner.main_options[1].should_instajump = 1;
     inner.main_options[2].should_instajump = 1;
     inner.main_options[3].should_instajump = 1;
+}
+
+// GLOBAL: TH16 0x4a6f00
+ShtFile *g_cached_sht_file;
+// GLOBAL: TH16 0x4a6efc
+ShtFile *g_cached_sht_file_subseason;
+
+static_assert(offsetof(Player, inner) == 0x610, "Player::inner");
+static_assert(offsetof(Player, snapshot_inner) == 0x166a0, "Player::snapshot_inner");
+static_assert(offsetof(Player, sht_file) == 0x2c788, "Player::sht_file");
+static_assert(sizeof(Player) == 0x2c828, "Player");
+
+// FUNCTION: TH16 0x440ec0
+PlayerInner::PlayerInner()
+{
+}
+
+// FUNCTION: TH16 0x441a50
+Player::~Player()
+{
+    g_UpdateFuncRegistry->unregister_locked(on_tick);
+    g_UpdateFuncRegistry->unregister_locked(on_draw);
+    g_Player = NULL;
+    if (g_Globals.flags_lo_45c & 1)
+    {
+        g_AnmManager->disable_vms_from_anm_file(anm_file);
+        g_AnmManager->disable_vms_from_anm_file(subseason_anm_file);
+        g_cached_sht_file = sht_file;
+        g_cached_sht_file_subseason = sht_file_subseason;
+    }
+    else
+    {
+        g_AnmManager->unload_anm(9);
+        if (sht_file != NULL)
+        {
+            free(sht_file);
+            sht_file = NULL;
+        }
+        g_cached_sht_file = NULL;
+        g_AnmManager->unload_anm(0x1e);
+        if (sht_file_subseason != NULL)
+        {
+            free(sht_file_subseason);
+            sht_file_subseason = NULL;
+        }
+        g_cached_sht_file_subseason = NULL;
+    }
+}
+
+// FUNCTION: TH16 0x441c60
+Player *Player::create()
+{
+    Player *player = new Player;
+    if (player->initialize() != 0)
+    {
+        delete player;
+        return NULL;
+    }
+    return player;
+}
+
+// FUNCTION: TH16 0x441740
+HARNESS_CALLED void Player::reset()
+{
+    inner.state = 1;
+    inner.shoot_key_short_timer = -1;
+    inner.shoot_key_long_timer = -1;
+    inner.time_in_state.reset();
+    inner.time_in_stage.reset();
+    inner.timer_3c.reset();
+    inner.flags &= ~9;
+    delete_vm_and_clear(inner.anm_id_focused_hitbox);
+    inner.anm_id_focused_hitbox.id = 0;
+    delete_vm_and_clear(snapshot_inner.anm_id_focused_hitbox);
+    snapshot_inner.anm_id_focused_hitbox.id = 0;
+    delete_vm_and_clear(inner.anm_id_15fa0);
+    inner.anm_id_15fa0.id = 0;
+    delete_vm_and_clear(snapshot_inner.anm_id_15fa0);
+    snapshot_inner.anm_id_15fa0.id = 0;
+    g_Gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
+    interrupt_options();
+    inner.repopulate_options();
+    inner.flags &= ~4;
+    inner.speed_multiplier = 1.0f;
+    inner.option_lasers[0] = 0;
+    inner.option_lasers[1] = 0;
+    inner.option_lasers[2] = 0;
+    inner.option_lasers[3] = 0;
+    unk_2c7d0 = 0;
+    unk_2c7d4 = 0;
+    unk_2c7d8 = 0;
+    inner.last_created_damage_source_index = 0;
+    player_scale_i.end_time = 0;
+    player_scale = 1.0f;
+    damage_multiplier = 1.0f;
+}
+
+// TODO: the original clears eax before the pops in both early returns; ours
+// does it after popping edi and esi.
+// FUNCTION: TH16 0x445360
+i32 Player::shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner)
+{
+    ShtShooter *shooter = get_shooter(shooter_ref);
+    if (shooter->unk_21 == 2)
+    {
+        i32 option = (i8)shooter->option - 1;
+        if (option >= 100)
+        {
+            option -= 100;
+        }
+        if (this->inner.option_lasers[((shooter_ref & 0xf0000) != 0) * 8 + option] != 0)
+        {
+            return 0;
+        }
+    }
+    PlayerBullet *bullet = this->inner.bullets;
+    i32 i;
+    for (i = 0; i < 0x100; i++, bullet++)
+    {
+        if (bullet->state == 0)
+        {
+            break;
+        }
+    }
+    if (i >= 0x100)
+    {
+        return 0;
+    }
+    return bullet->create(shooter_ref, time, inner) != 0 ? -1 : 0;
+}
+
+// TODO: the original realigns its frame (and esp, -8), most likely for
+// PlayerBullet::create, an opaque stub here.
+// FUNCTION: TH16 0x445470
+i32 Player::do_shooting(i32 short_time, i32 long_time)
+{
+    i32 index = 0;
+    i32 level = g_Globals.power / g_Globals.power_per_level;
+    if (inner.is_focused)
+    {
+        level += sht_file->num_power_levels + 1;
+    }
+    for (ShtShooter *shooter = sht_file->shooter_arrays[level]; shooter->fire_rate >= 0; shooter++, index++)
+    {
+        i32 fire;
+        if (shooter->fire_rate_long == 0)
+        {
+            fire = short_time % shooter->fire_rate == shooter->start_delay;
+        }
+        else
+        {
+            fire = long_time % shooter->fire_rate_long == shooter->start_delay_long;
+        }
+        if (fire)
+        {
+            shoot_one_bullet(level << 8 | index, short_time, &inner);
+        }
+    }
+    index = 0;
+    i32 season_level = g_Globals.season_level();
+    for (ShtShooter *shooter = sht_file_subseason->shooter_arrays[season_level]; shooter->fire_rate >= 0;
+         shooter++, index++)
+    {
+        i32 fire;
+        if (shooter->fire_rate_long == 0)
+        {
+            fire = short_time % shooter->fire_rate == shooter->start_delay;
+        }
+        else
+        {
+            fire = long_time % shooter->fire_rate_long == shooter->start_delay_long;
+        }
+        if (fire)
+        {
+            shoot_one_bullet((season_level | 0x100) << 8 | index, short_time, &inner);
+        }
+    }
+    return 0;
+}
+
+// TODO: the original saves ecx and edi on entry (most likely an LTCG
+// convention asked for by Player::on_tick, a stub here); ours saves edi only
+// around the short timer part.
+// FUNCTION: TH16 0x4455d0
+i32 Player::tick_shooting_state()
+{
+    if (inner.state == 1)
+    {
+        if (inner.shoot_key_short_timer.current < 0)
+        {
+            if (!(g_InputState.input & INPUT_SHOT))
+            {
+                goto long_timer;
+            }
+            if (inner.shoot_key_long_timer.current < 0)
+            {
+                inner.shoot_key_long_timer.set_value(0);
+            }
+            set_shoot_key_short_timer(0);
+        }
+        if (inner.shoot_key_short_timer.current != inner.shoot_key_short_timer.previous)
+        {
+            do_shooting(inner.shoot_key_short_timer.current, inner.shoot_key_long_timer.current);
+        }
+        if (inner.shoot_key_short_timer.current >= 14)
+        {
+            if (g_InputState.input & INPUT_SHOT)
+            {
+                inner.shoot_key_short_timer -= 14;
+            }
+            else
+            {
+                inner.shoot_key_short_timer.set_value(-1);
+            }
+        }
+        else
+        {
+            inner.shoot_key_short_timer++;
+        }
+    long_timer:
+        if (inner.shoot_key_long_timer.current >= 0)
+        {
+            if (inner.shoot_key_long_timer.current >= 0x77)
+            {
+                if (g_InputState.input & INPUT_SHOT)
+                {
+                    inner.shoot_key_long_timer -= 0x77;
+                }
+                else
+                {
+                    inner.shoot_key_long_timer.set_value(-1);
+                }
+            }
+            else
+            {
+                inner.shoot_key_long_timer++;
+            }
+        }
+    }
+    else
+    {
+        unk_2c790 = 0;
+        unk_2c794 = 0;
+    }
+    return 0;
+}
+
+// TODO: our spawn_item is an ordinary thiscall (/INCLUDE keeps it so),
+// where the original's LTCG dropped this and folded unk_3 and unk_6; the
+// graze counters and the midpoint are also scheduled differently.
+// FUNCTION: TH16 0x444cf0
+HARNESS_CALLED void Player::do_graze(Float3 *pos)
+{
+    g_Globals.graze = g_Globals.graze + 1 > 99999999 ? 99999999 : g_Globals.graze + 1;
+    g_Globals.graze_in_chapter = g_Globals.graze_in_chapter + 1 > 99999999 ? 99999999 : g_Globals.graze_in_chapter + 1;
+    Player *player = g_Player;
+    Float3 mid;
+    mid.x = (player->inner.pos.x + pos->x) * 0.5f;
+    mid.y = (pos->y + player->inner.pos.y) * 0.5f;
+    mid.z = 0.0f;
+    g_EffectManager->effect_anm->create_vm(0x18, &mid, 0.0f, -1, 0);
+    g_PopupManager->generate_small_score_popup(&mid, g_Globals.graze_in_chapter, 0xffc0c0ff);
+    g_SoundManager.play_sound_at_position(0x2a, pos->x);
+    g_ItemManager->spawn_item(0x10, pos, 0, atan2f(pos->y - player->inner.pos.y, pos->x - player->inner.pos.x), 1.9f,
+                              0, 0);
+}
+
+// TODO: the original realigns its frame (and esp, -8) and orders the
+// rotation and the bounds differently (same convention and logic).
+// FUNCTION: TH16 0x443af0
+HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only)
+{
+    f32 neg_angle = -angle;
+    D3DXVECTOR3 d = inner.pos - *pos;
+    f32 s = zun_sinf(neg_angle);
+    f32 c = zun_cosf(neg_angle);
+    D3DXVECTOR3 r(d.x * c - d.y * s, d.y * c + d.x * s, 0.0f);
+    D3DXVECTOR3 lo = r - hurtbox_halfsize * 16.0f;
+    D3DXVECTOR3 hi = r + hurtbox_halfsize * 16.0f;
+    if (lo.x > length || lo.y > width * 0.5f || 0.0f > hi.x || width * -0.5f > hi.y)
+    {
+        return 0;
+    }
+    lo = r - hurtbox_halfsize;
+    hi = r + hurtbox_halfsize;
+    if (lo.x > length || lo.y > width * 0.5f || 0.0f > hi.x || width * -0.5f > hi.y)
+    {
+        return 2;
+    }
+    if (g_Gui != NULL && g_Gui->msg != NULL)
+    {
+        return 0;
+    }
+    if (graze_only)
+    {
+        return 2;
+    }
+    if (inner.state == 2 || inner.state == 4 || inner.state == 3)
+    {
+        return 0;
+    }
+    if (inner.iframes.current > 0)
+    {
+        return 0;
+    }
+    die();
+    return 1;
 }

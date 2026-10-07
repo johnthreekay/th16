@@ -76,7 +76,9 @@ struct Supervisor
     i32 gamemode_to_switch_to;
     i32 gamemode_prev;
     i32 unk_6fc;
-    u8 unk_700[0x728 - 0x700];
+    // Copied into each stage's replay snapshot (RpyGamestate::flag_290).
+    i32 unk_700;
+    u8 unk_704[0x728 - 0x704];
     // text.anm: dialogue text and furigana lines.
     struct AnmLoaded *text_anm;
     u8 unk_72c[0x730 - 0x72c];
@@ -133,6 +135,9 @@ struct Supervisor
     static int __fastcall on_draw_38(void *arg);
     static int __fastcall on_draw_39(void *arg);
     static int __fastcall on_draw_55(void *arg);
+
+    // 0x43dcc0. Called once, when DirectInput setup fails.
+    DECOMP_NOINLINE void release_dinput();
 };
 
 enum SupervisorFlags

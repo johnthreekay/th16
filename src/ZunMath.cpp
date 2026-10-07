@@ -76,6 +76,14 @@ HARNESS_CALLED f32 zun_sinf(f32 x)
     return sinf(x);
 }
 
+// TODO: the original realigns its frame (and esp, -8) around the call; ours
+// only does that for sinf and cosf.
+// FUNCTION: TH16 0x43dc90
+HARNESS_CALLED f32 zun_tanf(f32 x)
+{
+    return tanf(x);
+}
+
 // TODO: the original aligns the frame to 64 bytes for its double.
 // FUNCTION: TH16 0x405260
 HARNESS_CALLED f32 zun_floorf(f32 x)

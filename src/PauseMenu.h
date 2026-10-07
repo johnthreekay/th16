@@ -40,6 +40,13 @@ struct PauseMenu
     void set_state(i32 state);
     void set_unk_1f4(i32 value);
 
+    // 0x43f6a0, 0x43f740 and 0x43f790: leaving states 1 (the pause menu),
+    // 2 and 3. They restore the game speed and the play time clock; the
+    // first also resumes the game and the dialogue.
+    void leave_state_1();
+    void leave_state_2();
+    void leave_state_3();
+
     int on_tick();
     int on_draw();
     static int __fastcall on_tick_thunk(void *arg);
