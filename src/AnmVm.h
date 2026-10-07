@@ -136,8 +136,8 @@ enum AnmVmFlagsHi
     // A VM with only FREEZES_WITH_WORLD set does not run while it is on.
     // Starting a script sets FREEZES_AFTER_FIRST_RUN instead, which
     // AnmLoaded::set_vm_script turns into FREEZES_WITH_WORLD after the
-    // first run. VMs with neither (the UI lists' copies of restored
-    // snapshots, some effects) keep running.
+    // first run. VMs with neither (those created into the UI list, the help
+    // manual's and some of the HUD's) keep running.
     ANM_VM_FREEZES_WITH_WORLD = 1 << 14,
     ANM_VM_FREEZES_AFTER_FIRST_RUN = 1 << 15,
     // world_pos and get_slowdown_factor stop walking up the parents at a VM
