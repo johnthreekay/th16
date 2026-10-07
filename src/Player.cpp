@@ -1544,7 +1544,7 @@ i32 Player::on_tick_body()
         {
             if (g_ReplayManager->mode != REPLAY_PLAYBACK)
             {
-                pause_menu_43f350();
+                open_game_over_menu();
             }
             inner.time_in_state++;
             break;

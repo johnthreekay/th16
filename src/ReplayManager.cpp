@@ -174,7 +174,7 @@ u32 ScorefileSection::compute_checksum(i32 size)
 }
 
 // Placeholder for the pause menu's end-of-replay handling (0x43f240).
-void replay_ended_43f240();
+void open_replay_end_menu();
 
 // TODO: the original realigns its frame to 8 bytes and keeps the recorded
 // input in a local (edi, spilled to the frame); ours rereads the global.
@@ -253,7 +253,7 @@ int ReplayManager::on_tick_playback()
                 g_InputState.input = 0;
                 g_InputState.input_rising = 0;
                 g_InputState.input_falling = 0;
-                replay_ended_43f240();
+                open_replay_end_menu();
                 stage_num = -1;
                 return 1;
             }

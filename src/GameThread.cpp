@@ -598,7 +598,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         {
             if (replay_mode != 0)
             {
-                replay_ended_43f240();
+                open_replay_end_menu();
             }
             else if (g_Globals.difficulty != 4)
             {
@@ -922,7 +922,7 @@ i32 stage_clear_42e150()
     {
         if (g_GameThread->replay_mode != 0)
         {
-            replay_ended_43f240();
+            open_replay_end_menu();
             return 0;
         }
         if (g_Globals.game_mode == 2)
@@ -940,7 +940,7 @@ i32 stage_clear_42e150()
                 .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
                 .cleared = 1;
         }
-        game_over_43f500();
+        open_stage_end_menu();
         return 0;
     }
     if (g_Globals.stage_num == 6)
@@ -969,7 +969,7 @@ i32 stage_clear_42e150()
         g_Gui->stage_clear_bonus += bonus;
         if (g_GameThread->replay_mode != 0)
         {
-            replay_ended_43f240();
+            open_replay_end_menu();
             return 0;
         }
         if (g_Scorefile->characters[g_Globals.subshot + g_Globals.character].play_counts[g_Globals.difficulty] < 99999)
@@ -991,7 +991,7 @@ i32 stage_clear_42e150()
         g_Gui->stage_clear_bonus += bonus;
         if (g_GameThread->replay_mode != 0)
         {
-            replay_ended_43f240();
+            open_replay_end_menu();
         }
         else
         {

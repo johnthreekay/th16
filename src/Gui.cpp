@@ -1514,7 +1514,7 @@ void Gui::start_dialogue(i32 script)
     {
         if (g_Spellcard->flags & SPELLCARD_FLAG_80)
         {
-            pause_menu_43f350();
+            open_game_over_menu();
         }
         else
         {
