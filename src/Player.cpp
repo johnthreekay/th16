@@ -13,6 +13,7 @@
 #include "SoundManager.h"
 #include "Spellcard.h"
 #include "Globals.h"
+#include "Input.h"
 #include "UpdateFunc.h"
 
 // FUNCTION: TH16 0x440d50
@@ -352,10 +353,10 @@ HARNESS_CALLED void Player::reset()
     inner.repopulate_options();
     inner.flags &= ~4;
     inner.speed_multiplier = 1.0f;
-    inner.unk_15fe8 = 0;
-    inner.unk_15fec = 0;
-    inner.laser_power_level = 0;
-    inner.unk_15ff4 = 0;
+    inner.option_lasers[0] = 0;
+    inner.option_lasers[1] = 0;
+    inner.option_lasers[2] = 0;
+    inner.option_lasers[3] = 0;
     unk_2c7d0 = 0;
     unk_2c7d4 = 0;
     unk_2c7d8 = 0;
@@ -363,4 +364,153 @@ HARNESS_CALLED void Player::reset()
     player_scale_i.end_time = 0;
     player_scale = 1.0f;
     damage_multiplier = 1.0f;
+}
+
+// TODO: the original clears eax before the pops in both early returns; ours
+// does it after popping edi and esi.
+// FUNCTION: TH16 0x445360
+i32 Player::shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner)
+{
+    ShtShooter *shooter = get_shooter(shooter_ref);
+    if (shooter->unk_21 == 2)
+    {
+        i32 option = (i8)shooter->option - 1;
+        if (option >= 100)
+        {
+            option -= 100;
+        }
+        if (this->inner.option_lasers[((shooter_ref & 0xf0000) != 0) * 8 + option] != 0)
+        {
+            return 0;
+        }
+    }
+    PlayerBullet *bullet = this->inner.bullets;
+    i32 i;
+    for (i = 0; i < 0x100; i++, bullet++)
+    {
+        if (bullet->state == 0)
+        {
+            break;
+        }
+    }
+    if (i >= 0x100)
+    {
+        return 0;
+    }
+    return bullet->create(shooter_ref, time, inner) != 0 ? -1 : 0;
+}
+
+// TODO: the original realigns its frame (and esp, -8), most likely for
+// PlayerBullet::create, an opaque stub here.
+// FUNCTION: TH16 0x445470
+i32 Player::do_shooting(i32 short_time, i32 long_time)
+{
+    i32 index = 0;
+    i32 level = g_Globals.power / g_Globals.power_per_level;
+    if (inner.is_focused)
+    {
+        level += sht_file->num_power_levels + 1;
+    }
+    for (ShtShooter *shooter = sht_file->shooter_arrays[level]; shooter->fire_rate >= 0; shooter++, index++)
+    {
+        i32 fire;
+        if (shooter->fire_rate_long == 0)
+        {
+            fire = short_time % shooter->fire_rate == shooter->start_delay;
+        }
+        else
+        {
+            fire = long_time % shooter->fire_rate_long == shooter->start_delay_long;
+        }
+        if (fire)
+        {
+            shoot_one_bullet(level << 8 | index, short_time, &inner);
+        }
+    }
+    index = 0;
+    i32 season_level = g_Globals.season_level();
+    for (ShtShooter *shooter = sht_file_subseason->shooter_arrays[season_level]; shooter->fire_rate >= 0;
+         shooter++, index++)
+    {
+        i32 fire;
+        if (shooter->fire_rate_long == 0)
+        {
+            fire = short_time % shooter->fire_rate == shooter->start_delay;
+        }
+        else
+        {
+            fire = long_time % shooter->fire_rate_long == shooter->start_delay_long;
+        }
+        if (fire)
+        {
+            shoot_one_bullet((season_level | 0x100) << 8 | index, short_time, &inner);
+        }
+    }
+    return 0;
+}
+
+// TODO: the original saves edi (and a stack slot) for the whole function;
+// ours saves edi only around the short timer part.
+// FUNCTION: TH16 0x4455d0
+i32 Player::tick_shooting_state()
+{
+    if (inner.state == 1)
+    {
+        if (inner.shoot_key_short_timer.current < 0)
+        {
+            if (!(g_InputState.input & INPUT_SHOT))
+            {
+                goto long_timer;
+            }
+            if (inner.shoot_key_long_timer.current < 0)
+            {
+                inner.shoot_key_long_timer.set_value(0);
+            }
+            set_shoot_key_short_timer(0);
+        }
+        if (inner.shoot_key_short_timer.current != inner.shoot_key_short_timer.previous)
+        {
+            do_shooting(inner.shoot_key_short_timer.current, inner.shoot_key_long_timer.current);
+        }
+        if (inner.shoot_key_short_timer.current >= 14)
+        {
+            if (g_InputState.input & INPUT_SHOT)
+            {
+                inner.shoot_key_short_timer -= 14;
+            }
+            else
+            {
+                inner.shoot_key_short_timer.set_value(-1);
+            }
+        }
+        else
+        {
+            inner.shoot_key_short_timer++;
+        }
+    long_timer:
+        if (inner.shoot_key_long_timer.current >= 0)
+        {
+            if (inner.shoot_key_long_timer.current >= 0x77)
+            {
+                if (g_InputState.input & INPUT_SHOT)
+                {
+                    inner.shoot_key_long_timer -= 0x77;
+                }
+                else
+                {
+                    inner.shoot_key_long_timer.set_value(-1);
+                }
+            }
+            else
+            {
+                inner.shoot_key_long_timer++;
+            }
+        }
+    }
+    else
+    {
+        unk_2c790 = 0;
+        unk_2c794 = 0;
+    }
+    return 0;
 }

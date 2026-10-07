@@ -72,6 +72,9 @@ struct PlayerBullet
     u8 unk_b4[0xc0 - 0xb4];
 
     struct PlayerDamageSource *damage_source();
+    // 0x444e10. Fires the shooter ref names from this (free) bullet; 0 on
+    // success.
+    i32 create(i32 shooter_ref, i32 time, struct PlayerInner *inner);
     // 0x445e20. The default reaction to hitting an enemy: the bullet
     // stops being a damage source and plays its hit animation.
     i32 hit();
@@ -121,12 +124,10 @@ struct PlayerInner
     ZunTimer shoot_key_short_timer;
     ZunTimer shoot_key_long_timer;
     i32 num_main_options;
-    i32 unk_15fe8;
-    i32 unk_15fec;
-    // Marisa's laser power while it is on screen (ExpHP).
-    i32 laser_power_level;
-    i32 unk_15ff4;
-    u8 unk_15ff8[0x16028 - 0x15ff8];
+    // Per option (8 main, then 8 season): nonzero while the option's
+    // laser is out, which stops it firing more (ExpHP: index 2 is Marisa's
+    // onscreen_laser_power_level).
+    i32 option_lasers[0x10];
     ZunTimer iframes;
     // 0x20: damage is multiplied this frame (EnemyManager::update).
     u32 flags;
@@ -168,7 +169,7 @@ extern DamageSourceHitFunc const g_damage_source_hit_funcs[4];
 struct ShtShooter
 {
     i8 fire_rate;
-    u8 start_delay;
+    i8 start_delay;
     i16 damage;
     Float2 offset_from_option;
     Float2 hitbox;
@@ -180,8 +181,8 @@ struct ShtShooter
     u8 anm;
     u8 anm_hit;
     i16 sfx_id;
-    u8 fire_rate_long;
-    u8 start_delay_long;
+    i8 fire_rate_long;
+    i8 start_delay_long;
     ShtBulletFunc func_on_init;
     ShtBulletFunc func_on_tick;
     ShtBulletFunc func_3;
@@ -201,8 +202,16 @@ struct ShtFile
     f32 move_speed_focused;
     f32 move_speed_diagonal;
     f32 move_speed_focused_diagonal;
-    i16 power_level_count;
-    i16 max_damage_u;
+    union
+    {
+        struct
+        {
+            i16 power_level_count;
+            i16 max_damage_u;
+        };
+        // How the code reads it.
+        i32 num_power_levels;
+    };
     i32 power_per_level;
     i32 max_damage;
     i32 unk_2c[5];
@@ -236,7 +245,9 @@ struct Player
     u8 unk_2c784[0x2c788 - 0x2c784];
     ShtFile *sht_file;
     ShtFile *sht_file_subseason;
-    u8 unk_2c790[0x2c798 - 0x2c790];
+    i32 unk_2c790;
+    u8 unk_2c794;
+    u8 unk_2c795[0x2c798 - 0x2c795];
     InterpFloat player_scale_i;
     // Only used while inner.flags has 0x10.
     f32 player_scale;
@@ -296,6 +307,14 @@ struct Player
     }
     // 0x443f10
     void die();
+    // 0x445360. Fires one shooter if a bullet is free (and the option's
+    // laser is not out); -1 if creating the bullet failed.
+    i32 shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner);
+    // 0x445470. Fires every shooter of the current power and season level
+    // whose rate matches the shot key timers.
+    i32 do_shooting(i32 short_time, i32 long_time);
+    // 0x4455d0. Runs the shot key timers while the player is alive.
+    i32 tick_shooting_state();
     // Enters state 1 for 60 frames.
     void start_respawn();
     // 0x442560
