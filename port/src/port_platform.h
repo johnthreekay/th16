@@ -28,13 +28,14 @@ struct SDL_Window;
 // display (SDL video failed to start; the game then runs windowless).
 SDL_Window *port_sdl_window(HWND hwnd = NULL);
 
-// Optional hook for the renderer, called by CreateWindowExA just before it
-// creates the SDL window: it may set SDL_GL_* attributes and returns the
-// SDL_WINDOW_* flags the renderer needs (SDL_WINDOW_OPENGL, ...). When the
-// renderer does not define it, the window is created with
-// SDL_WINDOW_OPENGL. If creation fails with the requested flags, the window
-// is created again without them (and the renderer finds no GL support).
-extern "C" uint32_t port_renderer_window_flags(void) __attribute__((weak));
+// The SDL_WINDOW_* flags the renderer needs on the game window (default
+// SDL_WINDOW_OPENGL). WinMain calls Direct3DCreate9 before it creates the
+// window (and again before it recreates it after a restart), so the
+// renderer sets them there, together with any SDL_GL_* attributes that must
+// be set before the window exists. If creation fails with these flags, the
+// window is created without them (and the renderer then finds no GL
+// support on it).
+void port_set_window_flags(uint32_t flags);
 
 // The size of the window's drawable area in pixels (what the back buffer is
 // scaled into when presenting; it differs from the back buffer size in

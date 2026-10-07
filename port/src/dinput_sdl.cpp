@@ -3,6 +3,7 @@
 // set through DIPROP_RANGE). Supervisor::dx_direct_input_initialize
 // creates them; Input.cpp and Supervisor::read_joypad poll them each frame.
 // The states come from port_input.h; see there for the controller layout.
+#include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -413,7 +414,7 @@ struct PortJoystick : public PortComObject<IDirectInputDevice8A>
             {
                 value = 0.5;
             }
-            LONG scaled = (LONG)(range_min[i] + value * (double)(range_max[i] - range_min[i]) + 0.5);
+            LONG scaled = (LONG)floor(range_min[i] + value * (double)(range_max[i] - range_min[i]) + 0.5);
             *(LONG *)((BYTE *)js + g_axes[i].offset) = scaled;
         }
         for (int i = 0; i < 4; i++)

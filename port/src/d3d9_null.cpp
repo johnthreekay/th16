@@ -649,6 +649,8 @@ bool image_size(const uint8_t *data, UINT size, UINT *width, UINT *height)
 extern "C" IDirect3D9 *Direct3DCreate9(UINT SDKVersion)
 {
     port_log("null renderer: nothing is drawn");
+    // No OpenGL needed on the window.
+    port_set_window_flags(0);
     return new NullDirect3D9();
 }
 

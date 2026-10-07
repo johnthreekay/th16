@@ -171,8 +171,29 @@ foreach(test_target th16_dsound_test th16_dsound_game_test)
     target_link_libraries(${test_target} PRIVATE SDL2::SDL2 Threads::Threads m)
 endforeach()
 
+# Tests of the platform layer (tests/platform_test.cpp): files, kernel
+# objects, input, GDI text; no game code or data.
+add_executable(th16_platform_test tests/platform_test.cpp
+    src/crt_compat.cpp src/win32_kernel.cpp src/win32_thread.cpp src/win32_user.cpp src/win32_misc.cpp
+    src/port_vfs.cpp src/port_text.cpp src/input_sdl.cpp src/dinput_sdl.cpp src/gdi_text.cpp)
+target_include_directories(th16_platform_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(th16_platform_test PRIVATE TH16_PORT)
+target_compile_options(th16_platform_test PRIVATE
+    -include ${CMAKE_CURRENT_SOURCE_DIR}/include/port_prelude.h -Wall -Wno-unknown-pragmas)
+if(TH16_M32)
+    target_compile_options(th16_platform_test PRIVATE -m32 -msse2 -mfpmath=sse)
+    target_link_options(th16_platform_test PRIVATE -m32)
+endif()
+target_link_libraries(th16_platform_test PRIVATE SDL2::SDL2 PkgConfig::TH16_TEXT Threads::Threads m)
+if(APPLE)
+    target_link_libraries(th16_platform_test PRIVATE ${ICONV_LIBRARY})
+endif()
+
 # `ctest` runs the mixer tests that need no game data, on SDL's dummy driver
 # (tests/run_dsound_tests.sh runs the rest).
 enable_testing()
 add_test(NAME dsound COMMAND th16_dsound_test)
 set_tests_properties(dsound PROPERTIES ENVIRONMENT "SDL_AUDIODRIVER=dummy;SDL_AUDIO_DRIVER=dummy")
+add_test(NAME platform COMMAND th16_platform_test)
+set_tests_properties(platform PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_JOYSTICK_HIDAPI=0")

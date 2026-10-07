@@ -81,6 +81,9 @@ std::map<std::string, WNDPROC> g_classes;
 std::set<PortHwnd *> g_hwnds;
 PortWindow *g_game_window;
 
+// What the renderer asked for (port_set_window_flags).
+Uint32 g_renderer_window_flags = SDL_WINDOW_OPENGL;
+
 int g_cursor_count;
 bool g_cursor_set = true;
 bool g_quit_posted;
@@ -144,9 +147,14 @@ void apply_window_mode(PortWindow *window)
     }
     if (window->style & WS_POPUP)
     {
-        SDL_SetWindowFullscreen(window->sdl, SDL_WINDOW_FULLSCREEN_DESKTOP);
+        port_log("window: full screen");
+        if (SDL_SetWindowFullscreen(window->sdl, SDL_WINDOW_FULLSCREEN_DESKTOP) != 0)
+        {
+            port_log("SDL_SetWindowFullscreen failed: %s", SDL_GetError());
+        }
         return;
     }
+    port_log("window: %dx%d windowed", window->width, window->height);
     SDL_SetWindowFullscreen(window->sdl, 0);
     if (SDL_GetWindowFlags(window->sdl) & SDL_WINDOW_MAXIMIZED)
     {
@@ -343,7 +351,7 @@ SDL_Window *create_sdl_window(const char *title, int x, int y, int width, int he
     {
         return NULL;
     }
-    Uint32 renderer_flags = port_renderer_window_flags != NULL ? port_renderer_window_flags() : SDL_WINDOW_OPENGL;
+    Uint32 renderer_flags = g_renderer_window_flags;
     Uint32 flags = SDL_WINDOW_SHOWN | (full_screen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
     if (x == CW_USEDEFAULT || !position_on_screen(x, y, width, height))
     {
@@ -365,6 +373,11 @@ SDL_Window *create_sdl_window(const char *title, int x, int y, int width, int he
 }
 
 } // namespace
+
+void port_set_window_flags(uint32_t flags)
+{
+    g_renderer_window_flags = flags;
+}
 
 SDL_Window *port_sdl_window(HWND hwnd)
 {
