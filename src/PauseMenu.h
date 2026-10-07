@@ -3,6 +3,7 @@
 #include "AnmManager.h"
 #include "MenuHelper.h"
 #include "UpdateFunc.h"
+#include "ZunMath.h"
 #include "ZunTimer.h"
 #include "types.h"
 
@@ -24,10 +25,17 @@ struct PauseMenu
     i32 state;
     i32 prev_state;
     i32 unk_1f4;
-    u8 unk_1f8[0x208 - 0x1f8];
+    // Where the next character of the replay or score name goes.
+    i32 name_cursor;
+    u8 unk_1fc[0x200 - 0x1fc];
+    // Nonzero once the score name is entered (the keyboard is hidden).
+    i32 unk_200;
+    u8 unk_204[0x208 - 0x204];
     i32 saved_global_4d9d90;
     ReplayManager *replays[25];
-    u8 unk_270[0x2e0 - 0x270];
+    u8 unk_270[0x2d4 - 0x270];
+    // The replay or score name being entered.
+    char name[0xc];
     f32 saved_game_speed;
     u8 unk_2e4[0x3ec - 0x2e4];
     i32 flags_3ec;
@@ -49,6 +57,18 @@ struct PauseMenu
 
     int on_tick();
     int on_draw();
+    // 0x43e730. The name entry keyboard; the name is drawn at pos.
+    void draw_keyboard(Float3 pos);
+    // 0x43e8c0. One line of the replay list. Does not use this; LTCG
+    // dropped it.
+    HARNESS_CALLED void draw_replay_entry(i32 index, Float3 *pos, struct RpyInfo *info);
+    // 0x43e9b0
+    void draw_replay_list();
+    // 0x43eb50. Naming the replay to save.
+    void draw_replay_name_entry();
+    // 0x43ec10. The high score table of the game that just ended, with the
+    // keyboard for the name.
+    void draw_high_scores();
     static int __fastcall on_tick_thunk(void *arg);
     static int __fastcall on_draw_thunk(void *arg);
 };

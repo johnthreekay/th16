@@ -29,12 +29,6 @@ int PauseMenu::on_tick()
     return 1;
 }
 
-// STUB: TH16 0x43edc0
-int PauseMenu::on_draw()
-{
-    return 1;
-}
-
 #include "../AsciiManager.h"
 #include "../PopupManager.h"
 

@@ -145,8 +145,8 @@ struct ScorefileHeader
 struct ScorefileScore
 {
     u32 score;
-    u8 stage;
-    u8 continues;
+    i8 stage;
+    i8 continues;
     char name[9];
     u8 unk_f;
     __time64_t date;

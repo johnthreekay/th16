@@ -55,7 +55,9 @@ struct RpyGamestate
 #pragma pack(push, 4)
 struct RpyInfo
 {
-    u8 unk_0[0xc];
+    char name[0xa];
+    // 2: spell practice.
+    u16 flags_a;
     __time64_t timestamp;
     u8 unk_14[0x84 - 0x14];
     i32 character;
