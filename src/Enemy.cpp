@@ -32,7 +32,7 @@ static_assert(sizeof(EnemyManager) == 0x190, "EnemyManager size");
 i32 EnemyLife::receive_damage(i32 damage)
 {
     total_damage_including_ignored += damage;
-    if (is_spell & 1)
+    if (is_spell & ENEMY_LIFE_SPELL)
     {
         current_scaled_by_seven -= damage;
         return current = (current_scaled_by_seven - starting_value_for_next_attack * 7) / 7 +
@@ -99,7 +99,7 @@ EnemyInf::EnemyInf(const char *sub_name)
     context.current_context->cur_location.subroutine_index = file_manager->find_sub_by_name(sub_name);
     context.current_context->cur_location.offset_from_first_instruction = 0;
     context.current_context->time = 0.0f;
-    enemy.life.is_spell &= ~2;
+    enemy.life.is_spell &= ~ENEMY_LIFE_KILL;
     enemy.life.current = 0;
     enemy.life.maximum = 0;
     enemy.life.remaining_for_cur_attack = 0;
@@ -734,7 +734,7 @@ int EnemyData::step_logic()
             flags_low |= ENEMY_FLAG_DAMAGED;
         }
     }
-    if (life.is_spell & 2)
+    if (life.is_spell & ENEMY_LIFE_KILL)
     {
         if (full->die() != 0)
         {

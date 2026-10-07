@@ -1914,7 +1914,7 @@ int EnemyData::ecl_run_over_300()
         }
         g_Spellcard->start(spell_id, name, full->context.current_context->get_int_arg(1),
                            full->context.current_context->get_int_arg(2));
-        life.is_spell |= 1;
+        life.is_spell |= ENEMY_LIFE_SPELL;
         life.current_scaled_by_seven = life.current * 7;
     }
         // fall through
@@ -1929,7 +1929,7 @@ int EnemyData::ecl_run_over_300()
     // spellEnd().
     case ECL_OP_SPELL_END:
         g_Spellcard->end();
-        life.is_spell &= ~1;
+        life.is_spell &= ~ENEMY_LIFE_SPELL;
         break;
     // spellTimeout(): no bonus decay.
     case ECL_OP_SPELL_TIMEOUT:
