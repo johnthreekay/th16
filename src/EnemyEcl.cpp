@@ -136,6 +136,17 @@ static inline void set_next(EnemyInf *enemy, int index, int life, int time, cons
     }
 }
 
+// The fog instruction's `new Fog(0, 0x11, 0)`, kept out of line for now.
+// The original constructs the fog in ecl_run_over_300 itself, which gives
+// that function an EH frame; in our partial program that frame makes LTCG
+// stop inlining the UCRT math into zun_fabsf, zun_cosf, zun_sinf,
+// zun_floorf and shoot_bullets (they lose their matches). Once more of the
+// program exists, try moving it back.
+static DECOMP_NOINLINE Fog *new_enemy_fog()
+{
+    return new Fog(0, 0x11, 0);
+}
+
 // FUNCTION: TH16 0x41dcb0
 int EnemyData::ecl_run_over_300()
 {
@@ -2207,7 +2218,7 @@ int EnemyData::ecl_run_over_300()
         *(ZunAngle *)&fog.unk_18 = 0.0f;
         if (fog.fog_radius > 0.0f)
         {
-            fog.fog_ptr = new Fog(0, 0x11, 0);
+            fog.fog_ptr = new_enemy_fog();
         }
         break;
     // callSTD(label): jumps the stage script.
