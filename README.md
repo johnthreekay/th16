@@ -403,6 +403,21 @@ decompiled code the surroundings it had in the original:
 - quickdiff's percentages are unreliable for functions with jump tables;
   use compare.py there.
 
+- The input words g_hardware_input_pressed/_repeat are fields of the
+  address-taken input struct at 0x4a50b0 in the original; ours must be
+  address-exposed (harness_w5d_input_words) or menu code keeps them in
+  registers. input_pressed_or_repeating inlines as an if/return pair:
+  `(p & m) || (r & m)` merges into `(p | r) & m`, a forceinline helper does
+  not.
+- Shared tail blocks come from duplicated statements the compiler
+  tail-merged, not from goto: write the statements twice.
+- AnmId::find_or_clear is called at all 25 original sites (DECOMP_NOINLINE).
+- Making get_vm_with_id visible (with DECOMP_NOINLINE) wins five matches
+  (Fog::~Fog, PauseMenu::open, interrupt_child, the options/key config
+  sprite updates) and loses five (anm_effect_2_on_copy_2,
+  EffectManager::next_index, BombAyaSubInf::on_tick, Spellcard::on_draw_body,
+  PauseMenu::on_draw); it stays an opaque stub until that is resolved.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
