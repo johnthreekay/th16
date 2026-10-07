@@ -449,8 +449,9 @@ i32 Player::do_shooting(i32 short_time, i32 long_time)
     return 0;
 }
 
-// TODO: the original saves edi (and a stack slot) for the whole function;
-// ours saves edi only around the short timer part.
+// TODO: the original saves ecx and edi on entry (most likely an LTCG
+// convention asked for by Player::on_tick, a stub here); ours saves edi only
+// around the short timer part.
 // FUNCTION: TH16 0x4455d0
 i32 Player::tick_shooting_state()
 {

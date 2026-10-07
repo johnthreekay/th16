@@ -2,6 +2,9 @@
 
 #include "PauseMenu.h"
 #include "ReplayManager.h"
+#include "GameThread.h"
+#include "Gui.h"
+#include "Supervisor.h"
 
 // GLOBAL: TH16 0x4a6ef4
 PauseMenu *g_PauseMenu;
@@ -92,4 +95,56 @@ int __fastcall PauseMenu::on_tick_thunk(void *arg)
 int __fastcall PauseMenu::on_draw_thunk(void *arg)
 {
     return ((PauseMenu *)arg)->on_draw();
+}
+
+extern double g_play_time_runtime;
+double LTCG_VECTORCALL get_runtime();
+
+// TODO: the original saves ecx and edi on entry (most likely an LTCG
+// convention its caller, the undecompiled pause menu tick, asks for); ours
+// saves edi only around the dialogue part.
+// FUNCTION: TH16 0x43f6a0
+void PauseMenu::leave_state_1()
+{
+    if (g_GameThread->replay_mode == 0)
+    {
+        g_play_time_runtime = get_runtime();
+    }
+    g_GameThread->flags.flag_4 = 0;
+    g_game_speed = saved_game_speed;
+    Gui *gui = g_Gui;
+    if (gui->msg != NULL)
+    {
+        gui->msg->show();
+    }
+    AnmVm *vm = g_AnmManager->get_vm_with_id(gui->ids_11c[4]);
+    if (vm != NULL)
+    {
+        vm->set_flag_lo_2_tree_inline();
+    }
+    g_unk_4d9d90 = saved_global_4d9d90;
+}
+
+// FUNCTION: TH16 0x43f740
+void PauseMenu::leave_state_2()
+{
+    if (g_GameThread->replay_mode == 0)
+    {
+        g_play_time_runtime = get_runtime();
+    }
+    AnmManager::interrupt_tree(anm_id_1e8, 1);
+    AnmManager::interrupt_tree(anm_id_1e4, 1);
+    g_game_speed = saved_game_speed;
+}
+
+// FUNCTION: TH16 0x43f790
+void PauseMenu::leave_state_3()
+{
+    if (g_GameThread->replay_mode == 0)
+    {
+        g_play_time_runtime = get_runtime();
+    }
+    AnmManager::interrupt_tree(anm_id_1e8, 1);
+    AnmManager::interrupt_tree(anm_id_1e4, 1);
+    g_game_speed = saved_game_speed;
 }
