@@ -8,6 +8,15 @@
 #
 # The matching MSVC build (scripts/build.py) never reads this file.
 cmake_minimum_required(VERSION 3.16)
+
+option(TH16_M32 "Build a 32-bit x86 binary (keeps the original's struct layout)" OFF)
+if(TH16_M32)
+    # In the flags CMake starts from, so that its compiler checks see a
+    # 32-bit target (CMAKE_SIZEOF_VOID_P 4) and find_package picks the
+    # 32-bit libraries (lib32/cmake/SDL2).
+    set(CMAKE_CXX_FLAGS_INIT "-m32")
+endif()
+
 project(th16_port CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -18,8 +27,6 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
 
-option(TH16_M32 "Build a 32-bit x86 binary (keeps the original's struct layout)" OFF)
-
 set(TH16_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 # Every game source except the matching build's scaffolding: src/stub/,
@@ -29,14 +36,14 @@ set(TH16_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 file(GLOB TH16_GAME_SOURCES CONFIGURE_DEPENDS ${TH16_ROOT}/src/*.cpp)
 file(GLOB TH16_PORT_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
-# Renderer testing before the platform layer exists: port/test/platform_shim.cpp
+# Renderer testing before the platform layer exists: port/tests/platform_shim.cpp
 # replaces the file, thread and window stubs (linked first, duplicates
 # allowed, so its definitions win). Never needed once the real platform
 # layer is in.
 option(TH16_TEST_SHIM "Link the test-only platform shim over the stubs" OFF)
 set(TH16_SHIM_SOURCES)
 if(TH16_TEST_SHIM)
-    set(TH16_SHIM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test/platform_shim.cpp)
+    set(TH16_SHIM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/tests/platform_shim.cpp)
 endif()
 
 add_executable(th16 ${TH16_SHIM_SOURCES} ${TH16_GAME_SOURCES} ${TH16_PORT_SOURCES})
@@ -116,14 +123,37 @@ else()
 endif()
 
 find_package(Threads REQUIRED)
-target_link_libraries(th16 PRIVATE Threads::Threads m)
+# SDL2 (or sdl2-compat), whose CMake package defines SDL2::SDL2: audio output
+# (dsound_sdl.cpp), the window and the OpenGL context (d3d9_gl.cpp, which
+# loads its GL functions through SDL, so nothing links libGL).
+find_package(SDL2 REQUIRED CONFIG)
+target_link_libraries(th16 PRIVATE SDL2::SDL2 Threads::Threads m)
 
-# SDL2 (window, OpenGL context). The renderer loads its GL functions
-# through SDL, so nothing links libGL. For -m32, look in the 32-bit
-# pkg-config directory.
-find_package(PkgConfig REQUIRED)
-if(TH16_M32 AND EXISTS /usr/lib32/pkgconfig AND NOT DEFINED ENV{PKG_CONFIG_LIBDIR})
-    set(ENV{PKG_CONFIG_LIBDIR} "/usr/lib32/pkgconfig:/usr/share/pkgconfig")
-endif()
-pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
-target_link_libraries(th16 PRIVATE PkgConfig::SDL2)
+# Tests of the DirectSound mixer (see NOTES.md, "Audio"):
+# - th16_dsound_test (tests/dsound_test.cpp) drives dsound_sdl.cpp directly;
+# - th16_dsound_game_test (tests/dsound_game_test.cpp) runs the game's own
+#   BGM streaming code (src/DSUtil.cpp) on it.
+add_executable(th16_dsound_test tests/dsound_test.cpp src/dsound_sdl.cpp)
+add_executable(th16_dsound_game_test tests/dsound_game_test.cpp src/dsound_sdl.cpp
+    ${TH16_ROOT}/src/DSUtil.cpp ${TH16_ROOT}/src/CriticalSections.cpp)
+foreach(test_target th16_dsound_test th16_dsound_game_test)
+    target_include_directories(${test_target} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${TH16_ROOT}/src)
+    target_compile_definitions(${test_target} PRIVATE TH16_PORT)
+    target_compile_options(${test_target} PRIVATE
+        -include ${CMAKE_CURRENT_SOURCE_DIR}/include/port_prelude.h
+        -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks -fsigned-char -ffp-contract=off
+        -Wall -Wno-unknown-pragmas -Wno-invalid-offsetof -Wno-parentheses -Wno-sign-compare
+        -Wno-mismatched-new-delete)
+    if(TH16_M32)
+        target_compile_options(${test_target} PRIVATE -m32 -msse2 -mfpmath=sse)
+        target_link_options(${test_target} PRIVATE -m32)
+    endif()
+    target_link_libraries(${test_target} PRIVATE SDL2::SDL2 Threads::Threads m)
+endforeach()
+
+# `ctest` runs the mixer tests that need no game data, on SDL's dummy driver
+# (tests/run_dsound_tests.sh runs the rest).
+enable_testing()
+add_test(NAME dsound COMMAND th16_dsound_test)
+set_tests_properties(dsound PROPERTIES ENVIRONMENT "SDL_AUDIODRIVER=dummy;SDL_AUDIO_DRIVER=dummy")
