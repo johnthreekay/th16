@@ -375,7 +375,7 @@ __forceinline i32 AnmVm::run_script()
             continue;
         // jmpDec
         case 201:
-            (*ANM_INT_PTR(0))--;
+            (*(!ANM_IS_VAR(0) ? &ins->args[0].i : get_int_var_ptr(&ins->args[0].i)))--;
             if (ANM_INT(0) > 0)
             {
                 script_time.set_value(ins->args[2].i);
