@@ -157,15 +157,12 @@ void InterpFloat::reset()
     time.reset();
 }
 
-// TODO: method 17 computes the new bezier_2, then copies initial to current as an integer
-// before storing it, and returns current reloaded; ours stores current from xmm0 (a temp for
-// the new bezier_2 or other statement orders do not change it).
 // FUNCTION: TH16 0x4171c0
 HARNESS_CALLED f32 InterpFloat::step()
 {
     if (end_time > 0)
     {
-        time.tick_mixed();
+        time.tick();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -196,8 +193,10 @@ HARNESS_CALLED f32 InterpFloat::step()
     {
         // Constant acceleration: goal is added to the step.
         initial += bezier_2;
-        current = initial;
         bezier_2 = bezier_2 + goal;
+        // Copied as an integer (mov eax; mov) and current reloaded for the
+        // return, as in the original; a float assignment forwards xmm0.
+        *(i32 *)&current = *(i32 *)&initial;
         return current;
     }
     else if (method == 8)
@@ -265,7 +264,9 @@ i32 InterpInt::step()
     {
         initial += bezier_2;
         bezier_2 = bezier_2 + goal;
-        current = initial;
+        // Copied as an integer (mov eax; mov) and current reloaded for the
+        // return, as in the original; a float assignment forwards xmm0.
+        *(i32 *)&current = *(i32 *)&initial;
         return current;
     }
     else if (method == 8)

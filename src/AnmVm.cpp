@@ -38,7 +38,8 @@ HARNESS_CALLED void *AnmVm::scalar_delete(u32 flags)
     return this;
 }
 
-// TODO: the flags_hi and/or and one pop are scheduled one store later in the original.
+// TODO: the flags_hi and/or and one pop are scheduled one store later in the original
+// (not the bitfield view, a local, one expression, other positions or HARNESS_CALLED).
 // FUNCTION: TH16 0x4090f0
 void AnmVm::wipe()
 {

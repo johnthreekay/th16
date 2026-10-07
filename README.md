@@ -708,7 +708,8 @@ decompiled code the surroundings it had in the original:
     update_options_cursor went to 99.9%). `w + 16.0f` written at each store
     keeps the add after the first lookup; adding into the parameter first
     hoists it.
-  - GameThread::thread_start does not realign its frame like the original.
+  - (Solved in sweep round 2, see below.) GameThread::thread_start does
+    not realign its frame like the original.
     Forcing it (a volatile double in it, harness_w3d_player's removed)
     matched 12 more functions it reaches (Stage::create, load_data,
     load_std, update_std_vms, on_draw_06, Gui::initialize,
@@ -876,6 +877,48 @@ decompiled code the surroundings it had in the original:
   - A struct local copy-initialized inside a block (`ZunAngle tmp =
     initial;` in a branch) gets a stack slot that function-scope locals do
     not; the original's InterpAngle::step code needs the block form.
+- Sweep round 2, list A:
+  - GameThread::thread_start realigns like the original with a double
+    local (`double zero = 0.0;` for the FpsCounter stores); a dead double
+    in a HARNESS_CALLED callee (Stage::create) did the same. That gave 11
+    matches below it (Stage::create, load_data, load_std, on_draw_06,
+    Gui::initialize, load_stage_files, LaserManager::initialize,
+    render_layer, the padded Gui::on_tick_callback and
+    BulletManager::on_draw_callback thunks).
+  - The original does not hand that alignment to every callback the
+    aligned code registers: GameThread's, Stage's and BulletManager's
+    on_tick_callback jump to bodies that realign themselves, and
+    Gui::on_draw_2_callback's body realigns, so AsciiInf::create_number and
+    Stage::start_std_vms stay unpadded. Taking those addresses in an inline
+    helper node (`static inline UpdateFuncCallback f() { return cb; }`)
+    keeps LTCG from passing the alignment on; taking the address directly
+    still passes it (Gui::on_tick_callback, on_draw_06_callback).
+  - A dead double in a HARNESS_CALLED set_vm_script made it realign itself,
+    not its callers (the original pads set_vm_script and realigns all of
+    its laser callers); the set_substate trick does not always push up.
+  - seek_bgm_to_stage_time as a plain inline helper (not DECOMP_NOINLINE)
+    gives GameThread::on_tick_body the original's late `and esp, -8`
+    without padding sub_42dc50's callees; written out, it realigns early.
+  - `test byte ptr [flags], 0x40` followed by a fresh dword load for the
+    game_mode bitfield: a `*(u8 *)` cast and the bitfield view both share
+    one load (`test al`); reading game_mode through
+    `((volatile Globals *)&g_Globals)` keeps them apart.
+  - A store through D3DXVECTOR2's operator FLOAT* (`uv[1] = ...`) may alias
+    uv.x, so the following `uv.x < 0` test stays after it
+    (EnemyData::update_fog).
+  - InterpFloat::step matches with the plain ZunTimer::tick (current stored
+    before current_f) and method 17 copying initial to current as an
+    integer (`*(i32 *)&current = *(i32 *)&initial`) after the bezier_2
+    update: the original copies it with mov eax/mov and reloads current
+    for the return, where a float assignment forwards xmm0.
+  - A class without its `// VTABLE:` annotation shows the vftable store in
+    its constructor and destructor as a raw address in reccmp (AsciiInf).
+  - The frames of create_vm and create_vm_front (4 unused bytes) are padded
+    for known alignment: every original caller calls them aligned.
+  - Open, scheduling only: AnmVm::wipe's flags_hi and/or and pops, and
+    EnemyInf's memset pushes, come a few stores later in the original; the
+    bitfield view, a local, one expression and other statement positions
+    do not move them.
 
 ### Compiler-generated and CRT functions
 
@@ -916,6 +959,8 @@ Name-based annotations: the marker, then a comment line naming the function.
   fail on a stale object or quietly use one.
 - Comments must go above `// FUNCTION:`, not between it and the signature:
   reccmp then loses the function and build.py may misread the declaration.
+  The same holds for `// GLOBAL:`: with a comment line in between, reccmp
+  names the variable after the comment and every use shows as a difference.
 - quickdiff misreports jump thunks and tail jumps; check those with
   compare.py.
 - Overloads are told apart by the object file that defines them and then

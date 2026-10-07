@@ -102,30 +102,34 @@ void ConfigData::set_defaults()
     set_defaults_inline();
 }
 
-// GLOBAL: TH16 0x492278
 // Credits per difficulty.
+// GLOBAL: TH16 0x492278
 static const i32 g_continues_per_difficulty[6] = {5, 5, 5, 5, 0, 0};
 
-// GLOBAL: TH16 0x492290
 // The maximum point item value per difficulty, divided by 100.
+// GLOBAL: TH16 0x492290
 static const i32 g_max_piv_per_difficulty[6] = {500000, 500000, 500000, 500000, 500000, 1000000};
 
-// GLOBAL: TH16 0x4922a8
 // The starting point item value per difficulty, divided by 100.
+// GLOBAL: TH16 0x4922a8
 static const i32 g_initial_piv_per_difficulty[6] = {10000, 10000, 10000, 10000, 10000, 100000};
+
+// Takes on_tick_callback's address for thread_start. In the original the
+// callback is not entered with known 8-byte alignment (it jumps to
+// on_tick_body, which realigns itself), although thread_start realigns;
+// taking the address in an inline helper node keeps LTCG from handing the
+// alignment down to it (on_tick_body's callees would get padded frames).
+static inline UpdateFuncCallback game_thread_on_tick_callback()
+{
+    return (UpdateFuncCallback)GameThread::on_tick_callback;
+}
 
 // The game thread: waits for the loading screen, sets up a new game (or
 // the next stage) and creates the game objects. 0 on success; -1 (with the
 // thread flagged as failed) if something could not be created.
-// TODO: the original realigns its frame (and esp, -8; sub esp, 8) and tests
-// GLOBALS_FLAGS_45C & 0x40 as a byte. Forcing the realignment (a volatile
-// double here, harness_w3d_player's removed) gains 12 matches below it
-// (Stage::create, load_data, load_std, update_std_vms, on_draw_06,
-// Gui::initialize, LaserManager::initialize, ...), loses start_std_vms and
-// AsciiInf::create_number, and gives GameThread::on_tick_callback the
-// aligned thunk where the original jumps. HARNESS_CALLED on its callees (the
-// managers' create, get_runtime, AnmVm::run, repopulate_options) does not
-// make LTCG realign it.
+// It realigns its frame (and esp, -8) for the `zero` double local below,
+// which hands known alignment to the managers' create functions (padded
+// frames in Stage::create, Gui::initialize, LaserManager::initialize, ...).
 // FUNCTION: TH16 0x42cb60
 i32 GameThread::thread_start()
 {
@@ -300,7 +304,7 @@ i32 GameThread::thread_start()
     }
 
     {
-        UpdateFunc *f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_callback);
+        UpdateFunc *f = g_UpdateFuncRegistry->create_func(game_thread_on_tick_callback());
         f->flags &= ~UPDATE_FUNC_ACTIVE;
         f->arg = thread;
         g_UpdateFuncRegistry->register_on_tick(f, 0xf);
@@ -378,15 +382,18 @@ i32 GameThread::thread_start()
     }
     if (!(GLOBALS_FLAGS_45C & 0x40))
     {
-        if (g_Globals.game_mode != 2)
+        // The original tests the flag byte in memory and loads the word
+        // again for game_mode; a plain read shares one load.
+        if (((volatile Globals *)&g_Globals)->game_mode != 2)
         {
             g_Supervisor.stop_bgm();
         }
         g_Supervisor.play_bgm_wav(0, g_stage_data->music_names[0]);
         g_Supervisor.play_bgm_wav(1, g_stage_data->music_names[1]);
     }
-    g_FpsCounter->total_actual = 0.0;
-    g_FpsCounter->total_expected = 0.0;
+    double zero = 0.0;
+    g_FpsCounter->total_actual = zero;
+    g_FpsCounter->total_expected = zero;
     thread->time_in_stage.set_value(0);
     (&g_Globals.unk_204)[g_Globals.stage_num] = 0;
     g_Globals.unk_224 = 0;
@@ -560,11 +567,12 @@ DECOMP_NOINLINE GameThread::~GameThread()
     g_Supervisor.background_color = (GLOBALS_FLAGS_45C & 1) ? 0 : 0xff000000;
 }
 
-// The original seeks inline in on_tick_body. With the double math there,
-// LTCG realigns on_tick_body early enough to hand the alignment down to
-// sub_42dc50's callees, and Stage::start_std_vms (0x40add0) loses its
-// shrink-wrapped edi; kept out of line until that is understood.
-static DECOMP_NOINLINE void seek_bgm_to_stage_time()
+// The original seeks inline in on_tick_body. Written out there, the double
+// math makes LTCG realign on_tick_body early enough to hand the alignment
+// down to sub_42dc50's callees (Stage::start_std_vms, 0x40add0, loses its
+// shrink-wrapped edi); in a plain inline helper the double belongs to the
+// helper's node, and on_tick_body realigns late like the original.
+static inline void seek_bgm_to_stage_time()
 {
     ((CStreamingSound *)g_SoundManager.bgm_stream)->seek(g_Globals.time_in_stage / 60.0);
 }

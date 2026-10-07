@@ -100,6 +100,15 @@ __forceinline void BulletManager::reset_lists()
     tick_list_head.unk_c = NULL;
 }
 
+// Takes on_tick_callback's address for initialize: the original's callback
+// jumps to on_tick_body, which realigns itself, so it must not inherit the
+// known alignment GameThread::thread_start hands initialize (an inline helper
+// node keeps LTCG from passing it on).
+static inline UpdateFuncCallback bullet_on_tick_callback()
+{
+    return (UpdateFuncCallback)BulletManager::on_tick_callback;
+}
+
 // TODO: esi/edi get pushed after the early return, not at entry, and the
 // loop stores b->freelist_node.entry through b, not the loop pointer.
 // FUNCTION: TH16 0x411a30
@@ -115,7 +124,7 @@ i32 BulletManager::initialize()
     next_free = bullets;
     bullets[BULLET_COUNT].state = BULLET_STATE_SENTINEL;
 
-    UpdateFunc *f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_callback);
+    UpdateFunc *f = g_UpdateFuncRegistry->create_func(bullet_on_tick_callback());
     f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
     g_UpdateFuncRegistry->register_on_tick(f, 0x1c);
@@ -180,10 +189,8 @@ i32 __fastcall BulletManager::on_tick_callback(BulletManager *self)
     return self->on_tick_body();
 }
 
-// TODO: the original wraps a plain call in push ecx/pop ecx; ours tail-calls. A harness
-// standing in for thread_start's aligned create() call (create and initialize HARNESS_CALLED)
-// matches this and lifts initialize to 96%, but on_tick_callback then pads its call too,
-// because our on_tick_body does not realign itself like the original's.
+// The push ecx/pop ecx padding comes from GameThread::thread_start's
+// realignment, handed down through create and initialize.
 // FUNCTION: TH16 0x412c80
 i32 __fastcall BulletManager::on_draw_callback(BulletManager *self)
 {

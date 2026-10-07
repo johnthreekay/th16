@@ -6,9 +6,6 @@
 #include "Supervisor.h"
 #include "ZunMath.h"
 
-// TODO: the original compares uv.x with 0 only after storing uv.y; ours
-// compares it right after storing it (`uv.x < 0.0f` and a D3DXVECTOR2
-// assignment do not change it).
 // FUNCTION: TH16 0x41cbd0
 void EnemyData::update_fog()
 {
@@ -83,7 +80,9 @@ void EnemyData::update_fog()
                 points->y = g_game_2d_origin_y + 448.0f - 1.0f;
             }
             vertex->uv.x = points->x / g_resolution_x;
-            vertex->uv.y = points->y / g_resolution_y;
+            // Through D3DXVECTOR2's operator FLOAT*: the store may alias uv.x,
+            // so its test comes after it, as in the original.
+            vertex->uv[1] = points->y / g_resolution_y;
             if (0.0f > vertex->uv.x)
             {
                 vertex->uv.x = 0.0f;
