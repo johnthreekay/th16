@@ -856,7 +856,7 @@ __forceinline i32 AnmVm::run_script()
             }
             if (sprite < 0)
             {
-                g_AsciiManager->ascii_anm->set_sprite(this, 0x102);
+                g_AsciiManager->ascii_anm->set_sprite(this, ASCII_SPRITE_FALLBACK);
             }
             else
             {
@@ -924,7 +924,7 @@ __forceinline i32 AnmVm::run_script()
             }
             if (sprite < 0)
             {
-                g_AsciiManager->ascii_anm->set_sprite(this, 0x102);
+                g_AsciiManager->ascii_anm->set_sprite(this, ASCII_SPRITE_FALLBACK);
             }
             else
             {

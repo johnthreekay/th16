@@ -126,6 +126,7 @@ enum AnmVmFlagsHi
     ANM_VM_CREATED_BY_GAME = 1 << 10,
     // Point instead of linear filtering.
     ANM_VM_FILTER_POINT_SHIFT = 11,
+    ANM_VM_FILTER_POINT = 1 << 11,
     // AnmManager::draw_text and its variants draw without the outline.
     ANM_VM_TEXT_NO_OUTLINE = 1 << 12,
     // AnmVmFlagsHiFields::uv_quad_from_corners.

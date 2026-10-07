@@ -875,7 +875,7 @@ void Supervisor::setup_special_anms()
         }
         if (g_screen_coord_scale == 1.5f)
         {
-            vm_1c4->flags_hi &= ~(1 << ANM_VM_FILTER_POINT_SHIFT);
+            vm_1c4->flags_hi &= ~ANM_VM_FILTER_POINT;
         }
     }
     else
