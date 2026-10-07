@@ -1636,7 +1636,7 @@ void Gui::sub_426d70()
     if (g_Globals.stage_num == 1 && g_GameThread->replay_mode == 0 && g_Globals.continues_used == 0)
     {
         AnmId id = create_effect_inline(gui->front_anm, 0x45, -1, NULL);
-        Float3 pos(0.0f, g_Globals.character == 3 ? 148 : 128, 0.0f);
+        Float3 pos(0.0f, g_Globals.character == CHARACTER_MARISA ? 148 : 128, 0.0f);
         AnmVm *vm = g_AnmManager->get_vm_with_id(id);
         if (vm != NULL)
         {

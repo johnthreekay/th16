@@ -312,11 +312,11 @@ int EnemyManager::update()
     }
     if (g_Player->damage_multiplier > 1.01f)
     {
-        g_Player->inner.flags |= 0x20;
+        g_Player->inner.flags |= PLAYER_FLAG_DAMAGE_BOOSTED;
     }
     else
     {
-        g_Player->inner.flags &= ~0x20;
+        g_Player->inner.flags &= ~PLAYER_FLAG_DAMAGE_BOOSTED;
     }
     g_Player->damage_multiplier = 1.0f;
     inner.time_in_stage.tick();
@@ -643,7 +643,7 @@ int EnemyData::step_logic()
             damage += unk_3fe0;
             unk_3fe0 = 0;
         }
-        if (g_Player->inner.state == 2 || g_Player->inner.state == 0)
+        if (g_Player->inner.state == PLAYER_STATE_DEAD || g_Player->inner.state == PLAYER_STATE_RESPAWNING)
         {
             damage /= 5;
         }
