@@ -132,6 +132,15 @@ struct BgmCommandEntry
 
 #define SOUND_FILE_COUNT 0x43
 
+// The DirectSound sample's sound manager; only the device and the
+// destructor that releases it.
+struct CSoundManager
+{
+    struct IDirectSound8 *m_pDS;
+
+    ~CSoundManager();
+};
+
 // What the sound threads should do (SoundManager::thread_state).
 enum SoundThreadState
 {
@@ -154,7 +163,13 @@ struct SoundManager
     i32 queued_ids[SOUND_QUEUE_SIZE];
     i32 queued_counts[SOUND_QUEUE_SIZE];
     i32 queued_pans[SOUND_QUEUE_SIZE][0x80];
-    u8 unk_187c[0x1980 - 0x187c];
+    // BGM tracks read ahead into memory (thbgm.fmt entry, file data, read
+    // position and size), and the slot playing.
+    ThBgmFormat *preload_format[0x10];
+    u8 *preload_data[0x10];
+    u8 *preload_cursor[0x10];
+    i32 preload_size[0x10];
+    i32 preload_current;
     // thbgm.fmt.
     ThBgmFormat *bgm_format;
     // File name of the BGM that select_bgm last switched to.
@@ -165,7 +180,11 @@ struct SoundManager
     // File name of the BGM playing.
     char bgm_name[0x100];
     BgmCommandEntry bgm_commands[0x1f];
-    u8 unk_4454[0x5660 - 0x4454];
+    u8 unk_4454[0x4560 - 0x4454];
+    // File names of the preloaded tracks.
+    char preload_names[0x10][0x100];
+    // The BGM archive (thbgm.dat).
+    char bgm_file_name[0x100];
     BgmStream *bgm_stream;
     u8 unk_5664[0x5668 - 0x5664];
     HANDLE bgm_event;
@@ -183,6 +202,9 @@ struct SoundManager
 
     // Queues a command for the sound thread.
     void modify_bgm(i32 command, i32 arg, const char *name);
+    // Frees everything initialize created. Reaches the manager through
+    // g_SoundManager; LTCG dropped this.
+    HARNESS_CALLED i32 release();
 
     // 0x45d510
     i32 initialize(HWND window);

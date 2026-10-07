@@ -1,6 +1,7 @@
 // Stand-in callers for wave 3 range E (0x44f710-0x4630f0) functions whose
 // shape depends on how the rest of the game calls them.
 #include "../AnmManager.h"
+#include "../SoundManager.h"
 #include "../TextHelper.h"
 
 // Like WinMain and the Window frame functions around a device reset.
@@ -31,4 +32,10 @@ void harness_w3e_draw_text(RECT *rect, i32 x, i32 size, D3DCOLOR color, D3DCOLOR
     draw_text(rect, x, size, color, shadow, text, texture, font, spacing, 1);
     draw_text(rect, x * 2, size, color, shadow, text, texture, font, 0, 0);
     draw_text(rect + 1, x, size + 1, shadow, color, text, texture, font + 1, spacing * 2, spacing);
+}
+
+// Like WinMain's shutdown (0x459902).
+void harness_w3e_sound_release()
+{
+    g_SoundManager.release();
 }

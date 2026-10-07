@@ -41,6 +41,10 @@ static_assert(offsetof(SoundManager, bgm_name) == 0x22e0, "SoundManager layout")
 static_assert(offsetof(SoundManager, bgm_commands) == 0x23e0, "SoundManager layout");
 static_assert(offsetof(SoundManager, bgm_stream) == 0x5660, "SoundManager layout");
 static_assert(offsetof(SoundManager, init_thread) == 0x5674, "SoundManager layout");
+static_assert(offsetof(SoundManager, preload_format) == 0x187c, "SoundManager layout");
+static_assert(offsetof(SoundManager, preload_current) == 0x197c, "SoundManager layout");
+static_assert(offsetof(SoundManager, preload_names) == 0x4560, "SoundManager layout");
+static_assert(offsetof(SoundManager, bgm_file_name) == 0x5560, "SoundManager layout");
 static_assert(sizeof(SoundManager) == 0x5698, "SoundManager layout");
 static_assert(offsetof(BgmStream, refilling) == 0x9c, "BgmStream layout");
 static_assert(sizeof(ThBgmFormat) == 0x34, "ThBgmFormat layout");
@@ -217,6 +221,73 @@ void SoundManager::thread_load_sound_files(void *arg)
     {
         Sleep(1);
     }
+}
+
+inline CSoundManager::~CSoundManager()
+{
+    if (m_pDS != NULL)
+    {
+        m_pDS->Release();
+        m_pDS = NULL;
+    }
+}
+
+// FUNCTION: TH16 0x45d850
+HARNESS_CALLED i32 SoundManager::release()
+{
+    if (bgm_format != NULL)
+    {
+        free(bgm_format);
+        bgm_format = NULL;
+    }
+    for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
+    {
+        if (sound_buffers[i].buffer != NULL)
+        {
+            sound_buffers[i].buffer->Release();
+            sound_buffers[i].buffer = NULL;
+        }
+    }
+    for (i32 i = 0; i < SOUND_FILE_COUNT; i++)
+    {
+        if (sound_file_data[i] != NULL)
+        {
+            free(sound_file_data[i]);
+            sound_file_data[i] = NULL;
+        }
+    }
+    if (manager == NULL)
+    {
+        return 0;
+    }
+    KillTimer(game_window, 1);
+    stop_bgm();
+    dsound = NULL;
+    init_sound_buffer->Stop();
+    if (init_sound_buffer != NULL)
+    {
+        init_sound_buffer->Release();
+        init_sound_buffer = NULL;
+    }
+    if (bgm_stream != NULL)
+    {
+        bgm_stream->destroy();
+        bgm_stream = NULL;
+    }
+    if (manager != NULL)
+    {
+        delete manager;
+        manager = NULL;
+    }
+    for (i32 i = 0; i < 0x10; i++)
+    {
+        if (preload_data[i] != NULL)
+        {
+            free(preload_data[i]);
+            preload_data[i] = NULL;
+        }
+    }
+    return 0;
 }
 
 // FUNCTION: TH16 0x45d9d0
