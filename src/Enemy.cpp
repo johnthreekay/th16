@@ -513,6 +513,35 @@ int __fastcall ecl_ext_damage_stored(EnemyData *enemy, int damage)
     return damage;
 }
 
+// The third damage hook: the damage the player deals to the hurtboxes
+// around the VM in anm_ids[1] (a rotated bar and a circle below it), on top
+// of the damage the enemy took itself.
+// TODO: the original loads vm->rotation.z into xmm3 after pushing enemy_id; ours before the size.x store.
+// FUNCTION: TH16 0x425410
+int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage)
+{
+    int bar_damage = 0;
+    int circle_damage = 0;
+    i32 hit = 0;
+    Float3 pos = enemy->final_pos.pos;
+    AnmVm *vm = g_AnmManager->get_vm_with_id(enemy->anm_ids[1]);
+    if (vm == NULL)
+    {
+        enemy->anm_ids[1].id = 0;
+    }
+    else
+    {
+        pos.y += 24.0f;
+        Float2 size(vm->scale.x * 192.0f, vm->scale.y * 32.0f);
+        bar_damage = g_Player->compute_damage_to_enemy(&pos, &size, vm->rotation.z, 0.0f, &hit, 0, 0,
+                                                       enemy->full->enemy_id);
+        pos.y += 32.0f;
+        circle_damage =
+            g_Player->compute_damage_to_enemy(&pos, NULL, 0.0f, 48.0f, &hit, 0, 0, enemy->full->enemy_id);
+    }
+    return damage + bar_damage + circle_damage;
+}
+
 // GLOBAL: TH16 0x4a6dc0
 EnemyManager *g_EnemyManager;
 

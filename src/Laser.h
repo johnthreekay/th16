@@ -98,20 +98,23 @@ class LaserDataInf
     }
 };
 
+// Parameters of a straight laser. Layout from ExpHP (zLaserLineInner); his
+// field names say which BulletManager shooter field each one comes from.
 struct LaserLineInner
 {
     D3DXVECTOR3 start_pos;
     f32 ang_aim;
+    // ExpHP: __bmgr_00c__was_128, __bmgr_008__was_16.
     f32 laser_new_arg_2;
     f32 laser_new_arg_1;
     f32 laser_new_arg_3;
     f32 laser_new_arg_4;
     // ExpHP: spd1.
     f32 speed;
-    i32 type;
-    i32 color;
+    i32 bullet_type;
+    i32 bullet_color;
     f32 distance;
-    u8 unk_30[4];
+    i32 unk_30;
     u32 flags;
     BulletEx ex[0x12];
     i32 shot_sfx;
@@ -122,6 +125,8 @@ struct LaserLineInner
         memset(this, 0, sizeof(*this));
     }
 };
+static_assert(offsetof(LaserLineInner, ex) == 0x38, "LaserLineInner::ex");
+static_assert(offsetof(LaserLineInner, shot_sfx) == 0x350, "LaserLineInner::shot_sfx");
 
 // VTABLE: TH16 0x492424
 class LaserLineInf : public LaserDataInf
@@ -135,7 +140,7 @@ class LaserLineInf : public LaserDataInf
     LaserLineInf();
 
     virtual void get_point(f32 distance, Float3 *out);
-    virtual void run_ex();
+    DECOMP_NOINLINE virtual void run_ex();
     virtual i32 initialize(void *params);
     virtual i32 on_tick();
     virtual i32 on_draw();
@@ -162,8 +167,9 @@ class LaserLineInf : public LaserDataInf
 struct LaserInfiniteInner
 {
     D3DXVECTOR3 start_pos;
-    // Set by ECL laserTrajectory (z always 0).
-    D3DXVECTOR3 trajectory;
+    // Moves the laser's origin each frame; set by ECL laserTrajectory (z
+    // always 0).
+    D3DXVECTOR3 velocity;
     f32 ang_aim;
     f32 laser_st_rotation;
     f32 laser_new_arg_2;
@@ -221,11 +227,26 @@ struct LaserCurveNode
     LaserCurveNode *prev;
     f32 unk_8;
     f32 unk_c;
-    u8 unk_10[0x3c - 0x10];
+    // 0: straight at angle/speed, 1: velocity (or turning, see 0x438370),
+    // 2: speed and angle change by speed_delta/angle_delta.
+    i32 mode;
+    Float3 velocity;
+    Float3 start_pos;
+    f32 angle;
+    f32 speed;
+    f32 speed_delta;
+    f32 angle_delta;
 
     LaserCurveNode()
     {
     }
+
+    // 0x438370. Steps a point of the curve back by one frame of this node's
+    // motion (t is the node time, its fraction the part of the frame).
+    void step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle, f32 t);
+    // 0x437ee0. Where the node's motion is at the given time (unk_8 is
+    // its start time), with its speed and angle there.
+    void get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, f32 time);
 };
 
 // Parameters of a curvy laser. Layout from ExpHP (zLaserCurveInner); his
@@ -246,7 +267,11 @@ struct LaserCurveInner
     BulletEx ex[0x12];
     i32 shot_sfx;
     i32 shot_transform_sfx;
-    u8 unk_34c[0x358 - 0x34c];
+    u8 unk_34c[0x350 - 0x34c];
+    // Set when a bomb splits a laser: the node list and time the new piece
+    // continues from.
+    LaserCurveNode *source_nodes;
+    f32 source_time;
 
     LaserCurveInner()
     {
@@ -259,7 +284,10 @@ struct LaserCurveInner
 struct LaserCurveSegment
 {
     Float3 pos;
-    u8 unk_c[0x20 - 0xc];
+    u8 unk_c[0x18 - 0xc];
+    // Direction and length of the piece to the next point.
+    f32 angle;
+    f32 length;
 };
 
 // VTABLE: TH16 0x4922e0
@@ -306,10 +334,11 @@ struct LaserBeamInner
     u8 unk_c[0x18 - 0xc];
     f32 ang_aim;
     u8 unk_1c[4];
-    f32 laser_new_arg_3;
+    // laser_new_arg_3.
+    f32 length;
     f32 laser_new_arg_4;
     // Instruction 713's second argument.
-    i32 laser_beam_on_arg_1;
+    i32 id;
     i32 color;
     f32 distance;
     // The shooter's laser_timing[0].
@@ -330,7 +359,10 @@ class LaserBeamInf : public LaserDataInf
   public:
     LaserBeamInner inner;
     AnmVm vm_928;
-    u8 unk_f24[0x1f28 - 0xf24];
+    i32 unk_f24;
+    // Filled with the length on creation.
+    f32 unk_f28[0x200];
+    u8 unk_1728[0x1f28 - 0x1728];
 
     LaserBeamInf();
 
@@ -435,3 +467,9 @@ struct LaserManager
 };
 
 extern LaserManager *g_LaserManager;
+
+// 0x404220. Where the line through (x1, y1) at angle1 meets the line
+// through (x2, y2) at angle2; the laser graze checks use it to find the
+// point of the laser closest to the player.
+HARNESS_CALLED i32 __stdcall line_intersection(f32 *out_x, f32 *out_y, f32 x1, f32 y1, f32 angle1, f32 x2, f32 y2,
+                                               f32 angle2);

@@ -1,7 +1,10 @@
+#include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "AnmManager.h"
 #include "CriticalSections.h"
+#include "EffectManager.h"
 #include "Laser.h"
 
 // Placeholder (not decompiled yet).
@@ -16,13 +19,6 @@ i32 LaserCurveInf::initialize(void *params)
 void LaserCurveInf::run_ex()
 {
     unit5_placeholder(this);
-}
-
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x4377d0
-i32 LaserCurveInf::on_tick()
-{
-    return unit5_placeholder(this);
 }
 
 // Placeholder (not decompiled yet).
@@ -62,18 +58,232 @@ i32 LaserCurveInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x4397d0
-i32 LaserCurveInf::cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e)
+// Cancels the segments inside a bomb's rectangle (an effect and items on
+// every tenth), then cuts the laser: a hit head is dropped, the laser ends
+// at the first hit run, and every later unhit run of at least 4 segments
+// becomes a new curvy laser continuing this one's nodes.
+// TODO: the original keeps center, size and the loop state in different registers and stack slots; the run loops are laid out differently.
+// FUNCTION: TH16 0x4397d0
+i32 LaserCurveInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 e)
 {
-    return unit5_placeholder(this);
+    if (e != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    i32 count = 0;
+    u8 *hit = (u8 *)malloc(inner.segment_count);
+    memset(hit, 0, inner.segment_count);
+    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    i32 i;
+    for (i = 0; i < inner.segment_count; i++, segment++)
+    {
+        Float3 seg_pos = segment->pos;
+        f32 half_w = size->x;
+        f32 half_h = size->y;
+        f32 dx = seg_pos.x - center->x;
+        f32 dy = seg_pos.y - center->y;
+        if (rect_angle != 0.0f)
+        {
+            f32 neg_angle = -rect_angle;
+            f32 s = zun_sinf(neg_angle);
+            f32 c = zun_cosf(neg_angle);
+            f32 rx = dx * c - dy * s;
+            dy = dy * c + dx * s;
+            dx = rx;
+        }
+        if (half_w * 0.5f < (f32)fabs(dx) || half_h * 0.5f < (f32)fabs(dy))
+        {
+            continue;
+        }
+        count++;
+        hit[i] = 1;
+        if (i % 10 == 0)
+        {
+            gen_items_from_cancel(&seg_pos, mode);
+            g_EffectManager->track_inline(
+                g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0xd1, &seg_pos, 0.0f, -1, 0));
+        }
+    }
+    if (count != 0)
+    {
+        if (count >= inner.segment_count)
+        {
+            pending_delete = 1;
+            if (hit != NULL)
+            {
+                free(hit);
+            }
+            return count;
+        }
+        i32 j;
+        for (j = 0; j < inner.segment_count; j++)
+        {
+            if (!hit[j])
+            {
+                break;
+            }
+        }
+        if (j != 0)
+        {
+            for (i32 k = 0; k + j < inner.segment_count; k++)
+            {
+                hit[k] = hit[k + j];
+            }
+            timer_40 += (f32)-j;
+            inner.segment_count -= j;
+            if (inner.segment_count < 4)
+            {
+                pending_delete = 1;
+                goto done;
+            }
+            j = 0;
+        }
+        for (; j < inner.segment_count; j++)
+        {
+            if (hit[j])
+            {
+                break;
+            }
+        }
+        i32 head = j;
+        while (j < inner.segment_count)
+        {
+            for (; j < inner.segment_count; j++)
+            {
+                if (!hit[j])
+                {
+                    break;
+                }
+            }
+            if (j >= i)
+            {
+                break;
+            }
+            i32 run = 0;
+            i32 start = j;
+            for (; j < inner.segment_count; j++, run++)
+            {
+                if (hit[j])
+                {
+                    break;
+                }
+            }
+            if (run >= 4)
+            {
+                LaserCurveInner params = inner;
+                params.segment_count = run;
+                params.shot_sfx = -1;
+                params.source_nodes = &nodes;
+                params.source_time = timer_40.current_f - (f32)start;
+                g_LaserManager->allocate_new_laser(LASER_CURVE, &params);
+            }
+        }
+        if (head >= 4)
+        {
+            inner.segment_count = head;
+        }
+        else
+        {
+            pending_delete = 1;
+        }
+    }
+done:
+    if (hit != NULL)
+    {
+        free(hit);
+    }
+    return count;
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x43a2f0
-i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d)
+// Cancels the segments inside a bomb's circle (an effect and items on every
+// tenth), then cuts them off the laser: all hit deletes it, a hit head is
+// dropped, and otherwise everything before the end of the first hit run.
+// Returns the number of segments hit.
+// FUNCTION: TH16 0x43a2f0
+i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 mode, i32 d)
 {
-    return unit5_placeholder(this);
+    if (d != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    i32 count = 0;
+    u8 hit[0x100];
+    memset(hit, 0, sizeof(hit));
+    radius = radius * radius;
+    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    i32 i;
+    for (i = 0; i < inner.segment_count; i++, segment++)
+    {
+        Float3 seg_pos = segment->pos;
+        if ((pos->x - seg_pos.x) * (pos->x - seg_pos.x) + (pos->y - seg_pos.y) * (pos->y - seg_pos.y) > radius)
+        {
+            continue;
+        }
+        count++;
+        hit[i] = 1;
+        if (i % 10 == 0)
+        {
+            gen_items_from_cancel(&seg_pos, mode);
+            g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0xd1, &seg_pos, 0.0f, -1, 0);
+        }
+    }
+    if (count != 0)
+    {
+        if (count >= i)
+        {
+            pending_delete = 1;
+            return count;
+        }
+        i32 j;
+        for (j = 0; j < i; j++)
+        {
+            if (!hit[j])
+            {
+                break;
+            }
+        }
+        if (j != 0)
+        {
+            for (i32 k = 0; k < inner.segment_count - j; k++)
+            {
+                ((LaserCurveSegment *)unk_1524)[k] = ((LaserCurveSegment *)unk_1524)[k + j];
+            }
+            timer_40 += (f32)-j;
+            inner.segment_count -= j;
+            return count;
+        }
+        i32 head = 0;
+        for (; j < i; j++, head++)
+        {
+            if (hit[j])
+            {
+                break;
+            }
+        }
+        if (j < i && head != 0)
+        {
+            for (; j < i; j++)
+            {
+                if (!hit[j])
+                {
+                    break;
+                }
+            }
+            if (j >= i)
+            {
+                inner.segment_count = head;
+            }
+            else
+            {
+                for (i32 k = 0; k < inner.segment_count - j; k++)
+                {
+                    ((LaserCurveSegment *)unk_1524)[k] = ((LaserCurveSegment *)unk_1524)[k + j];
+                }
+                inner.segment_count -= j;
+            }
+        }
+    }
+    return count;
 }
 
 // AnmLoaded::create_vm as LTCG inlined it into some callers.
@@ -151,13 +361,6 @@ i32 LaserCurveInf::method_30(Float3 *pos, f32 radius)
         return 0;
     }
     return 2;
-}
-
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x437cf0
-i32 LaserCurveInf::check_graze_or_kill(i32 a)
-{
-    return unit5_placeholder(this);
 }
 
 

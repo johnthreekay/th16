@@ -356,6 +356,12 @@ struct Player
     // 0x443af0. The same for a rectangle reaching length from pos along
     // angle, width wide (lasers).
     HARNESS_CALLED i32 check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only);
+    // 0x445a30 (ExpHP: enm_compute_damage_sources_445a30). Damage the
+    // player's damage sources deal to an enemy hurtbox at pos: a rectangle
+    // of size rotated by angle, or a circle of radius when size is NULL.
+    // *hit tells whether anything hit.
+    HARNESS_CALLED i32 compute_damage_to_enemy(Float3 *pos, Float2 *size, f32 angle, f32 radius, i32 *hit, i32 unk_5,
+                                               i32 unk_6, i32 enemy_id);
 };
 
 // .sht files kept by ~Player when the next Player reuses them.

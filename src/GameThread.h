@@ -98,7 +98,10 @@ struct GameThread
     u32 unk_20;
     ConfigData config;
     GameThreadFlags flags;
-    u8 unk_8c[0x94 - 0x8c];
+    // Frames since the music restart flag (0x10000) was set, and how many
+    // to wait.
+    i32 unk_8c;
+    i32 unk_90;
     i32 unk_94;
     u8 unk_98[0xa8 - 0x98];
     i32 chapter;

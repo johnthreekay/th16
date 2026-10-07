@@ -9,6 +9,7 @@
 #include "GameThread.h"
 #include "Globals.h"
 #include "Gui.h"
+#include "Input.h"
 #include "Item.h"
 #include "Laser.h"
 #include "PauseMenu.h"
@@ -16,6 +17,7 @@
 #include "PopupManager.h"
 #include "ReplayManager.h"
 #include "Scorefile.h"
+#include "ScreenEffect.h"
 #include "SoundManager.h"
 #include "Stage.h"
 #include "Spellcard.h"
@@ -100,19 +102,273 @@ DECOMP_NOINLINE void GameThread::thread_start()
     unit5_placeholder(g_GameThread);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x42d200
+extern i32 g_unk_4c0f40;
+
+// g_Globals' flag word at 0x45c as a whole (flags_lo_45c, game_mode, ...).
+#define GLOBALS_FLAGS_45C (*(u32 *)((u8 *)&g_Globals + 0x45c))
+
+// Ends a game: saves the score file, shows "now loading" for what comes
+// next, and deletes the game objects (keeping the stage, GUI and player
+// across a stage transition, flag 2) and the update functions.
+// TODO: the original's frame is 4 bytes larger and it lays out the mode 4/16 branch before mode 14.
+// FUNCTION: TH16 0x42d200
 DECOMP_NOINLINE GameThread::~GameThread()
 {
-    unit5_placeholder(this);
+    scorefile_save_449a00();
+    GLOBALS_FLAGS_45C &= ~3;
+    g_game_speed = 1.0f;
+    g_draw_hook_4a6eec = NULL;
+    g_draw_hook_4a6ee8 = NULL;
+    if (g_Supervisor.gamemode_to_switch_to == 10 || g_Supervisor.gamemode_to_switch_to == 11)
+    {
+        g_AsciiManager->show_now_loading_inline(480.0f, 392.0f);
+        if (g_Globals.weird_stage_num == g_Globals.stage_num)
+        {
+            GLOBALS_FLAGS_45C |= 1;
+        }
+    }
+    else if (g_Supervisor.gamemode_to_switch_to == 12)
+    {
+        g_AsciiManager->show_now_loading(480.0f, 392.0f);
+        GLOBALS_FLAGS_45C |= 2;
+    }
+    else if (g_Supervisor.gamemode_to_switch_to == 4 || g_Supervisor.gamemode_to_switch_to == 16)
+    {
+        g_AsciiManager->show_now_loading(480.0f, 392.0f);
+    }
+    else if (g_Supervisor.gamemode_to_switch_to == 14)
+    {
+        g_AsciiManager->show_now_loading(480.0f, 392.0f);
+        if (g_Globals.weird_stage_num != g_Globals.stage_num)
+        {
+            g_Globals.continues_used++;
+            if (g_Globals.continues_used >= 10)
+            {
+                g_Globals.continues_used = 9;
+            }
+            GLOBALS_FLAGS_45C |= 8;
+        }
+        GLOBALS_FLAGS_45C |= 1;
+    }
+    if (!(GLOBALS_FLAGS_45C & 2))
+    {
+        if (g_Supervisor.gamemode_to_switch_to != 15 && g_Supervisor.gamemode_to_switch_to != 16)
+        {
+            delete g_ReplayManager;
+        }
+        delete g_Stage;
+        delete g_Stage2;
+        delete g_PauseMenu;
+        delete g_Gui;
+        delete g_Player;
+        delete g_BulletManager;
+        delete g_ItemManager;
+        delete g_LaserManager;
+        delete g_PopupManager;
+    }
+    else
+    {
+        g_Gui->release_msg();
+        delete g_Stage2;
+        g_Stage2 = g_Stage;
+        PauseMenu *pause = g_PauseMenu;
+        if (pause->on_tick_func != NULL)
+        {
+            pause->on_tick_func->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        if (pause->on_draw_func != NULL)
+        {
+            pause->on_draw_func->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        BulletManager *bullets = g_BulletManager;
+        if (bullets->on_tick != NULL)
+        {
+            bullets->on_tick->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        if (bullets->on_draw != NULL)
+        {
+            bullets->on_draw->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        ReplayManager *replay = g_ReplayManager;
+        if (replay->on_tick_22_func != NULL)
+        {
+            replay->on_tick_22_func->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        if (replay->on_draw_func != NULL)
+        {
+            replay->on_draw_func->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        g_ItemManager->destroy_all();
+    }
+    if (!(GLOBALS_FLAGS_45C & 9))
+    {
+        delete g_EnemyManager;
+    }
+    else
+    {
+        g_EnemyManager->destroy_all();
+    }
+    g_AnmManager->disable_vms_from_anm_file(g_EffectManager->effect_anm);
+    g_AnmManager->disable_vms_from_anm_file(g_EffectManager->bullet_anm);
+    BombInf::destroy_all();
+    delete g_Spellcard;
+    g_UpdateFuncRegistry->unregister_locked(on_tick);
+    g_UpdateFuncRegistry->unregister_locked(on_draw);
+    g_GameThread = NULL;
+    if (!(g_Globals.game_mode == 2 && (GLOBALS_FLAGS_45C & 1)) && !(GLOBALS_FLAGS_45C & 0x42))
+    {
+        if (g_Supervisor.config.flags_2c & 0x10)
+        {
+            g_SoundManager.modify_bgm(4, 0, "dummy");
+        }
+        else
+        {
+            g_SoundManager.modify_bgm(3, 0, "dummy");
+        }
+        g_SoundManager.bgm_name[0] = '\0';
+    }
+    SoundManager::pause_sounds();
+    g_unk_4c0f40 = 1;
+    g_Supervisor.background_color = (GLOBALS_FLAGS_45C & 1) ? 0 : 0xff000000;
 }
 
-// Placeholder (not decompiled yet).
+// Placeholder: the decompiled body below is parked. With it, LTCG sees a
+// call to sub_42dc50 and Stage::start_std_vms (0x40add0, sub_42dc50's
+// callee) stops matching (edi is saved in the prologue instead of after the
+// loop guard). Its best version (80.6%) is kept under #if 0.
 // STUB: TH16 0x42d7b0
 DECOMP_NOINLINE i32 GameThread::on_tick_body()
 {
     return unit5_placeholder(this);
 }
+
+#if 0
+// One frame of a game: the ending fade, the stage restart and intro
+// timing, the demo's end, the music restart after a pause and the timers.
+// TODO: the original keeps the return 3 epilogue at the top and a second null test around the inlined delete of g_Stage2.
+DECOMP_NOINLINE i32 GameThread::on_tick_body()
+{
+    if (*(u32 *)&flags & 0x4000)
+    {
+        if (*(u32 *)&flags & 0x10)
+        {
+            return 3;
+        }
+        fade_timer++;
+        if (fade_timer == 180)
+        {
+            ScreenEffect::create_inline(5, 200, 0, 0, 0, 0x54);
+        }
+        if (fade_timer >= 380)
+        {
+            if (replay_mode != 0)
+            {
+                replay_ended_43f240();
+            }
+            else if (g_Globals.difficulty != 4)
+            {
+                g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 15;
+            }
+            else
+            {
+                g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 16;
+            }
+        }
+    }
+    if ((g_Gui->flags_1ac & 0x100) && g_Gui->timer_1b0.current < 120 && !flags.flag_4)
+    {
+        return 1;
+    }
+    if (time_in_stage.current == 0)
+    {
+        if (sub_42dc50())
+        {
+            return 1;
+        }
+    }
+    else if (time_in_stage.current == 30)
+    {
+        sub_42dee0();
+    }
+    if (g_Stage2 != NULL && (g_Stage2->stage_flags & 8))
+    {
+        delete g_Stage2;
+    }
+    if (time_in_stage.current == 5)
+    {
+        g_unk_4d9d90 = 2;
+    }
+    if (*(u32 *)&flags & 4)
+    {
+        *(u32 *)&flags |= 0x80;
+        return 1;
+    }
+    if (g_Globals.flags_hi_45c & 1)
+    {
+        if ((g_hardware_input & 0x80103) || (*(u32 *)&flags & 0x70))
+        {
+            g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+        }
+        if (time_in_stage.current == 0xf00)
+        {
+            ScreenEffect::create(5, 60, 0, 0, 0, 0x33);
+        }
+        else if (time_in_stage.current == 0xf3c)
+        {
+            g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+        }
+    }
+    Gui::update_score();
+    if ((*(u32 *)&flags & 0x10) || (*(u32 *)&flags & 0x20) || (*(u32 *)&flags & 0x40))
+    {
+        return 3;
+    }
+    if (*(u32 *)&flags & 0x10000)
+    {
+        if (unk_8c == 0)
+        {
+            if (g_Globals.chapter < 0x2b)
+            {
+                g_Supervisor.stop_bgm();
+            }
+            AnmManager::interrupt_tree(*(AnmId *)&g_Supervisor.config.unk_0, 1);
+        }
+        unk_8c++;
+        if (unk_8c < unk_90 && unk_8c > 1)
+        {
+            return 3;
+        }
+        if (unk_8c >= unk_90)
+        {
+            if (g_Globals.chapter < 0x2b)
+            {
+                g_Supervisor.play_bgm(0, g_stage_data->music_ids[0]);
+                while (SoundManager::update_sound_thread() != 0)
+                {
+                }
+            }
+            if (g_Globals.chapter < 0x2b)
+            {
+                ((CStreamingSound *)g_SoundManager.bgm_stream)->seek(g_Globals.time_in_stage / 60.0);
+            }
+            *(u32 *)&flags &= ~0x10000;
+            unk_8c = 0;
+        }
+    }
+    g_Supervisor.vm_1bc->run();
+    g_Supervisor.vm_1c0->run();
+    g_Supervisor.vm_1c4->run();
+    g_Supervisor.vm_1c8->run();
+    g_Globals.time_in_stage++;
+    g_Globals.time_in_chapter++;
+    if (g_unk_4c0f40 != 0)
+    {
+        g_unk_4c0f40--;
+    }
+    time_in_stage++;
+    return 1;
+}
+#endif
 
 // FUNCTION: TH16 0x418420
 void GameThread::enable_update_funcs()
@@ -308,5 +564,130 @@ i32 GameThread::sub_42dee0()
         g_AsciiManager->hide_now_loading_inline();
         time_in_stage.reset();
     }
+    return 0;
+}
+
+// The end of a stage: the clear bonus, then the next stage, the ending (stage
+// 6 and the extra stage, with their clear counts) or, in practice, the end
+// of the game with the practice records updated. Always 0.
+// FUNCTION: TH16 0x42e150
+i32 stage_clear_42e150()
+{
+    GameThread *thread = g_GameThread;
+    if (g_Globals.game_mode != 2)
+    {
+        Gui::show_stage_clear_bonus();
+    }
+    g_Player->resume_options();
+    if (g_MainBomb->in_use != 0)
+    {
+        g_MainBomb->method_14();
+    }
+    if (g_Globals.game_mode != 0)
+    {
+        if (g_GameThread->replay_mode != 0)
+        {
+            replay_ended_43f240();
+            return 0;
+        }
+        if (g_Globals.game_mode == 2)
+        {
+            ScorefileSpell *spell =
+                &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[g_Globals.spell_id];
+            if (spell->practice_score < (i32)(g_Globals.score / 10 * 10))
+            {
+                spell->practice_score = g_Globals.score / 10 * 10;
+            }
+        }
+        if (g_GameThread->replay_mode == 0 && g_Globals.game_mode != 2)
+        {
+            g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
+                .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
+                .cleared = 1;
+        }
+        game_over_43f500();
+        return 0;
+    }
+    if (g_Globals.stage_num == 6)
+    {
+        *(u32 *)&thread->flags |= 0x4000;
+        thread->fade_timer = 0;
+        g_Gui->flags_1ac |= 0x10;
+        GameThread::update_play_time();
+        i32 bonus = 0;
+        switch (g_Globals.difficulty)
+        {
+        case 0:
+            bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
+            break;
+        case 1:
+            bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
+            break;
+        case 2:
+            bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
+            break;
+        case 3:
+            bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
+            break;
+        }
+        g_Globals.add_to_score(bonus);
+        g_Gui->stage_clear_bonus += bonus;
+        if (g_GameThread->replay_mode != 0)
+        {
+            replay_ended_43f240();
+            return 0;
+        }
+        if (g_Scorefile->characters[g_Globals.subshot + g_Globals.character].play_counts[g_Globals.difficulty] < 99999)
+        {
+            g_Scorefile->characters[g_Globals.subshot + g_Globals.character].play_counts[g_Globals.difficulty]++;
+        }
+        if (g_Globals.continues_used == 0 &&
+            g_Scorefile->characters[g_Globals.subshot + g_Globals.character].clears[g_Globals.difficulty] < 99999)
+        {
+            g_Scorefile->characters[g_Globals.subshot + g_Globals.character].clears[g_Globals.difficulty]++;
+        }
+        return 0;
+    }
+    if (g_Globals.stage_num == 7)
+    {
+        g_Gui->flags_1ac |= 0x10;
+        i32 bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
+        g_Globals.add_to_score(bonus);
+        g_Gui->stage_clear_bonus += bonus;
+        if (g_GameThread->replay_mode != 0)
+        {
+            replay_ended_43f240();
+        }
+        else
+        {
+            i32 *play_count =
+                &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].play_counts[g_Globals.difficulty];
+            if (*play_count < 99999)
+            {
+                (*play_count)++;
+            }
+            if (g_Globals.continues_used == 0 &&
+                g_Scorefile->characters[g_Globals.subshot + g_Globals.character].clears[g_Globals.difficulty] < 99999)
+            {
+                g_Scorefile->characters[g_Globals.subshot + g_Globals.character].clears[g_Globals.difficulty]++;
+            }
+        }
+        GameThread::update_play_time();
+        *(u32 *)&thread->flags |= 0x4000;
+        thread->fade_timer = 0;
+        return 0;
+    }
+    if (g_GameThread->replay_mode == 0)
+    {
+        g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
+            .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
+            .cleared = 1;
+    }
+    g_Supervisor.gamemode_to_switch_to = 12;
+    if (g_Globals.stage_num < 7)
+    {
+        g_Globals.stage_num++;
+    }
+    g_stage_data = &g_stage_table[g_Globals.stage_num];
     return 0;
 }

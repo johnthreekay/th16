@@ -4,10 +4,13 @@
 
 #include "AnmManager.h"
 #include "CriticalSections.h"
+#include "EffectManager.h"
+#include "Enemy.h"
 #include "GameErrorContext.h"
 #include "GameThread.h"
 #include "Globals.h"
 #include "Laser.h"
+#include "Player.h"
 #include "SoundManager.h"
 
 static_assert(offsetof(LaserLineInner, ex) == 0x38, "LaserLineInner::ex");
@@ -699,5 +702,1593 @@ i32 LaserCurveInf::method_44()
     }
     laser_sincosmul(&unk_60, angle, len);
     ex_state[3].timer.tick();
+    return 0;
+}
+
+// Cancels the laser: a cancel effect and cancel items every 16 units along
+// it. Returns the number of points.
+// TODO: the original builds the first point as one vector copied to pos and the effect copy, and copies it again at the loop end; ours copies it inside the inlined create_vm.
+// FUNCTION: TH16 0x434cd0
+i32 LaserLineInf::cancel(i32 mode, i32 b)
+{
+    if (b != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    f32 dist = 8.0f;
+    i32 count = 0;
+    Float3 step;
+    Float3 pos;
+    laser_sincosmul(&step, angle, 8.0f);
+    step.z = 0.0f;
+    pos = step + position;
+    step.x += step.x;
+    step.y += step.y;
+    while (unk_70 > dist + 8.0f)
+    {
+        D3DXVECTOR3 effect_pos = pos;
+        count++;
+        if (bullet_type <= 0x11 || bullet_type == 0x22 || bullet_type == 0x26)
+        {
+            AnmLoaded *anm = g_BulletManager->bullet_anm;
+            anm->create_vm_inline(inner.bullet_color * 2 + 0xd1, &effect_pos, 0.0f, -1);
+        }
+        else if (bullet_type <= 0x1f || bullet_type == 0x1b)
+        {
+            g_BulletManager->bullet_anm->create_vm(inner.bullet_color * 2 + 0x101, &pos, 0.0f, -1, 0);
+        }
+        else if (bullet_type <= 0x21)
+        {
+            g_BulletManager->bullet_anm->create_vm(inner.bullet_color * 2 + 0x119, &pos, 0.0f, -1, 0);
+        }
+        gen_items_from_cancel(&pos, mode);
+        pos += step;
+        dist += 16.0f;
+    }
+    state = 1;
+    return count;
+}
+
+// Cancels the laser like LaserLineInf::cancel, but only the points on screen
+// get an effect and items.
+// TODO: the original doubles step.x after loading position (scheduling) and stores step.z = 0 late from a second zero register.
+// FUNCTION: TH16 0x436c70
+i32 LaserInfiniteInf::cancel(i32 mode, i32 b)
+{
+    if (b != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    f32 dist = 8.0f;
+    i32 count = 0;
+    Float3 step;
+    Float3 pos;
+    laser_sincosmul(&step, angle, 8.0f);
+    step.z = 0.0f;
+    pos = step + position;
+    step.x += step.x;
+    step.y += step.y;
+    while (unk_70 > dist + 8.0f)
+    {
+        count++;
+        if (!(pos.x + 16.0f <= -192.0f || pos.x - 16.0f >= 192.0f || pos.y + 16.0f <= 0.0f || pos.y - 16.0f >= 448.0f))
+        {
+            if (bullet_type <= 0x11 || bullet_type == 0x22 || bullet_type == 0x26)
+            {
+                g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0xd1, &pos, 0.0f, -1, 0);
+            }
+            else if (bullet_type <= 0x1f || bullet_type == 0x1b)
+            {
+                g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x101, &pos, 0.0f, -1, 0);
+            }
+            else if (bullet_type <= 0x21)
+            {
+                g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x119, &pos, 0.0f, -1, 0);
+            }
+            gen_items_from_cancel(&pos, mode);
+        }
+        pos += step;
+        dist += 16.0f;
+    }
+    state = 1;
+    return count;
+}
+
+// Cancels the points (every 16 units) inside a bomb's circle, then cuts the
+// laser: a hit head moves its start forward, the first hit run ends it, and
+// every later unhit run becomes a new laser. Returns the number of points
+// hit.
+// TODO: register allocation differs throughout (the original keeps center in ebx and count in memory) and the run loops are laid out differently.
+// FUNCTION: TH16 0x434730
+i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 d)
+{
+    if (d != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    Float3 origin = position;
+    i32 count = 0;
+    f32 dist = 8.0f;
+    u8 hit[0x100];
+    memset(hit, 0, sizeof(hit));
+    Float3 step;
+    laser_sincosmul(&step, angle, 8.0f);
+    step.z = 0.0f;
+    Float3 pos;
+    pos = position + step;
+    pos.z = 0.0f;
+    step.x += step.x;
+    step.y += step.y;
+    step.z += step.z;
+    radius = radius * radius;
+    i32 i;
+    for (i = 0; unk_70 >= dist + 8.0f; i++)
+    {
+        if (!((center->x - pos.x) * (center->x - pos.x) + (center->y - pos.y) * (center->y - pos.y) > radius))
+        {
+            count++;
+            hit[i] = 1;
+            gen_items_from_cancel(&pos, mode);
+            if (bullet_type <= 0x11 || bullet_type == 0x22 || bullet_type == 0x26)
+            {
+                g_BulletManager->bullet_anm->create_vm(inner.bullet_color * 2 + 0xd1, &pos, 0.0f, -1, 0);
+            }
+            else if (bullet_type <= 0x1f || bullet_type == 0x1b)
+            {
+                g_BulletManager->bullet_anm->create_vm(inner.bullet_color * 2 + 0x101, &pos, 0.0f, -1, 0);
+            }
+            else if (bullet_type <= 0x21)
+            {
+                g_BulletManager->bullet_anm->create_vm(inner.bullet_color * 2 + 0x119, &pos, 0.0f, -1, 0);
+            }
+        }
+        pos += step;
+        dist += 16.0f;
+    }
+    if (count != 0)
+    {
+        if (count >= i)
+        {
+            pending_delete = 1;
+            return count;
+        }
+        i32 j;
+        for (j = 0; j < i; j++)
+        {
+            if (!hit[j])
+            {
+                break;
+            }
+        }
+        if (j != 0)
+        {
+            position += step * (f32)j;
+            unk_70 -= (f32)j * 16.0f;
+            if (!(unk_70 > 24.0f))
+            {
+                pending_delete = 1;
+                return count;
+            }
+            inner.laser_new_arg_2 = unk_70;
+            unk_7c = (f32)j * 16.0f;
+        }
+        i32 run = 0;
+        if (j < i)
+        {
+            for (; j < i; j++, run++)
+            {
+                if (hit[j])
+                {
+                    break;
+                }
+            }
+            if (j < i)
+            {
+                f32 len = (f32)run * 16.0f;
+                inner.laser_new_arg_2 -= unk_70 - len;
+                unk_70 = len;
+                if (24.0f > len)
+                {
+                    pending_delete = 1;
+                }
+                do
+                {
+                    if (hit[j])
+                    {
+                        j++;
+                        continue;
+                    }
+                    i32 start = j;
+                    run = 0;
+                    while (!hit[j])
+                    {
+                        j++;
+                        run++;
+                        if (j >= i)
+                        {
+                            break;
+                        }
+                    }
+                    LaserLineInner params = inner;
+                    params.laser_new_arg_2 = params.laser_new_arg_1 = (f32)run * 16.0f;
+                    if (params.laser_new_arg_1 > 24.0f)
+                    {
+                        params.start_pos = origin + step * (f32)start;
+                        g_LaserManager->allocate_new_laser(LASER_LINE, &params);
+                    }
+                } while (j < i);
+            }
+        }
+    }
+    return count;
+}
+
+// Cancels the points (every 16 units) inside a bomb's circle. A hit head
+// shortens the laser to nothing, otherwise it ends at the first hit run;
+// every later unhit run that starts on screen becomes a straight laser.
+// Returns the number of points hit.
+// TODO: the original zeroes i (ebx) before the memset and stores step.z first; the run loops' register use and the params copy differ.
+// FUNCTION: TH16 0x436670
+i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 d)
+{
+    if (d != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    Float3 origin = position;
+    i32 count = 0;
+    f32 dist = 8.0f;
+    u8 hit[0x100];
+    memset(hit, 0, sizeof(hit));
+    Float3 step;
+    laser_sincosmul(&step, angle, 8.0f);
+    step.z = 0.0f;
+    Float3 pos;
+    pos = position + step;
+    pos.z = 0.0f;
+    step.x += step.x;
+    step.y += step.y;
+    step.z += step.z;
+    radius = radius * radius;
+    i32 i;
+    for (i = 0; unk_70 > dist + 8.0f; i++)
+    {
+        if (!((center->x - pos.x) * (center->x - pos.x) + (center->y - pos.y) * (center->y - pos.y) > radius))
+        {
+            count++;
+            hit[i] = 1;
+            gen_items_from_cancel(&pos, mode);
+            if (!(pos.x + 32.0f <= -192.0f || pos.x - 32.0f >= 192.0f || pos.y + 32.0f <= 0.0f ||
+                  pos.y - 32.0f >= 448.0f))
+            {
+                if (bullet_type <= 0x11 || bullet_type == 0x22 || bullet_type == 0x26)
+                {
+                    g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0xd1, &pos, 0.0f, -1, 0);
+                }
+                else if (bullet_type <= 0x1f || bullet_type == 0x1b)
+                {
+                    g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x101, &pos, 0.0f, -1, 0);
+                }
+                else if (bullet_type <= 0x21)
+                {
+                    g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x119, &pos, 0.0f, -1, 0);
+                }
+            }
+        }
+        pos += step;
+        dist += 16.0f;
+    }
+    if (count != 0)
+    {
+        i32 j;
+        for (j = 0; j < i; j++)
+        {
+            if (!hit[j])
+            {
+                break;
+            }
+        }
+        if (j != 0)
+        {
+            unk_70 = 0.0f;
+        }
+        else
+        {
+            i32 run = 0;
+            for (; j < i; j++, run++)
+            {
+                if (hit[j])
+                {
+                    break;
+                }
+            }
+            if (j < i)
+            {
+                unk_70 = (f32)run * 16.0f;
+            }
+        }
+        while (j < i)
+        {
+            if (hit[j])
+            {
+                j++;
+                continue;
+            }
+            i32 run = 0;
+            i32 start = j;
+            while (!hit[j])
+            {
+                j++;
+                run++;
+                if (j >= i)
+                {
+                    break;
+                }
+            }
+            f32 start_f = (f32)start;
+            pos = origin + step * start_f;
+            if (!(pos.x + 32.0f <= -192.0f || pos.x - 32.0f >= 192.0f || pos.y + 32.0f <= 0.0f ||
+                  pos.y - 32.0f >= 448.0f))
+            {
+                LaserLineInner params;
+                params.start_pos = pos;
+                params.speed = 8.0f;
+                params.bullet_type = inner.type;
+                params.bullet_color = inner.color;
+                params.laser_new_arg_2 = params.laser_new_arg_1 = (f32)run * 16.0f;
+                params.ang_aim = angle;
+                params.laser_new_arg_4 = width;
+                params.laser_new_arg_3 = inner.laser_new_arg_2 - start_f * 16.0f;
+                g_LaserManager->allocate_new_laser(LASER_LINE, &params);
+            }
+        }
+    }
+    return count;
+}
+
+// FUNCTION: TH16 0x4357a0
+i32 LaserInfiniteInf::on_draw()
+{
+    i32 i = 0;
+    vm_950.pos = position;
+    f32 rotation = angle + ZUN_PI / 2;
+    while (rotation > ZUN_PI)
+    {
+        rotation -= ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    while (rotation < -ZUN_PI)
+    {
+        rotation += ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    AnmVm *vm = &vm_950;
+    vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
+    vm->rotation.z = rotation;
+    g_AnmManager->draw_vm(vm);
+    if (unk_7c == 0.0f)
+    {
+        vm_f4c.pos = position;
+        g_AnmManager->draw_vm(&vm_f4c);
+    }
+    return 0;
+}
+
+// Hits or grazes the player: a hit cancels the laser around the player, a
+// graze counts every third frame at the point of the laser nearest the
+// player.
+// TODO: the original adds position.x to the loaded start.x (operand order) and calls cancel_as_bomb_rectangle without speculative devirtualization.
+// FUNCTION: TH16 0x433510
+i32 LaserLineInf::check_graze_or_kill(i32 graze_only)
+{
+    if (unk_70 > 16.0f && width > 3.0f)
+    {
+        Float3 start;
+        if (!(inner.flags & 2))
+        {
+            laser_sincosmul(&start, angle, unk_70 / 10.0f);
+            start.x += position.x;
+            start.y = position.y + start.y;
+            start.z = position.z + start.z;
+        }
+        else
+        {
+            start = position;
+        }
+        f32 length = unk_70;
+        if (!(inner.flags & 2))
+        {
+            length = length * 4.0f / 5.0f;
+        }
+        f32 w = width;
+        if (32.0f > w)
+        {
+            w = w * 0.5f;
+        }
+        else
+        {
+            w = w - (w + 16.0f) * 0.5f;
+        }
+        i32 result = g_Player->check_hit_rotated_rect(&start, angle, w, length, graze_only);
+        if (result == 1)
+        {
+            Float3 size(32.0f, 32.0f, 0.0f);
+            cancel_as_bomb_rectangle(&g_Player->inner.pos, &size, 0.0f, 0, 1);
+            return 0;
+        }
+        if (result == 2)
+        {
+            if (timer_2c.current % 3 == 0)
+            {
+                f32 x;
+                f32 y;
+                line_intersection(&x, &y, start.x, start.y, angle, g_Player->inner.pos.x, g_Player->inner.pos.y,
+                                  normalize_angle(angle + ZUN_PI / 2));
+                start.x = x;
+                start.y = y;
+                g_Player->do_graze(&start);
+            }
+            timer_2c++;
+        }
+    }
+    return 0;
+}
+
+// The same for infinite lasers, once they are out (states 2 and 4).
+// TODO: the original keeps angle in xmm3 across normalize_angle and calls cancel_as_bomb_rectangle without speculative devirtualization.
+// FUNCTION: TH16 0x435610
+i32 LaserInfiniteInf::check_graze_or_kill(i32 graze_only)
+{
+    if ((state == 4 || state == 2) && unk_70 > 16.0f)
+    {
+        Float3 start = position;
+        f32 w = width;
+        if (32.0f > w)
+        {
+            w = w * 0.5f;
+        }
+        else
+        {
+            w = w - (w + 16.0f) / 3.0f;
+        }
+        i32 result = g_Player->check_hit_rotated_rect(&start, angle, w, unk_70 * 0.9f, graze_only);
+        if (result == 1)
+        {
+            Float3 size(32.0f, 32.0f, 0.0f);
+            cancel_as_bomb_rectangle(&g_Player->inner.pos, &size, 0.0f, 0, 1);
+            return 0;
+        }
+        if (result == 2)
+        {
+            if (timer_2c.current % 3 == 0)
+            {
+                f32 x;
+                f32 y;
+                line_intersection(&x, &y, start.x, start.y, angle, g_Player->inner.pos.x, g_Player->inner.pos.y,
+                                  normalize_angle(angle + ZUN_PI / 2));
+                start.x = x;
+                start.y = y;
+                g_Player->do_graze(&start);
+            }
+            timer_2c++;
+        }
+    }
+    return 0;
+}
+
+// The same for curvy lasers, piece by piece past the first 16 units; one
+// graze per frame at most.
+// TODO: the original adds segment->pos.z to the loaded mid.z (operand order) and calls cancel_as_bomb_rectangle without speculative devirtualization.
+// FUNCTION: TH16 0x437cf0
+i32 LaserCurveInf::check_graze_or_kill(i32 graze_only)
+{
+    i32 grazed = 0;
+    f32 dist = 0.0f;
+    Float3 graze_pos;
+    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    for (i32 i = 0; i < inner.segment_count - 1; i++, segment++)
+    {
+        Float3 mid;
+        laser_sincosmul(&mid, segment->angle, segment->length * 0.5f);
+        mid += segment->pos;
+        dist += segment->length;
+        if (dist >= 16.0f)
+        {
+            i32 result = g_Player->check_hit_rotated_rect(&mid, segment->angle, width * 0.5f, segment->length, graze_only);
+            if (result == 1)
+            {
+                Float3 size(32.0f, 32.0f, 0.0f);
+                cancel_as_bomb_rectangle(&g_Player->inner.pos, &size, 0.0f, 0, 1);
+            }
+            else if (result == 2 && !grazed && timer_2c.current % 3 == 0)
+            {
+                graze_pos = mid;
+                grazed = 1;
+            }
+        }
+    }
+    if (grazed)
+    {
+        g_Player->do_graze(&graze_pos);
+    }
+    timer_2c.tick();
+    return 0;
+}
+
+// cancel_as_bomb_circle for a bomb's rectangle (center, size, rotated by
+// rect_angle): the points are tested in the rectangle's frame.
+// TODO: register allocation differs throughout (the original keeps this in esi and copies center and size to locals first).
+// FUNCTION: TH16 0x433860
+i32 LaserLineInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 e)
+{
+    if (e != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    Float3 origin = position;
+    i32 count = 0;
+    f32 dist = 8.0f;
+    u8 hit[0x100];
+    memset(hit, 0, sizeof(hit));
+    f32 dx = position.x - center->x;
+    f32 dy = position.y - center->y;
+    f32 neg_angle = -rect_angle;
+    f32 s = zun_sinf(neg_angle);
+    f32 c = zun_cosf(neg_angle);
+    f32 local_x = dx * c - dy * s;
+    f32 local_y = dy * c + dx * s;
+    i32 n = 0;
+    f32 local_angle = angle - rect_angle;
+    while (local_angle > ZUN_PI)
+    {
+        local_angle -= ZUN_2PI;
+        if (n++ > 32)
+        {
+            break;
+        }
+    }
+    while (local_angle < -ZUN_PI)
+    {
+        local_angle += ZUN_2PI;
+        if (n++ > 32)
+        {
+            break;
+        }
+    }
+    Float3 local_step;
+    laser_sincosmul(&local_step, local_angle, 8.0f);
+    local_y += local_step.y;
+    local_step.z = 0.0f;
+    local_step.y += local_step.y;
+    f32 half_w = size->x * 0.5f;
+    f32 half_h = size->y * 0.5f;
+    local_x += local_step.x;
+    local_step.x += local_step.x;
+    Float3 step;
+    laser_sincosmul(&step, angle, 8.0f);
+    step.z = 0.0f;
+    Float3 pos;
+    pos = position + step;
+    pos.z = 0.0f;
+    step.x += step.x;
+    step.y += step.y;
+    step.z += step.z;
+    i32 i;
+    for (i = 0; unk_70 >= dist + 8.0f; i++)
+    {
+        if (!(-half_w > local_x || local_x > half_w || -half_h > local_y || local_y > half_h))
+        {
+            count++;
+            hit[i] = 1;
+            gen_items_from_cancel(&pos, mode);
+            if (bullet_type <= 0x11 || bullet_type == 0x22 || bullet_type == 0x26)
+            {
+                AnmId id = g_BulletManager->bullet_anm->create_vm(inner.bullet_color * 2 + 0xd1, &pos, 0.0f, -1, 0);
+                g_EffectManager->track_inline(id);
+            }
+            else if (bullet_type <= 0x1e)
+            {
+                g_EffectManager->track(
+                    g_BulletManager->bullet_anm->create_vm(inner.bullet_color * 2 + 0x101, &pos, 0.0f, -1, 0));
+            }
+            else if (bullet_type <= 0x21)
+            {
+                g_EffectManager->track(
+                    g_BulletManager->bullet_anm->create_vm(inner.bullet_color * 2 + 0x119, &pos, 0.0f, -1, 0));
+            }
+        }
+        pos += step;
+        local_x += local_step.x;
+        local_y += local_step.y;
+        dist += 16.0f;
+    }
+    if (count != 0)
+    {
+        if (count >= i)
+        {
+            pending_delete = 1;
+            return count;
+        }
+        i32 j;
+        for (j = 0; j < i; j++)
+        {
+            if (!hit[j])
+            {
+                break;
+            }
+        }
+        if (j != 0)
+        {
+            position += step * (f32)j;
+            unk_70 -= (f32)j * 16.0f;
+            if (!(unk_70 > 24.0f))
+            {
+                pending_delete = 1;
+                return count;
+            }
+            inner.laser_new_arg_2 = unk_70;
+            unk_7c = (f32)j * 16.0f;
+        }
+        i32 run = 0;
+        if (j < i)
+        {
+            for (; j < i; j++, run++)
+            {
+                if (hit[j])
+                {
+                    break;
+                }
+            }
+            if (j < i)
+            {
+                f32 len = (f32)run * 16.0f;
+                inner.laser_new_arg_2 -= unk_70 - len;
+                unk_70 = len;
+                if (24.0f > len)
+                {
+                    pending_delete = 1;
+                }
+                do
+                {
+                    if (hit[j])
+                    {
+                        j++;
+                        continue;
+                    }
+                    i32 start = j;
+                    run = 0;
+                    while (!hit[j])
+                    {
+                        j++;
+                        run++;
+                        if (j >= i)
+                        {
+                            break;
+                        }
+                    }
+                    LaserLineInner params = inner;
+                    params.laser_new_arg_2 = params.laser_new_arg_1 = (f32)run * 16.0f;
+                    if (params.laser_new_arg_1 > 24.0f)
+                    {
+                        params.start_pos = origin + step * (f32)start;
+                        g_LaserManager->allocate_new_laser(LASER_LINE, &params);
+                    }
+                } while (j < i);
+            }
+        }
+    }
+    return count;
+}
+
+// cancel_as_bomb_circle for a bomb's rectangle, tested in the rectangle's
+// frame. The pieces after the first hit run become straight lasers.
+// TODO: register allocation differs throughout, as in LaserLineInf::cancel_as_bomb_rectangle.
+// FUNCTION: TH16 0x435880
+i32 LaserInfiniteInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 e)
+{
+    if (e != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    Float3 origin = position;
+    i32 count = 0;
+    f32 dist = 8.0f;
+    u8 hit[0x100];
+    memset(hit, 0, sizeof(hit));
+    f32 dx = position.x - center->x;
+    f32 dy = position.y - center->y;
+    f32 neg_angle = -rect_angle;
+    f32 s = zun_sinf(neg_angle);
+    f32 c = zun_cosf(neg_angle);
+    f32 local_x = dx * c - dy * s;
+    f32 local_y = dy * c + dx * s;
+    i32 n = 0;
+    f32 local_angle = angle - rect_angle;
+    while (local_angle > ZUN_PI)
+    {
+        local_angle -= ZUN_2PI;
+        if (n++ > 32)
+        {
+            break;
+        }
+    }
+    while (local_angle < -ZUN_PI)
+    {
+        local_angle += ZUN_2PI;
+        if (n++ > 32)
+        {
+            break;
+        }
+    }
+    Float3 local_step;
+    laser_sincosmul(&local_step, local_angle, 8.0f);
+    local_y += local_step.y;
+    local_step.z = 0.0f;
+    local_step.y += local_step.y;
+    f32 half_w = size->x * 0.5f;
+    f32 half_h = size->y * 0.5f;
+    local_x += local_step.x;
+    local_step.x += local_step.x;
+    Float3 step;
+    laser_sincosmul(&step, angle, 8.0f);
+    step.z = 0.0f;
+    Float3 pos;
+    pos = position + step;
+    pos.z = 0.0f;
+    step.x += step.x;
+    step.y += step.y;
+    step.z += step.z;
+    i32 i;
+    for (i = 0; unk_70 >= dist + 8.0f; i++)
+    {
+        if (!(-half_w > local_x || local_x > half_w || -half_h > local_y || local_y > half_h))
+        {
+            count++;
+            hit[i] = 1;
+            gen_items_from_cancel(&pos, mode);
+            if (bullet_type <= 0x11 || bullet_type == 0x22 || bullet_type == 0x26)
+            {
+                AnmId id = g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0xd1, &pos, 0.0f, -1, 0);
+                g_EffectManager->track_inline(id);
+            }
+            else if (bullet_type <= 0x1f || bullet_type == 0x1b)
+            {
+                g_EffectManager->track(
+                    g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x101, &pos, 0.0f, -1, 0));
+            }
+            else if (bullet_type <= 0x21)
+            {
+                g_EffectManager->track(
+                    g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x119, &pos, 0.0f, -1, 0));
+            }
+        }
+        pos += step;
+        local_x += local_step.x;
+        local_y += local_step.y;
+        dist += 16.0f;
+    }
+    if (count != 0)
+    {
+        i32 j;
+        for (j = 0; j < i; j++)
+        {
+            if (!hit[j])
+            {
+                break;
+            }
+        }
+        if (j != 0)
+        {
+            unk_70 = 0.0f;
+        }
+        else
+        {
+            i32 run = 0;
+            for (; j < i; j++, run++)
+            {
+                if (hit[j])
+                {
+                    break;
+                }
+            }
+            if (j < i)
+            {
+                unk_70 = (f32)run * 16.0f;
+            }
+        }
+        while (j < i)
+        {
+            if (hit[j])
+            {
+                j++;
+                continue;
+            }
+            i32 run = 0;
+            i32 start = j;
+            while (!hit[j])
+            {
+                j++;
+                run++;
+                if (j >= i)
+                {
+                    break;
+                }
+            }
+            LaserLineInner params;
+            params.speed = 8.0f;
+            params.distance = 0.0f;
+            params.shot_sfx = -1;
+            params.shot_transform_sfx = -1;
+            params.laser_new_arg_2 = params.laser_new_arg_1 = (f32)run * 16.0f;
+            params.start_pos = origin + step * (f32)start;
+            params.ang_aim = angle;
+            params.bullet_type = inner.type;
+            params.laser_new_arg_4 = width;
+            params.bullet_color = inner.color;
+            params.laser_new_arg_3 = inner.laser_new_arg_2 - (f32)start * 16.0f;
+            params.flags ^= (params.flags ^ (inner.flags >> 1)) & 1;
+            g_LaserManager->allocate_new_laser(LASER_LINE, &params);
+        }
+    }
+    return count;
+}
+
+// Sets the laser up from its parameters: the body and its origin VM, the
+// shot sound, and the start offset along the aim.
+// TODO: the original realigns the frame (and esp, -8); everything else matches.
+// FUNCTION: TH16 0x435050
+i32 LaserInfiniteInf::initialize(void *params)
+{
+    inner = *(LaserInfiniteInner *)params;
+    bullet_type = inner.type;
+    state = 3;
+    kind = LASER_INFINITE;
+    bullet_color = inner.color;
+    AnmVm *vm = &vm_950;
+    vm->wipe();
+    vm_950.index_of_sprite_mapping_func = 2;
+    vm_950.associated_game_entity = this;
+    g_LaserManager->bullet_anm->set_vm_script(vm, g_bullet_types[bullet_type].script);
+    vm->interrupt(2);
+    vm->run();
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    AnmVmFlagsLoFields *fields = (AnmVmFlagsLoFields *)&vm_950.flags_lo;
+    fields->anchor_x = 0;
+    fields->anchor_y = 2;
+    fields->render_mode = 1;
+    vm_950.flags_hi = vm_950.flags_hi & ~0x80000 | 0x40000;
+    vm = &vm_f4c;
+    g_LaserManager->bullet_anm->copy_vm(vm, inner.color + 0x38);
+    vm->unk_5b0 = NULL;
+    vm->parent = NULL;
+    vm->run();
+    vm->interrupt(2);
+    vm->run();
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    ((AnmVmFlagsLoFields *)&vm_f4c.flags_lo)->render_mode = 1;
+    vm_f4c.flags_hi = vm_f4c.flags_hi & ~0x80000 | 0x40000;
+    if (inner.shot_sfx >= 0)
+    {
+        g_SoundManager.play_sound_at_position(inner.shot_sfx, 0.0f);
+    }
+    position = inner.start_pos;
+    if (inner.distance != 0.0f)
+    {
+        Float3 offset;
+        laser_sincosmul(&offset, inner.ang_aim, inner.distance);
+        position.x += offset.x;
+        position.y += offset.y;
+    }
+    unk_70 = inner.laser_new_arg_1;
+    length = inner.speed;
+    angle = inner.ang_aim;
+    ex_index = *(i32 *)inner.unk_50;
+    width = 2.0f;
+    id = inner.laser_st_on_arg_1;
+    timer_2c.reset();
+    unk_94c = 0;
+    return 0;
+}
+
+// Sets a beam up from its parameters.
+// TODO: the original addresses vm_928 through the pointer left over from the inlined wipe (store order, ecx vs edx).
+// FUNCTION: TH16 0x43a860
+i32 LaserBeamInf::initialize(void *params)
+{
+    inner = *(LaserBeamInner *)params;
+    position = inner.start_pos;
+    unk_70 = inner.length;
+    angle = inner.ang_aim;
+    bullet_color = inner.color;
+    state = 3;
+    kind = LASER_BEAM;
+    id = inner.id;
+    for (i32 i = 0; i < 0x200; i++)
+    {
+        unk_f28[i] = unk_70;
+    }
+    width = 1.0f;
+    unk_f24 = 0;
+    vm_928.wipe();
+    vm_928.flags_lo = vm_928.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    return 0;
+}
+
+// TODO: register allocation and the order of the vector temporaries differ (the original builds them with unpcklps).
+// FUNCTION: TH16 0x438370
+void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle,
+                               f32 t)
+{
+    switch (mode)
+    {
+    case 0:
+        *out_pos = *pos - velocity * this->speed;
+        *out_speed = this->speed;
+        *out_angle = this->angle;
+        break;
+    case 1:
+        if (-990.0f > angle_delta)
+        {
+            f32 dt = speed - speed_delta;
+            *out_pos = *pos - velocity * dt;
+            *out_speed = this->speed - speed_delta;
+            *out_angle = angle;
+        }
+        else
+        {
+            Float3 a;
+            Float3 b;
+            a.z = 0.0f;
+            b.z = 0.0f;
+            laser_sincosmul(&a, angle, -speed);
+            laser_sincosmul(&b, angle_delta, -speed_delta);
+            Float3 sum = b + a;
+            *out_pos = *pos + sum;
+            *out_speed = (f32)sqrt(sum.x * sum.x + sum.y * sum.y);
+            *out_angle = atan2(sum.y, sum.x);
+        }
+        break;
+    case 2:
+    {
+        Float3 d;
+        d.z = 0.0f;
+        laser_sincosmul(&d, angle, speed);
+        f32 whole = (f32)floor(t);
+        *out_pos = *pos - d * (t - whole);
+        *out_speed = speed - speed_delta;
+        i32 i = 0;
+        f32 a = angle - angle_delta;
+        while (a > ZUN_PI)
+        {
+            a -= ZUN_2PI;
+            if (i++ > 32)
+            {
+                break;
+            }
+        }
+        while (a < -ZUN_PI)
+        {
+            a += ZUN_2PI;
+            if (i++ > 32)
+            {
+                break;
+            }
+        }
+        *out_angle = a;
+        laser_sincosmul(&d, a, *out_speed);
+        *out_pos = *out_pos - d * (1.0f - t + whole);
+        break;
+    }
+    }
+}
+
+// TODO: register allocation differs (the original keeps the stepped position in xmm registers and stack shadows; the frame is aligned to 64).
+// FUNCTION: TH16 0x437ee0
+void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, f32 time)
+{
+    time -= unk_8;
+    switch (mode)
+    {
+    case 0:
+        *out_pos = start_pos + velocity * time * speed;
+        *out_speed = speed;
+        *out_angle = angle;
+        break;
+    case 1:
+        if (-990.0f > angle_delta)
+        {
+            *out_pos = start_pos + velocity * (speed + speed + speed_delta * time) * (time + 1.0f) * 0.5f;
+            *out_speed = speed_delta * time + speed;
+            *out_angle = angle;
+        }
+        else
+        {
+            Float3 start = start_pos;
+            Float3 a;
+            Float3 b;
+            a.z = 0.0f;
+            b.z = 0.0f;
+            laser_sincosmul(&a, angle, speed);
+            laser_sincosmul(&b, angle_delta, speed_delta);
+            Float3 sum = b + a;
+            *out_pos = start + sum * time;
+            *out_speed = (f32)sqrt(sum.x * sum.x + sum.y * sum.y);
+            *out_angle = atan2(sum.y, sum.x);
+        }
+        break;
+    case 2:
+    {
+        Float3 pos = start_pos;
+        f32 a = angle;
+        f32 s = speed;
+        Float3 d;
+        d.z = 0.0f;
+        for (i32 n = (i32)time; n > 0; n--)
+        {
+            laser_sincosmul(&d, a, s);
+            i32 i = 0;
+            a += angle_delta;
+            while (a > ZUN_PI)
+            {
+                a -= ZUN_2PI;
+                if (i++ > 32)
+                {
+                    break;
+                }
+            }
+            while (a < -ZUN_PI)
+            {
+                a += ZUN_2PI;
+                if (i++ > 32)
+                {
+                    break;
+                }
+            }
+            pos.x += d.x;
+            s += speed_delta;
+            pos.y += d.y;
+            pos.z += d.z;
+        }
+        laser_sincosmul(&d, a, s);
+        *out_pos = pos + d * (time - (f32)floor(time));
+        *out_speed = s;
+        *out_angle = a;
+        break;
+    }
+    }
+}
+
+// One frame: the et_ex steps until none asks to run again, growth (or, at
+// full length, moving and shrinking to laser_new_arg_3), leaving the screen
+// once the two delay timers ran out, then the graze check and the VMs.
+// Nonzero once the laser is done.
+// TODO: ours speculatively devirtualizes run_ex, method_3c and method_50 (the first and last still stubs); the original calls them through the vtable.
+// FUNCTION: TH16 0x432f40
+i32 LaserLineInf::on_tick()
+{
+    i32 again;
+    do
+    {
+        run_ex();
+        if (ex_flags == 0)
+        {
+            break;
+        }
+        again = 0;
+        if (ex_flags & 1)
+        {
+            again = method_38();
+        }
+        if (ex_flags & 4)
+        {
+            again += method_3c();
+        }
+        if (ex_flags & 8)
+        {
+            again += method_40();
+        }
+        if (ex_flags & 0x10)
+        {
+            switch (ex_state[3].ints[3])
+            {
+            case 0:
+                again += method_44();
+                break;
+            case 1:
+                again += method_4c();
+                break;
+            case 4:
+                again += method_48();
+                break;
+            }
+        }
+        if (ex_flags & 0x40)
+        {
+            again += method_50();
+        }
+        if (ex_flags & 0x1000)
+        {
+            again += method_54();
+        }
+        if ((i32)ex_flags < 0)
+        {
+            if (ex_state[5].timer.current <= 0)
+            {
+                ex_flags ^= 0x80000000;
+                again++;
+            }
+            else
+            {
+                ex_state[5].timer.decrement(1.0f);
+            }
+        }
+        if (countdown_5c8 != 0)
+        {
+            countdown_5c8--;
+        }
+    } while (again != 0);
+    f32 step = length * g_game_speed;
+    if (unk_70 < inner.laser_new_arg_2)
+    {
+        unk_70 = step + unk_70;
+        if (unk_70 > inner.laser_new_arg_2)
+        {
+            unk_70 = inner.laser_new_arg_2;
+        }
+    }
+    else
+    {
+        unk_7c = step + unk_7c;
+        position.x = unk_60.x * g_game_speed + position.x;
+        position.y = position.y + unk_60.y * g_game_speed;
+        position.z = position.z + unk_60.z * g_game_speed;
+        if (inner.laser_new_arg_3 > 0.0f && unk_70 + unk_7c > inner.laser_new_arg_3)
+        {
+            unk_70 = inner.laser_new_arg_3 - unk_7c;
+            inner.laser_new_arg_2 = unk_70;
+            if (0.0f >= unk_70)
+            {
+                return 1;
+            }
+        }
+    }
+    if (timer_5a0.current > 0 || timer_5b4.current > 0)
+    {
+        if (timer_5a0.current > 0)
+        {
+            timer_5a0.decrement(1.0f);
+        }
+        if (timer_5b4.current > 0)
+        {
+            timer_5b4.decrement(1.0f);
+        }
+    }
+    else
+    {
+        Float3 tip;
+        laser_sincosmul(&tip, angle, unk_70);
+        f32 tip_x = position.x + tip.x;
+        f32 tip_y = position.y + tip.y;
+        if ((position.x + width <= -192.0f || position.x - width >= 192.0f || position.y + width <= 0.0f ||
+             position.y - width >= 448.0f) &&
+            (tip_x + width <= -192.0f || tip_x - width >= 192.0f || tip_y + width <= 0.0f || tip_y - width >= 448.0f))
+        {
+            return 1;
+        }
+    }
+    check_graze_or_kill(0);
+    AnmVm *vm = &vm_92c;
+    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm->scale.x = width / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_width;
+    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm->scale.y = unk_70 / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_height;
+    vm->run();
+    if (unk_7c == 0.0f)
+    {
+        vm_f28.run();
+    }
+    vm_1524.run();
+    timer.tick();
+    return 0;
+}
+
+// One frame: the et_ex steps, then each segment follows the node list to
+// its place at timer_40 minus its index (segments not out yet stay at the
+// start), leaving the screen once every segment is off it.
+// TODO: ours speculatively devirtualizes run_ex and the small et_ex steps; register allocation differs.
+// FUNCTION: TH16 0x4377d0
+i32 LaserCurveInf::on_tick()
+{
+    i32 again;
+    do
+    {
+        run_ex();
+        if (ex_flags == 0)
+        {
+            break;
+        }
+        again = 0;
+        if (ex_flags & 1)
+        {
+            again = method_38();
+        }
+        if (ex_flags & 4)
+        {
+            again += method_3c();
+        }
+        if (ex_flags & 8)
+        {
+            again += method_40();
+        }
+        if (ex_flags & 0x10)
+        {
+            switch (ex_state[3].ints[3])
+            {
+            case 0:
+                again += method_44();
+                break;
+            case 1:
+                again += method_4c();
+                break;
+            case 4:
+                again += method_48();
+                break;
+            }
+        }
+        if (ex_flags & 0x40)
+        {
+            again += method_50();
+        }
+        if (ex_flags & 0x1000)
+        {
+            again += method_54();
+        }
+        if (ex_flags & 0x100)
+        {
+            again += method_60();
+        }
+        if ((i32)ex_flags < 0)
+        {
+            if (ex_state[5].timer.current <= 0)
+            {
+                ex_flags ^= 0x80000000;
+                again++;
+            }
+            else
+            {
+                ex_state[5].timer.decrement(1.0f);
+            }
+        }
+        if (countdown_5c8 != 0)
+        {
+            countdown_5c8--;
+        }
+    } while (again != 0);
+    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    if (!(flags_rest & 1))
+    {
+        i32 placed = 0;
+        for (i32 i = 0; i < inner.segment_count; i++, segment++)
+        {
+            f32 t = timer_40.current_f - (f32)i;
+            if (t >= 0.0f)
+            {
+                LaserCurveNode *node;
+                for (node = &nodes; node != NULL; node = node->next)
+                {
+                    if (t >= node->unk_8 && node->unk_c > t)
+                    {
+                        if (!placed)
+                        {
+                            node->get_state(&segment->pos, &segment->length, &segment->angle, t);
+                        }
+                        else
+                        {
+                            node->step_back(&segment->pos, &segment->length, &segment->angle, &segment[-1].pos,
+                                            segment[-1].length, segment[-1].angle, t);
+                        }
+                        break;
+                    }
+                }
+                placed = 1;
+            }
+            else
+            {
+                segment->pos = inner.start_pos;
+                *(Float3 *)segment->unk_c = g_zero_vec;
+                segment->angle = inner.ang_aim;
+                segment->length = inner.speed;
+            }
+        }
+    }
+    segment = (LaserCurveSegment *)unk_1524;
+    if (timer_5a0.current > 0 || (ex_flags & 0x100))
+    {
+        timer_5a0.decrement(1.0f);
+    }
+    else
+    {
+        i32 i;
+        for (i = 0; i < inner.segment_count; i++, segment++)
+        {
+            Float3 head;
+            laser_sincosmul(&head, angle, unk_70);
+            head += position;
+            if (!(segment->pos.x + width <= -192.0f || segment->pos.x - width >= 192.0f ||
+                  segment->pos.y + width <= 0.0f || segment->pos.y - width >= 448.0f))
+            {
+                break;
+            }
+        }
+        if (i >= inner.segment_count)
+        {
+            return 1;
+        }
+    }
+    check_graze_or_kill(0);
+    vm_92c.run();
+    vm_f28.run();
+    timer_40.tick();
+    return 0;
+}
+
+// Runs the laser's pending et_ex instructions: each one starts an et_ex
+// step (ex_flags and its ex_state), or acts at once (sounds, bullets, the
+// sprite, blend mode, jumps).
+// TODO: the shooter fields after pos are written through raw offsets; register allocation and the case layout differ.
+// FUNCTION: TH16 0x431fe0
+DECOMP_NOINLINE void LaserLineInf::run_ex()
+{
+    while (ex_index < 0x12)
+    {
+        BulletEx *ex = &inner.ex[ex_index];
+        if (ex->type == 0)
+        {
+            return;
+        }
+        if (ex->slot == 0 && ex_flags != 0)
+        {
+            return;
+        }
+        switch (ex->type)
+        {
+        case 1:
+            ex_flags |= 1;
+            ex_state[0].timer.set_value(0);
+            ex_state[0].floats[7] = 0.0f;
+            break;
+        case 4:
+            ex_flags |= 4;
+            ex_state[1].floats[0] = ex->r;
+            if (-990.0f >= ex->s)
+            {
+                ex_state[1].floats[1] = angle;
+            }
+            else if (ex->s >= 990.0f)
+            {
+                ex_state[1].floats[1] = g_Player->angle_to_player(&position);
+            }
+            else
+            {
+                ex_state[1].floats[1] = ex->s;
+            }
+            ex_state[1].timer.set_value(0);
+            ex_state[1].ints[0] = ex->a;
+            laser_sincosmul((Float3 *)&ex_state[1].floats[5], ex_state[1].floats[1], ex_state[1].floats[0]);
+            if (ex_index != 0 && inner.shot_transform_sfx >= 0)
+            {
+                g_SoundManager.play_sound_centered(inner.shot_transform_sfx, 0);
+            }
+            break;
+        case 8:
+            ex_flags |= 8;
+            ex_state[2].floats[0] = ex->r;
+            ex_state[2].floats[1] = ex->s;
+            ex_state[2].timer.set_value(0);
+            ex_state[2].ints[0] = ex->a;
+            if (ex_index != 0 && inner.shot_transform_sfx >= 0)
+            {
+                g_SoundManager.play_sound_centered(inner.shot_transform_sfx, 0);
+            }
+            break;
+        case 0x10:
+            ex_flags |= ex->type;
+            ex_state[3].floats[1] = ex->r;
+            ex_state[3].floats[0] = ex->s > -999.0f ? ex->s : length;
+            ex_state[3].timer.set_value(0);
+            ex_state[3].ints[0] = ex->a;
+            ex_state[3].ints[1] = ex->b;
+            ex_state[3].ints[2] = 0;
+            ex_state[3].ints[3] = ex->c;
+            break;
+        case 0x40:
+            if (ex->a > 0)
+            {
+                ex_flags |= ex->type;
+                if (ex->r >= 0.0f)
+                {
+                    ex_state[4].floats[0] = ex->r;
+                }
+                else
+                {
+                    ex_state[4].floats[0] = length;
+                }
+                ex->a--;
+                ex_state[4].ints[1] = ex->a;
+                ex_state[4].ints[0] = 0;
+                ex_state[4].ints[2] = ex->b;
+            }
+            break;
+        case 0x80:
+            countdown_5c8 = ex->a;
+            break;
+        case 0x100:
+            timer_5b4.set_inline(ex->a);
+            ex_index++;
+            continue;
+        case 0x200:
+        {
+            AnmVm *vm = &vm_92c;
+            g_BulletManager->bullet_anm->copy_vm(vm, g_bullet_types[ex->a].script + ex->b);
+            vm->unk_5b0 = NULL;
+            vm->parent = NULL;
+            vm->run();
+            break;
+        }
+        case 0x400:
+            state = 3;
+            break;
+        case 0x800:
+            g_SoundManager.play_sound_at_position(ex->a, position.x);
+            ex_index++;
+            continue;
+        case 0x1000:
+            ex_flags |= ex->type;
+            ex_state[6].timer.set_inline(ex->a);
+            break;
+        case 0x2000:
+        {
+            EnemyBulletShooter shooter;
+            laser_sincosmul(&shooter.pos, angle, unk_70);
+            i32 a = ex->a;
+            shooter.pos.x += position.x;
+            shooter.pos.z = 0.0f;
+            shooter.aim_type = (a >> 24) & 0x7f;
+            shooter.type = (a >> 16) & 0xff;
+            shooter.pos.y += position.y;
+            shooter.color = (a >> 8) & 0xff;
+            shooter.spd1 = ex->r;
+            shooter.spd2 = ex->s;
+            shooter.start_transform = a & 0xff;
+            ex_index++;
+            shooter.count = ex->b;
+            shooter.layers = ex[1].a;
+            shooter.ang_aim = ex[1].r;
+            shooter.sfx_flags = ex[1].b;
+            shooter.ang_bullet_dist = ex[1].s;
+            memcpy(shooter.ex, inner.ex, sizeof(inner.ex));
+            g_BulletManager->shoot_bullets(&shooter);
+            ex_index++;
+            if (a < 0)
+            {
+                cancel(0, 0);
+            }
+            break;
+        }
+        case 0x8000:
+            id = ex->a;
+            ex_index++;
+            continue;
+        case 0x10000:
+            ex_index = ex->a;
+            continue;
+        case 0x100000:
+            if (ex->a != 0)
+            {
+                vm_92c.flags_lo = vm_92c.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+            }
+            else
+            {
+                vm_92c.flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
+            }
+            ex_index++;
+            continue;
+        case 0x80000000:
+            ex_flags |= ex->type;
+            ex_state[5].timer.set_inline(ex->a);
+            break;
+        }
+        ex_index++;
+    }
+}
+
+// Sets the laser up from its parameters: the body, origin and tip VMs, the
+// delay timers, the shot sound and the start offset along the aim.
+// TODO: the original realigns the frame (and esp, -8); everything else matches.
+// FUNCTION: TH16 0x431b30
+i32 LaserLineInf::initialize(void *params)
+{
+    inner = *(LaserLineInner *)params;
+    bullet_type = inner.bullet_type;
+    state = 2;
+    kind = LASER_LINE;
+    bullet_color = inner.bullet_color;
+    AnmVm *vm = &vm_92c;
+    vm->wipe();
+    vm_92c.index_of_sprite_mapping_func = 2;
+    vm_92c.associated_game_entity = this;
+    g_LaserManager->bullet_anm->set_vm_script(vm, g_bullet_types[bullet_type].script);
+    vm->interrupt(2);
+    vm->run();
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    AnmVmFlagsLoFields *fields = (AnmVmFlagsLoFields *)&vm_92c.flags_lo;
+    fields->anchor_x = 0;
+    fields->anchor_y = 2;
+    fields->render_mode = 1;
+    vm_92c.flags_hi = vm_92c.flags_hi & ~0x80000 | 0x40000;
+    vm = &vm_f28;
+    g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x38);
+    vm->unk_5b0 = NULL;
+    vm->parent = NULL;
+    vm->run();
+    vm->interrupt(2);
+    vm->run();
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    ((AnmVmFlagsLoFields *)&vm_f28.flags_lo)->render_mode = 1;
+    vm_f28.flags_hi = vm_f28.flags_hi & ~0x80000 | 0x40000;
+    if (bullet_type > 0x11 && bullet_type != 0x26)
+    {
+        vm = &vm_1524;
+        g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x53);
+        vm->unk_5b0 = NULL;
+        vm->parent = NULL;
+        vm->run();
+    }
+    else
+    {
+        vm = &vm_1524;
+        g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x5b);
+        vm->unk_5b0 = NULL;
+        vm->parent = NULL;
+        vm->run();
+        vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    }
+    vm_1524.flags_hi = vm_1524.flags_hi & ~0x80000 | 0x40000;
+    timer_5a0.set_inline(30);
+    timer_5b4.set_inline(3);
+    if (inner.shot_sfx >= 0)
+    {
+        g_SoundManager.play_sound_at_position(inner.shot_sfx, 0.0f);
+    }
+    timer_2c.reset();
+    timer_40.reset();
+    position = inner.start_pos;
+    if (inner.distance != 0.0f)
+    {
+        Float3 offset;
+        laser_sincosmul(&offset, inner.ang_aim, inner.distance);
+        position.x += offset.x;
+        position.y += offset.y;
+    }
+    width = inner.laser_new_arg_4;
+    unk_70 = inner.laser_new_arg_1;
+    length = inner.speed;
+    angle = inner.ang_aim;
+    if (inner.laser_new_arg_1 > inner.laser_new_arg_2)
+    {
+        unk_7c = 0.01f;
+    }
+    else
+    {
+        unk_7c = 0.0f;
+    }
+    laser_sincosmul(&unk_60, angle, length);
+    ex_index = inner.unk_30;
     return 0;
 }

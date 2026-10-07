@@ -358,7 +358,7 @@ i32 __fastcall ScreenEffect::on_cleanup(ScreenEffect *self)
 }
 
 // FUNCTION: TH16 0x45d150
-ScreenEffect *LTCG_FASTCALL ScreenEffect::create(i32 mode, i32 arg_18, i32 arg_1c, i32 arg_20, i32 arg_24,
+DECOMP_NOINLINE ScreenEffect *LTCG_FASTCALL ScreenEffect::create(i32 mode, i32 arg_18, i32 arg_1c, i32 arg_20, i32 arg_24,
                                                 i32 draw_priority)
 {
     ScreenEffect *effect = new ScreenEffect;

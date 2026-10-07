@@ -81,11 +81,11 @@ struct SpellcardFlagBits
 
 extern EnemyFuncSetFunc const g_ecl_func_sets[3];
 int __fastcall ecl_ext_damage_stored(EnemyData *enemy, int damage);
-int __fastcall ecl_ext_damage_425410(EnemyData *enemy, int damage);
+int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage);
 
 // GLOBAL: TH16 0x490eb4
 // The damage hooks ECL's flagExtDmg installs.
-extern EnemyExtDamageFunc const g_ecl_ext_damage_funcs[3] = {NULL, ecl_ext_damage_stored, ecl_ext_damage_425410};
+extern EnemyExtDamageFunc const g_ecl_ext_damage_funcs[3] = {NULL, ecl_ext_damage_stored, ecl_ext_damage_anm_hurtbox};
 
 // The hooks ECL 634 installs; only entry 0 (NULL).
 extern void *g_ecl_unknown_634_funcs[1];
@@ -166,8 +166,8 @@ static DECOMP_NOINLINE void ecl_laser_on(EnemyData *enemy)
     i32 idx = enemy->get_int_arg(0);
     memcpy(params.ex, enemy->bullet_props[idx].ex, sizeof(params.ex));
     get_shot_origin(enemy, idx, &params.start_pos);
-    params.type = enemy->bullet_props[idx].type;
-    params.color = enemy->bullet_props[idx].color;
+    params.bullet_type = enemy->bullet_props[idx].type;
+    params.bullet_color = enemy->bullet_props[idx].color;
     params.ang_aim = normalize_angle(enemy->bullet_props[idx].ang_aim);
     params.flags = enemy->bullet_props[idx].flags | 1;
     params.speed = enemy->bullet_props[idx].spd1;
@@ -218,9 +218,9 @@ static DECOMP_NOINLINE void ecl_laser_beam_on(EnemyData *enemy)
     params.ang_aim = normalize_angle(enemy->bullet_props[idx].ang_aim);
     params.timing = enemy->bullet_props[idx].laser_timing[0];
     params.laser_new_arg_4 = enemy->bullet_props[idx].laser_new_arg_4;
-    params.laser_new_arg_3 = enemy->bullet_props[idx].pos.z;
+    params.length = enemy->bullet_props[idx].pos.z;
     params.distance = enemy->bullet_props[idx].distance;
-    params.laser_beam_on_arg_1 = enemy->get_int_arg(1);
+    params.id = enemy->get_int_arg(1);
     g_LaserManager->allocate_new_laser(LASER_BEAM, &params);
 }
 
@@ -1998,7 +1998,7 @@ int EnemyData::ecl_run_over_300()
         trajectory.z = 0.0f;
         if (laser != NULL)
         {
-            ((LaserInfiniteInf *)laser)->inner.trajectory = trajectory;
+            ((LaserInfiniteInf *)laser)->inner.velocity = trajectory;
         }
         break;
     }
