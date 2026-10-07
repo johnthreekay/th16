@@ -134,6 +134,7 @@ static __forceinline i32 segments_cross(f32 x1, f32 y1, f32 x2, f32 y2, f32 x3, 
     return !(c3 * c4 > 0.0f);
 }
 
+// TODO: ours unrolls the rotation loop (the original keeps it rolled, eax counting 4) and lays the points out differently on the stack.
 // FUNCTION: TH16 0x403a90
 HARNESS_CALLED i32 __stdcall collision_test_points_in_rect(f32 x, f32 y, f32 w, f32 h, f32 angle, Float2 *points)
 {
@@ -168,6 +169,7 @@ HARNESS_CALLED i32 __stdcall collision_test_points_in_rect(f32 x, f32 y, f32 w, 
     return 0;
 }
 
+// TODO: same tests and formulas; register allocation and stack slots differ (the original spills x4 - x3 into the x4 argument slot).
 // FUNCTION: TH16 0x403ec0
 HARNESS_CALLED i32 __stdcall collision_segment_intersection(f32 *out_x, f32 *out_y, f32 x1, f32 y1, f32 x2, f32 y2,
                                                             f32 x3, f32 y3, f32 x4, f32 y4)
@@ -198,6 +200,7 @@ HARNESS_CALLED i32 __stdcall collision_segment_intersection(f32 *out_x, f32 *out
     f32 dx2 = x4 - x3;
     if (fabsf(dx2) < 0.01f)
     {
+        slope2 = 0.0f;
         intercept2 = x3;
         vertical2 = 1;
     }
@@ -234,6 +237,7 @@ HARNESS_CALLED i32 __stdcall collision_segment_intersection(f32 *out_x, f32 *out
     return 1;
 }
 
+// TODO: the return 0 of the two-vertical-lines case shares the parallel case's epilogue in ours.
 // FUNCTION: TH16 0x404220
 HARNESS_CALLED i32 __stdcall collision_line_intersection(f32 *out_x, f32 *out_y, f32 x1, f32 y1, f32 angle1, f32 x2,
                                                          f32 y2, f32 angle2)
@@ -269,6 +273,7 @@ HARNESS_CALLED i32 __stdcall collision_line_intersection(f32 *out_x, f32 *out_y,
     from_polar(&dir, angle2, 10.0f);
     if (fabsf(dir.x) < 0.01f)
     {
+        slope2 = 0.0f;
         vertical2 = 1;
         intercept2 = x2;
     }
@@ -305,6 +310,7 @@ HARNESS_CALLED i32 __stdcall collision_line_intersection(f32 *out_x, f32 *out_y,
     return 1;
 }
 
+// TODO: same logic; the corner setup, rotation loop unrolling and register allocation differ.
 // FUNCTION: TH16 0x404600
 HARNESS_CALLED i32 __stdcall collision_line_rect(Float2 *near_point, Float2 *far_point, Float3 *pos, f32 line_angle,
                                                  f32 rect_x, f32 rect_y, f32 w, f32 h, f32 rect_angle)
@@ -376,6 +382,7 @@ HARNESS_CALLED i32 __stdcall collision_line_rect(Float2 *near_point, Float2 *far
     return 1;
 }
 
+// TODO: same logic; ours unrolls the rotation loops and allocates the corner arrays and registers differently.
 // FUNCTION: TH16 0x4049c0
 HARNESS_CALLED i32 __stdcall collision_test_rect_rect(f32 x1, f32 y1, f32 w1, f32 h1, f32 angle1, f32 x2, f32 y2,
                                                       f32 w2, f32 h2, f32 angle2)
