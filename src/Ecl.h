@@ -72,9 +72,62 @@ struct EclStack
 
     // 0x474810. Opens a call frame with size bytes of locals; -1 when the
     // stack is full.
-    i32 enter(i32 size);
+    HARNESS_CALLED i32 enter(i32 size);
     // 0x474860. Closes the frame enter opened.
-    i32 ecl_return();
+    HARNESS_CALLED i32 ecl_return();
+
+    // Typed pushes and pops of the expression stack, inlined into
+    // EclRunContext::ecl_run.
+    __forceinline i32 pop_int()
+    {
+        stack_offset -= 4;
+        EclStackItem item = *(EclStackItem *)((u8 *)data + stack_offset);
+        stack_offset -= 4;
+        char type = *((char *)data + stack_offset);
+        if (type == 'f')
+        {
+            return (i32)item.f;
+        }
+        else if (type == 'i')
+        {
+            return item.i;
+        }
+        return item.i;
+    }
+    __forceinline f32 pop_float()
+    {
+        stack_offset -= 4;
+        EclStackItem item = *(EclStackItem *)((u8 *)data + stack_offset);
+        stack_offset -= 4;
+        char type = *((char *)data + stack_offset);
+        if (type != 'f' && type == 'i')
+        {
+            return (f32)item.i;
+        }
+        return item.f;
+    }
+    __forceinline void push_int(i32 value)
+    {
+        *((char *)data + stack_offset) = 'i';
+        stack_offset += 4;
+        *(i32 *)((char *)data + stack_offset) = value;
+        stack_offset += 4;
+    }
+    __forceinline void push_float(f32 value)
+    {
+        EclStackItem item;
+        item.f = value;
+        *((char *)data + stack_offset) = 'f';
+        stack_offset += 4;
+        *(i32 *)((u8 *)data + stack_offset) = item.i;
+        stack_offset += 4;
+    }
+    // Pops the saved value of a call frame.
+    __forceinline i32 pop_raw()
+    {
+        stack_offset -= 4;
+        return *(i32 *)((u8 *)data + stack_offset);
+    }
 };
 
 // One thread of ECL execution (ExpHP: zEclRunContext).
@@ -119,7 +172,9 @@ struct EclRunContext
     // The instruction at cur_location, NULL when there is none.
     EclRawInstr *current_instr();
     // 0x4747d0. current_instr, out of line (ExpHP: get_subroutine_ptr).
-    EclRawInstr *get_subroutine_ptr();
+    HARNESS_CALLED EclRawInstr *get_subroutine_ptr();
+    // get_float_arg_ptr for the instruction at loc.
+    f32 *float_arg_ptr_at(EclLocation *loc, int index);
 };
 
 // Intrusive list of run contexts (ExpHP: zEclRunContextList).

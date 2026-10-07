@@ -95,6 +95,23 @@ struct ZunTimer
         set(time);
     }
 
+    // set with everything spelled out, for big callers where LTCG inlined
+    // it but our build would not (StageInner::run_std).
+    __forceinline void set_inline(i32 time)
+    {
+        if (!(control & ZUN_TIMER_INITIALIZED))
+        {
+            current = 0;
+            previous = -999999;
+            current_f = 0.0f;
+            speed_index = 0;
+            control |= ZUN_TIMER_INITIALIZED;
+        }
+        current = time;
+        current_f = (f32)time;
+        previous = time - 1;
+    }
+
     // 0x406490. The out-of-line copy of set.
     HARNESS_CALLED void set_value(i32 time);
 

@@ -97,13 +97,20 @@ struct StageInner
     Camera camera;
     Stage *stage;
     AnmVm anm_vms[8];
-    u8 unk_32f0[0x3310 - 0x32f0];
+    // Set with the VM by instruction 14.
+    i32 unk_32f0[8];
     // A squared distance (3100 squared at load time).
     f32 unk_3310;
     Fog *fog;
-    u8 unk_3318[0x3324 - 0x3318];
+    // Reset by instruction 17 (112, 192, -1).
+    f32 unk_3318;
+    f32 unk_331c;
+    i32 unk_3320;
     ZunTimer fog_timer;
-    u8 unk_3338[0x3344 - 0x3338];
+    i32 unk_3338;
+    i32 unk_333c;
+    // Instruction 17's argument: 1 picks the fog with 7 points per strip.
+    i32 fog_kind;
     // Color passed to the ANM manager; the top byte flags a new value.
     u32 color_3344;
 
@@ -112,8 +119,14 @@ struct StageInner
 
     // 0x409490. Starts interpolating the fog from its current value.
     void set_sky_interp(i32 end_time, i32 method, CameraSky *goal);
-    // 0x40b3b0
-    void run_std();
+    // 0x40b3b0. Runs the instructions whose time has come, advances the
+    // time, steps the camera interpolators and rocks the camera.
+    i32 run_std();
+    // unk_18's low byte: the camera rocking pattern (instruction 12).
+    u8 &rocking_mode()
+    {
+        return *(u8 *)&unk_18;
+    }
     // 0x40c4a0
     void step_fog();
 };

@@ -21,6 +21,34 @@ struct MsgFile
     } scripts[1];
 };
 
+// One dialogue instruction (ExpHP: zMsgRawInstr).
+struct MsgRawInstr
+{
+    u16 time;
+    u8 opcode;
+    // Size of the arguments.
+    u8 args_size;
+    union
+    {
+        i32 i[1];
+        f32 f[1];
+        char s[1];
+    } args;
+};
+
+// The bitfields of GuiMsgVm::flags that dialogue instructions assign; the
+// assignments compile to xor/and/xor.
+struct GuiMsgVmFlags
+{
+    // Instruction 10: skipping is allowed.
+    u32 skippable : 1;
+    // Instruction 26: the text uses the second font.
+    u32 font : 1;
+    // Instruction 29: the speech bubble type.
+    u32 textbox_type : 4;
+    u32 unk_6 : 26;
+};
+
 // A running dialogue script. Layout from ExpHP's th-re-data (zGuiMsgVm).
 struct GuiMsgVm
 {
@@ -79,6 +107,14 @@ struct GuiMsgVm
     HARNESS_CALLED void set_textbox(f32 x, f32 y, f32 width, i32 kind);
     // LTCG passes the width in xmm1.
     HARNESS_CALLED void set_textbox_width(f32 width, i32 kind);
+    // 0x42a1d0. Runs the instructions whose time has come and advances the
+    // script time; -1 once the script has ended.
+    HARNESS_CALLED i32 run();
+
+    MsgRawInstr *instr()
+    {
+        return (MsgRawInstr *)current_instr;
+    }
 };
 
 // One of the three boss life bars.

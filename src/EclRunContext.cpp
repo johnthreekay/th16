@@ -1,9 +1,12 @@
 // ECL argument decoding: an argument flagged in variable_mask names a local
 // (>= 0, a byte offset from the frame base), a stack entry (-1 to -100,
 // counted back from the top) or a global variable of the VM (the rest).
+#include <math.h>
 #include <string.h>
 
 #include "Ecl.h"
+#include "Rng.h"
+#include "ZunMath.h"
 
 static_assert(sizeof(EclRunContext) == 0x11e8, "EclRunContext size");
 
@@ -306,14 +309,14 @@ int SptResourceInf::find_sub_by_name(const char *name) throw()
 }
 
 // FUNCTION: TH16 0x4747d0
-EclRawInstr *EclRunContext::get_subroutine_ptr()
+HARNESS_CALLED EclRawInstr *EclRunContext::get_subroutine_ptr()
 {
     return current_instr();
 }
 
 // TODO: the original stores stack_offset before loading base_offset.
 // FUNCTION: TH16 0x474810
-i32 EclStack::enter(i32 size)
+HARNESS_CALLED i32 EclStack::enter(i32 size)
 {
     i32 old_offset = stack_offset;
     if (size + stack_offset >= 0x1000)
@@ -328,7 +331,7 @@ i32 EclStack::enter(i32 size)
 }
 
 // FUNCTION: TH16 0x474860
-i32 EclStack::ecl_return()
+HARNESS_CALLED i32 EclStack::ecl_return()
 {
     stack_offset -= 4;
     i32 old_base = base_offset;
@@ -522,4 +525,604 @@ i32 SptInf::create_async(i32 id, i32 start)
     head->next = node;
     node->prev = head;
     return context.current_context->call_sub(ctx, start, 0);
+}
+
+// The pointer argument getter for an instruction other than the current
+// one (the interpolation's own instruction).
+__forceinline f32 *EclRunContext::float_arg_ptr_at(EclLocation *loc, int index)
+{
+    SptInf *vm = this->vm;
+    EclRawInstr *ins = (EclRawInstr *)((u8 *)vm->file_manager->subroutines[loc->subroutine_index].bytecode + 0x10 +
+                                       loc->offset_from_first_instruction);
+    if (ins->variable_mask & (1 << index))
+    {
+        f32 value = ins->args[index].f;
+        if (value >= 0.0f)
+        {
+            return (f32 *)((u8 *)stack.data + (stack.base_offset + (i32)value));
+        }
+        return vm->get_float_global_ptr((i32)value);
+    }
+    return NULL;
+}
+
+// Instructions below 300; the VM handles the rest (run_over_300). Each
+// instruction runs once its time has come; time counts up by speed per
+// frame and jumps set it. Case bodies follow ZUN's order in the binary.
+// TODO: the original computes each operator's result before the inlined
+// push (ours sinks it into the push), so sub/mul and the comparisons do not
+// tail-merge into add's and eq's push; stack slots and base/index register
+// order in the stack addressing differ; the float_i loop keeps vm in esi.
+// FUNCTION: TH16 0x472030
+HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
+{
+    if (cur_location.offset_from_first_instruction == -1 || cur_location.subroutine_index == -1)
+    {
+        return -1;
+    }
+    EclRawInstr *ins = (EclRawInstr *)((u8 *)vm->file_manager->subroutines[cur_location.subroutine_index].bytecode +
+                                       0x10 + cur_location.offset_from_first_instruction);
+    while (time >= (f32)ins->time)
+    {
+        if (ins->rank_mask & difficulty_mask)
+        {
+            switch ((i16)ins->opcode)
+            {
+            case 0:
+                break;
+            // return
+            case 10:
+                stack.ecl_return();
+                if (stack.stack_offset != 0)
+                {
+                    cur_location.subroutine_index = stack.pop_raw();
+                    cur_location.offset_from_first_instruction = stack.pop_raw();
+                    *(i32 *)&time = stack.pop_raw();
+                    stack.stack_offset = stack.pop_raw();
+                    ins = get_subroutine_ptr();
+                    if (cur_location.offset_from_first_instruction >= 0)
+                    {
+                        break;
+                    }
+                }
+            // delete
+            case 1:
+                cur_location.offset_from_first_instruction = -1;
+                cur_location.subroutine_index = -1;
+                return -1;
+            // callAsync
+            case 15:
+                vm->create_async(-1, 0);
+                goto next_instr;
+            // killAllAsync
+            case 21:
+            {
+                EclRunContextList *node = vm->async_list_head.next;
+                while (node != NULL)
+                {
+                    EclRunContextList *next = node->next;
+                    node->entry->cur_location.offset_from_first_instruction = -1;
+                    node->entry->cur_location.subroutine_index = -1;
+                    node = next;
+                }
+                goto next_instr;
+            }
+            // callAsyncId: the id follows the subroutine name.
+            case 16:
+                vm->create_async(
+                    pop_int_arg_given_value(1, ins->args[(ins->args[0].i + sizeof(i32)) / sizeof(EclStackItem)].i),
+                    1);
+                goto next_instr;
+            // killAsync
+            case 17:
+            {
+                EclRunContextList *node = vm->lookup_async(get_int_arg(0));
+                if (node != NULL)
+                {
+                    node->entry->cur_location.offset_from_first_instruction = -1;
+                }
+                break;
+            }
+            case 18:
+            {
+                EclRunContextList *node = vm->lookup_async(get_int_arg(0));
+                if (node != NULL)
+                {
+                    node->entry->flags_11e4 |= 1;
+                }
+                break;
+            }
+            case 19:
+            {
+                EclRunContextList *node = vm->lookup_async(get_int_arg(0));
+                if (node != NULL)
+                {
+                    node->entry->flags_11e4 &= ~1;
+                }
+                break;
+            }
+            case 20:
+            {
+                EclRunContextList *node = vm->lookup_async(get_int_arg(0));
+                if (node != NULL)
+                {
+                    EclRunContext *ctx = node->entry;
+                    ctx->unk_101c = get_int_arg(1);
+                }
+                break;
+            }
+            // call: the callee pops the stack arguments itself.
+            case 11:
+                ins->num_stack_refs = 0;
+                if (call_sub(this, 0, 0) != 0)
+                {
+                    cur_location.offset_from_first_instruction = -1;
+                    cur_location.subroutine_index = -1;
+                    return -1;
+                }
+                ins = get_subroutine_ptr();
+                continue;
+            // jmpNeq (jump if nonzero)
+            case 14:
+                if (stack.pop_int() != 0)
+                {
+                    goto jump;
+                }
+                break;
+            // jmpEq (jump if zero)
+            case 13:
+                if (stack.pop_int() != 0)
+                {
+                    break;
+                }
+            // jmp: offset, new time
+            case 12:
+            jump:
+                time = ins->args[1].i;
+                cur_location.offset_from_first_instruction += ins->args[0].i;
+                ins = (EclRawInstr *)((u8 *)ins + ins->args[0].i);
+                continue;
+            // wait
+            case 23:
+                time -= get_int_arg(0);
+                break;
+            case 24:
+                time -= get_float_arg(0);
+                break;
+            // stackAlloc
+            case 40:
+                stack.enter(get_int_arg(0));
+                break;
+            case 41:
+                stack.ecl_return();
+                break;
+            // push
+            case 42:
+                stack.push_int(pop_int_arg(0));
+                goto next_instr;
+            case 44:
+                stack.push_float(pop_float_arg(0));
+                goto next_instr;
+            // set: stores the popped value, then converts it in place.
+            case 43:
+            {
+                i32 *dst = get_int_arg_ptr(0);
+                *dst = stack.pop_raw();
+                stack.stack_offset -= 4;
+                if (*((char *)stack.data + stack.stack_offset) == 'f')
+                {
+                    *dst = (i32) * (f32 *)dst;
+                }
+                goto next_instr;
+            }
+            case 45:
+            {
+                f32 *dst = get_float_arg_ptr(0);
+                *(i32 *)dst = stack.pop_raw();
+                stack.stack_offset -= 4;
+                char type = *((char *)stack.data + stack.stack_offset);
+                if (type != 'f' && type == 'i')
+                {
+                    *dst = (f32) * (i32 *)dst;
+                }
+                goto next_instr;
+            }
+            // Integer arithmetic.
+            case 50:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                a += b;
+                stack.push_int(a);
+                ins->num_stack_refs = 0;
+                goto next_instr;
+            }
+            case 52:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a - b);
+                ins->num_stack_refs = 0;
+                goto next_instr;
+            }
+            case 54:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a * b);
+                ins->num_stack_refs = 0;
+                goto next_instr;
+            }
+            case 56:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a / b);
+                ins->num_stack_refs = 0;
+                goto next_instr;
+            }
+            case 58:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a % b);
+                ins->num_stack_refs = 0;
+                goto next_instr;
+            }
+            // Float arithmetic.
+            case 51:
+            {
+                f32 b = stack.pop_float();
+                f32 a = stack.pop_float();
+                stack.push_float(a + b);
+                ins->num_stack_refs = 0;
+                goto next_instr;
+            }
+            case 53:
+            {
+                f32 b = stack.pop_float();
+                f32 a = stack.pop_float();
+                stack.push_float(a - b);
+                ins->num_stack_refs = 0;
+                goto next_instr;
+            }
+            case 55:
+            {
+                f32 b = stack.pop_float();
+                f32 a = stack.pop_float();
+                stack.push_float(a * b);
+                ins->num_stack_refs = 0;
+                goto next_instr;
+            }
+            case 57:
+            {
+                f32 b = stack.pop_float();
+                f32 a = stack.pop_float();
+                stack.push_float(a / b);
+                ins->num_stack_refs = 0;
+                goto next_instr;
+            }
+            // Integer comparisons.
+            case 59:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a == b);
+                goto next_instr;
+            }
+            case 61:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a != b);
+                goto next_instr;
+            }
+            case 63:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a < b);
+                goto next_instr;
+            }
+            case 65:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a <= b);
+                goto next_instr;
+            }
+            case 67:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a > b);
+                goto next_instr;
+            }
+            case 69:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a >= b);
+                goto next_instr;
+            }
+            case 71:
+                stack.push_int(!stack.pop_int());
+                goto next_instr;
+            // Float comparisons.
+            case 60:
+            {
+                f32 b = stack.pop_float();
+                f32 a = stack.pop_float();
+                stack.push_int(a == b);
+                goto next_instr;
+            }
+            case 62:
+            {
+                f32 b = stack.pop_float();
+                f32 a = stack.pop_float();
+                stack.push_int(a != b);
+                goto next_instr;
+            }
+            case 64:
+            {
+                f32 b = stack.pop_float();
+                f32 a = stack.pop_float();
+                stack.push_int(a < b);
+                goto next_instr;
+            }
+            case 66:
+            {
+                f32 b = stack.pop_float();
+                f32 a = stack.pop_float();
+                stack.push_int(a <= b);
+                goto next_instr;
+            }
+            case 68:
+            {
+                f32 b = stack.pop_float();
+                f32 a = stack.pop_float();
+                stack.push_int(a > b);
+                goto next_instr;
+            }
+            case 70:
+            {
+                f32 b = stack.pop_float();
+                f32 a = stack.pop_float();
+                stack.push_int(a >= b);
+                goto next_instr;
+            }
+            case 72:
+                stack.push_int(stack.pop_float() == 0.0f);
+                goto next_instr;
+            // Logic and bit operations.
+            case 73:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a || b);
+                goto next_instr;
+            }
+            case 74:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a && b);
+                goto next_instr;
+            }
+            case 75:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a ^ b);
+                goto next_instr;
+            }
+            case 76:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a | b);
+                goto next_instr;
+            }
+            case 77:
+            {
+                i32 b = stack.pop_int();
+                i32 a = stack.pop_int();
+                stack.push_int(a & b);
+                goto next_instr;
+            }
+            // Negation.
+            case 83:
+                stack.push_int(-stack.pop_int());
+                goto next_instr;
+            case 84:
+                stack.push_float(-stack.pop_float());
+                goto next_instr;
+            // Decrement a variable, pushing its old value.
+            case 78:
+            {
+                i32 value = get_int_arg(0);
+                *get_int_arg_ptr(0) = value - 1;
+                stack.push_int(value);
+                goto next_instr;
+            }
+            case 79:
+                stack.push_float((f32)sin(stack.pop_float()));
+                goto next_instr;
+            case 88:
+                stack.push_float(sqrtf(stack.pop_float()));
+                goto next_instr;
+            case 80:
+                stack.push_float((f32)cos(stack.pop_float()));
+                goto next_instr;
+            // x, y = radius at angle
+            case 81:
+            {
+                f32 angle = normalize_angle(get_float_arg(2));
+                Float3 pos;
+                sincosmul(&pos, angle, get_float_arg(3));
+                *get_float_arg_ptr(0) = pos.x;
+                *get_float_arg_ptr(1) = pos.y;
+                break;
+            }
+            // Squared length, length.
+            case 85:
+            {
+                f32 x = get_float_arg(1);
+                f32 y = get_float_arg(2);
+                *get_float_arg_ptr(0) = x * x + y * y;
+                break;
+            }
+            case 86:
+            {
+                f32 x = get_float_arg(1);
+                f32 y = get_float_arg(2);
+                *get_float_arg_ptr(0) = sqrtf(x * x + y * y);
+                break;
+            }
+            case 82:
+            {
+                f32 angle = normalize_angle(get_float_arg(0));
+                *get_float_arg_ptr(0) = angle;
+                break;
+            }
+            // Angle from (x1, y1) to (x2, y2).
+            case 87:
+            {
+                f32 x1 = get_float_arg(1);
+                f32 y1 = get_float_arg(2);
+                f32 x2 = get_float_arg(3);
+                f32 y2 = get_float_arg(4);
+                f32 angle = atan2f(y2 - y1, x2 - x1);
+                *get_float_arg_ptr(0) = angle;
+                break;
+            }
+            // Signed difference of two angles, wrapped once.
+            case 89:
+            {
+                f32 a = get_float_arg(1);
+                f32 b = get_float_arg(2);
+                f32 diff;
+                if (b - a > ZUN_PI)
+                {
+                    diff = b - (a + ZUN_2PI);
+                }
+                else if (a - b > ZUN_PI)
+                {
+                    diff = b - (a - ZUN_2PI);
+                }
+                else
+                {
+                    diff = b - a;
+                }
+                *get_float_arg_ptr(0) = diff;
+                break;
+            }
+            // Rotate (x, y) by an angle.
+            case 90:
+            {
+                f32 x = get_float_arg(2);
+                f32 y = get_float_arg(3);
+                f32 angle = normalize_angle(get_float_arg(4));
+                f32 s = zun_sinf(angle);
+                f32 c = zun_cosf(angle);
+                f32 rx = x * c - y * s;
+                f32 ry = y * c + x * s;
+                *get_float_arg_ptr(0) = rx;
+                *get_float_arg_ptr(1) = ry;
+                break;
+            }
+            // floatTime: interpolate a variable from initial to goal.
+            case 91:
+            {
+                i32 i = get_int_arg(0);
+                float_i_locs[i] = cur_location;
+                float_i[i].step();
+                float_i[i].end_time = get_int_arg(2);
+                float_i[i].method = get_int_arg(3);
+                f32 initial = get_float_arg(4);
+                f32 goal = get_float_arg(5);
+                float_i[i].initial = initial;
+                float_i[i].goal = goal;
+                *get_float_arg_ptr(1) = initial;
+                float_i[i].bezier_1 = 0.0f;
+                float_i[i].bezier_2 = 0.0f;
+                float_i[i].reset();
+                break;
+            }
+            // The same with bezier control values.
+            case 92:
+            {
+                i32 i = get_int_arg(0);
+                float_i_locs[i] = cur_location;
+                float_i[i].step();
+                float_i[i].end_time = get_int_arg(2);
+                float_i[i].method = get_int_arg(3);
+                f32 initial = get_float_arg(4);
+                f32 goal = get_float_arg(5);
+                float_i[i].initial = initial;
+                float_i[i].goal = goal;
+                *get_float_arg_ptr(1) = initial;
+                f32 bezier_1 = get_float_arg(6);
+                f32 bezier_2 = get_float_arg(7);
+                float_i[i].bezier_1 = bezier_1;
+                float_i[i].bezier_2 = bezier_2;
+                float_i[i].reset();
+                break;
+            }
+            // Random point in a ring.
+            case 93:
+            {
+                f32 r1 = get_float_arg(2);
+                f32 r2 = get_float_arg(3);
+                f32 angle = g_replay_safe_rng.randf_neg_to(ZUN_PI);
+                f32 radius = g_replay_safe_rng.randf_neg_to(r2 - r1) + r1;
+                Float3 pos;
+                sincosmul(&pos, angle, radius);
+                *get_float_arg_ptr(0) = pos.x;
+                *get_float_arg_ptr(1) = pos.y;
+                break;
+            }
+            // Debug instructions, empty in release builds.
+            case 22:
+            case 30:
+            case 31:
+                break;
+            default:
+            {
+                i32 result = vm->run_over_300();
+                if (result == -1)
+                {
+                    goto step_float_i;
+                }
+                else if (result == 0)
+                {
+                    break;
+                }
+                else if (result == 1)
+                {
+                    continue;
+                }
+                break;
+            }
+            }
+            if (ins->num_stack_refs)
+            {
+                stack.stack_offset -= ins->num_stack_refs;
+            }
+        }
+    next_instr:
+        cur_location.offset_from_first_instruction += ins->total_size;
+        ins = (EclRawInstr *)((u8 *)ins + ins->total_size);
+    }
+    time += speed;
+step_float_i:
+    for (i32 i = 0; i < 8; i++)
+    {
+        if (float_i[i].end_time != 0)
+        {
+            f32 *dst = float_arg_ptr_at(&float_i_locs[i], 1);
+            *dst = float_i[i].step();
+        }
+    }
+    return 0;
 }
