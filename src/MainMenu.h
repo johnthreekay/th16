@@ -97,7 +97,7 @@ class TitleInf : public TaskInf
 
     // Not decompiled yet (ExpHP's names).
     HARNESS_CALLED i32 on_draw__practice_stage_select();
-    i32 on_draw__replay();
+    HARNESS_CALLED i32 on_draw__replay();
     HARNESS_CALLED i32 on_draw__player_data();
     HARNESS_CALLED i32 on_draw__4538b0();
     HARNESS_CALLED i32 on_draw__4541b0();
@@ -114,6 +114,11 @@ class TitleInf : public TaskInf
     // site; LTCG folded it.
     DECOMP_NOINLINE void load_spell_list(i32 stage, i32 row, i32 *ids, i32 unused);
     i32 highlight_spell_row(i32 selected);
+    // The row of replay_slot on its page of 25.
+    i32 replay_slot_row()
+    {
+        return replay_slot % 25;
+    }
 };
 
 extern TitleInf *g_MainMenu;

@@ -3,6 +3,7 @@
 #include <direct.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 #include "MainMenu.h"
@@ -235,6 +236,163 @@ const char *const g_character_names[4] = {"Reimu  ", "Cirno  ", "Aya    ", "Mari
 // special glyphs 0x81, 0x7f and 0x80.
 // GLOBAL: TH16 0x492840
 const char g_name_entry_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-=.,!?@:;[]()_/{}|~^#$%&*   ";
+
+// Line formats of the replay list: numbered and user replays, each with
+// and without a replay in the slot.
+// GLOBAL: TH16 0x493700
+const char *const g_replay_list_formats[2][2] = {
+    {"No.%.2d %s %.2d/%.2d/%.2d %.2d:%.2d %s %s %s %s %2.1f%%",
+     "No.%.2d -------- --/--/-- --:-- ------- ------ ------- --- ---%%"},
+    {"%s  %s %.2d/%.2d/%.2d %.2d:%.2d %s %s %s %s %s %2.1f%%",
+     "User  -------- --/--/-- --:-- ------- ------ ------- --- ---%%"},
+};
+// GLOBAL: TH16 0x493710
+const char *const g_replay_spell_format[1] = {"No.%.2d %s %.2d/%.2d/%.2d %.2d:%.2d %s %s SpellPr %3d %2.1f%%"};
+
+// The 4 characters after "th16_ud" in a user replay's file name.
+// GLOBAL: TH16 0x4dfd54
+char g_replay_user_number[5];
+
+// The replay menu: a page of 25 replays, then the chosen replay with the
+// score at the end of each stage.
+// TODO: the empty slot format index: the original uses setne and a scaled index, ours neg/sbb/and.
+// FUNCTION: TH16 0x451d50
+HARNESS_CALLED i32 TitleInf::on_draw__replay()
+{
+    Float3 pos;
+    switch (substate)
+    {
+    case 2:
+    {
+        pos.x = 32.0f;
+        pos.y = 80.0f;
+        pos.z = 0.0f;
+        g_AsciiManager->draw_shadows = 1;
+        for (i32 i = menu_1d4.next_selection * 25; i < (menu_1d4.next_selection + 1) * 25; i++)
+        {
+            ReplayManager **replay = &replays[i];
+            g_AsciiManager->color.d3d = menu.next_selection == i % 25 ? 0xffffff00 : 0xff808080;
+            if (*replay != NULL)
+            {
+                RpyInfo *info = (*replay)->info;
+                struct tm *time = localtime(&info->timestamp);
+                if (menu_1d4.next_selection == 0)
+                {
+                    if (!(info->unk_0[0xa] & 2))
+                    {
+                        g_AsciiManager->create_stringf(
+                            &pos, g_replay_list_formats[0][0], i + 1, (const char *)info->unk_0, time->tm_year % 100,
+                            time->tm_mon + 1, time->tm_mday, time->tm_hour, time->tm_min,
+                            g_character_names[info->character + info->subshot], g_season_names[info->subseason],
+                            g_difficulty_names[info->difficulty], g_stage_short_names[info->stage], info->slowdown);
+                    }
+                    else
+                    {
+                        g_AsciiManager->create_stringf(&pos, g_replay_spell_format[0], i + 1, (const char *)info->unk_0,
+                                                       time->tm_year % 100, time->tm_mon + 1, time->tm_mday,
+                                                       time->tm_hour, time->tm_min,
+                                                       g_character_names[info->character + info->subshot],
+                                                       g_season_names[info->subseason], info->spell_id + 1,
+                                                       info->slowdown);
+                    }
+                }
+                else
+                {
+                    memcpy(g_replay_user_number, &(*replay)->filename[7], 4);
+                    g_replay_user_number[4] = '\0';
+                    g_AsciiManager->create_stringf(
+                        &pos, g_replay_list_formats[1][0], g_replay_user_number, (const char *)info->unk_0,
+                        time->tm_year % 100, time->tm_mon + 1, time->tm_mday, time->tm_hour, time->tm_min,
+                        g_character_names[info->character + info->subshot], g_difficulty_names[info->difficulty],
+                        g_season_names[info->subseason], g_stage_short_names[info->stage], info->slowdown);
+                }
+            }
+            else
+            {
+                g_AsciiManager->create_stringf(&pos, g_replay_list_formats[menu_1d4.next_selection != 0][1], i + 1);
+            }
+            pos.y += 15.0f;
+        }
+        g_AsciiManager->color.d3d = 0xffffffff;
+        g_AsciiManager->draw_shadows = 0;
+        break;
+    }
+    case 4:
+    {
+        pos.x = 32.0f;
+        pos.y = 80.0f;
+        pos.z = 0.0f;
+        RpyInfo *info = replays[replay_slot]->info;
+        if (time_in_state.current < 10)
+        {
+            pos.y = (10.0f - time_in_state.current_f) * (f32)(replay_slot_row() * 15) / 10.0f + 80.0f;
+        }
+        g_AsciiManager->draw_shadows = 1;
+        struct tm *time = localtime(&info->timestamp);
+        if (menu_1d4.next_selection == 0)
+        {
+            if (!(info->unk_0[0xa] & 2))
+            {
+                g_AsciiManager->create_stringf(
+                    &pos, g_replay_list_formats[0][0], replay_slot + 1, (const char *)info->unk_0, time->tm_year % 100,
+                    time->tm_mon + 1, time->tm_mday, time->tm_hour, time->tm_min,
+                    g_character_names[info->character + info->subshot], g_season_names[info->subseason],
+                    g_difficulty_names[info->difficulty], g_stage_short_names[info->stage], info->slowdown);
+            }
+            else
+            {
+                g_AsciiManager->create_stringf(&pos, g_replay_spell_format[0], replay_slot + 1, (const char *)info->unk_0,
+                                               time->tm_year % 100, time->tm_mon + 1, time->tm_mday, time->tm_hour,
+                                               time->tm_min, g_character_names[info->character + info->subshot],
+                                               g_season_names[info->subseason], info->spell_id + 1, info->slowdown);
+            }
+        }
+        else
+        {
+            memcpy(g_replay_user_number, &replays[replay_slot]->filename[7], 4);
+            g_replay_user_number[4] = '\0';
+            g_AsciiManager->create_stringf(
+                &pos, g_replay_list_formats[1][0], g_replay_user_number, (const char *)info->unk_0,
+                time->tm_year % 100, time->tm_mon + 1, time->tm_mday, time->tm_hour, time->tm_min,
+                g_character_names[info->character + info->subshot], g_difficulty_names[info->difficulty],
+                g_stage_short_names[info->stage], g_season_names[info->subseason], info->slowdown);
+        }
+        if (time_in_state.current >= 10)
+        {
+            pos.x = 220.0f;
+            pos.y = 128.0f;
+            for (i32 i = 1; i < 8; i++)
+            {
+                g_AsciiManager->color.d3d = menu.next_selection == i - 1 ? 0xffffff00 : 0xff808080;
+                if (replays[replay_slot]->stages[i].gamestate_at_stage_begin == NULL)
+                {
+                    g_AsciiManager->create_stringf(&pos, "%s  ---------", g_stage_names[i]);
+                }
+                else
+                {
+                    RpyGamestate *next;
+                    if (i < 6 && (next = replays[replay_slot]->stages[i + 1].gamestate_at_stage_begin) != NULL)
+                    {
+                        Globals *globals = (Globals *)next->globals;
+                        g_AsciiManager->create_stringf(&pos, "%s  %.8d%d", g_stage_names[i], globals->score,
+                                                       globals->continues_used);
+                    }
+                    else
+                    {
+                        g_AsciiManager->create_stringf(&pos, "%s  %.8d%d", g_stage_names[i], info->score,
+                                                       info->continues_used);
+                    }
+                }
+                pos.y += 18.0f;
+            }
+        }
+        g_AsciiManager->color.d3d = 0xffffffff;
+        g_AsciiManager->draw_shadows = 0;
+        break;
+    }
+    }
+    return 1;
+}
 
 // Player data: the top ten of the chosen character and difficulty, the
 // number of games and the play time.
