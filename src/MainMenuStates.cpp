@@ -33,6 +33,31 @@ extern const char g_name_entry_chars[];
 BOOL __stdcall spell_practice_row_seen(i32 stage, i32 row);
 extern const i32 g_spell_practice_ids[7][13][5];
 
+// input_pressed_or_repeating, inlined.
+static __forceinline i32 pressed_or_repeating_inline(u32 mask)
+{
+    if (g_hardware_input_pressed & mask)
+    {
+        return 1;
+    }
+    if (g_hardware_input_repeat & mask)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+// Small MenuHelper steps that some menus inline.
+static __forceinline void menu_save_selection(MenuHelper *m)
+{
+    m->current_selection = m->next_selection;
+}
+
+static __forceinline i32 menu_selection_moved(MenuHelper *m)
+{
+    return m->current_selection != m->next_selection;
+}
+
 static_assert(offsetof(TitleInf, menu_5cec) == 0x5cec, "TitleInf::menu_5cec");
 static_assert(offsetof(TitleInf, spell_stage) == 0x5dc4, "TitleInf::spell_stage");
 static_assert(offsetof(TitleInf, spell_ids) == 0x5dd0, "TitleInf::spell_ids");
@@ -97,7 +122,7 @@ void TitleInf::load_replay_list()
 }
 
 // Saving the replay after a game: picking a slot, then entering the name.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the slot cursor tests.
+// TODO: the original realigns its frame (and esp, -8), keeps this in edi (spilled), and computes the % 13 column tests with a multiply.
 // FUNCTION: TH16 0x453c10
 i32 TitleInf::do_replay_save()
 {
@@ -131,11 +156,11 @@ i32 TitleInf::do_replay_save()
         break;
     case 2:
         menu.current_selection = menu.next_selection;
-        if ((g_hardware_input_pressed & INPUT_UP) || (g_hardware_input_repeat & INPUT_UP))
+        if (pressed_or_repeating_inline(INPUT_UP))
         {
             menu.move_cursor(-1);
         }
-        if ((g_hardware_input_pressed & INPUT_DOWN) || (g_hardware_input_repeat & INPUT_DOWN))
+        if (pressed_or_repeating_inline(INPUT_DOWN))
         {
             menu.move_cursor(1);
         }
@@ -171,24 +196,38 @@ i32 TitleInf::do_replay_save()
         }
         break;
     case 3:
-        menu_5a5c.current_selection = menu_5a5c.next_selection;
-        if (input_pressed_or_repeating(INPUT_UP))
+        menu_save_selection(&menu_5a5c);
+        if (pressed_or_repeating_inline(INPUT_UP))
         {
             menu_5a5c.move_cursor(-13);
         }
-        if (input_pressed_or_repeating(INPUT_DOWN))
+        if (pressed_or_repeating_inline(INPUT_DOWN))
         {
             menu_5a5c.move_cursor(13);
         }
-        if (input_pressed_or_repeating(INPUT_LEFT))
+        if (pressed_or_repeating_inline(INPUT_LEFT))
         {
-            menu_5a5c.move_cursor(menu_5a5c.next_selection % 13 == 0 ? 12 : -1);
+            if (menu_5a5c.next_selection % 13 != 0)
+            {
+                menu_5a5c.move_cursor(-1);
+            }
+            else
+            {
+                menu_5a5c.move_cursor(12);
+            }
         }
-        if (input_pressed_or_repeating(INPUT_RIGHT))
+        if (pressed_or_repeating_inline(INPUT_RIGHT))
         {
-            menu_5a5c.move_cursor(menu_5a5c.next_selection % 13 == 12 ? -12 : 1);
+            if (menu_5a5c.next_selection % 13 != 12)
+            {
+                menu_5a5c.move_cursor(1);
+            }
+            else
+            {
+                menu_5a5c.move_cursor(-12);
+            }
         }
-        if (menu_5a5c.current_selection != menu_5a5c.next_selection)
+        if (menu_selection_moved(&menu_5a5c))
         {
             g_SoundManager.play_sound_centered(10, 0);
         }
@@ -200,16 +239,22 @@ i32 TitleInf::do_replay_save()
                 if (replay_name_cursor < 8)
                 {
                     replay_name[replay_name_cursor] = g_name_entry_chars[choice];
-                    goto advance;
+                    replay_name_cursor++;
+                    if (replay_name_cursor >= 8)
+                    {
+                        menu_5a5c.set_cursor(90);
+                    }
                 }
-                replay_name[replay_name_cursor - 1] = g_name_entry_chars[choice];
+                else
+                {
+                    replay_name[replay_name_cursor - 1] = g_name_entry_chars[choice];
+                }
             }
             else if (choice == 88)
             {
                 if (replay_name_cursor < 8)
                 {
                     replay_name[replay_name_cursor] = ' ';
-                advance:
                     replay_name_cursor++;
                     if (replay_name_cursor >= 8)
                     {
@@ -438,20 +483,6 @@ i32 TitleInf::do_difficulty_select()
         break;
     }
     return 1;
-}
-
-// input_pressed_or_repeating, inlined.
-static __forceinline i32 pressed_or_repeating_inline(u32 mask)
-{
-    if (g_hardware_input_pressed & mask)
-    {
-        return 1;
-    }
-    if (g_hardware_input_repeat & mask)
-    {
-        return 1;
-    }
-    return 0;
 }
 
 // AnmId::clear_flag_lo_2_tree as LTCG inlined it here.
@@ -802,11 +833,11 @@ i32 TitleInf::do_practice_stage_select()
         break;
     case 2:
         menu.current_selection = menu.next_selection;
-        if ((g_hardware_input_pressed & INPUT_UP) || (g_hardware_input_repeat & INPUT_UP))
+        if (pressed_or_repeating_inline(INPUT_UP))
         {
             menu.move_cursor(-1);
         }
-        if ((g_hardware_input_pressed & INPUT_DOWN) || (g_hardware_input_repeat & INPUT_DOWN))
+        if (pressed_or_repeating_inline(INPUT_DOWN))
         {
             menu.move_cursor(1);
         }
@@ -971,17 +1002,6 @@ u32 g_cheat_progress;
 u8 g_cheat_keys[0x100];
 // GLOBAL: TH16 0x4dfe60
 u8 g_cheat_prev_keys[0x100];
-
-// Small MenuHelper steps the player data inlines.
-static __forceinline void menu_save_selection(MenuHelper *m)
-{
-    m->current_selection = m->next_selection;
-}
-
-static __forceinline i32 menu_selection_moved(MenuHelper *m)
-{
-    return m->current_selection != m->next_selection;
-}
 
 // The player data screen: difficulty (menu_fc) and character (menu)
 // records, and pages of spell cards (menu_1d4, 0 for none). On Extra with
@@ -1468,19 +1488,19 @@ i32 TitleInf::do_replay_menu()
     case 2:
         menu.current_selection = menu.next_selection;
         menu_1d4.current_selection = menu_1d4.next_selection;
-        if ((g_hardware_input_pressed & INPUT_UP) || (g_hardware_input_repeat & INPUT_UP))
+        if (pressed_or_repeating_inline(INPUT_UP))
         {
             menu.move_cursor(-1);
         }
-        if ((g_hardware_input_pressed & INPUT_DOWN) || (g_hardware_input_repeat & INPUT_DOWN))
+        if (pressed_or_repeating_inline(INPUT_DOWN))
         {
             menu.move_cursor(1);
         }
-        if ((g_hardware_input_pressed & INPUT_LEFT) || (g_hardware_input_repeat & INPUT_LEFT))
+        if (pressed_or_repeating_inline(INPUT_LEFT))
         {
             menu_1d4.move_cursor(-1);
         }
-        if ((g_hardware_input_pressed & INPUT_RIGHT) || (g_hardware_input_repeat & INPUT_RIGHT))
+        if (pressed_or_repeating_inline(INPUT_RIGHT))
         {
             menu_1d4.move_cursor(1);
         }
