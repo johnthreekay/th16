@@ -64,12 +64,14 @@ HARNESS_CALLED void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius)
     }
 }
 
+// TODO: thunk to an out-of-line copy since Player::on_tick_body exists: Player::create's EH state reaches it through initialize, on_tick_callback and PosVel::step (README).
 // FUNCTION: TH16 0x4054f0
 HARNESS_CALLED f32 zun_cosf(f32 x)
 {
     return cosf(x);
 }
 
+// TODO: thunk to an out-of-line copy since Player::on_tick_body exists: Player::create's EH state reaches it through initialize, on_tick_callback and PosVel::step (README).
 // FUNCTION: TH16 0x405510
 HARNESS_CALLED f32 zun_sinf(f32 x)
 {
@@ -84,7 +86,7 @@ HARNESS_CALLED f32 zun_tanf(f32 x)
     return tanf(x);
 }
 
-// TODO: the original aligns the frame to 64 bytes for its double.
+// TODO: thunk to an out-of-line copy since Player::on_tick_body exists: Player::create's EH state reaches it through initialize, on_tick_callback and PosVel::step (README).
 // FUNCTION: TH16 0x405260
 HARNESS_CALLED f32 zun_floorf(f32 x)
 {

@@ -535,7 +535,7 @@ int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage)
     {
         pos.y += 24.0f;
         Float2 size(vm->scale.x * 192.0f, vm->scale.y * 32.0f);
-        bar_damage = g_Player->compute_damage_to_enemy(&pos, &size, vm->rotation.z, 0.0f, &hit, NULL, 0,
+        bar_damage = g_Player->compute_damage_to_enemy(&pos, (Float3 *)&size, vm->rotation.z, 0.0f, &hit, NULL, 0,
                                                        enemy->full->enemy_id);
         pos.y += 32.0f;
         circle_damage =
@@ -592,7 +592,7 @@ int EnemyData::step_logic()
         }
         else
         {
-            result = g_Player->compute_damage_to_enemy(&final_pos.pos, &hurtbox_size, rotation, 0.0f, &hit,
+            result = g_Player->compute_damage_to_enemy(&final_pos.pos, (Float3 *)&hurtbox_size, rotation, 0.0f, &hit,
                                                        &last_damage_pos, 1, full->enemy_id);
         }
         if (result != 0 && hit != 0 && full->die() != 0)
@@ -629,7 +629,7 @@ int EnemyData::step_logic()
             }
             else
             {
-                damage = g_Player->compute_damage_to_enemy(&final_pos.pos, &hurtbox_size, rotation, 0.0f, &hit,
+                damage = g_Player->compute_damage_to_enemy(&final_pos.pos, (Float3 *)&hurtbox_size, rotation, 0.0f, &hit,
                                                            &last_damage_pos, 0, full->enemy_id);
             }
             damage = damage * g_Player->damage_multiplier;

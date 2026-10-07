@@ -23,17 +23,7 @@ void PauseMenu::tick_open()
 #include "../AsciiManager.h"
 #include "../PopupManager.h"
 
-// STUB: TH16 0x44a000
-int PopupManager::on_draw()
-{
-    return 1;
-}
 
 #include "../LoadingThread.h"
 
-// STUB: TH16 0x447760
-int ReplayManager::initialize(i32 mode, const char *filename)
-{
-    return 0;
-}
 

@@ -98,7 +98,7 @@ i32 Globals::collect_season_item(i32 unused)
 }
 
 // FUNCTION: TH16 0x43deb0
-void Globals::init_season_level_delta(i32 level, i32 delta)
+HARNESS_CALLED void Globals::init_season_level_delta(i32 level, i32 delta)
 {
     g_Globals.season_level_deltas[level] = delta;
     i32 sum = 0;

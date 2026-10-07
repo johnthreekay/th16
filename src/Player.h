@@ -37,11 +37,16 @@ struct PlayerOption
     i32 unk_70;
     u8 unk_74[0x80 - 0x74];
     i32 unk_80;
-    u8 unk_84[0xb0 - 0x84];
+    u8 unk_84[0xa8 - 0x84];
+    // The direction shooters with an angle of 995 and up fire in.
+    f32 angle;
+    u8 unk_ac[0xb0 - 0xac];
     AnmId anm_id_b0;
     AnmId anm_id_b4;
     ZunTimer timer_b8;
-    u8 unk_cc[0xd4 - 0xcc];
+    u8 unk_cc[0xd0 - 0xcc];
+    // Its index among the options of its kind.
+    i32 index;
     // Next update moves the option straight to its preferred position.
     i32 should_instajump;
     u8 unk_d8[0xdc - 0xd8];
@@ -49,6 +54,15 @@ struct PlayerOption
     // the same index, even for season options).
     void(__fastcall *on_update)(PlayerOption *option);
     u8 unk_e0[0xe4 - 0xe0];
+};
+
+// The bitfields of PlayerBullet::flags that code assigns.
+struct PlayerBulletFlags
+{
+    u32 unk_0 : 1;
+    // Fired while focused.
+    u32 focused : 1;
+    u32 unk_2 : 30;
 };
 
 struct PlayerBullet
@@ -65,8 +79,18 @@ struct PlayerBullet
     i32 unk_94;
     i32 unk_98;
     i32 unk_9c;
-    i32 unk_a0;
-    i32 unk_a4;
+    union
+    {
+        i32 unk_a0;
+        // Marisa's laser (sht_on_tick_446260): its current length.
+        f32 laser_length;
+    };
+    union
+    {
+        i32 unk_a4;
+        // Copied to the damage source's unk_18 (rectangle height).
+        f32 unk_a4_f;
+    };
     i32 unk_a8;
     // Which shooter of the .sht file fired it: index in the low byte,
     // shooter array above it, 0xf0000 set for the season file.
@@ -95,7 +119,12 @@ struct PlayerDamageSource
     // Rectangles (create_rect_damage_source): angle, then width and
     // height in unk_14 and unk_18.
     f32 unk_c;
-    i32 unk_10;
+    union
+    {
+        i32 unk_10;
+        // Added to unk_c each frame.
+        f32 angular_speed;
+    };
     f32 unk_14;
     f32 unk_18;
     PosVel pos;
@@ -139,10 +168,16 @@ struct PlayerInner
     ZunTimer iframes;
     // 0x20: damage is multiplied this frame (EnemyManager::update).
     u32 flags;
-    u8 unk_16040[0x16050 - 0x16040];
-    // Scaled by 1/128; aims and sizes Aya's bomb.
+    // The .sht file's four move speeds (unfocused, focused, and both
+    // diagonally) in 1/128 pixels.
+    i32 speeds_subpixel[4];
+    // Scaled by 1/128; aims and sizes Aya's bomb. The movement this frame
+    // in 1/128 pixels (ExpHP: attempted_delta_pos__subpixel).
     f32 unk_16050;
-    u8 unk_16054[0x16070 - 0x16054];
+    f32 unk_16054;
+    f32 unk_16058;
+    Float3 last_nonzero_delta_pos_subpixel;
+    Int2 velocity_subpixel;
     // How far (in percent) options move toward their preferred position
     // each frame; below 30 they stay put.
     i32 percent_moved_by_options;
@@ -150,7 +185,11 @@ struct PlayerInner
     i32 unk_16074;
     // Set every frame by the autumn release.
     f32 speed_multiplier;
-    u8 unk_1607c[0x16090 - 0x1607c];
+    // Pushes the player along (subtracted from the movement, in pixels).
+    Float3 unk_1607c;
+    // The power level the main options were last laid out for.
+    i32 options_power_level;
+    i32 num_season_options;
 
     // 0x440ec0. Only the members' constructors; out of line, as the
     // original calls it for both of Player's copies and a global one.
@@ -190,8 +229,16 @@ struct ShtShooter
     i32 unk_1c;
     u8 option;
     u8 unk_21;
-    u8 anm;
-    u8 anm_hit;
+    union
+    {
+        struct
+        {
+            u8 anm;
+            u8 anm_hit;
+        };
+        // How PlayerBullet::create reads the script number.
+        i16 anm_script;
+    };
     i16 sfx_id;
     i8 fire_rate_long;
     i8 start_delay_long;
@@ -268,7 +315,10 @@ struct Player
     i32 unk_2c7d0;
     i32 unk_2c7d4;
     i32 unk_2c7d8;
-    u8 unk_2c7dc[0x2c828 - 0x2c7dc];
+    BoundingBox3 item_collect_box;
+    BoundingBox3 item_attract_box_focused;
+    BoundingBox3 item_attract_box_unfocused;
+    u8 unk_2c824[0x2c828 - 0x2c824];
 
     Player()
     {
@@ -308,7 +358,14 @@ struct Player
     HARNESS_CALLED void set_position_subpixel(Int2 *pos);
     // Loads a .sht file and resolves its offsets and callbacks. Does not
     // use this.
-    i32 read_sht_file(ShtFile **out, const char *path);
+    HARNESS_CALLED i32 read_sht_file(ShtFile **out, const char *path);
+
+    // The option a shooter's option number (minus one) names: 100 and up
+    // are season options.
+    PlayerOption *get_option(i32 index)
+    {
+        return index >= 100 ? &inner.subseason_options[index - 100] : &inner.main_options[index];
+    }
 
     // The shooter a bullet's shooter_ref names.
     ShtShooter *get_shooter(i32 ref)
@@ -332,15 +389,32 @@ struct Player
     i32 do_shooting(i32 short_time, i32 long_time);
     // 0x4455d0. Runs the shot key timers while the player is alive.
     i32 tick_shooting_state();
+    // 0x441cf0. Reads the arrows and the focus key, moves the player and
+    // the options, and keeps the hitbox and release VMs on the player.
+    i32 move();
+    // 0x4456d0. Runs every live bullet: its shot type callback, movement,
+    // the off-screen check and its damage source.
+    i32 tick_bullets();
     // Enters state 1 for 60 frames.
     void start_respawn();
     // 0x442380. Moves the options toward their positions around the
     // player and places their VMs.
     HARNESS_CALLED i32 update_options(PlayerOption *options, i32 count);
     // 0x442560
-    i32 on_tick_body();
+    DECOMP_NOINLINE i32 on_tick_body();
     static i32 __fastcall on_tick_callback(Player *player);
     static i32 __fastcall on_draw_callback(Player *player);
+
+    // 0x445a30. Applies the player's damage sources (and the bomb) to an
+    // enemy at pos: a rectangle of size rotated by rotation, or a circle
+    // of radius when size is NULL. Returns the damage (capped by the shot
+    // type), sets *hit_flag when something hit that should flash the enemy
+    // and *hit_pos to the last hitting source. no_score skips the score
+    // and the sources' hit callbacks; enemy_id stops a source hitting the
+    // same enemy twice in a row. Reaches the player through g_Player; LTCG
+    // dropped this and passes rotation in xmm3.
+    HARNESS_CALLED i32 compute_damage_to_enemy(Float3 *pos, Float3 *size, f32 rotation, f32 radius, i32 *hit_flag,
+                                               Float3 *hit_pos, i32 no_score, i32 enemy_id);
 
     // Members that reach the player through g_Player; LTCG dropped this.
     // 0x444cf0. Counts a graze at pos: effect, popup, sound and a graze
@@ -356,13 +430,6 @@ struct Player
     // 0x443af0. The same for a rectangle reaching length from pos along
     // angle, width wide (lasers).
     HARNESS_CALLED i32 check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only);
-    // 0x445a30 (ExpHP: enm_compute_damage_sources_445a30). Damage the
-    // player's damage sources deal to an enemy hurtbox at pos: a rectangle
-    // of size rotated by angle, or a circle of radius when size is NULL.
-    // *hit tells whether anything hit, *hit_pos (if not NULL) where; no_score
-    // skips the score.
-    HARNESS_CALLED i32 compute_damage_to_enemy(Float3 *pos, Float2 *size, f32 angle, f32 radius, i32 *hit,
-                                               Float3 *hit_pos, i32 no_score, i32 enemy_id);
 };
 
 // .sht files kept by ~Player when the next Player reuses them.
