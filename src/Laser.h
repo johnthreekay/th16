@@ -250,7 +250,11 @@ struct LaserCurveInner
     BulletEx ex[0x12];
     i32 shot_sfx;
     i32 shot_transform_sfx;
-    u8 unk_34c[0x358 - 0x34c];
+    u8 unk_34c[0x350 - 0x34c];
+    // Set when a bomb splits a laser: the node list and time the new piece
+    // continues from.
+    LaserCurveNode *source_nodes;
+    f32 source_time;
 
     LaserCurveInner()
     {
