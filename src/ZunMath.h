@@ -63,6 +63,9 @@ struct Int3
 // copies cannot be annotated yet: build.py only finds external symbols.
 static void __fastcall sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -72,6 +75,7 @@ static void __fastcall sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // The same as an external function: the copy at 0x4054d0, which PosVel's

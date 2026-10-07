@@ -788,7 +788,7 @@ i32 Stage::load_std(const char *path)
     script = (StdInstr *)((u8 *)std + std->script_offset);
     for (i32 i = 0; i < std->num_objects; i++)
     {
-        objects[i] = (StdObject *)((u8 *)objects[i] + (u32)std);
+        objects[i] = (StdObject *)((u8 *)objects[i] + (uptr)std);
     }
     vms = (AnmVm *)malloc(std->num_quads * sizeof(AnmVm));
     memset(vms, 0, std->num_quads * sizeof(AnmVm));

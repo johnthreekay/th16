@@ -231,6 +231,9 @@ void LTCG_FASTCALL divide_vec2_by_640_480(Float2 *out, Float2 *in)
 // FUNCTION: TH16 0x464930
 static void __fastcall anm_sincosmul_xy(f32 *x, f32 *y, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul2(x, y, angle, radius, radius);
+#else
     __asm {
         mov eax, x
         fld angle
@@ -241,11 +244,15 @@ static void __fastcall anm_sincosmul_xy(f32 *x, f32 *y, f32 angle, f32 radius)
         mov eax, y
         fstp [eax]
     }
+#endif
 }
 
 // FUNCTION: TH16 0x464d60
 static void __fastcall anm_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -255,6 +262,7 @@ static void __fastcall anm_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // Rebuilds the vertices that render modes 9, 13, 14, 24 and 25 draw from

@@ -24,6 +24,9 @@
 // FUNCTION: TH16 0x40f570
 static void __fastcall cirno_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -33,12 +36,16 @@ static void __fastcall cirno_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // The same for Marisa's bomb.
 // FUNCTION: TH16 0x410130
 static void __fastcall marisa_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -48,6 +55,7 @@ static void __fastcall marisa_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // A bomb ends a spell card's bonus once the card has run a second.

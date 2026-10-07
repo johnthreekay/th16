@@ -25,14 +25,14 @@ i32 __fastcall sht_on_tick_446260(PlayerBullet *bullet);
 i32 __fastcall sht_on_tick_446e00(PlayerBullet *bullet);
 i32 __fastcall sht_on_tick_4470f0(PlayerBullet *bullet);
 i32 __fastcall sht_on_tick_447480(PlayerBullet *bullet);
-i32 __fastcall sht_on_hit_4460c0(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall sht_on_hit_447270(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall damage_source_on_hit_445d40(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall damage_source_on_hit_4474a0(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y);
+i32 __fastcall sht_on_hit_4460c0(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y);
+i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y);
+i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y);
+i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y);
+i32 __fastcall sht_on_hit_447270(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y);
+i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y);
+i32 __fastcall damage_source_on_hit_445d40(PlayerDamageSource *source, iptr unk, iptr enemy, f32 x, f32 y);
+i32 __fastcall damage_source_on_hit_4474a0(PlayerDamageSource *source, iptr unk, iptr enemy, f32 x, f32 y);
 
 // GLOBAL: TH16 0x4919c0
 ShtBulletFunc const g_sht_on_init_funcs[7] = {
@@ -271,7 +271,7 @@ i32 __fastcall sht_on_tick_447480(PlayerBullet *bullet)
 // TODO: register allocation: the original loads the player into ecx and
 // the scaled index into edx, reading the old value straight into eax.
 // FUNCTION: TH16 0x4474a0
-i32 __fastcall damage_source_on_hit_4474a0(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall damage_source_on_hit_4474a0(PlayerDamageSource *source, iptr unk, iptr enemy, f32 x, f32 y)
 {
     i32 index = source->bullet_index;
     Player *player = g_Player;
@@ -291,7 +291,7 @@ i32 __fastcall sht_on_init_4474d0(PlayerBullet *bullet)
 // TODO: the original computes the shooter twice from scratch (keeping ref in
 // ebx); ours shares the common parts and spills them.
 // FUNCTION: TH16 0x445d40
-i32 __fastcall damage_source_on_hit_445d40(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall damage_source_on_hit_445d40(PlayerDamageSource *source, iptr unk, iptr enemy, f32 x, f32 y)
 {
     Player *player = g_Player;
     i32 ref = player->inner.bullets[source->bullet_index].shooter_ref;
@@ -321,7 +321,7 @@ i32 PlayerBullet::hit()
 // TODO: the original pushes interrupt_tree's 1 between the stores to the new
 // damage source; ours pushes it first.
 // FUNCTION: TH16 0x446e20
-i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y)
 {
     i32 damage = g_Player->get_shooter(bullet->shooter_ref)->damage;
     PlayerDamageSource *source =
@@ -343,7 +343,7 @@ i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
 // A tinted effect pointing back the way the bullet came, give or take 20
 // degrees.
 // FUNCTION: TH16 0x4460c0
-i32 __fastcall sht_on_hit_4460c0(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_4460c0(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y)
 {
     f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * 0.34906584f);
     angle = wrap_angle(angle + ZUN_PI);
@@ -358,7 +358,7 @@ i32 __fastcall sht_on_hit_4460c0(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
 
 // Turns the effect up to 20 degrees either way.
 // FUNCTION: TH16 0x447270
-i32 __fastcall sht_on_hit_447270(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_447270(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y)
 {
     f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * 0.34906584f);
     g_EffectManager->effect_anm->create_vm(0x98, &bullet->pos.pos, angle, -1, 0);
@@ -369,7 +369,7 @@ i32 __fastcall sht_on_hit_447270(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
 // bullet in esi throughout (with an unused stack slot); ours reloads the
 // player for create_damage_source.
 // FUNCTION: TH16 0x446f80
-i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y)
 {
     Player *player = g_Player;
     i32 damage = player->get_shooter(bullet->shooter_ref)->damage;
@@ -389,7 +389,7 @@ i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
 // TODO: the original aligns its frame to 8 bytes (and esp, -8) and
 // addresses its locals through esp.
 // FUNCTION: TH16 0x447320
-i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y)
 {
     f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * 0.34906584f);
     AnmId id = g_EffectManager->effect_anm->create_vm(0x98, &bullet->pos.pos, angle, -1, 0);
@@ -407,6 +407,9 @@ i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
 // FUNCTION: TH16 0x4476b0
 static void __fastcall player_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -416,6 +419,7 @@ static void __fastcall player_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // ZunAngle's subtraction (shortest signed difference) as the laser code
@@ -554,7 +558,7 @@ i32 __fastcall sht_on_tick_446260(PlayerBullet *bullet)
 // size for rectangles, else radius) and spray sparks along it.
 // TODO: the original looks the damage source up in each branch (hoisting only g_Player) and spills more locals; frame and registers differ.
 // FUNCTION: TH16 0x446870
-i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y)
 {
     Float3 *enemy_pos = (Float3 *)unk;
     Float3 *enemy_size = (Float3 *)enemy;

@@ -28,6 +28,9 @@ BulletManager *g_BulletManager;
 // FUNCTION: TH16 0x417510
 static void __fastcall bullet_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -37,12 +40,16 @@ static void __fastcall bullet_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // A second copy, which only step_ex_08 calls.
 // FUNCTION: TH16 0x4173a0
 static void __fastcall bullet_sincosmul_2(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -52,6 +59,7 @@ static void __fastcall bullet_sincosmul_2(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // FUNCTION: TH16 0x411880
@@ -745,10 +753,15 @@ void Bullet::run_ex()
         {
             active_ex_flags |= 4;
             ex_state[1].floats[0] = ex->r;
-            ZunAngle angle = ex->s <= -999990.0f
-                                 ? angle_ref()
-                                 : ZunAngle(ex->s >= 999990.0f ? g_Player->angle_to_player(&pos) + ex->m : ex->s);
-            ex_state[1].floats[1] = angle.value;
+            {
+                // Scoped so that the jumps to play_sound below do not
+                // bypass its initialization (which MSVC allows).
+                ZunAngle angle =
+                    ex->s <= -999990.0f
+                        ? angle_ref()
+                        : ZunAngle(ex->s >= 999990.0f ? g_Player->angle_to_player(&pos) + ex->m : ex->s);
+                ex_state[1].floats[1] = angle.value;
+            }
             ex_state[1].timer.set_value(0);
             ex_state[1].ints[0] = ex->a;
             bullet_sincosmul((Float3 *)&ex_state[1].floats[5], ex_state[1].floats[1], ex_state[1].floats[0]);

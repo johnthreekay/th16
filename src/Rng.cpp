@@ -32,21 +32,33 @@ u32 Rng::rand_u32()
 // FUNCTION: TH16 0x402c70
 f32 Rng::randf_0_to_1()
 {
+#ifdef TH16_PORT
+    port_finit();
+#else
     __asm finit;
+#endif
     return (f32)rand_u32() / (f32)0xffffffff;
 }
 
 // FUNCTION: TH16 0x402cb0
 f32 Rng::randf_neg_1_to_1()
 {
+#ifdef TH16_PORT
+    port_finit();
+#else
     __asm finit;
+#endif
     return (f32)rand_u32() / (f32)0x7fffffff - 1.0f;
 }
 
 // FUNCTION: TH16 0x402cf0
 f32 Rng::randf_neg_pi_to_pi()
 {
+#ifdef TH16_PORT
+    port_finit();
+#else
     __asm finit;
+#endif
     return (f32)rand_u32() / ((f32)0xffffffff / ZUN_2PI) - ZUN_PI;
 }
 

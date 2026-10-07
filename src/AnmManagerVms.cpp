@@ -967,7 +967,7 @@ HARNESS_CALLED AnmId AnmManager::store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, 
     if (vm == NULL)
     {
         AnmId none;
-        none.id = (i32)vm;
+        none.id = (i32)(iptr)vm;
         return none;
     }
     i32 id;
@@ -1014,7 +1014,7 @@ AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
     if (snapshot == NULL)
     {
         AnmId none;
-        none.id = (i32)snapshot;
+        none.id = (i32)(iptr)snapshot;
         return none;
     }
     ENTER_CS(CS_ANM_MANAGER);

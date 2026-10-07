@@ -1,5 +1,19 @@
 #pragma once
 
+#ifdef TH16_PORT
+// The portable build (port/CMakeLists.txt) compiles with GCC or Clang. The
+// matching-build annotations below are hints for MSVC's link-time code
+// generation; here they reduce to their plain meaning. The calling
+// convention keywords they expand to are defined away by
+// port/include/port_prelude.h.
+#define DECOMP_NOINLINE __attribute__((noinline))
+#define DECOMP_ALIGN16 __attribute__((aligned(16)))
+#define LTCG_FASTCALL
+#define LTCG_VECTORCALL
+#define HARNESS_CALLED
+#define LTCG_NOTHROW noexcept
+#else
+
 // Link-time code generation decides inlining with the whole program in view.
 // Until the callers of a function are decompiled too, our build sees far
 // fewer call sites than ZUN's did and inlines things the original calls.
@@ -42,3 +56,5 @@
 // the promise spelled out to keep callers shaped like the original. Remove
 // it once the callee is decompiled.
 #define LTCG_NOTHROW throw()
+
+#endif // TH16_PORT

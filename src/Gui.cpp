@@ -1483,7 +1483,11 @@ GuiMsgVm::GuiMsgVm(void *script)
 // FUNCTION: TH16 0x429ff0
 void Gui::start_dialogue(i32 script)
 {
+#ifdef TH16_PORT
+    port_finit();
+#else
     __asm finit;
+#endif
     if (script == -1 || script == -3)
     {
         i32 boss = script == -1;

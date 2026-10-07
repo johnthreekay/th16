@@ -313,7 +313,7 @@ struct AnmManager
     u8 last_address_u;
     u8 last_address_v;
     u8 unk_184fbbe[2];
-    i32 render_cache_184fbc0;
+    iptr render_cache_184fbc0;
     IDirect3DVertexBuffer9 *vertex_buffer;
     // A unit quad (one corner per entry) that draw_vm__mode_7 transforms
     // with matrix_184f56c to work out each corner's fog.
@@ -709,6 +709,15 @@ inline AnmVm *get_vm_or_clear(AnmId &id)
     }
     return vm;
 }
+
+#ifdef TH16_PORT
+// MSVC binds the non-const reference above to a temporary id
+// (get_vm_or_clear(find_child_id(...))); standard C++ needs this overload.
+inline AnmVm *get_vm_or_clear(AnmId &&id)
+{
+    return get_vm_or_clear(id);
+}
+#endif
 
 // The first descendant of the VM running the script, or NULL if the VM is
 // gone (forgetting the id then).

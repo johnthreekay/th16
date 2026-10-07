@@ -34,6 +34,9 @@ i32 get_piv_rounded();
 // FUNCTION: TH16 0x430df0
 static void __fastcall item_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -43,6 +46,7 @@ static void __fastcall item_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // FUNCTION: TH16 0x42f0b0

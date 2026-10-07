@@ -79,7 +79,7 @@ struct Supervisor
     // ExpHP's layout puts d3d, d3d_device and dinput 4 bytes later, but
     // the code says otherwise: GetBackBuffer/SetRenderState go through +0x8
     // and DirectInput8Create writes +0xc.
-    u8 unk_0[4];
+    u8 unk_0[sizeof(void *)];
     IDirect3D9 *d3d;
     IDirect3DDevice9 *d3d_device;
     IDirectInput8A *dinput;

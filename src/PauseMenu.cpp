@@ -1070,7 +1070,11 @@ void PauseMenu::tick_open()
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
         {
-            i32 choice = menu.next_selection;
+            // Assigned apart from its declaration: the goto to score_entered
+            // jumps into this block, which standard C++ only allows past a
+            // declaration without an initializer.
+            i32 choice;
+            choice = menu.next_selection;
             if (choice < 0x58)
             {
                 if (name_cursor < 8)

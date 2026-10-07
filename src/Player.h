@@ -207,8 +207,8 @@ struct BoundingBox3
 // The shot type callbacks a .sht file refers to by index; loading the file
 // replaces the indices with these pointers.
 typedef i32(__fastcall *ShtBulletFunc)(PlayerBullet *bullet);
-typedef i32(__fastcall *ShtHitFunc)(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-typedef i32(__fastcall *DamageSourceHitFunc)(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y);
+typedef i32(__fastcall *ShtHitFunc)(PlayerBullet *bullet, iptr unk, iptr enemy, f32 x, f32 y);
+typedef i32(__fastcall *DamageSourceHitFunc)(PlayerDamageSource *source, iptr unk, iptr enemy, f32 x, f32 y);
 extern ShtBulletFunc const g_sht_on_init_funcs[7];
 extern ShtBulletFunc const g_sht_on_tick_funcs[8];
 extern ShtHitFunc const g_sht_on_hit_funcs[8];

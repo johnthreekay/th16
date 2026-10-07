@@ -76,6 +76,16 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
     g_sprite_temp_buffer[3].pos.y += camera_unk_fc.y;
     if (flags & 1)
     {
+#ifdef TH16_PORT
+        f32 x0 = port_frndint_sub(g_sprite_temp_buffer[0].pos.x, half);
+        f32 x1 = port_frndint_sub(g_sprite_temp_buffer[1].pos.x, half);
+        f32 y0 = port_frndint_sub(g_sprite_temp_buffer[0].pos.y, half);
+        f32 y2 = port_frndint_sub(g_sprite_temp_buffer[2].pos.y, half);
+        g_sprite_temp_buffer[2].pos.y = g_sprite_temp_buffer[3].pos.y = y2;
+        g_sprite_temp_buffer[0].pos.y = g_sprite_temp_buffer[1].pos.y = y0;
+        g_sprite_temp_buffer[1].pos.x = g_sprite_temp_buffer[3].pos.x = x1;
+        g_sprite_temp_buffer[0].pos.x = g_sprite_temp_buffer[2].pos.x = x0;
+#else
         __asm {
             fld g_sprite_temp_buffer[0 * TYPE g_sprite_temp_buffer].pos.x
             frndint
@@ -98,6 +108,7 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
             fst g_sprite_temp_buffer[0 * TYPE g_sprite_temp_buffer].pos.x
             fstp g_sprite_temp_buffer[2 * TYPE g_sprite_temp_buffer].pos.x
         }
+#endif
     }
     vm->last_rendered_quad_in_surface_space[0] = *(Float3 *)&g_sprite_temp_buffer[0].pos;
     vm->last_rendered_quad_in_surface_space[1] = *(Float3 *)&g_sprite_temp_buffer[1].pos;
@@ -315,12 +326,16 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
     f32 angle = vm->get_total_rotation()->z;
     f32 sine;
     f32 cosine;
+#ifdef TH16_PORT
+    port_sincos(angle, &sine, &cosine);
+#else
     __asm {
         fld angle
         fsincos
         fstp cosine
         fstp sine
     }
+#endif
     AnmAnchorCorners xs = g_anchor_corners_x[(vm->flags_lo >> 21) & 3];
     AnmAnchorCorners ys = g_anchor_corners_y[(vm->flags_lo >> 23) & 3];
     i32 i;
@@ -378,12 +393,16 @@ i32 __stdcall AnmManager::write_sprite_corners__mode_4(AnmVm *vm)
     f32 angle = vm->get_total_rotation()->z;
     f32 sine;
     f32 cosine;
+#ifdef TH16_PORT
+    port_sincos(angle, &sine, &cosine);
+#else
     __asm {
         fld angle
         fsincos
         fstp cosine
         fstp sine
     }
+#endif
     D3DXVECTOR3 world_pos(vm->entity_pos.x + vm->pos.x + vm->pos_2.x, vm->entity_pos.y + vm->pos.y + vm->pos_2.y,
                           vm->entity_pos.z + vm->pos.z + vm->pos_2.z);
     D3DXMATRIX world;
@@ -411,12 +430,16 @@ i32 __stdcall AnmManager::write_sprite_corners__mode_4(AnmVm *vm)
     f32 height = vm->sprite_size.y * scale * vm->scale.y * vm->scale_2.y;
     g_sprite_temp_buffer[0].pos.z = g_sprite_temp_buffer[1].pos.z = g_sprite_temp_buffer[2].pos.z =
         g_sprite_temp_buffer[3].pos.z = screen.z;
+#ifdef TH16_PORT
+    port_sincos(angle, &sine, &cosine);
+#else
     __asm {
         fld angle
         fsincos
         fstp cosine
         fstp sine
     }
+#endif
     f32 x0, x1, x2, x3;
     f32 y0, y1, y2, y3;
     switch ((vm->flags_lo >> 21) & 3)
@@ -631,10 +654,10 @@ static inline AnmLoadedSprite *set_texture_of_vm(AnmManager *mgr, AnmVm *vm)
 // last one set is still right.
 static inline void set_texture_transform_of_vm(AnmManager *mgr, AnmVm *vm, AnmLoadedSprite *sprite)
 {
-    if (mgr->render_cache_184fbc0 != (i32)sprite || vm->uv_scroll_pos.x != 0.0f || vm->uv_scroll_pos.x != 0.0f ||
+    if (mgr->render_cache_184fbc0 != (iptr)sprite || vm->uv_scroll_pos.x != 0.0f || vm->uv_scroll_pos.x != 0.0f ||
         vm->uv_scale.x != 1.0f || vm->uv_scale.y != 1.0f)
     {
-        mgr->render_cache_184fbc0 = (i32)sprite;
+        mgr->render_cache_184fbc0 = (iptr)sprite;
         D3DXMATRIX texture_matrix = vm->matrix_450;
         texture_matrix._31 = vm->uv_quad_of_sprite[0].x + vm->uv_scroll_pos.x;
         texture_matrix._32 = vm->uv_quad_of_sprite[0].y + vm->uv_scroll_pos.y;

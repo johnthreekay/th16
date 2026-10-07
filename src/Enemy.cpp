@@ -860,6 +860,9 @@ EnemyInf::~EnemyInf()
 // FUNCTION: TH16 0x426240
 static void __fastcall sincosmul_ellipse(Float3 *dst, f32 angle, f32 rx, f32 ry)
 {
+#ifdef TH16_PORT
+    port_sincosmul2(&dst->x, &dst->y, angle, rx, ry);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -869,6 +872,7 @@ static void __fastcall sincosmul_ellipse(Float3 *dst, f32 angle, f32 rx, f32 ry)
         fmul ry
         fstp [eax+4]
     }
+#endif
 }
 
 // FUNCTION: TH16 0x41a720

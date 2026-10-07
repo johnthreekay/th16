@@ -95,6 +95,9 @@ extern void *g_ecl_unknown_634_funcs[1];
 // FUNCTION: TH16 0x426260
 static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -104,6 +107,7 @@ static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // Where shooter i fires from: its absolute origin plus the offset when the

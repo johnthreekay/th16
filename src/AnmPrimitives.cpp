@@ -7,6 +7,9 @@
 // FUNCTION: TH16 0x469e00
 static void __fastcall primitive_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -16,6 +19,7 @@ static void __fastcall primitive_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // A width x height rectangle at (x, y) rotated by angle, anchored by
@@ -35,12 +39,16 @@ HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f3
     f32 c;
     f32 s;
     f32 a = angle;
+#ifdef TH16_PORT
+    port_sincos(a, &s, &c);
+#else
     __asm {
         fld a
         fsincos
         fstp c
         fstp s
     }
+#endif
     f32 x0, x1, x2, x3;
     f32 y0, y1, y2, y3;
     switch (anchor_x)
@@ -125,12 +133,16 @@ HARNESS_CALLED i32 AnmManager::draw_rect_outline(f32 x, f32 y, f32 width, f32 he
     f32 c;
     f32 s;
     f32 a = angle;
+#ifdef TH16_PORT
+    port_sincos(a, &s, &c);
+#else
     __asm {
         fld a
         fsincos
         fstp c
         fstp s
     }
+#endif
     f32 x0, x1, x2, x3;
     f32 y0, y1, y2, y3;
     switch (anchor_x)
@@ -228,12 +240,16 @@ HARNESS_CALLED i32 AnmManager::draw_line(f32 x, f32 y, f32 length, f32 angle, D3
     f32 c;
     f32 s;
     f32 a = angle;
+#ifdef TH16_PORT
+    port_sincos(a, &s, &c);
+#else
     __asm {
         fld a
         fsincos
         fstp c
         fstp s
     }
+#endif
     f32 start;
     f32 end;
     f32 offset = 0.0f;

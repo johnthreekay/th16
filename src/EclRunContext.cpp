@@ -484,6 +484,9 @@ HARNESS_CALLED void ecl_log(const char *fmt, ...)
 // FUNCTION: TH16 0x474510
 static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -493,6 +496,7 @@ static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // FUNCTION: TH16 0x471db0

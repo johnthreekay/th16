@@ -357,13 +357,13 @@ HARNESS_CALLED i32 Player::read_sht_file(ShtFile **out, const char *path)
     }
     for (i32 i = 0; i < (*out)->sht_off_count; i++)
     {
-        (*out)->shooter_arrays[i] = (ShtShooter *)((u8 *)(*out)->shooters + (u32)(*out)->shooter_arrays[i]);
+        (*out)->shooter_arrays[i] = (ShtShooter *)((u8 *)(*out)->shooters + (uptr)(*out)->shooter_arrays[i]);
         for (ShtShooter *shooter = (*out)->shooter_arrays[i]; shooter->fire_rate >= 0; shooter++)
         {
-            shooter->func_on_init = g_sht_on_init_funcs[(i32)shooter->func_on_init];
-            shooter->func_on_tick = g_sht_on_tick_funcs[(i32)shooter->func_on_tick];
-            shooter->func_3 = g_sht_func_3_table[(i32)shooter->func_3];
-            shooter->func_on_hit = g_sht_on_hit_funcs[(i32)shooter->func_on_hit];
+            shooter->func_on_init = g_sht_on_init_funcs[(iptr)shooter->func_on_init];
+            shooter->func_on_tick = g_sht_on_tick_funcs[(iptr)shooter->func_on_tick];
+            shooter->func_3 = g_sht_func_3_table[(iptr)shooter->func_3];
+            shooter->func_on_hit = g_sht_on_hit_funcs[(iptr)shooter->func_on_hit];
         }
     }
     return 0;
@@ -776,7 +776,7 @@ HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f3
     {
         return 0;
     }
-    i32 total = g_MainBomb->in_use == 0 ? 0 : g_MainBomb->method_c((i32)pos, (i32)size);
+    i32 total = g_MainBomb->in_use == 0 ? 0 : g_MainBomb->method_c((iptr)pos, (iptr)size);
     if (hit_flag != NULL)
     {
         *hit_flag = total > 0 ? 1 : 0;
@@ -844,7 +844,7 @@ HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f3
             if (source->unk_90 != 0)
             {
                 source->hit_func = enemy_id;
-                damage = g_damage_source_hit_funcs[source->unk_90](source, (i32)pos, (i32)size, rotation, radius);
+                damage = g_damage_source_hit_funcs[source->unk_90](source, (iptr)pos, (iptr)size, rotation, radius);
             }
             source->total_damage_dealt += source->damage;
         }

@@ -185,7 +185,11 @@ HARNESS_CALLED void Spellcard::decode_time_code(i32 *seconds, i32 *hundredths)
 // FUNCTION: TH16 0x417f00
 void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
 {
+#ifdef TH16_PORT
+    port_finit();
+#else
     __asm finit;
+#endif
     time = 0;
     this->spell_id = spell_id;
     strcpy(this->name, name);

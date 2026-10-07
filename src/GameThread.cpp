@@ -131,7 +131,11 @@ i32 GameThread::thread_start()
 {
     GameThread *thread = g_GameThread;
     *(u32 *)&thread->flags |= 4;
+#ifdef TH16_PORT
+    port_finit();
+#else
     __asm finit;
+#endif
     while (g_AnmManager->screen_copies[0].anm_slot >= 0)
     {
         if (g_Supervisor.flags & 0x180)

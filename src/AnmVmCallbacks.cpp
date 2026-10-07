@@ -15,6 +15,9 @@
 // FUNCTION: TH16 0x406cc0
 static void __fastcall effect3_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -24,6 +27,7 @@ static void __fastcall effect3_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // ins_508 data of effect kind 2.
@@ -58,6 +62,9 @@ int __fastcall anm_effect_2_init(AnmVm *vm, i32 arg)
 // FUNCTION: TH16 0x406470
 static void __fastcall effect2_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -67,6 +74,7 @@ static void __fastcall effect2_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // Gives a new child VM its color and flight time.

@@ -52,6 +52,9 @@ HARNESS_CALLED f32 LTCG_VECTORCALL normalize_angle(f32 a)
 // FUNCTION: TH16 0x4054d0
 HARNESS_CALLED void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm
     {
         mov eax, dst
@@ -62,6 +65,7 @@ HARNESS_CALLED void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp dword ptr [eax + 4]
     }
+#endif
 }
 
 // FUNCTION: TH16 0x43dc90

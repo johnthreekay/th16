@@ -11,3 +11,5 @@ __pycache__/
 /reccmp-build.yml
 # Agent worktrees
 /.claude/
+# Portable build output (port/CMakeLists.txt)
+/build-port/

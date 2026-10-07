@@ -32,6 +32,9 @@ BulletTypeInfo g_bullet_types[BULLET_TYPE_COUNT];
 // FUNCTION: TH16 0x43ad00
 static void __fastcall laser_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
+#ifdef TH16_PORT
+    port_sincosmul(&dst->x, angle, radius);
+#else
     __asm {
         mov eax, dst
         fld angle
@@ -41,6 +44,7 @@ static void __fastcall laser_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+#endif
 }
 
 // FUNCTION: TH16 0x42cb00
