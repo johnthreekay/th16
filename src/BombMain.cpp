@@ -400,7 +400,7 @@ void BombReimuAOrb::update()
             if (target.id != 0)
             {
                 target_enemy = target.get();
-                if (!(target_enemy->enemy.flags_low & 0xc000021))
+                if (!(target_enemy->enemy.flags_low & ENEMY_FLAGS_UNTARGETABLE))
                 {
                     f32 goal = atan2(target_enemy->enemy.final_pos.pos.y - pos.y,
                                      target_enemy->enemy.final_pos.pos.x - pos.x);

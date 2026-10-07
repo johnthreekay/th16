@@ -128,7 +128,7 @@ HARNESS_CALLED int EnemyManager::get_enemy_count()
     {
         next = node->next;
         EnemyInf *enemy = node->entry;
-        BOOL ignored = (enemy->enemy.flags_low & 0x31) || enemy->enemy.set_invuln.current > 0 ? TRUE : FALSE;
+        BOOL ignored = (enemy->enemy.flags_low & ENEMY_FLAGS_UNDAMAGEABLE) || enemy->enemy.set_invuln.current > 0 ? TRUE : FALSE;
         if (!ignored)
         {
             count++;
@@ -284,7 +284,7 @@ HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
     }
     node->next = NULL;
     node->prev = NULL;
-    if (!(enemy->enemy.flags_high & 4))
+    if (!(enemy->enemy.flags_high & ENEMY_FLAG_HIGH_4))
     {
         enemy_count_real--;
     }
@@ -301,9 +301,9 @@ int EnemyManager::update()
     for (EnemyList *node = active_enemy_list_head; node != NULL; node = next)
     {
         next = node->next;
-        if (!(node->entry->enemy.flags_low & 0x2000000) && node->entry->on_tick() == 0)
+        if (!(node->entry->enemy.flags_low & ENEMY_FLAG_DELETE) && node->entry->on_tick() == 0)
         {
-            node->entry->enemy.flags_low &= ~0x40000;
+            node->entry->enemy.flags_low &= ~ENEMY_FLAG_TICKED;
         }
         else
         {
@@ -439,7 +439,7 @@ HARNESS_CALLED EnemyRef EnemyManager::find_closest(D3DXVECTOR3 *pos, f32 max_dis
     {
         next = node->next;
         EnemyInf *enemy = node->entry;
-        if (enemy->enemy.flags_low & 0xc000021)
+        if (enemy->enemy.flags_low & ENEMY_FLAGS_UNTARGETABLE)
         {
             continue;
         }
@@ -549,7 +549,7 @@ int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage)
 static inline void enemy_play_hit_sound(EnemyData *enemy, i32 low_life_spell, i32 low_life)
 {
     u32 spell_flags = g_Spellcard->flags;
-    if ((enemy->flags_low & 0x40800000) && (spell_flags & 9) != 9 &&
+    if ((enemy->flags_low & (ENEMY_FLAG_BIG_LIFE | ENEMY_FLAG_BOSS)) && (spell_flags & 9) != 9 &&
         (((spell_flags & 1) && enemy->full->enemy.life.remaining_for_cur_attack < low_life_spell) ||
          (!(spell_flags & 1) && enemy->full->enemy.life.remaining_for_cur_attack < low_life)))
     {
@@ -568,24 +568,24 @@ static inline void enemy_play_hit_sound(EnemyData *enemy, i32 low_life_spell, i3
 // FUNCTION: TH16 0x41c330
 int EnemyData::step_logic()
 {
-    if ((flags_low & 0x10000000) && (g_MainBomb->in_use == 1 || g_SubseasonBomb->in_use == 1) &&
-        !(flags_low & 0x20000000))
+    if ((flags_low & ENEMY_FLAG_BOMBSHIELD) && (g_MainBomb->in_use == 1 || g_SubseasonBomb->in_use == 1) &&
+        !(flags_low & ENEMY_FLAG_BOMBSHIELD_UP))
     {
         anm_set_main = bombshield_on_anm_main;
         anm_ids[0].replace_with_effect(bombshield_on_anm_main);
-        flags_low |= 0x20000001;
+        flags_low |= (ENEMY_FLAG_BOMBSHIELD_UP | ENEMY_FLAG_NO_HURTBOX);
     }
-    else if (g_MainBomb->in_use != 1 && g_SubseasonBomb->in_use != 1 && (flags_low & 0x20000000))
+    else if (g_MainBomb->in_use != 1 && g_SubseasonBomb->in_use != 1 && (flags_low & ENEMY_FLAG_BOMBSHIELD_UP))
     {
         anm_set_main = bombshield_off_anm_main;
         anm_ids[0].replace_with_effect(bombshield_off_anm_main);
-        flags_low &= ~0x20000001;
+        flags_low &= ~(ENEMY_FLAG_BOMBSHIELD_UP | ENEMY_FLAG_NO_HURTBOX);
     }
-    if (flags_low & 0x800)
+    if (flags_low & ENEMY_FLAG_DIE_ON_HIT)
     {
         i32 hit = 0;
         i32 result;
-        if (!(flags_low & 0x1000))
+        if (!(flags_low & ENEMY_FLAG_RECT_HITBOX))
         {
             result = g_Player->compute_damage_to_enemy(&final_pos.pos, NULL, 0.0f, hurtbox_size.x * 0.5f, &hit,
                                                        &last_damage_pos, 1, full->enemy_id);
@@ -615,14 +615,14 @@ int EnemyData::step_logic()
             return -1;
         }
     }
-    flags_low &= ~0x200000;
+    flags_low &= ~ENEMY_FLAG_DAMAGED;
     i32 hit = 0;
-    if (!(flags_low & 0x21))
+    if (!(flags_low & (ENEMY_FLAG_NO_HURTBOX | ENEMY_FLAG_INTANGIBLE)))
     {
         i32 damage = 0;
         if (hurtbox_size.x > 0.0f)
         {
-            if (!(flags_low & 0x1000))
+            if (!(flags_low & ENEMY_FLAG_RECT_HITBOX))
             {
                 damage = g_Player->compute_damage_to_enemy(&final_pos.pos, NULL, 0.0f, hurtbox_size.x * 0.5f, &hit,
                                                            &last_damage_pos, 0, full->enemy_id);
@@ -681,7 +681,7 @@ int EnemyData::step_logic()
             {
                 life_damage /= 30;
             }
-            if (!(flags_low & 0x10) && set_invuln.current <= 0)
+            if (!(flags_low & ENEMY_FLAG_INVINCIBLE) && set_invuln.current <= 0)
             {
                 life.receive_damage(life_damage);
             }
@@ -711,6 +711,7 @@ int EnemyData::step_logic()
                     return -1;
                 }
             }
+            // Bit 7 is ENEMY_FLAG_NO_DEATH.
             if ((life.current <= 0) & ~(flags_low >> 7))
             {
                 if (full->die() != 0)
@@ -718,7 +719,7 @@ int EnemyData::step_logic()
                     return 1;
                 }
             }
-            flags_low |= 0x200000;
+            flags_low |= ENEMY_FLAG_DAMAGED;
         }
     }
     if (life.is_spell & 2)
@@ -728,7 +729,7 @@ int EnemyData::step_logic()
             return 1;
         }
     }
-    if (!(flags_low & 0x22) && no_hitbox_dur.current <= 0 && !(flags_low & 0x4000000))
+    if (!(flags_low & (ENEMY_FLAG_NO_HITBOX | ENEMY_FLAG_INTANGIBLE)) && no_hitbox_dur.current <= 0 && !(flags_low & ENEMY_FLAG_4000000))
     {
         if (func_from_ecl_unknown_634 != NULL)
         {
@@ -737,7 +738,7 @@ int EnemyData::step_logic()
         else
         {
             i32 result;
-            if (!(flags_low & 0x1000))
+            if (!(flags_low & ENEMY_FLAG_RECT_HITBOX))
             {
                 result = g_Player->check_hit_circle(&final_pos.pos, hitbox_size.x * 0.5f, 0);
             }
@@ -761,7 +762,7 @@ int EnemyData::step_logic()
                 pos.z = final_pos.pos.z + 0.0f;
                 result = g_Player->check_hit_rotated_rect(&pos, rotation, hitbox_size.x, hitbox_size.y, 0);
             }
-            if ((flags_low & 0x200) && result == 2 && time_in_ecl.current % 6 == 0)
+            if ((flags_low & ENEMY_FLAG_GRAZEABLE) && result == 2 && time_in_ecl.current % 6 == 0)
             {
                 g_Player->do_graze(&g_Player->inner.pos);
             }
@@ -774,6 +775,7 @@ int EnemyData::step_logic()
     }
     else if (unk_3ff0 == 0)
     {
+        // Bit 31: EnemyFlagsLow::magenta_flash.
         if (flags_low >= 0x80000000)
         {
             if (time_in_ecl.current % 4 == 0)
@@ -786,7 +788,7 @@ int EnemyData::step_logic()
                 vm->flags_lo &= ~0x60000;
             }
         }
-        if ((flags_low & 0x200000) && !(flags_low & 0x2000))
+        if ((flags_low & ENEMY_FLAG_DAMAGED) && !(flags_low & ENEMY_FLAG_NO_HIT_EFFECT))
         {
             vm->color_2.d3d = 0xff0000ff;
             vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
@@ -803,7 +805,7 @@ int EnemyData::step_logic()
         else if (time_in_ecl.current % 4 == 0)
         {
             u32 spell_flags = g_Spellcard->flags;
-            if ((flags_low & 0x40800000) && (spell_flags & 9) != 9 &&
+            if ((flags_low & (ENEMY_FLAG_BIG_LIFE | ENEMY_FLAG_BOSS)) && (spell_flags & 9) != 9 &&
                 (((spell_flags & 1) && full->enemy.life.remaining_for_cur_attack < 100) ||
                  (!(spell_flags & 1) && full->enemy.life.remaining_for_cur_attack < 500)))
             {
@@ -835,9 +837,9 @@ EnemyManager *g_EnemyManager;
 EnemyInf::~EnemyInf()
 {
     g_EnemyManager->remove_from_active_list(this);
-    if (!(enemy.flags_high & 4))
+    if (!(enemy.flags_high & ENEMY_FLAG_HIGH_4))
     {
-        if (enemy.flags_low & 0x800000)
+        if (enemy.flags_low & ENEMY_FLAG_BOSS)
         {
             g_EnemyManager->inner.boss_ids[enemy.own_boss_id] = 0;
         }
@@ -956,7 +958,7 @@ int EnemyInf::on_tick()
 {
     if (enemy.slowdown <= 0.0f)
     {
-        if (enemy.flags_high & 1)
+        if (enemy.flags_high & ENEMY_FLAG_HIGH_VMS_SLOWED)
         {
             for (i32 i = 0; i < 16; i++)
             {
@@ -983,7 +985,7 @@ int EnemyInf::on_tick()
     }
     int result = enemy.on_tick();
     g_game_speed = game_speed;
-    enemy.flags_high |= 1;
+    enemy.flags_high |= ENEMY_FLAG_HIGH_VMS_SLOWED;
     return result;
 }
 
@@ -994,11 +996,11 @@ int EnemyInf::on_tick()
 // FUNCTION: TH16 0x41d2e0
 int EnemyData::on_tick()
 {
-    if (flags_low & 0x40000)
+    if (flags_low & ENEMY_FLAG_TICKED)
     {
         return 0;
     }
-    flags_low |= 0x40000;
+    flags_low |= ENEMY_FLAG_TICKED;
     if (step_interpolators() != 0)
     {
         return -1;
@@ -1016,7 +1018,7 @@ int EnemyData::on_tick()
         return -1;
     }
     update_fog();
-    if (!(flags_low & 0x4000000))
+    if (!(flags_low & ENEMY_FLAG_4000000))
     {
         for (i32 i = 0; i < 14; i++)
         {
@@ -1082,7 +1084,7 @@ void EnemyData::update_final_pos()
 {
     final_pos.velocity = abs_pos.pos + rel_pos.pos - final_pos.pos;
     final_pos.step();
-    if (flags_low & 0x20000)
+    if (flags_low & ENEMY_FLAG_MOVE_LIMIT)
     {
         f32 half = move_limit_size.x * 0.5f;
         if (move_limit_center.x - half > final_pos.pos.x)
@@ -1171,14 +1173,14 @@ void EnemyManager::kill_all()
     {
         next = node->next;
         EnemyInf *enemy = node->entry;
-        if (!(enemy->enemy.flags_low & 0xc004a0) || enemy->enemy.flags_low & 0x100)
+        if (!(enemy->enemy.flags_low & ENEMY_FLAGS_SURVIVE_KILL_ALL) || enemy->enemy.flags_low & ENEMY_FLAG_ALWAYS_KILLABLE)
         {
             enemy->enemy.drops.reset();
             enemy->enemy.last_damage_pos.x = 0.0f;
             enemy->enemy.last_damage_pos.y = 192.0f;
             enemy->enemy.unk_452c = 0;
             enemy->die();
-            enemy->enemy.flags_low |= 0x2000000;
+            enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
         }
     }
     mgr->inner.time_in_stage.tick_mixed();
@@ -1194,14 +1196,14 @@ void __stdcall EnemyManager::kill_all_with_unk_278(i32 value)
     {
         EnemyList *next = node->next;
         EnemyInf *enemy = node->entry;
-        if ((!(enemy->enemy.flags_low & 0xc004a0) || enemy->enemy.flags_low & 0x100) && enemy->enemy.unk_278 == value)
+        if ((!(enemy->enemy.flags_low & ENEMY_FLAGS_SURVIVE_KILL_ALL) || enemy->enemy.flags_low & ENEMY_FLAG_ALWAYS_KILLABLE) && enemy->enemy.unk_278 == value)
         {
             enemy->enemy.drops.reset();
             enemy->enemy.last_damage_pos.x = 0.0f;
             enemy->enemy.last_damage_pos.y = 192.0f;
             enemy->enemy.unk_452c = 0;
             enemy->die();
-            enemy->enemy.flags_low |= 0x2000000;
+            enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
         }
         node = next;
     }
@@ -1219,7 +1221,7 @@ void EnemyManager::kill_all_no_set_death()
     {
         next = node->next;
         EnemyInf *enemy = node->entry;
-        if (!(enemy->enemy.flags_low & 0xc004a0) || enemy->enemy.flags_low & 0x100)
+        if (!(enemy->enemy.flags_low & ENEMY_FLAGS_SURVIVE_KILL_ALL) || enemy->enemy.flags_low & ENEMY_FLAG_ALWAYS_KILLABLE)
         {
             enemy->enemy.drops.reset();
             enemy->enemy.last_damage_pos.x = 0.0f;
@@ -1227,7 +1229,7 @@ void EnemyManager::kill_all_no_set_death()
             enemy->enemy.unk_452c = 0;
             enemy->enemy.set_death[0] = '\0';
             enemy->die();
-            enemy->enemy.flags_low |= 0x2000000;
+            enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
         }
     }
     mgr->inner.time_in_stage.tick();
@@ -1259,7 +1261,7 @@ const char *EnemyInf::check_life_interrupts()
         enemy.life.current = enemy.interrupts[i].life;
         enemy.interrupts[i].life = -1;
         enemy.time_in_ecl.reset();
-        enemy.flags_low &= ~0x1000000;
+        enemy.flags_low &= ~ENEMY_FLAG_TIMEOUT;
         return enemy.interrupts[i].sub_for_set_next;
     }
     return NULL;
@@ -1276,7 +1278,7 @@ const char *EnemyInf::check_time_interrupts()
         {
             continue;
         }
-        if (enemy.flags_low & 0x800000)
+        if (enemy.flags_low & ENEMY_FLAG_BOSS)
         {
             i32 remaining = enemy.interrupts[i].time - enemy.time_in_ecl.current;
             i32 seconds = remaining / 60;
@@ -1296,11 +1298,11 @@ const char *EnemyInf::check_time_interrupts()
         enemy.life.current = enemy.interrupts[i].life;
         enemy.interrupts[i].life = -1;
         enemy.time_in_ecl.reset();
-        enemy.flags_low |= 0x1000000;
+        enemy.flags_low |= ENEMY_FLAG_TIMEOUT;
         Spellcard *spellcard = g_Spellcard;
         if (!(spellcard->flags & 8))
         {
-            enemy.flags_low &= ~0x1000000;
+            enemy.flags_low &= ~ENEMY_FLAG_TIMEOUT;
             spellcard->flags |= 0x80;
             if (spellcard->flags & 1)
             {
@@ -1350,7 +1352,7 @@ int EnemyData::ecl_anm_set_sprite()
         final_sprite_size.x = vm->scale.y * vm->sprite_size.y;
         final_sprite_size.y = vm->scale.x * vm->sprite_size.x;
     }
-    if (flags_low & 0x20)
+    if (flags_low & ENEMY_FLAG_INTANGIBLE)
     {
         vm = get_vm(anm_ids[slot]);
         if (vm != NULL)
@@ -1384,7 +1386,7 @@ EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, EnemyCreatePara
     enemy->unk_5744 = params->parent_enemy_id;
     if (params->life >= 1000)
     {
-        ((EnemyFlagsLow *)&enemy->enemy.flags_low)->flag_40000000 = 1;
+        ((EnemyFlagsLow *)&enemy->enemy.flags_low)->big_life = 1;
     }
     enemy->enemy.own_chapter = g_Globals.chapter;
     enemy->on_tick();
@@ -1470,7 +1472,7 @@ int EnemyData::ecl_enm_create()
     {
         params.mirrored = 1;
     }
-    if (flags_low & 0x80000)
+    if (flags_low & ENEMY_FLAG_MIRRORED)
     {
         params.pos.x *= -1.0f;
         params.mirrored ^= 1;
@@ -1663,7 +1665,7 @@ int EnemyInf::get_int_global(int var)
     case ECL_VAR_TIME:
         return enemy.time_in_ecl.current;
     case ECL_VAR_TIMEOUT:
-        return ((EnemyFlagsLow *)&enemy.flags_low)->flag_1000000;
+        return ((EnemyFlagsLow *)&enemy.flags_low)->timeout;
     case ECL_VAR_ABS_ANGLE:
         return (i32)enemy.abs_pos.angle.value;
     case ECL_VAR_REL_ANGLE:
@@ -1907,7 +1909,7 @@ f32 EnemyInf::get_float_global(int var)
     case ECL_VAR_TIME:
         return enemy.time_in_ecl.current_f;
     case ECL_VAR_TIMEOUT:
-        return ((EnemyFlagsLow *)&enemy.flags_low)->flag_1000000;
+        return ((EnemyFlagsLow *)&enemy.flags_low)->timeout;
     case ECL_VAR_I0:
         return enemy.ecl_int_vars[0];
     case ECL_VAR_I1:
@@ -2222,7 +2224,7 @@ int EnemyData::step_interpolators()
         rel_pos.update_secondary_fields();
     }
     abs_pos.step();
-    if (flags_low & 0x4000000)
+    if (flags_low & ENEMY_FLAG_4000000)
     {
         rel_pos.pos.x += g_Supervisor.cameras[0].unk_104.x;
         rel_pos.pos.y += g_Supervisor.cameras[0].unk_104.y;

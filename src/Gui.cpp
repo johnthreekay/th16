@@ -1883,7 +1883,7 @@ i32 Gui::on_tick_body()
                 }
                 continue;
             }
-            if (boss->enemy.life.current >= 100000 || (boss->enemy.flags_low & 0x31) ||
+            if (boss->enemy.life.current >= 100000 || (boss->enemy.flags_low & ENEMY_FLAGS_UNDAMAGEABLE) ||
                 boss->enemy.set_invuln.current > 0 || msg != NULL)
             {
                 delete_boss_bar_vms(bar);
@@ -2021,7 +2021,7 @@ i32 Gui::on_tick_body()
     if (g_EnemyManager != NULL)
     {
         EnemyInf *boss = get_boss_inline(g_EnemyManager, 0);
-        if (boss != NULL && !((boss->enemy.flags_low >> 5) & 1) && !(boss->enemy.flags_low & 1))
+        if (boss != NULL && !((boss->enemy.flags_low >> 5) & 1) && !(boss->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX))
         {
             AnmVm *vm = get_vm_or_clear(id_9c);
             vm->set_flag_lo_2_tree_inline();

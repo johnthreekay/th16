@@ -51,7 +51,7 @@ static __forceinline AnmId create_vm_front_at(AnmLoaded *file, i32 script, Float
 }
 
 // pi - angle, wrapped: the direction mirrored about the vertical axis, for
-// mirrored enemies (flags_low 0x80000).
+// mirrored enemies (ENEMY_FLAG_MIRRORED).
 static inline f32 mirror_angle(f32 angle)
 {
     return normalize_angle(ZUN_PI / 2 - normalize_angle(angle - ZUN_PI / 2));
@@ -447,13 +447,13 @@ int EnemyData::ecl_run_over_300()
             final_sprite_size.x = vm->scale.y * vm->sprite_size.y;
             final_sprite_size.y = vm->scale.x * vm->sprite_size.x;
         }
-        if (flags_low & 0x20)
+        if (flags_low & ENEMY_FLAG_INTANGIBLE)
         {
             anm_ids[slot].clear_flag_lo_2_tree();
         }
         if (slot == 0)
         {
-            flags_low |= 0x100000;
+            flags_low |= ENEMY_FLAG_DIRECTIONAL_ANM;
             anm_slot_0_script = anm_set_main = script;
             unk_274 = 0;
             anm_slot_0_anm_index = selected_anm_index;
@@ -465,7 +465,7 @@ int EnemyData::ecl_run_over_300()
         delete_vm_and_clear(anm_ids[0]);
         anm_ids[0] =
             g_EnemyManager->anim_statement_anms[selected_anm_index]->create_vm_front(anm_set_main, anm_layers + 7, 0);
-        flags_low &= ~0x100000;
+        flags_low &= ~ENEMY_FLAG_DIRECTIONAL_ANM;
         anm_slot_0_script = anm_set_main;
         unk_274 = 0;
         anm_slot_0_anm_index = selected_anm_index;
@@ -483,7 +483,7 @@ int EnemyData::ecl_run_over_300()
             final_sprite_size.x = vm->scale.y * vm->sprite_size.y;
             final_sprite_size.y = vm->scale.x * vm->sprite_size.x;
         }
-        if (flags_low & 0x20)
+        if (flags_low & ENEMY_FLAG_INTANGIBLE)
         {
             anm_ids[slot].clear_flag_lo_2_tree();
         }
@@ -504,7 +504,7 @@ int EnemyData::ecl_run_over_300()
             final_sprite_size.x = vm->scale.y * vm->sprite_size.y;
             final_sprite_size.y = vm->scale.x * vm->sprite_size.x;
         }
-        if (flags_low & 0x20)
+        if (flags_low & ENEMY_FLAG_INTANGIBLE)
         {
             anm_ids[slot].clear_flag_lo_2_tree();
         }
@@ -590,7 +590,7 @@ int EnemyData::ecl_run_over_300()
         }
         if (instr->opcode == 436 || instr->opcode == 437)
         {
-            x = flags_low & 0x80000 ? pos_vel->pos.x - x : pos_vel->pos.x + x;
+            x = flags_low & ENEMY_FLAG_MIRRORED ? pos_vel->pos.x - x : pos_vel->pos.x + x;
             y = pos_vel->pos.y + y;
         }
         interp->end_time = full->context.current_context->get_int_arg(0);
@@ -622,7 +622,7 @@ int EnemyData::ecl_run_over_300()
         }
         if (instr->opcode == 438 || instr->opcode == 439)
         {
-            x = flags_low & 0x80000 ? pos_vel->pos.x - x : pos_vel->pos.x + x;
+            x = flags_low & ENEMY_FLAG_MIRRORED ? pos_vel->pos.x - x : pos_vel->pos.x + x;
             y = pos_vel->pos.y + y;
         }
         interp->end_time = full->context.current_context->get_int_arg(0);
@@ -677,7 +677,7 @@ int EnemyData::ecl_run_over_300()
         f32 speed = full->context.current_context->get_float_arg(1);
         if (angle > -999999.0)
         {
-            if ((flags_low & 0x80000) && (instr->opcode == 404 || instr->opcode == 406))
+            if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == 404 || instr->opcode == 406))
             {
                 angle = mirror_angle(angle);
             }
@@ -713,7 +713,7 @@ int EnemyData::ecl_run_over_300()
         {
             if (angle > -999999.0)
             {
-                if ((flags_low & 0x80000) && (instr->opcode == 405 || instr->opcode == 407))
+                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == 405 || instr->opcode == 407))
                 {
                     angle = mirror_angle(angle);
                 }
@@ -728,7 +728,7 @@ int EnemyData::ecl_run_over_300()
         {
             if (angle > -999999.0)
             {
-                if ((flags_low & 0x80000) && (instr->opcode == 405 || instr->opcode == 407))
+                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == 405 || instr->opcode == 407))
                 {
                     angle = -angle;
                 }
@@ -764,7 +764,7 @@ int EnemyData::ecl_run_over_300()
     {
         PosVel *pv = instr->opcode == 440 ? &abs_pos : &rel_pos;
         f32 angle = get_float_arg(0);
-        if (flags_low & 0x80000)
+        if (flags_low & ENEMY_FLAG_MIRRORED)
         {
             angle = mirror_angle(angle);
         }
@@ -789,7 +789,7 @@ int EnemyData::ecl_run_over_300()
         {
             if (angle > -999999.0)
             {
-                if ((flags_low & 0x80000) && (instr->opcode == 441 || instr->opcode == 443))
+                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == 441 || instr->opcode == 443))
                 {
                     angle = mirror_angle(angle);
                 }
@@ -803,7 +803,7 @@ int EnemyData::ecl_run_over_300()
         {
             if (angle > -999999.0)
             {
-                if ((flags_low & 0x80000) && (instr->opcode == 441 || instr->opcode == 443))
+                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == 441 || instr->opcode == 443))
                 {
                     angle = -angle;
                 }
@@ -1066,7 +1066,7 @@ int EnemyData::ecl_run_over_300()
     // 504: moveLimit(x, y, width, height): keeps final_pos inside the
     // rectangle (see update_final_pos).
     case 504:
-        flags_low |= 0x20000;
+        flags_low |= ENEMY_FLAG_MOVE_LIMIT;
         move_limit_center.x = get_float_arg(0);
         move_limit_center.y = get_float_arg(1);
         move_limit_size.x = get_float_arg(2);
@@ -1074,7 +1074,7 @@ int EnemyData::ecl_run_over_300()
         break;
     // 505: moveLimitReset().
     case 505:
-        flags_low &= ~0x20000;
+        flags_low &= ~ENEMY_FLAG_MOVE_LIMIT;
         break;
     // 526: etProtectRange(radius), kept squared.
     case 526:
@@ -1225,7 +1225,7 @@ int EnemyData::ecl_run_over_300()
         break;
     // unknown563(on)
     case 563:
-        ((EnemyFlagsLow *)&flags_low)->flag_1000 = get_int_arg(0);
+        ((EnemyFlagsLow *)&flags_low)->rect_hitbox = get_int_arg(0);
         break;
     // unknown564(angle): sets rotation.
     case 564:
@@ -1238,7 +1238,7 @@ int EnemyData::ecl_run_over_300()
     // flagSet(flags)
     case 502:
         flags_low |= get_int_arg(0);
-        if (flags_low & 0x20)
+        if (flags_low & ENEMY_FLAG_INTANGIBLE)
         {
             for (i32 i = 0; i < 16; i++)
             {
@@ -1249,7 +1249,7 @@ int EnemyData::ecl_run_over_300()
     // flagClear(flags)
     case 503:
         flags_low &= ~get_int_arg(0);
-        if (!(flags_low & 0x20))
+        if (!(flags_low & ENEMY_FLAG_INTANGIBLE))
         {
             for (i32 i = 0; i < 16; i++)
             {
@@ -1314,9 +1314,9 @@ int EnemyData::ecl_run_over_300()
         life.current = value;
         life.maximum = value;
         life.remaining_for_cur_attack = value;
-        if (flags_low & 0x800000)
+        if (flags_low & ENEMY_FLAG_BOSS)
         {
-            ((EnemyFlagsLow *)&flags_low)->flag_40000000 = 1;
+            ((EnemyFlagsLow *)&flags_low)->big_life = 1;
         }
         life.current_scaled_by_seven = value * 7;
         break;
@@ -1337,15 +1337,15 @@ int EnemyData::ecl_run_over_300()
         g_EnemyManager->set_boss_bit(0);
         if (boss_id < 0)
         {
-            if (flags_low & 0x800000)
+            if (flags_low & ENEMY_FLAG_BOSS)
             {
                 g_EnemyManager->inner.boss_ids[own_boss_id] = 0;
             }
-            flags_low &= ~0x800000;
+            flags_low &= ~ENEMY_FLAG_BOSS;
         }
         else
         {
-            flags_low |= 0x800000;
+            flags_low |= ENEMY_FLAG_BOSS;
             g_EnemyManager->set_boss_id(boss_id, full);
             own_boss_id = boss_id;
         }
@@ -1798,7 +1798,7 @@ int EnemyData::ecl_run_over_300()
     case 514:
     {
         const char *sub = (const char *)&instr->args[4];
-        if (g_Globals.game_mode == 2 && (flags_low & 0x800000))
+        if (g_Globals.game_mode == 2 && (flags_low & ENEMY_FLAG_BOSS))
         {
             if (own_boss_id == 0)
             {
@@ -2201,7 +2201,7 @@ int EnemyData::ecl_run_over_300()
     case 546:
         ((EnemyFlagsLow *)&flags_low)->bombshield = get_int_arg(0);
         bombshield_on_anm_main = get_int_arg(1);
-        flags_low &= ~0x20000001;
+        flags_low &= ~(ENEMY_FLAG_BOMBSHIELD_UP | ENEMY_FLAG_NO_HURTBOX);
         bombshield_off_anm_main = anm_set_main;
         break;
     // unknown559(limit): the enemy limit.
@@ -2279,7 +2279,7 @@ int EnemyData::ecl_run_over_300()
     }
     // unknown549(flag)
     case 549:
-        ((EnemyFlagsLow *)&flags_low)->unk_31 = get_int_arg(0);
+        ((EnemyFlagsLow *)&flags_low)->magenta_flash = get_int_arg(0);
         break;
     // unknown550(value)
     case 550:
@@ -2361,7 +2361,7 @@ int EnemyData::ecl_run_over_300()
         EnemyInf *enemy = g_EnemyManager->find_enemy_by_id(get_int_arg(0));
         if (enemy != NULL)
         {
-            enemy->enemy.flags_low |= 0x2000000;
+            enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
         }
         break;
     }

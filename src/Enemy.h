@@ -131,36 +131,114 @@ struct EnemyInterrupt
     char sub_for_set_timeout[0x40];
 };
 
+// EnemyData::flags_low. ECL's flagSet and flagClear take these masks; the
+// numbered ones are not understood yet.
+enum EnemyFlags
+{
+    // Takes no damage from shots and bombs.
+    ENEMY_FLAG_NO_HURTBOX = 1 << 0,
+    // Does not hit the player.
+    ENEMY_FLAG_NO_HITBOX = 1 << 1,
+    // Stays alive off screen horizontally / vertically.
+    ENEMY_FLAG_OFFSCREEN_X = 1 << 2,
+    ENEMY_FLAG_OFFSCREEN_Y = 1 << 3,
+    // Damage is counted (total_damage_including_ignored) but not taken.
+    ENEMY_FLAG_INVINCIBLE = 1 << 4,
+    // Neither hurtbox nor hitbox; also hides the VMs (clear_flag_lo_2_tree).
+    ENEMY_FLAG_INTANGIBLE = 1 << 5,
+    // Survives reaching zero life.
+    ENEMY_FLAG_NO_DEATH = 1 << 7,
+    // The kill_all family kills it even with ENEMY_FLAGS_SURVIVE_KILL_ALL.
+    ENEMY_FLAG_ALWAYS_KILLABLE = 1 << 8,
+    // Touching it grazes (every sixth frame).
+    ENEMY_FLAG_GRAZEABLE = 1 << 9,
+    // One of ENEMY_FLAGS_SURVIVE_KILL_ALL; otherwise unused here.
+    ENEMY_FLAG_400 = 1 << 10,
+    // Any hit from the player's shots kills it at once.
+    ENEMY_FLAG_DIE_ON_HIT = 1 << 11,
+    // Hurtbox and hitbox are rectangles rotated by EnemyData::rotation
+    // (ECL 563) instead of circles.
+    ENEMY_FLAG_RECT_HITBOX = 1 << 12,
+    // No damage flash or hit sound.
+    ENEMY_FLAG_NO_HIT_EFFECT = 1 << 13,
+    // final_pos is kept inside move_limit_center/size (moveLimit).
+    ENEMY_FLAG_MOVE_LIMIT = 1 << 17,
+    // EnemyData::on_tick ran this frame; EnemyManager::update clears it.
+    ENEMY_FLAG_TICKED = 1 << 18,
+    // Mirrored about the vertical axis: x movement and angles flip.
+    ENEMY_FLAG_MIRRORED = 1 << 19,
+    // anm_ids[0] switches between the still, left and right scripts.
+    ENEMY_FLAG_DIRECTIONAL_ANM = 1 << 20,
+    // Took damage this frame (damage flash and hit sound).
+    ENEMY_FLAG_DAMAGED = 1 << 21,
+    // One of ENEMY_FLAGS_SURVIVE_KILL_ALL; otherwise unused here.
+    ENEMY_FLAG_400000 = 1 << 22,
+    // A boss (setBoss); its id is own_boss_id.
+    ENEMY_FLAG_BOSS = 1 << 23,
+    // A time interrupt is running (ECL variable TIMEOUT).
+    ENEMY_FLAG_TIMEOUT = 1 << 24,
+    // Deleted at the next EnemyManager::update (the kill_all family).
+    ENEMY_FLAG_DELETE = 1 << 25,
+    // Set from EnemyCreateParams::flag_4000000 (always 0 in TH16): no
+    // collision with the player, VMs drawn at final_pos without their
+    // offsets, never a homing target.
+    ENEMY_FLAG_4000000 = 1 << 26,
+    // Set by ECL 544; never a homing target.
+    ENEMY_FLAG_8000000 = 1 << 27,
+    // A bomb shield (bombShield): while a bomb is active the enemy switches
+    // to bombshield_on_anm_main and takes no damage.
+    ENEMY_FLAG_BOMBSHIELD = 1 << 28,
+    ENEMY_FLAG_BOMBSHIELD_UP = 1 << 29,
+    // Created with 1000 or more life, or given its life as a boss: low-life
+    // hit sound and flash like a boss.
+    ENEMY_FLAG_BIG_LIFE = 1 << 30,
+    // Bit 31 (ECL 549) makes the main VM flash magenta.
+
+    // Not hurt by the player's shots (also not counted by get_enemy_count).
+    ENEMY_FLAGS_UNDAMAGEABLE = ENEMY_FLAG_NO_HURTBOX | ENEMY_FLAG_INVINCIBLE | ENEMY_FLAG_INTANGIBLE,
+    // Not a target of homing shots.
+    ENEMY_FLAGS_UNTARGETABLE = ENEMY_FLAG_NO_HURTBOX | ENEMY_FLAG_INTANGIBLE | ENEMY_FLAG_4000000 | ENEMY_FLAG_8000000,
+    // Spared by the kill_all family unless ENEMY_FLAG_ALWAYS_KILLABLE.
+    ENEMY_FLAGS_SURVIVE_KILL_ALL =
+        ENEMY_FLAG_INTANGIBLE | ENEMY_FLAG_NO_DEATH | ENEMY_FLAG_400 | ENEMY_FLAG_400000 | ENEMY_FLAG_BOSS,
+};
+
+// EnemyData::flags_high.
+enum EnemyFlagsHigh
+{
+    // The VMs were given the enemy's slowdown; reset once it is over.
+    ENEMY_FLAG_HIGH_VMS_SLOWED = 1 << 0,
+    // Never set in TH16: not counted in enemy_count_real, and the
+    // destructor leaves the VMs and the boss slot alone.
+    ENEMY_FLAG_HIGH_4 = 1 << 2,
+};
+
 // The bitfields of EnemyData::flags_low that code assigns (rather than
-// sets or clears); the assignments compile to xor/and/xor.
+// sets or clears); the assignments compile to xor/and/xor. See EnemyFlags.
 struct EnemyFlagsLow
 {
     u32 unk_0 : 2;
-    // Stays alive off screen horizontally / vertically.
     u32 no_offscreen_delete_x : 1;
     u32 no_offscreen_delete_y : 1;
     u32 unk_4 : 8;
-    // Set by ECL 563.
-    u32 flag_1000 : 1;
+    u32 rect_hitbox : 1;
     u32 unk_13 : 3;
     // Has been on screen; leaving it then deletes the enemy.
     u32 was_on_screen : 1;
     u32 unk_17 : 2;
     u32 mirrored : 1;
-    // Switches anm_ids[0] between the left, right and still scripts.
     u32 directional_anm : 1;
     u32 unk_21 : 3;
-    // Set while a time interrupt is running (check_time_interrupts).
-    u32 flag_1000000 : 1;
+    u32 timeout : 1;
     u32 unk_25 : 1;
     u32 flag_4000000 : 1;
+    // ENEMY_FLAG_8000000.
     u32 unk_27 : 1;
-    // Bomb shield up (ECL bombShield).
     u32 bombshield : 1;
     u32 unk_29 : 1;
-    // Life of 1000 or more.
-    u32 flag_40000000 : 1;
-    u32 unk_31 : 1;
+    u32 big_life : 1;
+    // Makes the main VM flash magenta (ECL 549).
+    u32 magenta_flash : 1;
 };
 
 // An enemy's state, embedded in EnemyInf (ExpHP: zEnemyData).

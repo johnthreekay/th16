@@ -44,9 +44,9 @@ struct EnemyCreateParams
     i32 score_reward;
     i32 item_drop;
     i32 life;
-    // Mirrored: flips x movement (EnemyData::flags_low 0x80000).
+    // ENEMY_FLAG_MIRRORED.
     i32 mirrored;
-    // EnemyData::flags_low 0x4000000.
+    // ENEMY_FLAG_4000000; enmCreate leaves it 0.
     i32 flag_4000000;
     i32 ecl_int_vars[4];
     f32 ecl_float_vars[8];

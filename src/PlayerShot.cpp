@@ -109,7 +109,7 @@ i32 __fastcall sht_on_tick_445ee0(PlayerBullet *bullet)
         else
         {
             EnemyInf *enemy = target->get();
-            if (!(enemy->enemy.flags_low & 0xc000021))
+            if (!(enemy->enemy.flags_low & ENEMY_FLAGS_UNTARGETABLE))
             {
                 f32 angle = atan2f(enemy->enemy.final_pos.pos.y - bullet->pos.pos.y,
                                    enemy->enemy.final_pos.pos.x - bullet->pos.pos.x);
@@ -200,7 +200,7 @@ i32 __fastcall sht_on_init_4470e0(PlayerBullet *bullet)
 
 // Waits for an enemy in the same row, then stops and flies at it
 // sideways.
-// TODO: ours gets a /GS cookie for pos and merges the flags_low & 1 test into the 0xc000021 one.
+// TODO: ours gets a /GS cookie for pos and merges the ENEMY_FLAG_NO_HURTBOX test into the ENEMY_FLAGS_UNTARGETABLE one.
 // FUNCTION: TH16 0x4470f0
 i32 __fastcall sht_on_tick_4470f0(PlayerBullet *bullet)
 {
@@ -222,7 +222,7 @@ i32 __fastcall sht_on_tick_4470f0(PlayerBullet *bullet)
             Float3 pos = bullet->pos.pos;
             while (enemy != NULL)
             {
-                if (!(enemy->enemy.flags_low & 1) && !(enemy->enemy.flags_low & 0xc000021) &&
+                if (!(enemy->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX) && !(enemy->enemy.flags_low & ENEMY_FLAGS_UNTARGETABLE) &&
                     pos.y >= enemy->enemy.final_pos.pos.y - 16.0f && enemy->enemy.final_pos.pos.y + 16.0f >= pos.y &&
                     (enemy->enemy.final_pos.pos.x - 16.0f >= pos.x || pos.x >= enemy->enemy.final_pos.pos.x + 16.0f))
                 {
