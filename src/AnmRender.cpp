@@ -183,6 +183,53 @@ i32 AnmManager::write_sprite(RenderVertex144 *vertices)
     return 0;
 }
 
+// Render mode 9: like draw_vm__mode_11 for visible VMs only, with the
+// texture set first and color ops reset to modulate.
+// TODO: the original keeps this in ebx and vm in esi (edi only around SetTexture); ours spills this.
+// FUNCTION: TH16 0x4681f0
+i32 AnmManager::draw_vm__mode_9(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count)
+{
+    if (!(vm->flags_lo & ANM_VM_VISIBLE))
+    {
+        return -1;
+    }
+    if (!(vm->flags_lo & ANM_VM_FLAG_LO_2))
+    {
+        return -1;
+    }
+    if (vm->color_1.a == 0)
+    {
+        return -1;
+    }
+    if (unrendered_sprite_count != 0)
+    {
+        flush_sprites();
+    }
+    i32 texture = g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].image_file_num_in_all;
+    if (render_cache_184fbb0 != texture)
+    {
+        render_cache_184fbb0 = texture;
+        g_Supervisor.d3d_device->SetTexture(0, loaded_anms[texture >> 8]->d3d[texture & 0xff].texture);
+    }
+    if (render_cache_184fbb6 != 3)
+    {
+        g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        render_cache_184fbb6 = 3;
+    }
+    setup_render_state_for_vm(vm);
+    if (g_AnmManager->last_color_op != 1)
+    {
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+        g_AnmManager->last_color_op = 1;
+    }
+    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, vertex_count - 2, vertices,
+                                             sizeof(RenderVertex144));
+    return 0;
+}
+
 // TODO: the original keeps this in edi with a stack copy; ours uses ebx.
 // FUNCTION: TH16 0x468350
 i32 AnmManager::draw_vm__mode_11(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count)

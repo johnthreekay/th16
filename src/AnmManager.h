@@ -329,6 +329,9 @@ struct AnmManager
     // 0x468350. Draws vertex_count vertices (a triangle fan, in screen
     // space) with the VM's texture and blending.
     i32 draw_vm__mode_11(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count);
+    // 0x4681f0 (ExpHP: draw_vm__mode_9__textureCircle). The same as a
+    // triangle strip, for visible VMs only.
+    i32 draw_vm__mode_9(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count);
     // 0x46efa0
     AnmVm *get_vm_with_id(AnmId id);
     // 0x46f1c0. Marks the VM and its children for deletion. Reaches the
