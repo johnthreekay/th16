@@ -8,6 +8,15 @@
 #
 # The matching MSVC build (scripts/build.py) never reads this file.
 cmake_minimum_required(VERSION 3.16)
+
+option(TH16_M32 "Build a 32-bit x86 binary (keeps the original's struct layout)" OFF)
+if(TH16_M32)
+    # In the flags CMake starts from, so that its compiler checks see a
+    # 32-bit target (CMAKE_SIZEOF_VOID_P 4) and find_package picks the
+    # 32-bit libraries (lib32/cmake/SDL2).
+    set(CMAKE_CXX_FLAGS_INIT "-m32")
+endif()
+
 project(th16_port CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -17,8 +26,6 @@ set(CMAKE_CXX_EXTENSIONS ON)
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
-
-option(TH16_M32 "Build a 32-bit x86 binary (keeps the original's struct layout)" OFF)
 
 set(TH16_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
@@ -114,13 +121,17 @@ else()
 endif()
 
 find_package(Threads REQUIRED)
-target_link_libraries(th16 PRIVATE Threads::Threads m)
+# SDL2 (or sdl2-compat), whose CMake package defines SDL2::SDL2: the window,
+# events and input (win32_user.cpp, input_sdl.cpp) and audio output
+# (dsound_sdl.cpp).
+find_package(SDL2 REQUIRED CONFIG)
+target_link_libraries(th16 PRIVATE SDL2::SDL2 Threads::Threads m)
 
-# The platform layer: SDL2 (window, events, input), FreeType and fontconfig
-# (the GDI text renderer), iconv (Shift-JIS; part of glibc, a library on
-# macOS). For -m32, pkg-config has to report the 32-bit libraries; where
-# they have their own pkg-config directory (Arch's lib32-*, Debian's
-# i386-linux-gnu) it is used unless PKG_CONFIG_LIBDIR is set.
+# FreeType and fontconfig (the GDI text renderer, gdi_text.cpp) through
+# pkg-config, and iconv (Shift-JIS; part of glibc, a library on macOS). For
+# -m32, pkg-config has to report the 32-bit libraries; where they have their
+# own pkg-config directory (Arch's lib32-*, Debian's i386-linux-gnu) it is
+# used unless PKG_CONFIG_LIBDIR is set.
 if(TH16_M32 AND NOT DEFINED ENV{PKG_CONFIG_LIBDIR})
     foreach(dir /usr/lib32/pkgconfig /usr/lib/i386-linux-gnu/pkgconfig)
         if(IS_DIRECTORY ${dir})
@@ -130,9 +141,38 @@ if(TH16_M32 AND NOT DEFINED ENV{PKG_CONFIG_LIBDIR})
     endforeach()
 endif()
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(TH16_DEPS REQUIRED IMPORTED_TARGET sdl2 freetype2 fontconfig)
-target_link_libraries(th16 PRIVATE PkgConfig::TH16_DEPS)
+pkg_check_modules(TH16_TEXT REQUIRED IMPORTED_TARGET freetype2 fontconfig)
+target_link_libraries(th16 PRIVATE PkgConfig::TH16_TEXT)
 if(APPLE)
     find_library(ICONV_LIBRARY iconv REQUIRED)
     target_link_libraries(th16 PRIVATE ${ICONV_LIBRARY})
 endif()
+
+# Tests of the DirectSound mixer (see NOTES.md, "Audio"):
+# - th16_dsound_test (tests/dsound_test.cpp) drives dsound_sdl.cpp directly;
+# - th16_dsound_game_test (tests/dsound_game_test.cpp) runs the game's own
+#   BGM streaming code (src/DSUtil.cpp) on it.
+add_executable(th16_dsound_test tests/dsound_test.cpp src/dsound_sdl.cpp)
+add_executable(th16_dsound_game_test tests/dsound_game_test.cpp src/dsound_sdl.cpp
+    ${TH16_ROOT}/src/DSUtil.cpp ${TH16_ROOT}/src/CriticalSections.cpp)
+foreach(test_target th16_dsound_test th16_dsound_game_test)
+    target_include_directories(${test_target} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${TH16_ROOT}/src)
+    target_compile_definitions(${test_target} PRIVATE TH16_PORT)
+    target_compile_options(${test_target} PRIVATE
+        -include ${CMAKE_CURRENT_SOURCE_DIR}/include/port_prelude.h
+        -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks -fsigned-char -ffp-contract=off
+        -Wall -Wno-unknown-pragmas -Wno-invalid-offsetof -Wno-parentheses -Wno-sign-compare
+        -Wno-mismatched-new-delete)
+    if(TH16_M32)
+        target_compile_options(${test_target} PRIVATE -m32 -msse2 -mfpmath=sse)
+        target_link_options(${test_target} PRIVATE -m32)
+    endif()
+    target_link_libraries(${test_target} PRIVATE SDL2::SDL2 Threads::Threads m)
+endforeach()
+
+# `ctest` runs the mixer tests that need no game data, on SDL's dummy driver
+# (tests/run_dsound_tests.sh runs the rest).
+enable_testing()
+add_test(NAME dsound COMMAND th16_dsound_test)
+set_tests_properties(dsound PROPERTIES ENVIRONMENT "SDL_AUDIODRIVER=dummy;SDL_AUDIO_DRIVER=dummy")
