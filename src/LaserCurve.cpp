@@ -329,7 +329,7 @@ i32 LaserCurveInf::cancel(i32 mode, i32 b)
             create_vm_inline(anm, inner.color * 2 + 0xd1, &pos, 0.0f, -1);
         }
     }
-    state = 1;
+    state = LASER_STATE_CANCELLED;
     return 0;
 }
 

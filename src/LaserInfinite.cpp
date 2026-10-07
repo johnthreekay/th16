@@ -33,7 +33,7 @@ void LaserInfiniteInf::run_ex()
             ex_invuln_remaining_frames = ex->a;
             break;
         case BULLET_EX_DELETE:
-            state = 3;
+            state = LASER_STATE_WARNING;
             break;
         case BULLET_EX_BLEND:
             if (ex->a != 0)
@@ -139,35 +139,35 @@ i32 LaserInfiniteInf::on_tick()
     position.z = position.z + inner.velocity.z * g_game_speed;
     switch (state)
     {
-    case 3:
-        if (timer.current >= inner.unk_30)
+    case LASER_STATE_WARNING:
+        if (timer.current >= inner.start_time)
         {
             timer.set_value(0);
-            state = 4;
+            state = LASER_STATE_EXPANDING;
         }
         break;
-    case 4:
-        if (timer.current < inner.unk_34)
+    case LASER_STATE_EXPANDING:
+        if (timer.current < inner.expand_time)
         {
-            width = inner.laser_new_arg_4 * timer.current_f / inner.unk_34;
+            width = inner.laser_new_arg_4 * timer.current_f / inner.expand_time;
             break;
         }
         timer.set_value(0);
-        state = 2;
+        state = LASER_STATE_ACTIVE;
         width = inner.laser_new_arg_4;
-    case 2:
-        if (timer.current < inner.unk_38)
+    case LASER_STATE_ACTIVE:
+        if (timer.current < inner.duration)
         {
             break;
         }
         timer.set_value(0);
-        state = 5;
-    case 5:
-        if (timer.current >= inner.unk_3c)
+        state = LASER_STATE_SHRINKING;
+    case LASER_STATE_SHRINKING:
+        if (timer.current >= inner.shrink_time)
         {
             return 1;
         }
-        width = inner.laser_new_arg_4 - timer.current_f * inner.laser_new_arg_4 / inner.unk_3c;
+        width = inner.laser_new_arg_4 - timer.current_f * inner.laser_new_arg_4 / inner.shrink_time;
         break;
     }
     check_graze_or_kill(0);

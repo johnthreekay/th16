@@ -339,7 +339,7 @@ i32 LaserManager::on_tick_body()
                 continue;
             }
         }
-        if (laser->state == 1)
+        if (laser->state == LASER_STATE_CANCELLED)
         {
             destroy(laser);
         }
@@ -394,7 +394,7 @@ i32 __fastcall LaserManager::on_draw_callback(LaserManager *mgr)
     while (laser != NULL)
     {
         LaserDataInf *next = laser->next;
-        if (laser->state != 1)
+        if (laser->state != LASER_STATE_CANCELLED)
         {
             laser->on_draw();
         }
@@ -477,7 +477,7 @@ HARNESS_CALLED i32 LaserManager::cancel_in_rectangle(Float3 *a, Float3 *b, f32 a
     while (laser != NULL)
     {
         LaserDataInf *next = laser->next;
-        if (laser->state != 1 && laser->ticked)
+        if (laser->state != LASER_STATE_CANCELLED && laser->ticked)
         {
             count += laser->cancel_as_bomb_rectangle(a, b, angle, mode, e);
         }
@@ -513,7 +513,7 @@ HARNESS_CALLED i32 LaserManager::cancel_in_radius(Float3 *pos, f32 radius, i32 c
     for (; laser != NULL; laser = next)
     {
         next = laser->next;
-        if (laser->state == 1)
+        if (laser->state == LASER_STATE_CANCELLED)
         {
             continue;
         }
@@ -529,7 +529,7 @@ HARNESS_CALLED i32 LaserManager::clear_all(i32 mode, i32 b)
     while (laser != NULL)
     {
         LaserDataInf *next = laser->next;
-        if (laser->state != 1)
+        if (laser->state != LASER_STATE_CANCELLED)
         {
             laser->cancel(mode, b);
         }
@@ -857,7 +857,7 @@ i32 LaserLineInf::cancel(i32 mode, i32 b)
         pos += step;
         dist += 16.0f;
     }
-    state = 1;
+    state = LASER_STATE_CANCELLED;
     return count;
 }
 
@@ -902,7 +902,7 @@ i32 LaserInfiniteInf::cancel(i32 mode, i32 b)
         pos += step;
         dist += 16.0f;
     }
-    state = 1;
+    state = LASER_STATE_CANCELLED;
     return count;
 }
 
@@ -1541,7 +1541,7 @@ i32 LaserLineInf::check_graze_or_kill(i32 graze_only)
 // FUNCTION: TH16 0x435610
 i32 LaserInfiniteInf::check_graze_or_kill(i32 graze_only)
 {
-    if ((state == 4 || state == 2) && hit_length > 16.0f)
+    if ((state == LASER_STATE_EXPANDING || state == LASER_STATE_ACTIVE) && hit_length > 16.0f)
     {
         Float3 start = position;
         f32 w = width;
@@ -1943,7 +1943,7 @@ i32 LaserInfiniteInf::initialize(void *params)
 {
     inner = *(LaserInfiniteInner *)params;
     bullet_type = inner.type;
-    state = 3;
+    state = LASER_STATE_WARNING;
     kind = LASER_INFINITE;
     bullet_color = inner.color;
     AnmVm *vm = &vm_950;
@@ -2002,7 +2002,7 @@ i32 LaserBeamInf::initialize(void *params)
     hit_length = inner.length;
     angle = inner.ang_aim;
     bullet_color = inner.color;
-    state = 3;
+    state = LASER_STATE_WARNING;
     kind = LASER_BEAM;
     id = inner.id;
     for (i32 i = 0; i < 0x200; i++)
@@ -2028,7 +2028,7 @@ i32 LaserCurveInf::initialize(void *params)
 {
     inner = *(LaserCurveInner *)params;
     bullet_type = inner.type;
-    state = 2;
+    state = LASER_STATE_ACTIVE;
     kind = LASER_CURVE;
     bullet_color = inner.color;
     AnmVm *vm = &vm_92c;
@@ -2367,7 +2367,7 @@ void LaserCurveInf::run_ex()
             break;
         }
         case BULLET_EX_DELETE:
-            state = 3;
+            state = LASER_STATE_WARNING;
             break;
         case BULLET_EX_PLAY_SOUND:
             g_SoundManager.play_sound_at_position(ex->a, position.x);
@@ -2953,7 +2953,7 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
             break;
         }
         case BULLET_EX_DELETE:
-            state = 3;
+            state = LASER_STATE_WARNING;
             break;
         case BULLET_EX_PLAY_SOUND:
             g_SoundManager.play_sound_at_position(ex->a, position.x);
@@ -3031,7 +3031,7 @@ i32 LaserLineInf::initialize(void *params)
 {
     inner = *(LaserLineInner *)params;
     bullet_type = inner.bullet_type;
-    state = 2;
+    state = LASER_STATE_ACTIVE;
     kind = LASER_LINE;
     bullet_color = inner.bullet_color;
     AnmVm *vm = &vm_92c;
@@ -3104,6 +3104,6 @@ i32 LaserLineInf::initialize(void *params)
         unk_7c = 0.0f;
     }
     laser_sincosmul(&tip_offset, angle, length);
-    ex_index = inner.unk_30;
+    ex_index = inner.start_transform;
     return 0;
 }

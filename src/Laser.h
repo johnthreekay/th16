@@ -15,6 +15,19 @@ struct AnmLoaded;
 // Base of every laser kind. The name is ZUN's, from RTTI. The base methods
 // are almost all empty; the slot names follow ExpHP's zVTableLaser.
 // VTABLE: TH16 0x492490
+// LaserDataInf::state.
+enum LaserState
+{
+    // Cancelled: skipped by on_draw and removed on the next tick.
+    LASER_STATE_CANCELLED = 1,
+    LASER_STATE_ACTIVE = 2,
+    // Infinite lasers: the thin warning line, then widening, then (after
+    // ACTIVE) shrinking away.
+    LASER_STATE_WARNING = 3,
+    LASER_STATE_EXPANDING = 4,
+    LASER_STATE_SHRINKING = 5,
+};
+
 class LaserDataInf
 {
   public:
@@ -29,7 +42,7 @@ class LaserDataInf
     // (like BULLET_FLAG_FROZEN).
     u32 frozen : 1;
     u32 flags_rest : 28;
-    // 1: skipped by on_draw and removed on the next tick.
+    // A LaserState.
     i32 state;
     i32 kind;
     ZunTimer timer;
@@ -136,7 +149,8 @@ struct LaserLineInner
     i32 bullet_type;
     i32 bullet_color;
     f32 distance;
-    i32 unk_30;
+    // Index of the first et_ex transform.
+    i32 start_transform;
     u32 flags;
     BulletEx ex[0x12];
     i32 shot_sfx;
@@ -207,10 +221,12 @@ struct LaserInfiniteInner
     f32 laser_new_arg_4;
     // ExpHP: spd1.
     f32 speed;
-    i32 unk_30;
-    i32 unk_34;
-    i32 unk_38;
-    i32 unk_3c;
+    // laserTiming: frames of the thin warning line, of widening, at full
+    // width and of shrinking (LaserState).
+    i32 start_time;
+    i32 expand_time;
+    i32 duration;
+    i32 shrink_time;
     i32 shot_sfx;
     i32 shot_transform_sfx;
     i32 laser_st_on_arg_1;
@@ -490,7 +506,7 @@ struct LaserManager
         while (laser != NULL)
         {
             LaserDataInf *next = laser->next;
-            if (laser->state != 1 && laser->ticked)
+            if (laser->state != LASER_STATE_CANCELLED && laser->ticked)
             {
                 laser->cancel_as_bomb_rectangle(a, b, angle, mode, e);
             }
@@ -507,7 +523,7 @@ struct LaserManager
         while (laser != NULL)
         {
             LaserDataInf *next = laser->next;
-            if (laser->state != 1)
+            if (laser->state != LASER_STATE_CANCELLED)
             {
                 laser->cancel_as_bomb_circle(pos, radius, c, d);
             }

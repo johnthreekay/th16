@@ -1142,7 +1142,7 @@ void Bullet::run_ex()
                 params.distance = ex[1].m;
                 params.shot_sfx = ex[1].a;
                 params.shot_transform_sfx = ex[1].b;
-                params.unk_30 = ex[1].c;
+                params.start_transform = ex[1].c;
                 LaserManager *mgr = g_LaserManager;
                 if (mgr->list_length < 0x200)
                 {
@@ -1181,10 +1181,10 @@ void Bullet::run_ex()
                 params.laser_new_arg_1 = ex->m;
                 params.laser_new_arg_2 = ex->n;
                 ex_index++;
-                params.unk_30 = ex[1].a;
-                params.unk_34 = ex[1].b;
-                params.unk_38 = ex[1].c;
-                params.unk_3c = ex[1].d;
+                params.start_time = ex[1].a;
+                params.expand_time = ex[1].b;
+                params.duration = ex[1].c;
+                params.shrink_time = ex[1].d;
                 params.laser_new_arg_4 = ex[1].r;
                 params.distance = ex[1].s;
                 params.shot_sfx = 0x12;

@@ -191,12 +191,12 @@ static DECOMP_NOINLINE void ecl_laser_st_on(EnemyData *enemy)
     params.type = enemy->bullet_props[idx].type;
     params.color = enemy->bullet_props[idx].color;
     params.ang_aim = normalize_angle(enemy->bullet_props[idx].ang_aim);
-    params.unk_30 = enemy->bullet_props[idx].laser_timing[0];
-    params.unk_34 = enemy->bullet_props[idx].laser_timing[1];
+    params.start_time = enemy->bullet_props[idx].laser_timing[0];
+    params.expand_time = enemy->bullet_props[idx].laser_timing[1];
     params.speed = enemy->bullet_props[idx].spd1;
-    params.unk_38 = enemy->bullet_props[idx].laser_timing[2];
+    params.duration = enemy->bullet_props[idx].laser_timing[2];
     params.laser_new_arg_1 = enemy->bullet_props[idx].pos.x;
-    params.unk_3c = enemy->bullet_props[idx].laser_timing[3];
+    params.shrink_time = enemy->bullet_props[idx].laser_timing[3];
     params.flags = enemy->bullet_props[idx].flags | 2;
     params.laser_new_arg_2 = enemy->bullet_props[idx].pos.y;
     params.laser_new_arg_4 = enemy->bullet_props[idx].laser_new_arg_4;
