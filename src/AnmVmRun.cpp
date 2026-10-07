@@ -290,7 +290,14 @@ static inline void anm_set_float2(Float2 *v, f32 x, f32 y)
 
 // The color arguments of instructions 408 and 413 (and the current color),
 // as set_rgb1_time and set_rgb2_time take them. Alpha is left unset.
-static inline void anm_rgb(ZunColor *c, i32 r, i32 g, i32 b)
+struct AnmRgb
+{
+    u8 b;
+    u8 g;
+    u8 r;
+};
+
+static inline void anm_rgb(AnmRgb *c, i32 r, i32 g, i32 b)
 {
     c->b = b;
     c->g = g;
@@ -907,11 +914,11 @@ __forceinline i32 AnmVm::run_script()
         // colorTime, alphaTime, color2Time, alpha2Time
         case 408:
         {
-            ZunColor initial;
+            AnmRgb initial;
             anm_rgb(&initial, color_1.r, color_1.g, color_1.b);
-            ZunColor goal;
+            AnmRgb goal;
             anm_rgb(&goal, ANM_INT(2), ANM_INT(3), ANM_INT(4));
-            set_rgb1_time(ANM_INT(0), (u8)ins->args[1].i, &initial, &goal);
+            set_rgb1_time(ANM_INT(0), (u8)ins->args[1].i, (ZunColor *)&initial, (ZunColor *)&goal);
             break;
         }
         case 409:
@@ -919,11 +926,11 @@ __forceinline i32 AnmVm::run_script()
             break;
         case 413:
         {
-            ZunColor initial;
+            AnmRgb initial;
             anm_rgb(&initial, color_2.r, color_2.g, color_2.b);
-            ZunColor goal;
+            AnmRgb goal;
             anm_rgb(&goal, ANM_INT(2), ANM_INT(3), ANM_INT(4));
-            set_rgb2_time(ANM_INT(0), (u8)ins->args[1].i, &initial, &goal);
+            set_rgb2_time(ANM_INT(0), (u8)ins->args[1].i, (ZunColor *)&initial, (ZunColor *)&goal);
             break;
         }
         case 414:
