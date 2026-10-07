@@ -3,8 +3,11 @@
 #include "decomp.h"
 #include "types.h"
 
-// A float angle kept in [-pi, pi]. The name is ours; the methods are
-// inferred from a run of small functions at 0x4052e0-0x4054cc.
+// A float angle kept in [-pi, pi] (wrap_angle after every operation). The
+// name is ours; the methods are inferred from a run of small functions at
+// 0x4052e0-0x4054cc and two more at 0x4475f0 and 0x447650. Kept out of line
+// with harness callers (src/harness/ZunAngle.cpp), which give them the
+// custom conventions LTCG picked in the original.
 struct ZunAngle
 {
     f32 value;

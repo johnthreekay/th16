@@ -2212,8 +2212,8 @@ void EnemyData::ecl_anm_vm_instr()
 int EnemyData::step_interpolators()
 {
     prev_final_pos = final_pos;
-    if (abs_angle_i.end_time != 0 && (abs_pos.flags & 0xf) != POSVEL_MODE_CIRCLE &&
-        (abs_pos.flags & 0xf) != POSVEL_MODE_ELLIPSE)
+    if (abs_angle_i.end_time != 0 && (abs_pos.flags & POSVEL_MODE_MASK) != POSVEL_MODE_CIRCLE &&
+        (abs_pos.flags & POSVEL_MODE_MASK) != POSVEL_MODE_ELLIPSE)
     {
         abs_pos.angle.value = wrap_angle(wrap_angle(abs_angle_i.step()));
     }
@@ -2221,8 +2221,8 @@ int EnemyData::step_interpolators()
     {
         abs_pos.speed = abs_speed_i.step();
     }
-    if (rel_angle_i.end_time != 0 && (rel_pos.flags & 0xf) != POSVEL_MODE_CIRCLE &&
-        (rel_pos.flags & 0xf) != POSVEL_MODE_ELLIPSE)
+    if (rel_angle_i.end_time != 0 && (rel_pos.flags & POSVEL_MODE_MASK) != POSVEL_MODE_CIRCLE &&
+        (rel_pos.flags & POSVEL_MODE_MASK) != POSVEL_MODE_ELLIPSE)
     {
         rel_pos.angle.value = wrap_angle(wrap_angle(rel_angle_i.step()));
     }

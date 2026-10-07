@@ -88,7 +88,7 @@ i32 Ending::on_tick_body()
         ticks++;
         if (!(child->flags & ENDING_CHILD_WAITING) && !(flags & ENDING_FLAG_2) && child->flags & ENDING_CHILD_SKIPPABLE)
         {
-            if (g_hardware_input & BUTTON_SKIP || (g_hardware_input & BUTTON_SHOT && g_hardware_input_held_4a51c4 >= 20))
+            if (g_hardware_input & BUTTON_SKIP || (g_hardware_input & BUTTON_SHOT && g_hardware_shot_hold_frames >= 20))
             {
                 if (ticks % 12 != 0)
                 {
@@ -339,7 +339,7 @@ i32 EndingChildF0::run()
             {
                 return 0;
             }
-            if (!(g_hardware_input & BUTTON_SKIP || (g_hardware_input & BUTTON_SHOT && g_hardware_input_held_4a51c4 >= 20)))
+            if (!(g_hardware_input & BUTTON_SKIP || (g_hardware_input & BUTTON_SHOT && g_hardware_shot_hold_frames >= 20)))
             {
                 return 0;
             }
@@ -362,7 +362,7 @@ i32 EndingChildF0::run()
                     return 0;
                 }
                 if (!(g_hardware_input & BUTTON_SKIP ||
-                      (g_hardware_input & BUTTON_SHOT && g_hardware_input_held_4a51c4 >= 20)))
+                      (g_hardware_input & BUTTON_SHOT && g_hardware_shot_hold_frames >= 20)))
                 {
                     return 0;
                 }

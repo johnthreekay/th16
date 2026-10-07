@@ -2,6 +2,16 @@
 
 #include "types.h"
 
+// Auto-repeat timing: a button held for INPUT_REPEAT_DELAY frames repeats,
+// then again every INPUT_REPEAT_INTERVAL frames. Holding it for
+// INPUT_HELD_LONG_FRAMES sets its held_long bit.
+enum InputRepeatTiming
+{
+    INPUT_REPEAT_DELAY = 26,
+    INPUT_REPEAT_INTERVAL = 8,
+    INPUT_HELD_LONG_FRAMES = 8,
+};
+
 // Button state with edge, hold and auto-repeat tracking. The global
 // instance at 0x4a50b0 (ExpHP's HARDWARE_INPUT) holds the raw keyboard and
 // pad state.
@@ -21,5 +31,7 @@ struct InputManager
     // Buttons held for at least 8 frames.
     u32 held_long;
 
+    // Updates the hold counters, repeat, held_long and the edges from cur
+    // and prev.
     void detect_holds_and_repeats();
 };

@@ -875,7 +875,7 @@ int EnemyData::ecl_run_over_300()
         f32 speed = get_float_arg(1);
         f32 radius = get_float_arg(2);
         f32 radial_speed = get_float_arg(3);
-        if ((pv->flags & 0xf) != POSVEL_MODE_CIRCLE)
+        if ((pv->flags & POSVEL_MODE_MASK) != POSVEL_MODE_CIRCLE)
         {
             pv->velocity = pv->pos;
         }
@@ -964,7 +964,7 @@ int EnemyData::ecl_run_over_300()
         f32 radial_speed = get_float_arg(3);
         f32 ellipse_angle = get_float_arg(4);
         f32 ellipse_ratio = get_float_arg(5);
-        if ((pv->flags & 0xf) != POSVEL_MODE_CIRCLE)
+        if ((pv->flags & POSVEL_MODE_MASK) != POSVEL_MODE_CIRCLE)
         {
             pv->velocity = pv->pos;
         }

@@ -3,12 +3,15 @@
 #include "Supervisor.h"
 
 // The speed multipliers a ZunTimer can follow, selected by its
-// speed_ptr_index: 0 is the game speed, 1 (NULL) a fixed speed of 1.
+// speed_index: 0 is the game speed; entry 1 (NULL, a fixed speed of 1) is
+// never selected, since speed() resets any index of 1 or more to 0.
 // GLOBAL: TH16 0x490eb0
 f32 *const g_timer_speed_ptrs[] = {&g_game_speed, NULL};
 
 // TODO: the unscaled path adds current_f into the delta register instead of
 // loading current_f into xmm0 and adding the delta.
+// Counts back by whole frames, scaled by the speed multiplier unless it is
+// close enough to 1.
 // FUNCTION: TH16 0x43ac80
 void ZunTimer::operator-=(i32 frames)
 {

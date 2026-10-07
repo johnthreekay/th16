@@ -35,6 +35,8 @@ ZunMemory g_ZunMemory;
 // SYNTHETIC: TH16 0x48ac30
 // ??__Fg_ZunMemory@@YAXXZ
 
+// Appends a formatted message to the buffer if it fits (dropping it
+// otherwise) and returns fmt.
 // FUNCTION: TH16 0x4029d0
 const char *GameErrorContext::log(const char *fmt, ...)
 {
@@ -62,6 +64,8 @@ const char *GameErrorContext::log(const char *fmt, ...)
     return fmt;
 }
 
+// log() for errors: the same, with a smaller temporary buffer, and makes
+// the game show the buffer in a message box when it exits.
 // FUNCTION: TH16 0x402aa0
 const char *GameErrorContext::fatal(const char *fmt, ...)
 {

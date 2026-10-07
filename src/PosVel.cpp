@@ -10,7 +10,7 @@ DECOMP_NOINLINE float __CRTDECL atan2f(float, float);
 // FUNCTION: TH16 0x402ff0
 void PosVel::update_secondary_fields()
 {
-    switch (flags & 0xf)
+    switch (flags & POSVEL_MODE_MASK)
     {
     case POSVEL_MODE_VELOCITY:
         from_polar(&velocity, angle.value, speed * g_game_speed);
@@ -32,7 +32,7 @@ void PosVel::update_secondary_fields()
 // FUNCTION: TH16 0x403110
 void PosVel::step()
 {
-    switch (flags & 0xf)
+    switch (flags & POSVEL_MODE_MASK)
     {
     case POSVEL_MODE_VELOCITY:
         pos += velocity;
@@ -82,7 +82,7 @@ void PosVel::step()
 // FUNCTION: TH16 0x4033d0
 void PosVel::step_from_center()
 {
-    if ((flags & 0xf) == POSVEL_MODE_WAVE)
+    if ((flags & POSVEL_MODE_MASK) == POSVEL_MODE_WAVE)
     {
         center = pos;
     }

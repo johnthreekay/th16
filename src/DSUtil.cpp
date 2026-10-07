@@ -54,9 +54,6 @@ static_assert(sizeof(DSBUFFERDESC) == sizeof(((CSound *)0)->m_desc), "CSound lay
 // GLOBAL: TH16 0x48b80c
 extern "C" const GUID IID_IDirectSoundNotify = {0xb0210783, 0x89cd, 0x11d0, {0xaf, 0x8, 0x0, 0xa0, 0xc9, 0x25, 0xcd, 0x16}};
 
-// The guard of the streaming buffer, shared with the sound thread.
-#define CS_BGM_STREAM 12
-
 // Debug output, empty in the release build (TH06: utils::DebugPrint2).
 // Declared with no named parameter: as `(const char *fmt, ...)`, LTCG drops
 // the one-argument call in CWaveFile::open_file, which the original keeps.
