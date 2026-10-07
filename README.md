@@ -389,6 +389,20 @@ decompiled code the surroundings it had in the original:
   local. ecl_run_over_300 keeps five cases in noinline helpers so it stays
   below the threshold until its `new Fog` EH frame can be restored.
 
+- Float arguments in an LTCG custom convention go to xmm registers by
+  position (counting `this`): the float at position 3 lands in xmm3, others
+  stay on the stack. Parameter order matters (compute_damage_to_enemy).
+- `Float3 p; p = a + b;` gives the original's unpcklps temp and movq copy;
+  `Float3 p = a + b;` stores field by field.
+- Early `return count` paths converge on one reload exit when the tail is
+  nested under `if (count != 0)`. Identical switch cases written out
+  separately keep the jump table.
+- DECOMP_NOINLINE must be on a virtual's in-class declaration to stop
+  speculative inlining; on the out-of-class definition it does nothing.
+  A callee whose only caller is newly decompiled may need DECOMP_NOINLINE.
+- quickdiff's percentages are unreliable for functions with jump tables;
+  use compare.py there.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
