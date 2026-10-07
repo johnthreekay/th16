@@ -308,10 +308,12 @@ struct Supervisor
     // Runs a loader function on `thread`. Every caller passes NULL for arg,
     // which LTCG folds; the loaders themselves are plain void functions.
     HARNESS_CALLED i32 start_thread(ThreadStart start, void *arg);
-    // 0x43c370. Queues name + ".wav" (a thbgm.fmt track) to be loaded.
-    HARNESS_CALLED i32 play_bgm_wav(i32 arg, const char *name);
-    // 0x43c3f0. Starts the loaded track and unlocks it in the music room.
-    HARNESS_CALLED i32 play_bgm(i32 arg, i32 track);
+    // 0x43c370. Queues name + ".wav" (a thbgm.fmt track) to be loaded into
+    // the given preload slot (BGM_LOAD).
+    HARNESS_CALLED i32 play_bgm_wav(i32 slot, const char *name);
+    // 0x43c3f0. Plays the given preload slot (BGM_PLAY) and unlocks the
+    // music room's track.
+    HARNESS_CALLED i32 play_bgm(i32 slot, i32 track);
     // 0x43c440
     HARNESS_CALLED i32 stop_bgm();
     // 0x43c470. Fades the BGM out; the time is scaled by a slowed game

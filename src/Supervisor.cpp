@@ -1384,24 +1384,24 @@ HARNESS_CALLED int Supervisor::load_game_config(const char *path)
 }
 
 // FUNCTION: TH16 0x43c370
-HARNESS_CALLED i32 Supervisor::play_bgm_wav(i32 arg, const char *name)
+HARNESS_CALLED i32 Supervisor::play_bgm_wav(i32 slot, const char *name)
 {
     char path[256];
 
     strcpy(path, name);
     append_wav_extension(path);
-    g_SoundManager.modify_bgm(BGM_LOAD, arg, path);
+    g_SoundManager.modify_bgm(BGM_LOAD, slot, path);
     return 1;
 }
 
 // FUNCTION: TH16 0x43c3f0
-HARNESS_CALLED i32 Supervisor::play_bgm(i32 arg, i32 track)
+HARNESS_CALLED i32 Supervisor::play_bgm(i32 slot, i32 track)
 {
     if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
     {
         g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
     }
-    g_SoundManager.modify_bgm(BGM_PLAY, arg, "dummy");
+    g_SoundManager.modify_bgm(BGM_PLAY, slot, "dummy");
     g_Scorefile->bgm_unlocked[track] = 1;
     return 0;
 }
