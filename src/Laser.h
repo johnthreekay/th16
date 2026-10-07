@@ -313,7 +313,15 @@ class LaserCurveInf : public LaserDataInf
 
 struct LaserBeamInner
 {
-    u8 unk_0[0x38];
+    D3DXVECTOR3 start_pos;
+    u8 unk_c[0x18 - 0xc];
+    f32 ang_aim;
+    u8 unk_1c[4];
+    f32 length;
+    u8 unk_24[4];
+    i32 id;
+    i32 color;
+    u8 unk_30[0x38 - 0x30];
     u32 flag_38 : 1;
     u32 flags_38_rest : 31;
     u8 unk_3c[0x354 - 0x3c];
@@ -330,7 +338,10 @@ class LaserBeamInf : public LaserDataInf
   public:
     LaserBeamInner inner;
     AnmVm vm_928;
-    u8 unk_f24[0x1f28 - 0xf24];
+    i32 unk_f24;
+    // Filled with the length on creation.
+    f32 unk_f28[0x200];
+    u8 unk_1728[0x1f28 - 0x1728];
 
     LaserBeamInf();
 

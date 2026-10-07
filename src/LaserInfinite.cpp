@@ -6,13 +6,6 @@ i32 LaserInfiniteInf::on_destroy()
     return 0;
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x435050
-i32 LaserInfiniteInf::initialize(void *params)
-{
-    return unit5_placeholder(this);
-}
-
 // Runs the laser's pending et_ex transforms.
 // TODO: in the blend mode case the original increments ex_index in memory (inc, reload) instead of from the loaded index.
 // FUNCTION: TH16 0x436fd0

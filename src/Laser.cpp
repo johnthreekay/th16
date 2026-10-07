@@ -1533,3 +1533,84 @@ i32 LaserInfiniteInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32
     }
     return count;
 }
+
+// Sets the laser up from its parameters: the body and its origin VM, the
+// shot sound, and the start offset along the aim.
+// TODO: the original realigns the frame (and esp, -8) and sets the VM's callbacks after the bullet type lookup.
+// FUNCTION: TH16 0x435050
+i32 LaserInfiniteInf::initialize(void *params)
+{
+    inner = *(LaserInfiniteInner *)params;
+    bullet_type = inner.type;
+    state = 3;
+    kind = LASER_INFINITE;
+    bullet_color = inner.color;
+    AnmVm *vm = &vm_950;
+    vm->wipe();
+    vm->index_of_sprite_mapping_func = 2;
+    vm->associated_game_entity = this;
+    g_LaserManager->bullet_anm->set_vm_script(vm, g_bullet_types[bullet_type].script);
+    vm->interrupt(2);
+    vm->run();
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    AnmVmFlagsLoFields *fields = (AnmVmFlagsLoFields *)&vm_950.flags_lo;
+    fields->anchor_x = 0;
+    fields->anchor_y = 2;
+    fields->render_mode = 1;
+    vm_950.flags_hi = vm_950.flags_hi & ~0x80000 | 0x40000;
+    vm = &vm_f4c;
+    g_LaserManager->bullet_anm->copy_vm(vm, inner.color + 0x38);
+    vm->unk_5b0 = NULL;
+    vm->parent = NULL;
+    vm->run();
+    vm->interrupt(2);
+    vm->run();
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    ((AnmVmFlagsLoFields *)&vm_f4c.flags_lo)->render_mode = 1;
+    vm_f4c.flags_hi = vm_f4c.flags_hi & ~0x80000 | 0x40000;
+    if (inner.shot_sfx >= 0)
+    {
+        g_SoundManager.play_sound_at_position(inner.shot_sfx, 0.0f);
+    }
+    position = inner.start_pos;
+    if (inner.distance != 0.0f)
+    {
+        Float3 offset;
+        laser_sincosmul(&offset, inner.ang_aim, inner.distance);
+        position.x += offset.x;
+        position.y += offset.y;
+    }
+    unk_70 = inner.laser_new_arg_1;
+    length = inner.speed;
+    angle = inner.ang_aim;
+    ex_index = *(i32 *)inner.unk_50;
+    width = 2.0f;
+    id = inner.laser_st_on_arg_1;
+    timer.reset();
+    unk_94c = 0;
+    return 0;
+}
+
+// Sets a beam up from its parameters.
+// TODO: the original addresses vm_928 through the pointer left over from the inlined wipe (store order, ecx vs edx).
+// FUNCTION: TH16 0x43a860
+i32 LaserBeamInf::initialize(void *params)
+{
+    inner = *(LaserBeamInner *)params;
+    position = inner.start_pos;
+    unk_70 = inner.length;
+    angle = inner.ang_aim;
+    bullet_color = inner.color;
+    state = 3;
+    kind = LASER_BEAM;
+    id = inner.id;
+    for (i32 i = 0; i < 0x200; i++)
+    {
+        unk_f28[i] = unk_70;
+    }
+    width = 1.0f;
+    unk_f24 = 0;
+    vm_928.wipe();
+    vm_928.flags_lo = vm_928.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    return 0;
+}
