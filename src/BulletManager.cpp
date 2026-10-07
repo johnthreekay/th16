@@ -1264,15 +1264,15 @@ done:
 
 static_assert(offsetof(Bullet, ex_state) == 0xfa0, "Bullet layout");
 
-// TODO: in the inlined timer tick the original adds the speed to
-// current_f in xmm0 (ours adds current_f to the speed in xmm1).
+// TODO: in the inlined timer tick the original adds the speed to current_f in xmm0 and
+// jumps to shared stores (ours adds current_f to the speed in xmm1; tick_mixed gets closer).
 // FUNCTION: TH16 0x414ec0
 i32 Bullet::step_ex_00()
 {
     if (ex_state[0].timer.current <= 16)
     {
         bullet_sincosmul(&velocity, angle, 5.0f - ex_state[0].timer.current_f * 5.0f / 16.0f + speed);
-        ex_state[0].timer.tick();
+        ex_state[0].timer.tick_mixed();
         return 0;
     }
     active_ex_flags ^= 1;
@@ -1458,8 +1458,6 @@ static void add_angle_twice(ZunAngle *a, f32 delta)
     a->value = wrap_angle(wrap_angle(a->value + delta));
 }
 
-// TODO: in the inlined timer tick the original keeps the frame in xmm0 on
-// the unscaled path (ours shares xmm1 with the scaled path).
 // FUNCTION: TH16 0x4153e0
 i32 Bullet::step_ex_03()
 {
@@ -1471,11 +1469,11 @@ i32 Bullet::step_ex_03()
     add_angle_twice(&angle_ref(), ex_state[2].floats[1] * g_game_speed);
     speed += ex_state[2].floats[0] * g_game_speed;
     bullet_sincosmul(&velocity, angle, speed);
-    ex_state[2].timer.tick();
+    ex_state[2].timer.tick_mixed();
     return 0;
 }
 
-// TODO: in the inlined timer tick the original loads current_f into xmm0
+// TODO: in the inlined timer tick (tick_mixed) the original loads current_f into xmm0
 // and adds the speed (ours adds current_f into the speed's xmm1).
 // FUNCTION: TH16 0x415570
 i32 Bullet::step_ex_04()
@@ -1519,7 +1517,7 @@ i32 Bullet::step_ex_04()
         new_speed = speed - ex_state[3].timer.current_f * speed / ex_state[3].ints[0];
     }
     bullet_sincosmul(&velocity, angle, new_speed);
-    ex_state[3].timer.tick();
+    ex_state[3].timer.tick_mixed();
     return 0;
 }
 
@@ -1642,7 +1640,7 @@ i32 Bullet::step_ex_17()
         angle = wrap_angle(atan2(velocity.y, velocity.x));
     }
     velocity.z = 0.0f;
-    ex_state[8].timer.tick();
+    ex_state[8].timer.tick_mixed();
     return 0;
 }
 

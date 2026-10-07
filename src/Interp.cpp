@@ -157,14 +157,15 @@ void InterpFloat::reset()
     time.reset();
 }
 
-// TODO: case 17 copies initial to current as an integer and returns current
-// reloaded.
+// TODO: method 17 computes the new bezier_2, then copies initial to current as an integer
+// before storing it, and returns current reloaded; ours stores current from xmm0 (a temp for
+// the new bezier_2 or other statement orders do not change it).
 // FUNCTION: TH16 0x4171c0
 HARNESS_CALLED f32 InterpFloat::step()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -195,8 +196,8 @@ HARNESS_CALLED f32 InterpFloat::step()
     {
         // Constant acceleration: goal is added to the step.
         initial += bezier_2;
-        bezier_2 = bezier_2 + goal;
         current = initial;
+        bezier_2 = bezier_2 + goal;
         return current;
     }
     else if (method == 8)
@@ -284,7 +285,7 @@ D3DXVECTOR2 InterpFloat2::step()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -341,7 +342,7 @@ D3DXVECTOR3 InterpFloat3::step()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -397,7 +398,7 @@ D3DXVECTOR2 InterpFloat2::step_radial_dist()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -454,7 +455,7 @@ D3DXVECTOR3 InterpStrange1::step()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -542,7 +543,7 @@ Int3 InterpInt3::step()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);

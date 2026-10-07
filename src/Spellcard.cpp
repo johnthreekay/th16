@@ -384,7 +384,7 @@ i32 Spellcard::on_tick_body()
     {
         bonus = (bonus - (bonus_max - bonus_max / 3) / (timeout - 300)) / 10 * 10;
     }
-    time.tick();
+    time.tick_mixed();
     if (time.current >= 120)
     {
         Player *player = g_Player;

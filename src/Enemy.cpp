@@ -1151,7 +1151,7 @@ int EnemyInf::die()
     return 1;
 }
 
-// TODO: the inlined tick adds speed and current_f the other way round (register choice).
+// TODO: the inlined tick (tick_mixed) adds speed and current_f the other way round (register choice).
 // FUNCTION: TH16 0x41d900
 void EnemyManager::kill_all()
 {
@@ -1171,7 +1171,7 @@ void EnemyManager::kill_all()
             enemy->enemy.flags_low |= 0x2000000;
         }
     }
-    mgr->inner.time_in_stage.tick();
+    mgr->inner.time_in_stage.tick_mixed();
 }
 
 // TODO: register allocation: the original keeps value in ebx and spills next to the argument slot.
@@ -1198,7 +1198,7 @@ void __stdcall EnemyManager::kill_all_with_unk_278(i32 value)
     mgr->inner.time_in_stage.tick();
 }
 
-// TODO: the inlined tick adds speed and current_f the other way round (register choice).
+// TODO: the inlined tick (tick_mixed) adds speed and current_f the other way round (register choice).
 // FUNCTION: TH16 0x41db70
 void EnemyManager::kill_all_no_set_death()
 {
@@ -1219,7 +1219,7 @@ void EnemyManager::kill_all_no_set_death()
             enemy->enemy.flags_low |= 0x2000000;
         }
     }
-    mgr->inner.time_in_stage.tick();
+    mgr->inner.time_in_stage.tick_mixed();
 }
 
 // FUNCTION: TH16 0x424f00

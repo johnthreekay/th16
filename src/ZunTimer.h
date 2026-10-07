@@ -171,6 +171,26 @@ struct ZunTimer
         current_f = cur_f;
     }
 
+    // tick with the int frame in a local and current_f updated in each
+    // branch, as other callers inline it.
+    void tick_mixed()
+    {
+        f32 *speed = this->speed();
+        i32 cur = current;
+        previous = cur;
+        if (speed == NULL || (*speed > 0.99f && *speed < 1.01f))
+        {
+            cur++;
+            current_f += 1.0f;
+        }
+        else
+        {
+            current_f += *speed;
+            cur = (i32)current_f;
+        }
+        current = cur;
+    }
+
     // tick with the updates made in each branch, as some callers inline it.
     void tick_in_place()
     {
