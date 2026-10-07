@@ -449,6 +449,8 @@ struct AnmFanData
     f32 radius[33];
     f32 radius_speed[32];
     f32 uv_speed;
+    // Randomized like uv_speed but never read: both directions scroll by
+    // uv_speed.
     f32 unk_4a8;
     u8 unk_4ac[4];
 };
