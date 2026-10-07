@@ -74,7 +74,9 @@ struct Supervisor
     IDirect3D9 *d3d;
     IDirect3DDevice9 *d3d_device;
     IDirectInput8A *dinput;
-    u8 unk_10[0x10];
+    // The window's screen rectangle, kept to restore its place when it
+    // goes back from full screen.
+    RECT window_rect;
     IDirectInputDevice8A *keyboard;
     IDirectInputDevice8A *joystick;
     u8 unk_28[0x2c - 0x28];
@@ -121,14 +123,19 @@ struct Supervisor
     u8 unk_718[0x71c - 0x718];
     // Set by load_game_config for config flag 0x20.
     i32 unk_71c;
-    u8 unk_720[0x728 - 0x720];
+    // Set to 1 by the Direct3D setup; cleared once it is done.
+    i32 unk_720;
+    i32 unk_724;
     // text.anm: dialogue text and furigana lines.
     struct AnmLoaded *text_anm;
     u8 unk_72c[0x730 - 0x72c];
     u32 flags;
     // timeGetTime() when on_registration ran; also the RNG seed.
     u32 start_time;
-    u8 unk_738[0x870 - 0x738];
+    u8 unk_738[0x73c - 0x738];
+    // What the device can do, checked once after it is created.
+    D3DCAPS9 caps;
+    u8 unk_86c[0x870 - 0x86c];
     Screenshot screenshot;
     ThreadInf thread;
     i32 unk_9b4;

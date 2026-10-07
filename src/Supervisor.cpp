@@ -282,9 +282,6 @@ HARNESS_CALLED void Supervisor::swap_transform_matrices(Camera *camera)
     }
 }
 
-// Not decompiled yet (src/stub/w3c.cpp). 0x46b900 sets up AnmManager
-// vertex data through g_AnmManager.
-void anm_manager_46b900();
 
 // The tanf from the CRT headers stays out of line (0x43dc90).
 DECOMP_NOINLINE float __CRTDECL tanf(float);
@@ -970,7 +967,7 @@ int __fastcall Supervisor::on_registration(void *arg)
     f->arg = fps;
     g_UpdateFuncRegistry->register_on_draw(f, 0x4b);
     fps->on_draw = f;
-    anm_manager_46b900();
+    AnmManager::setup_vertex_buffer();
     create_fonts();
     g_Supervisor.vm_1bc = new AnmVm;
     g_Supervisor.vm_1c0 = new AnmVm;

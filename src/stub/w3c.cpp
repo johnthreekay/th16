@@ -8,11 +8,6 @@ void w3c_stub_sink(void *p)
 {
 }
 
-// STUB: TH16 0x46b900
-void anm_manager_46b900()
-{
-}
-
 #include "../StageData.h"
 
 // GLOBAL: TH16 0x4a22d0

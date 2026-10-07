@@ -257,6 +257,190 @@ static void __fastcall anm_sincosmul(Float3 *dst, f32 angle, f32 radius)
     }
 }
 
+// Rebuilds the vertices that render modes 9, 13, 14, 24 and 25 draw from
+// ins_508_extra_data: a ring strip around the VM (9), an arc of it (13,
+// 14) and an upright cylinder band (24, 25), int_vars[0] steps around
+// with the texture's u spread over int_vars[1].
+// TODO: register allocation differs (the original keeps this in edi and the vertex cursor on the stack in mode 9).
+// FUNCTION: TH16 0x4632f0
+void AnmVm::update_special_vertices()
+{
+    switch ((flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
+    {
+    case 9: {
+        i32 n = int_vars[0] - 1;
+        f32 angle = rotation.z;
+        RenderVertex144 *vertex = (RenderVertex144 *)ins_508_extra_data;
+        f32 angle_step = ZUN_2PI / n;
+        f32 v_step = (f32)int_vars[1] / n;
+        Float3 pos;
+        get_own_transformed_pos(&pos);
+        D3DCOLOR color_outer = color_1.d3d;
+        D3DCOLOR color_inner = (flags_lo & ANM_VM_COLOR_MODE_MASK) ? color_2.d3d : color_1.d3d;
+        f32 half_width = scale.x * 0.5f;
+        f32 outer = scale.y + half_width;
+        f32 inner = scale.y - half_width;
+        if (unk_5b0 != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+        {
+            outer *= unk_5b0->scale.x;
+            inner *= unk_5b0->scale.y;
+        }
+        if ((flags_hi & ANM_VM_COORD_MODE_MASK) == 1 << 20)
+        {
+            outer *= g_screen_coord_scale;
+            inner *= g_screen_coord_scale;
+        }
+        else if ((flags_hi & ANM_VM_COORD_MODE_MASK) == 2 << 20)
+        {
+            outer *= g_screen_coord_scale * 0.5f;
+            inner *= g_screen_coord_scale * 0.5f;
+        }
+        f32 v = 0.0f;
+        for (; n > 0; n--)
+        {
+            vertex->pos.w = 1.0f;
+            vertex->diffuse = color_outer;
+            vertex->uv.x = uv_scroll_pos.x + uv_quad_of_sprite[0].x;
+            vertex->uv.y = uv_scroll_pos.y + v;
+            anm_sincosmul((Float3 *)&vertex->pos, angle, outer);
+            vertex->pos.z = 0.0f;
+            vertex->pos.x = vertex->pos.x + pos.x;
+            vertex->pos.y = pos.y + vertex->pos.y;
+            vertex->pos.z = vertex->pos.z + pos.z;
+            vertex++;
+            vertex->pos.w = 1.0f;
+            vertex->diffuse = color_inner;
+            vertex->uv.x = uv_quad_of_sprite[1].x + uv_scroll_pos.x;
+            vertex->uv.y = uv_scroll_pos.y + v;
+            anm_sincosmul((Float3 *)&vertex->pos, angle, inner);
+            vertex->pos.z = 0.0f;
+            vertex->pos.x = vertex->pos.x + pos.x;
+            vertex->pos.y = pos.y + vertex->pos.y;
+            vertex->pos.z = vertex->pos.z + pos.z;
+            v += v_step;
+            angle += angle_step;
+            vertex++;
+            angle = wrap_angle(angle);
+        }
+        RenderVertex144 *first = (RenderVertex144 *)ins_508_extra_data;
+        vertex[0] = first[0];
+        vertex[0].uv.y = uv_scroll_pos.y + v;
+        first = (RenderVertex144 *)ins_508_extra_data;
+        vertex[1] = first[1];
+        vertex[1].uv.y = uv_scroll_pos.y + v;
+        break;
+    }
+    case 13:
+    case 14: {
+        f32 start = wrap_angle(rotation.z - rotation.x * 0.5f);
+        i32 n = int_vars[0];
+        f32 v = 0.0f;
+        RenderVertex144 *vertex = (RenderVertex144 *)ins_508_extra_data;
+        f32 angle_step = rotation.x / (n - 1);
+        f32 v_step = (f32)int_vars[1] / (n - 1);
+        Float3 pos;
+        get_own_transformed_pos(&pos);
+        f32 angle;
+        if ((flags_lo & (0x1f << ANM_VM_RENDER_MODE_SHIFT)) == 14 << ANM_VM_RENDER_MODE_SHIFT)
+        {
+            angle = normalize_angle(rotation.z);
+        }
+        else
+        {
+            angle = start;
+        }
+        D3DCOLOR color = (flags_lo & ANM_VM_COLOR_MODE_MASK) ? color_2.d3d : color_1.d3d;
+        f32 half_width = scale.x * 0.5f;
+        f32 outer = scale.y + half_width;
+        f32 inner = scale.y - half_width;
+        if (unk_5b0 != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+        {
+            outer *= unk_5b0->scale.x;
+            inner *= unk_5b0->scale.y;
+        }
+        if ((flags_hi & ANM_VM_COORD_MODE_MASK) == 1 << 20)
+        {
+            outer *= g_screen_coord_scale;
+            inner *= g_screen_coord_scale;
+        }
+        else if ((flags_hi & ANM_VM_COORD_MODE_MASK) == 2 << 20)
+        {
+            outer *= g_screen_coord_scale * 0.5f;
+            inner *= g_screen_coord_scale * 0.5f;
+        }
+        for (; n > 0; n--)
+        {
+            vertex[0].pos.w = 1.0f;
+            vertex[0].diffuse = color;
+            vertex[0].uv.x = uv_scroll_pos.x + uv_quad_of_sprite[0].x;
+            vertex[0].uv.y = uv_scroll_pos.y + v;
+            anm_sincosmul((Float3 *)&vertex[0].pos, angle, outer);
+            vertex[0].pos.z = 0.0f;
+            vertex[0].pos.x = pos.x + vertex[0].pos.x;
+            vertex[0].pos.y = vertex[0].pos.y + pos.y;
+            vertex[0].pos.z = pos.z + vertex[0].pos.z;
+            vertex[1].pos.w = 1.0f;
+            vertex[1].diffuse = color;
+            vertex[1].uv.x = uv_quad_of_sprite[1].x + uv_scroll_pos.x;
+            vertex[1].uv.y = uv_scroll_pos.y + v;
+            anm_sincosmul((Float3 *)&vertex[1].pos, angle, inner);
+            vertex[1].pos.z = 0.0f;
+            vertex[1].pos.x = pos.x + vertex[1].pos.x;
+            vertex[1].pos.y = vertex[1].pos.y + pos.y;
+            vertex[1].pos.z = pos.z + vertex[1].pos.z;
+            vertex += 2;
+            v = v_step + v;
+            angle += angle_step;
+            angle = wrap_angle(angle);
+        }
+        break;
+    }
+    case 24:
+    case 25: {
+        f32 width = float_vars[0];
+        f32 angle = wrap_angle(float_vars[3] - width * 0.5f);
+        i32 n = int_vars[0];
+        f32 angle_step = width / (n - 1);
+        f32 v = 0.0f;
+        RenderVertexXyzDiffuseTex *vertex = (RenderVertexXyzDiffuseTex *)ins_508_extra_data;
+        f32 v_step = (f32)int_vars[1] / (n - 1);
+        D3DCOLOR color = (flags_lo & ANM_VM_COLOR_MODE_MASK) ? color_2.d3d : color_1.d3d;
+        f32 y = float_vars[1] * 0.5f;
+        f32 radius_top = float_vars[2];
+        f32 radius_bottom = float_vars[2];
+        if ((flags_lo & (0x1f << ANM_VM_RENDER_MODE_SHIFT)) == 25 << ANM_VM_RENDER_MODE_SHIFT)
+        {
+            radius_top = radius_bottom - y;
+            radius_bottom = y + radius_bottom;
+            y = 0.0f;
+        }
+        for (; n > 0; n--)
+        {
+            Float3 point;
+            anm_sincosmul(&point, angle, radius_top);
+            vertex[0].diffuse = color;
+            vertex[0].uv.x = uv_scroll_pos.x + uv_quad_of_sprite[0].x;
+            vertex[0].uv.y = uv_scroll_pos.y + v;
+            vertex[0].pos.x = point.x;
+            vertex[0].pos.y = y;
+            vertex[0].pos.z = point.y;
+            anm_sincosmul(&point, angle, radius_bottom);
+            vertex[1].diffuse = color;
+            vertex[1].uv.x = uv_quad_of_sprite[1].x + uv_scroll_pos.x;
+            vertex[1].uv.y = uv_scroll_pos.y + v;
+            v += v_step;
+            vertex[1].pos.x = point.x;
+            vertex[1].pos.y = -y;
+            vertex[1].pos.z = point.y;
+            angle += angle_step;
+            vertex += 2;
+            angle = wrap_angle(angle);
+        }
+        break;
+    }
+    }
+}
+
 // ANM instruction arguments: argument n is a constant unless bit n of
 // var_mask says it names a script variable.
 #define ANM_IS_VAR(n) (ins->var_mask & (1 << (n)))

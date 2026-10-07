@@ -559,3 +559,95 @@ void AnmLoaded::release()
         vms = NULL;
     }
 }
+
+// One anchoring's quad in the vertex buffer.
+struct AnmQuadXyzTex
+{
+    RenderVertexXyzTex v[4];
+};
+
+// TODO: 99%; the device pointer for CreateVertexBuffer is loaded into ecx (its vtable into eax) in the original.
+// FUNCTION: TH16 0x46b900
+void AnmManager::setup_vertex_buffer()
+{
+    AnmManager *mgr = g_AnmManager;
+    RenderVertexXyzTex *quad = mgr->quad_184fbc8;
+    quad[0].pos.x = quad[2].pos.x = -128.0f;
+    quad[1].pos.x = quad[3].pos.x = 128.0f;
+    quad[0].pos.y = quad[1].pos.y = -128.0f;
+    quad[2].pos.y = quad[3].pos.y = 128.0f;
+    quad[2].pos.z = quad[3].pos.z = 0.0f;
+    quad[0].pos.z = quad[1].pos.z = 0.0f;
+    quad[0].uv.x = quad[2].uv.x = 0.0f;
+    quad[1].uv.x = quad[3].uv.x = 1.0f;
+    quad[0].uv.y = quad[1].uv.y = 0.0f;
+    quad[2].uv.y = quad[3].uv.y = 1.0f;
+    g_quad_vertices_4df8a0[0].pos = quad[0].pos;
+    g_quad_vertices_4df8a0[1].pos = quad[1].pos;
+    g_quad_vertices_4df8a0[2].pos = quad[2].pos;
+    g_quad_vertices_4df8a0[3].pos = quad[3].pos;
+    g_quad_vertices_4df8a0[0].uv.x = quad[0].uv.x;
+    g_quad_vertices_4df8a0[0].uv.y = quad[0].uv.y;
+    g_quad_vertices_4df8a0[1].uv.x = quad[1].uv.x;
+    g_quad_vertices_4df8a0[1].uv.y = quad[1].uv.y;
+    g_quad_vertices_4df8a0[2].uv.x = quad[2].uv.x;
+    g_quad_vertices_4df8a0[2].uv.y = quad[2].uv.y;
+    g_quad_vertices_4df8a0[3].uv.x = quad[3].uv.x;
+    g_quad_vertices_4df8a0[3].uv.y = quad[3].uv.y;
+    g_Supervisor.d3d_device->CreateVertexBuffer(sizeof(mgr->quad_184fbc8) * 9, 0, D3DFVF_XYZ | D3DFVF_TEX1,
+                                                D3DPOOL_MANAGED, &mgr->vertex_buffer, NULL);
+    AnmQuadXyzTex *buffer;
+    mgr->vertex_buffer->Lock(0, 0, (void **)&buffer, 0);
+    // One copy per anchoring, at (anchor_y * 3 + anchor_x) quads in.
+    buffer[0] = *(AnmQuadXyzTex *)quad;
+    quad[0].pos.y += 128.0f;
+    quad[1].pos.y += 128.0f;
+    quad[2].pos.y += 128.0f;
+    quad[3].pos.y += 128.0f;
+    buffer[3] = *(AnmQuadXyzTex *)quad;
+    quad[0].pos.y -= 256.0f;
+    quad[1].pos.y -= 256.0f;
+    quad[2].pos.y -= 256.0f;
+    quad[3].pos.y -= 256.0f;
+    buffer[6] = *(AnmQuadXyzTex *)quad;
+    quad[0].pos.x += 128.0f;
+    quad[1].pos.x += 128.0f;
+    quad[2].pos.x += 128.0f;
+    quad[3].pos.x += 128.0f;
+    quad[0].pos.y += 128.0f;
+    quad[1].pos.y += 128.0f;
+    quad[2].pos.y += 128.0f;
+    quad[3].pos.y += 128.0f;
+    buffer[1] = *(AnmQuadXyzTex *)quad;
+    quad[0].pos.y += 128.0f;
+    quad[1].pos.y += 128.0f;
+    quad[2].pos.y += 128.0f;
+    quad[3].pos.y += 128.0f;
+    buffer[4] = *(AnmQuadXyzTex *)quad;
+    quad[0].pos.y -= 256.0f;
+    quad[1].pos.y -= 256.0f;
+    quad[2].pos.y -= 256.0f;
+    quad[3].pos.y -= 256.0f;
+    buffer[7] = *(AnmQuadXyzTex *)quad;
+    quad[0].pos.x -= 256.0f;
+    quad[1].pos.x -= 256.0f;
+    quad[2].pos.x -= 256.0f;
+    quad[3].pos.x -= 256.0f;
+    quad[0].pos.y += 128.0f;
+    quad[1].pos.y += 128.0f;
+    quad[2].pos.y += 128.0f;
+    quad[3].pos.y += 128.0f;
+    buffer[2] = *(AnmQuadXyzTex *)quad;
+    quad[0].pos.y += 128.0f;
+    quad[1].pos.y += 128.0f;
+    quad[2].pos.y += 128.0f;
+    quad[3].pos.y += 128.0f;
+    buffer[5] = *(AnmQuadXyzTex *)quad;
+    quad[0].pos.y -= 256.0f;
+    quad[1].pos.y -= 256.0f;
+    quad[2].pos.y -= 256.0f;
+    quad[3].pos.y -= 256.0f;
+    buffer[8] = *(AnmQuadXyzTex *)quad;
+    mgr->vertex_buffer->Unlock();
+    g_Supervisor.d3d_device->SetStreamSource(0, mgr->vertex_buffer, 0, sizeof(RenderVertexXyzTex));
+}

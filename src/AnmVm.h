@@ -262,6 +262,8 @@ extern AnmVmFunc g_anm_on_tick_funcs[5];
 // Run after the script by AnmVm::run, selected by index_of_on_wait; nonzero
 // keeps the script time from advancing. Only entry 0 (none) exists.
 extern AnmVmFunc g_anm_on_wait_funcs[1];
+// Run by AnmManager::draw_vm before drawing, selected by index_of_on_draw.
+extern AnmVmFunc g_anm_on_draw_funcs[7];
 // Maps the sprite numbers of ANM instructions 300 and 301, selected by
 // index_of_sprite_mapping_func (ExpHP: ANM_ON_SPRITE_SET_FUNCS).
 typedef i32(__fastcall *AnmVmSpriteFunc)(AnmVm *vm, i32 sprite);
@@ -440,7 +442,7 @@ struct AnmVm
     HARNESS_CALLED Float3 *transform_coords(Float3 *pos);
     // 0x406c40. The VM's position (pos + entity_pos + pos_2) through
     // transform_coords; returns out.
-    HARNESS_CALLED Float3 *get_own_transformed_pos(Float3 *out);
+    Float3 *get_own_transformed_pos(Float3 *out);
     // 0x46f510. The nth descendant (depth first) running the given script
     // (unk_49c; -1 for any).
     AnmVm *search_children(i32 script, i32 nth);

@@ -4,8 +4,3 @@
 
 // GLOBAL: TH16 0x491b48
 AnmVmSerializeFunc g_anm_serialize_funcs[2];
-
-// STUB: TH16 0x46c0d0
-void __stdcall AnmManager::convert_texture(IDirect3DTexture9 *texture)
-{
-}

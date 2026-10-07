@@ -220,6 +220,29 @@ struct RenderVertex044
     D3DCOLOR diffuse;
 };
 
+// Untransformed vertices: the 3D sprite quads in the vertex buffer
+// (D3DFVF_XYZ | D3DFVF_TEX1) and the vertices of render modes 24 and 25
+// (D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1).
+struct RenderVertexXyzTex
+{
+    D3DXVECTOR3 pos;
+    Float2 uv;
+};
+
+struct RenderVertexXyzDiffuseTex
+{
+    D3DXVECTOR3 pos;
+    D3DCOLOR diffuse;
+    Float2 uv;
+};
+
+// Transformed vertices without a color (D3DFVF_XYZRHW | D3DFVF_TEX1).
+struct RenderVertexXyzrhwTex
+{
+    D3DXVECTOR4 pos;
+    Float2 uv;
+};
+
 // A request to copy part of the back buffer into the texture of a loaded
 // .anm entry (the pause menu's snapshot of the game screen; TH06:
 // AnmManager::RequestScreenshot). anm_slot < 0 marks a free entry.
@@ -271,7 +294,9 @@ struct AnmManager
     AnmLoaded *loaded_anms[0x1f];
     D3DMATRIX matrix_184f56c;
     AnmVm vm_184f5ac;
-    u8 unk_184fba8[0x184fbb0 - 0x184fba8];
+    u8 unk_184fba8[0x184fbac - 0x184fba8];
+    // The D3DRS_TEXTUREFACTOR the 3D sprite code last set.
+    D3DCOLOR last_texture_factor;
     // The D3D state the sprite code last set, compared before setting it
     // again (so that it only changes, and flushes the batch, when needed).
     // Code that draws without the sprite code resets these so the next
@@ -290,7 +315,9 @@ struct AnmManager
     u8 unk_184fbbe[2];
     i32 render_cache_184fbc0;
     IDirect3DVertexBuffer9 *vertex_buffer;
-    u8 unk_184fbc8[0x184fc18 - 0x184fbc8];
+    // A unit quad (one corner per entry) that draw_vm__mode_7 transforms
+    // with matrix_184f56c to work out each corner's fog.
+    RenderVertexXyzTex quad_184fbc8[4];
     // Sprites waiting for flush_sprites, six vertices each (ExpHP:
     // zAnmVertexBuffers).
     i32 unrendered_sprite_count;
@@ -308,12 +335,19 @@ struct AnmManager
     ZunColor unk_1c7fd88;
     i32 unk_1c7fd8c;
 
+    // 0x46a3a0. Clears everything, fills the VM pool's free list and
+    // registers the tick and per-layer draw callbacks.
+    AnmManager();
     // 0x46b7d0. Destroys every VM still alive.
     ~AnmManager();
+    // 0x46b900. Fills the vertex buffer with the unit quad for each of the
+    // nine anchorings (draw_vm__mode_8). Goes through g_AnmManager.
+    static void setup_vertex_buffer();
 
     // Never inlined in the original (over 100 call sites).
     DECOMP_NOINLINE void flush_sprites();
-    void draw_vm(AnmVm *vm);
+    // 0x468490. Draws a VM by its render mode; -1 if it is not drawn.
+    HARNESS_CALLED i32 draw_vm(AnmVm *vm);
     // Sets blending, filtering and texture addressing for a VM, flushing
     // the batch first when they change.
     void setup_render_state_for_vm(AnmVm *vm);
@@ -326,7 +360,22 @@ struct AnmManager
     // 0x465280. Draws the quad in g_sprite_temp_buffer for a VM.
     i32 render_sprite_2d(AnmVm *vm, i32 unk);
     // Render mode 5.
-    void draw_vm__mode_5(AnmVm *vm);
+    i32 draw_vm__mode_5(AnmVm *vm);
+    // 0x466390 (ExpHP: write_sprite_corners__mode_4). Projects the VM's
+    // position and writes a camera-facing quad into g_sprite_temp_buffer;
+    // -1 if it is outside the depth range. Does not use this.
+    static i32 __stdcall write_sprite_corners__mode_4(AnmVm *vm);
+    // 0x466820. Render mode 6: mode 4 with distance fog.
+    i32 draw_vm__mode_6(AnmVm *vm);
+    // 0x467200. Render mode 7: the 2D quad of render_sub_466f00 with
+    // per-corner distance fog.
+    i32 draw_vm__mode_7(AnmVm *vm);
+    // 0x467410. Render mode 8 (and 15, with fog): a 3D sprite drawn from
+    // the vertex buffer with the VM's world and texture matrices.
+    i32 draw_vm__mode_8(AnmVm *vm);
+    // 0x467d00 (ExpHP: draw_vm__mode_X__textureArc3D). Render modes 24 and
+    // 25: the VM's own vertices as a 3D triangle strip.
+    i32 draw_vm__mode_24(AnmVm *vm, RenderVertexXyzDiffuseTex *vertices, i32 vertex_count);
     // 0x468350. Draws vertex_count vertices (a triangle fan, in screen
     // space) with the VM's texture and blending.
     i32 draw_vm__mode_11(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count);
@@ -617,6 +666,10 @@ __forceinline AnmId AnmLoaded::create_vm_inline(i32 script, Float3 *pos, f32 rot
 
 // The quad being built by the draw functions.
 extern RenderVertex144 g_sprite_temp_buffer[4];
+// The unit quads AnmManager's constructor and setup_vertex_buffer fill in
+// (TH06: g_PrimitivesToDrawVertexBuf, g_PrimitivesToDrawUnknown).
+extern RenderVertexXyzrhwTex g_quad_vertices_4df4a8[4];
+extern RenderVertexXyzDiffuseTex g_quad_vertices_4df8a0[4];
 
 // Deletes the VM (if still alive) and forgets the id.
 inline void delete_vm_and_clear(AnmId &id)
