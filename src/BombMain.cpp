@@ -616,8 +616,6 @@ void BombReimuAOrb::finish()
 }
 
 // finish for every orb, with the laser cancel and the VM deletion inlined.
-// TODO: the original loads the VM's child list after storing flags_hi (as
-// in ~EnemyInf).
 // FUNCTION: TH16 0x410bb0
 void BombReimuAOrbs::finish_all()
 {

@@ -237,8 +237,6 @@ HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_o
     return 1;
 }
 
-// TODO: the original reserves 8 bytes of locals where ours has 4.
-// TODO: the original realigns its frame to 8 bytes (ebx-based form); the body matches.
 // FUNCTION: TH16 0x443cd0
 void Player::lose_life()
 {
@@ -963,7 +961,6 @@ const char *const g_player_anm_names[4] = {"pl00.anm", "pl02.anm", "pl03.anm", "
 const char *const g_subseason_anm_names[5] = {"pl00sub.anm", "pl02sub.anm", "pl03sub.anm", "pl01sub.anm",
                                               "pl04sub.anm"};
 
-// TODO: block order of the .sht loading branch and the VM pointer register differ.
 // FUNCTION: TH16 0x440fb0
 i32 Player::initialize()
 {
@@ -1015,10 +1012,13 @@ i32 Player::initialize()
         g_UpdateFuncRegistry->register_on_draw(f, 0x1d);
         on_draw = f;
     }
-    anm_file->copy_vm(&vm, 0);
-    vm.unk_5b0 = NULL;
-    vm.parent = NULL;
-    vm.run();
+    {
+        AnmVm *player_vm = &vm;
+        anm_file->copy_vm(player_vm, 0);
+        player_vm->unk_5b0 = NULL;
+        player_vm->parent = NULL;
+        player_vm->run();
+    }
     set_position(0.0f, 400.0f);
     for (i32 i = 0; i < 4; i++)
     {

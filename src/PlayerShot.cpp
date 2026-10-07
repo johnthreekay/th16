@@ -386,8 +386,6 @@ i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     return bullet->unk_9c;
 }
 
-// TODO: the original aligns its frame to 8 bytes (and esp, -8) and
-// addresses its locals through esp.
 // FUNCTION: TH16 0x447320
 i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
 {
