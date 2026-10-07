@@ -362,8 +362,8 @@ decompiled code the surroundings it had in the original:
   `pos.y += 15` on the struct (separate x/y locals become immediates), and
   mind the field store order.
 - MSVC does not connect a store through a struct pointer with a later int
-  load of the same address: store `*(EnemyRef *)&b->unk_90`, then test
-  `b->unk_90`, to get the original's reload.
+  load of the same address: store `*(EnemyRef *)&b->target_enemy_id`, then test
+  `b->target_enemy_id`, to get the original's reload.
 - `memcpy(buf, ...)` lets the compiler drop a later `buf != NULL` test;
   `memcpy(buf + size, ...)` with `size = 0` keeps it.
 - An 8-byte field (`__time64_t date`) stored as one 8-byte zero changes the
@@ -832,7 +832,7 @@ decompiled code the surroundings it had in the original:
     first field), so update addresses it through `this` instead of a
     second pointer register.
 - /GS: direct calls to AnmManager::interrupt_tree are a cookie trigger as
-  well (sht_on_tick_4470f0 and BombMarisaAInf::on_tick lose their cookie
+  well (sht_on_tick_sideways and BombMarisaAInf::on_tick lose their cookie
   when the calls are removed). An inline wrapper node around it does not
   help, and neither does defining g_anm_on_switch_funcs (the table its
   inlined AnmVm::interrupt calls through) with its real entries in /GL

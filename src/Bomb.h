@@ -30,6 +30,8 @@ class BombInf
     u32 flags;
     UpdateFunc *on_tick_func;
     UpdateFunc *on_draw_func;
+    // Nothing in TH16 uses unk_10, unk_24, timer_48, unk_6c, unk_74,
+    // timer_94 or timer_a8.
     void *unk_10;
     // Where the bomb is centered (the player's position when it started,
     // or following them).
@@ -46,7 +48,9 @@ class BombInf
     // The bomb's main VM (a release: its inner circle, whose scale is the
     // damage and cancel radius). The bomb ends with it.
     AnmId anm_id;
+    // Deleted by the destructor; nothing in TH16 creates it.
     AnmId anm_id_60;
+
     // A second VM: an effect around the player (bombs) or the release's
     // outer ring.
     AnmId anm_id_secondary;
