@@ -268,6 +268,13 @@ static void __fastcall anm_sincosmul(Float3 *dst, f32 angle, f32 radius)
 #define ANM_FLAGS_LO ((AnmVmFlagsLoFields *)&flags_lo)
 #define ANM_FLAGS_HI ((AnmVmFlagsHiFields *)&flags_hi)
 
+// Stores to float argument n (a variable or the argument itself), with the
+// value computed first.
+static __forceinline void anm_store_float(AnmVm *vm, AnmRawInstr *ins, i32 n, f32 value)
+{
+    *((ins->var_mask & (1 << n)) ? vm->get_float_var_ptr(&ins->args[n].f) : &ins->args[n].f) = value;
+}
+
 // From a to b as t goes from 0 to 1.
 static inline f32 anm_lerp(f32 t, f32 a, f32 b)
 {
@@ -437,7 +444,7 @@ __forceinline i32 AnmVm::run_script()
             *ANM_INT_PTR(0) = ANM_INT(1) % ANM_INT(2);
             break;
         case 121:
-            *ANM_FLOAT_PTR(0) = fmodf(ANM_FLOAT(1), ANM_FLOAT(2));
+            anm_store_float(this, ins, 0, fmodf(ANM_FLOAT(1), ANM_FLOAT(2)));
             break;
         // iadd ... fmod
         case 102:
@@ -495,7 +502,7 @@ __forceinline i32 AnmVm::run_script()
             break;
         }
         case 111:
-            *ANM_FLOAT_PTR(0) = fmodf(ANM_FLOAT(0), ANM_FLOAT(1));
+            anm_store_float(this, ins, 0, fmodf(ANM_FLOAT(0), ANM_FLOAT(1)));
             break;
         // isetRand, fsetRand
         case 122:
@@ -505,11 +512,8 @@ __forceinline i32 AnmVm::run_script()
             break;
         }
         case 123:
-        {
-            f32 value = g_replay_unsafe_rng.randf_0_to(ANM_FLOAT(1));
-            *ANM_FLOAT_PTR(0) = value;
+            anm_store_float(this, ins, 0, g_replay_unsafe_rng.randf_0_to(ANM_FLOAT(1)));
             break;
-        }
         // fsin, fcos, ftan, facos, fatan
         case 124:
         {
