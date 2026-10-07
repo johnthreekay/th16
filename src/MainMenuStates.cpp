@@ -1447,7 +1447,7 @@ i32 g_last_replay_slot;
 
 // The replay menu: picking a replay (pages of 25) while the list loads on
 // the menu's thread, then the stage to start from.
-// TODO: the original realigns its frame (and esp, -8) and keeps the repeat input word in eax for the cursor tests.
+// TODO: register allocation: this moves through eax around the first slot % 25, the ascii create_effect loads g_AsciiManager into ecx, and stage + 1 stays in eax (as in do_spell_practice_difficulty).
 // FUNCTION: TH16 0x451750
 i32 TitleInf::do_replay_menu()
 {
@@ -1486,7 +1486,7 @@ i32 TitleInf::do_replay_menu()
         }
         break;
     case 2:
-        menu.current_selection = menu.next_selection;
+        menu_save_selection(&menu);
         menu_1d4.current_selection = menu_1d4.next_selection;
         if (pressed_or_repeating_inline(INPUT_UP))
         {
@@ -1504,11 +1504,11 @@ i32 TitleInf::do_replay_menu()
         {
             menu_1d4.move_cursor(1);
         }
-        if (menu_1d4.current_selection != menu_1d4.next_selection)
+        if (menu_selection_moved(&menu_1d4))
         {
             g_SoundManager.play_sound_centered(10, 0);
         }
-        if (menu.current_selection != menu.next_selection)
+        if (menu_selection_moved(&menu))
         {
             g_SoundManager.play_sound_centered(10, 0);
         }
@@ -1550,7 +1550,7 @@ i32 TitleInf::do_replay_menu()
     case 4:
         if (time_in_state.current >= 15)
         {
-            menu.current_selection = menu.next_selection;
+            menu_save_selection(&menu);
             if (input_pressed_or_repeating(INPUT_UP))
             {
                 menu.move_cursor(-1);
@@ -1559,7 +1559,7 @@ i32 TitleInf::do_replay_menu()
             {
                 menu.move_cursor(1);
             }
-            if (menu.current_selection != menu.next_selection)
+            if (menu_selection_moved(&menu))
             {
                 g_SoundManager.play_sound_centered(10, 0);
             }
