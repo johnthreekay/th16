@@ -1351,7 +1351,7 @@ HARNESS_CALLED int Supervisor::load_game_config(const char *path)
 }
 
 // FUNCTION: TH16 0x43c370
-i32 Supervisor::play_bgm_wav(i32 arg, const char *name)
+HARNESS_CALLED i32 Supervisor::play_bgm_wav(i32 arg, const char *name)
 {
     char path[256];
 
@@ -1362,7 +1362,7 @@ i32 Supervisor::play_bgm_wav(i32 arg, const char *name)
 }
 
 // FUNCTION: TH16 0x43c3f0
-i32 Supervisor::play_bgm(i32 arg, i32 track)
+HARNESS_CALLED i32 Supervisor::play_bgm(i32 arg, i32 track)
 {
     if (g_Supervisor.config.flags_2c & 0x10)
     {

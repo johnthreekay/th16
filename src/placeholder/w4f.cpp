@@ -6,12 +6,6 @@
 
 int w4f_placeholder_sink(void *object, int value);
 
-// STUB: TH16 0x4560b0
-DECOMP_NOINLINE void TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 unused)
-{
-    w4f_placeholder_sink(this, w4f_placeholder_sink(ids, stage + row + unused));
-}
-
 // STUB: TH16 0x448400
 HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 unused, i32 unk_4)
 {

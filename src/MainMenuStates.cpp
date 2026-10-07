@@ -1,14 +1,17 @@
 // States of the title screen's menus (TitleInf::on_tick dispatches on
 // state).
 #include <direct.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <time.h>
 
 #include "MainMenu.h"
 
 #include "EffectManager.h"
+#include "FileSystem.h"
 #include "GameWindow.h"
 #include "Globals.h"
 #include "HelpManual.h"
@@ -28,6 +31,32 @@ extern i32 g_practice_last_stage;
 extern i32 g_spell_practice_last_row;
 extern const char g_name_entry_chars[];
 BOOL __stdcall spell_practice_row_seen(i32 stage, i32 row);
+extern const i32 g_spell_practice_ids[7][13][5];
+
+// input_pressed_or_repeating, inlined.
+static __forceinline i32 pressed_or_repeating_inline(u32 mask)
+{
+    if (g_hardware_input_pressed & mask)
+    {
+        return 1;
+    }
+    if (g_hardware_input_repeat & mask)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+// Small MenuHelper steps that some menus inline.
+static __forceinline void menu_save_selection(MenuHelper *m)
+{
+    m->current_selection = m->next_selection;
+}
+
+static __forceinline i32 menu_selection_moved(MenuHelper *m)
+{
+    return m->current_selection != m->next_selection;
+}
 
 static_assert(offsetof(TitleInf, menu_5cec) == 0x5cec, "TitleInf::menu_5cec");
 static_assert(offsetof(TitleInf, spell_stage) == 0x5dc4, "TitleInf::spell_stage");
@@ -93,7 +122,7 @@ void TitleInf::load_replay_list()
 }
 
 // Saving the replay after a game: picking a slot, then entering the name.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the slot cursor tests.
+// TODO: the original realigns its frame (and esp, -8), keeps this in edi (spilled), and computes the % 13 column tests with a multiply.
 // FUNCTION: TH16 0x453c10
 i32 TitleInf::do_replay_save()
 {
@@ -127,11 +156,11 @@ i32 TitleInf::do_replay_save()
         break;
     case 2:
         menu.current_selection = menu.next_selection;
-        if ((g_hardware_input_pressed & INPUT_UP) || (g_hardware_input_repeat & INPUT_UP))
+        if (pressed_or_repeating_inline(INPUT_UP))
         {
             menu.move_cursor(-1);
         }
-        if ((g_hardware_input_pressed & INPUT_DOWN) || (g_hardware_input_repeat & INPUT_DOWN))
+        if (pressed_or_repeating_inline(INPUT_DOWN))
         {
             menu.move_cursor(1);
         }
@@ -167,24 +196,38 @@ i32 TitleInf::do_replay_save()
         }
         break;
     case 3:
-        menu_5a5c.current_selection = menu_5a5c.next_selection;
-        if (input_pressed_or_repeating(INPUT_UP))
+        menu_save_selection(&menu_5a5c);
+        if (pressed_or_repeating_inline(INPUT_UP))
         {
             menu_5a5c.move_cursor(-13);
         }
-        if (input_pressed_or_repeating(INPUT_DOWN))
+        if (pressed_or_repeating_inline(INPUT_DOWN))
         {
             menu_5a5c.move_cursor(13);
         }
-        if (input_pressed_or_repeating(INPUT_LEFT))
+        if (pressed_or_repeating_inline(INPUT_LEFT))
         {
-            menu_5a5c.move_cursor(menu_5a5c.next_selection % 13 == 0 ? 12 : -1);
+            if (menu_5a5c.next_selection % 13 != 0)
+            {
+                menu_5a5c.move_cursor(-1);
+            }
+            else
+            {
+                menu_5a5c.move_cursor(12);
+            }
         }
-        if (input_pressed_or_repeating(INPUT_RIGHT))
+        if (pressed_or_repeating_inline(INPUT_RIGHT))
         {
-            menu_5a5c.move_cursor(menu_5a5c.next_selection % 13 == 12 ? -12 : 1);
+            if (menu_5a5c.next_selection % 13 != 12)
+            {
+                menu_5a5c.move_cursor(1);
+            }
+            else
+            {
+                menu_5a5c.move_cursor(-12);
+            }
         }
-        if (menu_5a5c.current_selection != menu_5a5c.next_selection)
+        if (menu_selection_moved(&menu_5a5c))
         {
             g_SoundManager.play_sound_centered(10, 0);
         }
@@ -196,16 +239,22 @@ i32 TitleInf::do_replay_save()
                 if (replay_name_cursor < 8)
                 {
                     replay_name[replay_name_cursor] = g_name_entry_chars[choice];
-                    goto advance;
+                    replay_name_cursor++;
+                    if (replay_name_cursor >= 8)
+                    {
+                        menu_5a5c.set_cursor(90);
+                    }
                 }
-                replay_name[replay_name_cursor - 1] = g_name_entry_chars[choice];
+                else
+                {
+                    replay_name[replay_name_cursor - 1] = g_name_entry_chars[choice];
+                }
             }
             else if (choice == 88)
             {
                 if (replay_name_cursor < 8)
                 {
                     replay_name[replay_name_cursor] = ' ';
-                advance:
                     replay_name_cursor++;
                     if (replay_name_cursor >= 8)
                     {
@@ -267,6 +316,341 @@ i32 TitleInf::do_replay_save()
                 delete replays[i];
             }
             memset(replays, 0, sizeof(replays));
+        }
+        break;
+    }
+    return 1;
+}
+
+// The difficulty last picked (Normal at first), where the menu starts.
+// GLOBAL: TH16 0x49f274
+i32 g_last_difficulty = DIFFICULTY_NORMAL;
+// The character last picked, where the character select starts.
+// GLOBAL: TH16 0x4a6f24
+i32 g_last_character;
+
+// Picking the difficulty, or confirming Extra.
+// TODO: the original realigns its frame (and esp, -8) and keeps g_Globals.difficulty in ecx from the entry for the num_choices test.
+// FUNCTION: TH16 0x44fe20
+i32 TitleInf::do_difficulty_select()
+{
+    i32 script = (g_Globals.difficulty >= DIFFICULTY_EXTRA) + 0x7e;
+    switch (substate)
+    {
+    case 0:
+        if (anm_id_73c.id == 0)
+        {
+            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+        }
+        menu.wraps = 0;
+        menu.num_choices = g_Globals.difficulty < DIFFICULTY_EXTRA ? 4 : 1;
+        AnmManager::interrupt_tree(anm_ids[script], 1);
+        anm_ids[script].id = 0;
+        anm_ids[script] = title_anm->create_effect(script, -1, NULL);
+        AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
+        AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 13));
+        if (g_unk_4a6f1c == 4)
+        {
+            menu.set_cursor(g_Globals.difficulty);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 7));
+            AnmManager::interrupt_tree_and_run(anm_ids[script], 6);
+            AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x74), 2);
+            goto confirm;
+        }
+        anm_ids[0x68] = title_anm->create_effect(0x68, -1, NULL);
+        set_substate(1);
+        if (g_Globals.difficulty < DIFFICULTY_EXTRA)
+        {
+            if (!g_Scorefile->all_cleared(DIFFICULTY_EASY))
+            {
+                find_child_id(script, 0x9e).clear_flag_lo_2_tree();
+            }
+            if (!g_Scorefile->all_cleared(DIFFICULTY_NORMAL))
+            {
+                find_child_id(script, 0x9f).clear_flag_lo_2_tree();
+            }
+            if (!g_Scorefile->all_cleared(DIFFICULTY_HARD))
+            {
+                find_child_id(script, 0xa0).clear_flag_lo_2_tree();
+            }
+            if (!g_Scorefile->all_cleared(DIFFICULTY_LUNATIC))
+            {
+                find_child_id(script, 0xa1).clear_flag_lo_2_tree();
+            }
+        }
+        else if (!g_Scorefile->all_cleared(DIFFICULTY_EXTRA))
+        {
+            find_child_id(script, 0xa2).clear_flag_lo_2_tree();
+        }
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        if (g_Globals.difficulty < DIFFICULTY_EXTRA)
+        {
+            menu.current_selection = menu.next_selection;
+            if (input_pressed_or_repeating(INPUT_UP) || input_pressed_or_repeating(INPUT_LEFT))
+            {
+                menu.move_cursor(-1);
+            }
+            if (input_pressed_or_repeating(INPUT_DOWN) || input_pressed_or_repeating(INPUT_RIGHT))
+            {
+                menu.move_cursor(1);
+            }
+            if (menu.current_selection != menu.next_selection)
+            {
+                g_SoundManager.play_sound_centered(10, 0);
+                AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
+                AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 7));
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            set_substate(4);
+            g_SoundManager.play_sound_centered(9, 0);
+            interrupt_and_clear(script);
+            return 1;
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            AnmManager::interrupt_tree(anm_ids[script], 6);
+            if (g_Globals.difficulty < DIFFICULTY_EXTRA)
+            {
+                AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x74), 2);
+            }
+            else
+            {
+                AnmManager::interrupt_tree(find_child_id(script, 0x78), 2);
+            }
+            set_substate(3);
+            g_SoundManager.play_sound_centered(7, 0);
+            return 1;
+        }
+        break;
+    case 3:
+        if (time_in_state.current >= 14)
+        {
+            AnmManager::interrupt_tree(anm_ids[0x68], 1);
+            anm_ids[0x68].id = 0;
+        confirm:
+            set_state(6);
+            if (g_Globals.difficulty < DIFFICULTY_EXTRA)
+            {
+                g_Globals.difficulty = menu.next_selection;
+                g_last_difficulty = g_Globals.difficulty;
+            }
+            menu.push();
+            menu.wraps = 1;
+            menu.num_choices = 4;
+            menu.set_cursor(g_last_character);
+            g_Globals.character = g_last_character;
+            return 1;
+        }
+        break;
+    case 4:
+        if (time_in_state.current >= 6)
+        {
+            AnmManager::interrupt_tree(anm_ids[0x68], 1);
+            anm_ids[0x68].id = 0;
+            if (g_Globals.game_mode != 0)
+            {
+                g_last_difficulty = menu.next_selection;
+                g_Globals.difficulty = g_last_difficulty;
+            }
+            else if (g_Globals.difficulty < DIFFICULTY_EXTRA)
+            {
+                set_state(1);
+                g_Globals.difficulty = menu.next_selection;
+                g_last_difficulty = menu.next_selection;
+                menu.pop();
+                return 1;
+            }
+            else
+            {
+                g_Globals.difficulty = g_last_difficulty;
+            }
+            set_state(1);
+            AnmManager::interrupt_tree(anm_id_73c, 1);
+            anm_id_73c.id = 0;
+            set_state(1);
+            menu.pop();
+        }
+        break;
+    }
+    return 1;
+}
+
+// AnmId::clear_flag_lo_2_tree as LTCG inlined it here.
+static __forceinline void clear_flag_lo_2_tree_inline(AnmId id)
+{
+    AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+}
+
+// Picking the character. Extra only offers the characters that cleared the
+// main game; characters marked as cleared on this difficulty get a badge.
+// TODO: the original realigns its frame (and esp, -8) and loads g_Scorefile before the difficulty for the clear badges.
+// FUNCTION: TH16 0x4502c0
+i32 TitleInf::do_character_select()
+{
+    i32 script = (g_Globals.difficulty == DIFFICULTY_EXTRA) * 2 + 0x96;
+    switch (substate)
+    {
+    case 0:
+    {
+        menu.num_choices = 4;
+        if (g_Globals.difficulty == DIFFICULTY_EXTRA)
+        {
+            if (!g_Scorefile->has_cleared(menu.next_selection))
+            {
+                for (i32 i = 0; i < 4; i++)
+                {
+                    if (g_Scorefile->has_cleared(i))
+                    {
+                        menu.set_cursor(i);
+                        break;
+                    }
+                }
+            }
+            for (i32 i = 0; i < 4; i++)
+            {
+                if (!g_Scorefile->has_cleared_inline(i))
+                {
+                    menu.disable(i);
+                }
+            }
+        }
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x69]) == NULL)
+        {
+            anm_ids[0x69] = title_anm->create_effect(0x69, -1, NULL);
+        }
+        if (g_AnmManager->get_vm_with_id(anm_ids[script]) == NULL)
+        {
+            AnmManager::interrupt_tree(anm_ids[script], 1);
+            anm_ids[script].id = 0;
+            anm_ids[script] = title_anm->create_effect(script, -1, NULL);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
+        }
+        else
+        {
+            AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
+        }
+        AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 7));
+        set_substate(1);
+        if (g_Scorefile->characters[0].clears[g_Globals.difficulty] == 0)
+        {
+            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9a));
+        }
+        if (g_Scorefile->characters[1].clears[g_Globals.difficulty] == 0)
+        {
+            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9b));
+        }
+        if (g_Scorefile->characters[2].clears[g_Globals.difficulty] == 0)
+        {
+            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9c));
+        }
+        if (g_Scorefile->characters[3].clears[g_Globals.difficulty] == 0)
+        {
+            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9d));
+        }
+        if (g_unk_4a6f1c == 4)
+        {
+            menu.set_cursor(g_Globals.character);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 7));
+            AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x80), 6);
+            AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x88), 6);
+            AnmManager::interrupt_tree(find_child_id_inline(anm_ids[script], 0x58), 6);
+            AnmManager::interrupt_tree(find_child_id_inline(anm_ids[script], 0x59), 6);
+            goto confirm;
+        }
+    }
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        menu.current_selection = menu.next_selection;
+        if (pressed_or_repeating_inline(INPUT_LEFT))
+        {
+            AnmManager::interrupt_tree(anm_ids[0x5c], 1);
+            anm_ids[0x5c].id = 0;
+            g_SoundManager.play_sound_centered(10, 0);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 25));
+            menu.move_cursor(-1);
+            AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 13));
+        }
+        if (pressed_or_repeating_inline(INPUT_RIGHT))
+        {
+            AnmManager::interrupt_tree(anm_ids[0x5c], 1);
+            anm_ids[0x5c].id = 0;
+            g_SoundManager.play_sound_centered(10, 0);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 19));
+            menu.move_cursor(1);
+            AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 7));
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            set_substate(4);
+            g_SoundManager.play_sound_centered(9, 0);
+            return 1;
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x80), 6);
+            AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x88), 6);
+            AnmManager::interrupt_tree(find_child_id(script, 0x58), 6);
+            AnmManager::interrupt_tree(find_child_id(script, 0x59), 6);
+            g_SoundManager.play_sound_centered(7, 0);
+            set_substate(3);
+            return 1;
+        }
+        break;
+    case 3:
+        if (time_in_state.current >= 14)
+        {
+        confirm:
+            set_state(7);
+            g_Globals.character = menu.next_selection;
+            g_last_character = g_Globals.character;
+            // MenuHelper::push, clearing num_disabled last.
+            menu.stack_selection[menu.stack_depth] = menu.next_selection;
+            menu.stack_num_choices[menu.stack_depth] = menu.num_choices;
+            menu.stack_depth++;
+            if (menu.stack_depth >= 0x10)
+            {
+                menu.stack_depth = 0xf;
+            }
+            menu.num_disabled = 0;
+            menu.wraps = 1;
+            menu.num_choices = 5;
+            menu.set_cursor(g_Globals.character);
+            AnmManager::interrupt_tree(anm_ids[script], 6);
+            AnmManager::interrupt_tree(anm_ids[0x69], 1);
+            anm_ids[0x69].id = 0;
+            return 1;
+        }
+        break;
+    case 4:
+        if (time_in_state.current >= 6)
+        {
+            interrupt_and_clear(script);
+            AnmManager::interrupt_tree(anm_ids[0x69], 1);
+            anm_ids[0x69].id = 0;
+            set_state(5);
+            g_Globals.character = menu.next_selection;
+            menu.pop();
+            g_last_character = g_Globals.character;
         }
         break;
     }
@@ -449,11 +833,11 @@ i32 TitleInf::do_practice_stage_select()
         break;
     case 2:
         menu.current_selection = menu.next_selection;
-        if ((g_hardware_input_pressed & INPUT_UP) || (g_hardware_input_repeat & INPUT_UP))
+        if (pressed_or_repeating_inline(INPUT_UP))
         {
             menu.move_cursor(-1);
         }
-        if ((g_hardware_input_pressed & INPUT_DOWN) || (g_hardware_input_repeat & INPUT_DOWN))
+        if (pressed_or_repeating_inline(INPUT_DOWN))
         {
             menu.move_cursor(1);
         }
@@ -593,6 +977,252 @@ i32 TitleInf::do_practice_stage_select()
             AnmManager::interrupt_tree(anm_ids[0x71], 1);
             anm_ids[0x71].id = 0;
             set_state(7);
+            menu.pop();
+        }
+        break;
+    }
+    return 1;
+}
+
+// The unlock cheat typed on the player data screen ("ILOVEBEER", as
+// DirectInput key codes).
+// GLOBAL: TH16 0x4936d8
+const i32 g_cheat_code[9] = {0x17, 0x26, 0x18, 0x2f, 0x12, 0x30, 0x12, 0x12, 0x13};
+// The keys newly pressed this frame (also scratch space for remapping
+// virtual keys to DirectInput key codes).
+// GLOBAL: TH16 0x4df940
+u8 g_cheat_keys_pressed[0x100];
+// Frames since the last correct key, and how much of the code was typed.
+// GLOBAL: TH16 0x4dfa40
+i32 g_cheat_timer;
+// GLOBAL: TH16 0x4dfa44
+u32 g_cheat_progress;
+// The keyboard this frame and the last.
+// GLOBAL: TH16 0x4dfd60
+u8 g_cheat_keys[0x100];
+// GLOBAL: TH16 0x4dfe60
+u8 g_cheat_prev_keys[0x100];
+
+// The player data screen: difficulty (menu_fc) and character (menu)
+// records, and pages of spell cards (menu_1d4, 0 for none). On Extra with
+// the fourth character selected it also reads the unlock cheat.
+// TODO: the original realigns its frame (and esp, -8), tests the up input after the three selection copies, and ORs the first 16 key bytes into the second.
+// FUNCTION: TH16 0x452330
+i32 TitleInf::do_player_data()
+{
+    switch (substate)
+    {
+    case 0:
+        menu.num_choices = 4;
+        menu.set_cursor(0);
+        menu_fc.num_choices = 5;
+        menu_fc.set_cursor(1);
+        menu_fc.wraps = 1;
+        menu_1d4.num_choices = (count_spells_of_difficulty(menu_fc.next_selection) + 9) / 10 + 1;
+        menu_1d4.set_cursor(0);
+        menu_1d4.wraps = 1;
+        if (anm_id_73c.id == 0)
+        {
+            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+        }
+        anm_ids[0x6d] = title_anm->create_effect(0x6d, -1, NULL);
+        set_substate(1);
+        create_effect(menu.next_selection + 0xa7);
+        create_effect(menu_fc.next_selection + 0xaf);
+        anm_ids[0xb7] = title_anm->create_effect(0xb7, -1, NULL);
+        anm_ids[0xb8] = title_anm->create_effect(0xb8, -1, NULL);
+        anm_ids[0xb9] = title_anm->create_effect(0xb9, -1, NULL);
+        anm_ids[0xba] = title_anm->create_effect(0xba, -1, NULL);
+        anm_ids[0xb4] = title_anm->create_effect(0xb4, -1, NULL);
+        anm_ids[0xb5] = title_anm->create_effect(0xb5, -1, NULL);
+        anm_ids[0xb6] = title_anm->create_effect(0xb6, -1, NULL);
+        anm_ids[0xbb] = title_anm->create_effect(0xbb, -1, NULL);
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        menu_save_selection(&menu);
+        menu_save_selection(&menu_fc);
+        menu_save_selection(&menu_1d4);
+        if (pressed_or_repeating_inline(INPUT_UP))
+        {
+            menu_fc.move_cursor(-1);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xb9], 2);
+        }
+        if (pressed_or_repeating_inline(INPUT_DOWN))
+        {
+            menu_fc.move_cursor(1);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xba], 2);
+        }
+        if (menu_selection_moved(&menu_fc))
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            interrupt_and_clear(menu_fc.current_selection + 0xaf);
+            create_effect(menu_fc.next_selection + 0xaf);
+            if (menu_1d4.next_selection > 0)
+            {
+                menu_1d4.set_cursor(1);
+                draw_spell_card_page();
+            }
+            menu_1d4.num_choices = (count_spells_of_difficulty(menu_fc.next_selection) + 9) / 10 + 1;
+        }
+        if (pressed_or_repeating_inline(INPUT_LEFT))
+        {
+            menu.move_cursor(-1);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xb7], 2);
+        }
+        if (pressed_or_repeating_inline(INPUT_RIGHT))
+        {
+            menu.move_cursor(1);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xb8], 2);
+        }
+        if (menu_selection_moved(&menu))
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            interrupt_and_clear(menu.current_selection + 0xa7);
+            create_effect(menu.next_selection + 0xa7);
+            if (menu_1d4.next_selection > 0)
+            {
+                draw_spell_card_page();
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            if (menu_1d4.next_selection == 0)
+            {
+                for (i32 i = 0; i < 10; i++)
+                {
+                    anm_ids_740[i] = g_Supervisor.text_anm->create_effect(i + 3, -1, NULL);
+                }
+            }
+            menu_1d4.move_cursor(1);
+            if (menu_1d4.next_selection == 0)
+            {
+                for (i32 i = 0; i < 10; i++)
+                {
+                    AnmManager::interrupt_tree(anm_ids_740[i], 1);
+                }
+            }
+            else
+            {
+                draw_spell_card_page();
+            }
+            g_SoundManager.play_sound_centered(7, 0);
+        }
+        if (menu_fc.next_selection == 4 && menu.next_selection == 3)
+        {
+            if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_BOMB | INPUT_MENU | INPUT_ENTER))
+            {
+                g_cheat_progress = 0;
+                g_cheat_timer = 0;
+            }
+            memcpy(g_cheat_prev_keys, g_cheat_keys, sizeof(g_cheat_keys));
+            i32 source = get_keyboard_state(g_cheat_keys);
+            if (source == 2)
+            {
+                // GetKeyboardState gives virtual keys; move the letters to
+                // their DirectInput codes.
+                u8 *remapped = g_cheat_keys_pressed;
+                memset(remapped, 0, 0x100);
+                remapped[DIK_A] = g_cheat_keys['A'];
+                remapped[DIK_B] = g_cheat_keys['B'];
+                remapped[DIK_C] = g_cheat_keys['C'];
+                remapped[DIK_D] = g_cheat_keys['D'];
+                remapped[DIK_E] = g_cheat_keys['E'];
+                remapped[DIK_F] = g_cheat_keys['F'];
+                remapped[DIK_G] = g_cheat_keys['G'];
+                remapped[DIK_H] = g_cheat_keys['H'];
+                remapped[DIK_I] = g_cheat_keys['I'];
+                remapped[DIK_J] = g_cheat_keys['J'];
+                remapped[DIK_K] = g_cheat_keys['K'];
+                remapped[DIK_L] = g_cheat_keys['L'];
+                remapped[DIK_M] = g_cheat_keys['M'];
+                remapped[DIK_N] = g_cheat_keys['N'];
+                remapped[DIK_O] = g_cheat_keys['O'];
+                remapped[DIK_P] = g_cheat_keys['P'];
+                remapped[DIK_Q] = g_cheat_keys['Q'];
+                remapped[DIK_R] = g_cheat_keys['R'];
+                remapped[DIK_S] = g_cheat_keys['S'];
+                remapped[DIK_T] = g_cheat_keys['T'];
+                remapped[DIK_U] = g_cheat_keys['U'];
+                remapped[DIK_V] = g_cheat_keys['V'];
+                remapped[DIK_W] = g_cheat_keys['W'];
+                remapped[DIK_X] = g_cheat_keys['X'];
+                remapped[DIK_Y] = g_cheat_keys['Y'];
+                remapped[DIK_Z] = g_cheat_keys['Z'];
+                memcpy(g_cheat_keys, remapped, 0x100);
+            }
+            else if (source != 1)
+            {
+                goto tick;
+            }
+            for (i32 i = 0; i < 0x100; i++)
+            {
+                g_cheat_keys_pressed[i] = (g_cheat_keys[i] ^ g_cheat_prev_keys[i]) & g_cheat_keys[i];
+            }
+            if (g_cheat_progress >= 9)
+            {
+                g_Scorefile->unlock_all();
+                g_SoundManager.play_sound_centered(17, 0);
+                g_cheat_progress = 0;
+            }
+            else if ((i8)g_cheat_keys_pressed[g_cheat_code[g_cheat_progress]] < 0)
+            {
+                g_cheat_progress++;
+                g_cheat_timer = 0;
+            }
+            else
+            {
+                i8 any = 0;
+                for (i32 i = 0; i < DIK_SPACE; i++)
+                {
+                    any |= g_cheat_keys_pressed[i];
+                }
+                if (any < 0)
+                {
+                    g_cheat_progress = 0;
+                }
+            }
+        tick:
+            g_cheat_timer++;
+            if (g_cheat_timer > 300)
+            {
+                g_cheat_progress = 0;
+                g_cheat_timer = 0;
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            set_substate(3);
+            g_SoundManager.play_sound_centered(9, 0);
+            interrupt_and_clear(menu_fc.next_selection + 0xaf);
+            interrupt_and_clear(menu.next_selection + 0xa7);
+            interrupt_and_clear(0xb7);
+            interrupt_and_clear(0xb8);
+            interrupt_and_clear(0xb9);
+            interrupt_and_clear(0xba);
+            interrupt_and_clear(0xb4);
+            interrupt_and_clear(0xb5);
+            interrupt_and_clear(0xb6);
+            interrupt_and_clear(0xbb);
+            for (i32 i = 0; i < 10; i++)
+            {
+                AnmManager::interrupt_tree(anm_ids_740[i], 1);
+            }
+            return 1;
+        }
+        break;
+    case 3:
+        if (time_in_state.current >= 6)
+        {
+            interrupt_and_clear(0x6d);
+            AnmManager::interrupt_tree(anm_id_73c, 1);
+            anm_id_73c.id = 0;
+            set_state(1);
             menu.pop();
         }
         break;
@@ -858,19 +1488,19 @@ i32 TitleInf::do_replay_menu()
     case 2:
         menu.current_selection = menu.next_selection;
         menu_1d4.current_selection = menu_1d4.next_selection;
-        if ((g_hardware_input_pressed & INPUT_UP) || (g_hardware_input_repeat & INPUT_UP))
+        if (pressed_or_repeating_inline(INPUT_UP))
         {
             menu.move_cursor(-1);
         }
-        if ((g_hardware_input_pressed & INPUT_DOWN) || (g_hardware_input_repeat & INPUT_DOWN))
+        if (pressed_or_repeating_inline(INPUT_DOWN))
         {
             menu.move_cursor(1);
         }
-        if ((g_hardware_input_pressed & INPUT_LEFT) || (g_hardware_input_repeat & INPUT_LEFT))
+        if (pressed_or_repeating_inline(INPUT_LEFT))
         {
             menu_1d4.move_cursor(-1);
         }
-        if ((g_hardware_input_pressed & INPUT_RIGHT) || (g_hardware_input_repeat & INPUT_RIGHT))
+        if (pressed_or_repeating_inline(INPUT_RIGHT))
         {
             menu_1d4.move_cursor(1);
         }
@@ -1228,6 +1858,215 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
     return 1;
 }
 
+// The high score name entry after a game (unk_5a58 is set when the score
+// did not make the top ten), then on to saving the replay unless the game
+// was continued.
+// TODO: the original realigns its frame (and esp, -8) and computes the % 13 column tests with a multiply; ours keeps 13 in ebx for idiv.
+// FUNCTION: TH16 0x4532f0
+i32 TitleInf::do_score_name_entry()
+{
+    switch (substate)
+    {
+    case 0:
+    {
+        menu.num_choices = 30;
+        g_Supervisor.play_bgm_wav(0, "th128_08");
+        g_Supervisor.play_bgm(0, 0x11);
+        if (anm_id_73c.id == 0)
+        {
+            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+        }
+        create_effect(0x6f);
+        set_substate(1);
+        create_effect(g_Globals.subshot + g_Globals.character + 0xa7);
+        create_effect(g_Globals.difficulty + 0xaf);
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x61]) == NULL)
+        {
+            create_effect(0x61);
+            AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
+        }
+        g_Globals.stage_num = 8;
+        i32 rank = ((ScorefileData *)g_Scorefile)->charas[g_Globals.subshot + g_Globals.character].insert_score();
+        g_stage_data = &g_stage_table[0];
+        g_Globals.stage_num = 0;
+        g_Globals.weird_stage_num = 0;
+        if (rank >= 0)
+        {
+            time_in_state.set_value(0);
+            menu.wraps = 1;
+            menu.set_cursor(rank);
+            menu_5a5c.set_cursor(0);
+            menu_5a5c.num_choices = 0x5b;
+            menu_5a5c.wraps = 1;
+            strcpy(replay_name, g_Scorefile->last_replay_name);
+            if (strcmp(replay_name, "        ") != 0)
+            {
+                menu_5a5c.move_cursor(-1);
+            }
+            i32 len;
+            for (len = 8; len > 0 && replay_name[len - 1] == ' '; len--)
+            {
+            }
+            replay_name_cursor = len;
+            unk_5a58 = 0;
+        }
+        else
+        {
+            menu.set_cursor(-1);
+            unk_5a58 = 1;
+        }
+    }
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        if (unk_5a58 == 0)
+        {
+            menu_save_selection(&menu_5a5c);
+            if (input_pressed_or_repeating(INPUT_UP))
+            {
+                menu_5a5c.move_cursor(-13);
+            }
+            if (input_pressed_or_repeating(INPUT_DOWN))
+            {
+                menu_5a5c.move_cursor(13);
+            }
+            if (input_pressed_or_repeating(INPUT_LEFT))
+            {
+                if (menu_5a5c.next_selection % 13 != 0)
+                {
+                    menu_5a5c.move_cursor(-1);
+                }
+                else
+                {
+                    menu_5a5c.move_cursor(12);
+                }
+            }
+            if (input_pressed_or_repeating(INPUT_RIGHT))
+            {
+                if (menu_5a5c.next_selection % 13 != 12)
+                {
+                    menu_5a5c.move_cursor(1);
+                }
+                else
+                {
+                    menu_5a5c.move_cursor(-12);
+                }
+            }
+            if (menu_selection_moved(&menu_5a5c))
+            {
+                g_SoundManager.play_sound_centered(10, 0);
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            if (unk_5a58 == 0)
+            {
+                i32 choice = menu_5a5c.next_selection;
+                if (choice < 88)
+                {
+                    if (replay_name_cursor < 8)
+                    {
+                        replay_name[replay_name_cursor] = g_name_entry_chars[choice];
+                        replay_name_cursor++;
+                        if (replay_name_cursor >= 8)
+                        {
+                            menu_5a5c.set_cursor(90);
+                        }
+                    }
+                    else
+                    {
+                        replay_name[replay_name_cursor - 1] = g_name_entry_chars[choice];
+                    }
+                }
+                else if (choice == 88)
+                {
+                    if (replay_name_cursor < 8)
+                    {
+                        replay_name[replay_name_cursor] = ' ';
+                        replay_name_cursor++;
+                        if (replay_name_cursor >= 8)
+                        {
+                            menu_5a5c.set_cursor(90);
+                        }
+                    }
+                    else
+                    {
+                        replay_name[replay_name_cursor - 1] = ' ';
+                    }
+                }
+                else if (choice == 89)
+                {
+                    if (replay_name_cursor == 0)
+                    {
+                        break;
+                    }
+                    replay_name_cursor--;
+                    replay_name[replay_name_cursor] = ' ';
+                }
+                else if (choice == 90)
+                {
+                    strcpy(((ScorefileData *)g_Scorefile)
+                               ->charas[g_Globals.subshot + g_Globals.character]
+                               .scores[g_Globals.difficulty][menu.next_selection]
+                               .name,
+                           replay_name);
+                    strcpy(g_Scorefile->last_replay_name, replay_name);
+                    set_substate(3);
+                }
+            }
+            else
+            {
+                set_substate(3);
+            }
+            g_SoundManager.play_sound_centered(7, 0);
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            if (unk_5a58 == 0)
+            {
+                if (replay_name_cursor == 0)
+                {
+                    break;
+                }
+                g_SoundManager.play_sound_centered(9, 0);
+                replay_name_cursor--;
+                replay_name[replay_name_cursor] = ' ';
+                return 1;
+            }
+            set_substate(3);
+            g_SoundManager.play_sound_centered(7, 0);
+            return 1;
+        }
+        break;
+    case 3:
+        if (time_in_state.current >= 6)
+        {
+            interrupt_and_clear(0x6f);
+            interrupt_and_clear(g_Globals.subshot + g_Globals.character + 0xa7);
+            interrupt_and_clear(g_Globals.difficulty + 0xaf);
+            if (g_Globals.continues_used == 0)
+            {
+                set_state(15);
+                return 1;
+            }
+            ReplayManager::destroy(g_ReplayManager);
+            AnmManager::interrupt_tree(anm_id_73c, 1);
+            anm_id_73c.id = 0;
+            menu.pop();
+            set_state(1);
+            g_Supervisor.play_bgm_wav(0, "th16_01");
+            g_Supervisor.play_bgm(0, 0);
+        }
+        break;
+    }
+    return 1;
+}
+
 // The high score name entry after a game: the top ten of the character and
 // difficulty played, and while a name is entered, the name and the
 // character grid.
@@ -1472,6 +2311,305 @@ i32 TitleInf::do_manual()
     return 0;
 }
 
+char *__fastcall skip_line(char *p, i32 *remaining);
+char *__fastcall read_line(char *dst, char *src, i32 *remaining);
+
+// The comment shown for a track not heard in the game yet, with the first
+// press of the shot button.
+// GLOBAL: TH16 0x4936b8
+const char *g_music_room_warning[8] = {
+    "\x81@",
+    "\x81@\x81@\x81\x96\x81\x96\x91I\x91\xf0\x82\xb5\x82\xbd\x8b\xc8\x82\xcd\x82\xdc\x82\xbe\x83Q\x81[\x83\x80\x92\x86\x82"
+    "\xc5\x8d\xc4\x90\xb6\x82\xb3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb9\x82\xf1\x81\x96\x81\x96",
+    " ",
+    "\x81@\x81@\x81@\x81@\x8b\xc8\x82\xcc\x83R\x83\x81\x83\x93\x83g\x82\xaa\x83l\x83^\x83o\x83\x8c\x82\xc9\x82\xc8\x82"
+    "\xe9\x8b\xb0\x82\xea\x82\xaa\x82\xa0\x82\xe8\x82\xdc\x82\xb7\x81"
+    "B",
+    "\x81@\x81@\x81@\x81@\x81@\x81@\x81@\x81@\x81@\x82\xbb\x82\xea\x82\xc5\x82\xe0\x8d\xc4\x90\xb6\x82\xb5\x82\xdc\x82"
+    "\xb7\x82\xa9\x81H",
+    "\x81@",
+    "\x81@\x81@\x81@\x8d\xc4\x90\xb6\x82\xb5\x82\xbd\x82\xa2\x95\xfb\x82\xcd\x81"
+    "A\x82\xe0\x82\xa4\x88\xea\x93x\x8c\x88\x92\xe8\x83{\x83^\x83\x93\x82\xf0\x89\x9f\x82\xb5\x82\xc4\x82\xad\x82\xbe"
+    "\x82\xb3\x82\xa2\x81"
+    "B",
+    "\x81@\x81@\x81@\x8d\xc4\x90\xb6\x82\xb5\x82\xbd\x82\xad\x82\xc8\x82\xa2\x95\xfb\x82\xcd\x81"
+    "A\x83J\x81[\x83\\\x83\x8b\x82\xf0\x88\xda\x93\xae\x82\xb5\x82\xc4\x82\xad\x82\xbe\x82\xb3\x82\xa2\x81"
+    "B",
+};
+
+// Writes the next line of the chosen track's comment (or of the warning).
+static __forceinline void music_room_comment_step(TitleInf *menu)
+{
+    if (!(menu->time_in_state.current & 1) && menu->music_comment_line < 8)
+    {
+        AnmVm *vm = menu->anm_ids_7d0[menu->music_comment_line].find_or_clear();
+        if (!g_Scorefile->bgm_unlocked[menu->music_comment_track] && menu->music_warning != 0)
+        {
+            g_AnmManager->draw_text(vm, 0x8080ff, 0, 0, 0, 0, g_music_room_warning[menu->music_comment_line]);
+        }
+        else
+        {
+            g_AnmManager->draw_text(vm, 0xffffff, 0, 0, 0, 0,
+                                    menu->music_comments[menu->music_comment_track][menu->music_comment_line]);
+        }
+        vm->interrupt_out_of_line(2);
+        menu->music_comment_line++;
+    }
+}
+
+// The music room: the track list (ten rows shown, sliding in two at a time
+// at first) and the comment of the track last picked. Tracks not heard in
+// the game yet show as numbers, and playing one asks for a second press.
+// TODO: ours adds a /GS cookie for pos (a D3DXVECTOR3 in memory, see README) and keeps pos.x in memory in the scroll loop where the original uses xmm2.
+// FUNCTION: TH16 0x4546f0
+i32 TitleInf::do_music_room()
+{
+    Float3 pos;
+    switch (substate)
+    {
+    case 0:
+        if (time_in_state.current == 1)
+        {
+            menu.num_choices = 6;
+            menu.set_cursor(0);
+            if (anm_id_73c.id == 0)
+            {
+                anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            }
+            create_effect(0x6e);
+            i32 count = 0;
+            i32 size;
+            char *p = (char *)file_read_all("musiccmt.txt", &size, 0);
+            unk_5ce0 = p;
+            if (p == NULL)
+            {
+                goto leave;
+            }
+            while (size > 0)
+            {
+                if (*p == '#')
+                {
+                    p = skip_line(p, &size);
+                }
+                else if (*p == '@')
+                {
+                    p = read_line(music_filenames[count], p + 1, &size);
+                    p = read_line(music_titles[count], p, &size);
+                    for (i32 i = 0; i < 8; i++)
+                    {
+                        p = read_line(music_comments[count][i], p, &size);
+                    }
+                    count++;
+                }
+                else
+                {
+                    p = skip_line(p, &size);
+                }
+            }
+            menu.num_choices = count;
+            menu.set_cursor(0);
+            music_scroll = 0;
+            music_track_count = count;
+            pos.x = 0.0f;
+            pos.y = 0.0f;
+            pos.z = 0.0f;
+            for (i32 i = 0; i < 8; i++)
+            {
+                anm_ids_7d0[i] = g_Supervisor.text_anm->create_vm_inline(i + 0x13, &pos, 0.0f, -1);
+            }
+            music_comment_line = 0;
+            music_comment_track = 0;
+            music_warning = 0;
+        }
+        if (time_in_state.current < 10)
+        {
+            pos.x = 128.0f;
+            pos.y = (96.0f - music_scroll * 20.0f + (time_in_state.current * 40 - 40)) * 2.0f;
+            pos.z = 0.0f;
+            for (i32 i = time_in_state.current * 2 - 2; i < time_in_state.current * 2; i++)
+            {
+                if (i >= music_track_count)
+                {
+                    break;
+                }
+                anm_ids_740[0x10 + i] = title_anm->create_vm_inline(i + 0xbc, NULL, 0.0f, -1);
+                AnmVm *vm = get_vm_or_clear(anm_ids_740[0x10 + i]);
+                if (g_Scorefile->bgm_unlocked[i])
+                {
+                    g_AnmManager->draw_text(vm, 0xffffff, 0, 0, 0, 0, music_titles[i]);
+                }
+                else
+                {
+                    g_AnmManager->draw_text(vm, 0xffffff, 0, 0, 0, 0,
+                                            "No.%2d  \x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H", i + 1);
+                }
+                if (i >= music_scroll && i < music_scroll + 10)
+                {
+                    vm->set_flag_lo_2_tree_inline();
+                }
+                else
+                {
+                    vm->clear_flag_lo_2_tree_inline();
+                }
+                if (i == menu.next_selection)
+                {
+                    pos.x -= 8.0;
+                }
+                vm->set_pos_time(4, 0, &vm->pos, &pos);
+                if (i == menu.next_selection)
+                {
+                    pos.x += 8.0;
+                }
+                pos.y += 40.0f;
+                vm->interrupt(i != menu.next_selection ? 3 : 2);
+            }
+        }
+        if (time_in_state.current >= 10)
+        {
+            substate = 1;
+            time_in_state.reset();
+            return 0;
+        }
+        break;
+    case 1:
+        music_room_comment_step(this);
+        if (time_in_state.current > 4)
+        {
+            set_substate(2);
+            return 0;
+        }
+        break;
+    case 2:
+        music_room_comment_step(this);
+        menu.current_selection = menu.next_selection;
+        if (pressed_or_repeating_inline(INPUT_UP))
+        {
+            menu.move_cursor(-1);
+        }
+        if (pressed_or_repeating_inline(INPUT_DOWN))
+        {
+            menu.move_cursor(1);
+        }
+        if (menu.current_selection != menu.next_selection)
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            if (menu.next_selection < music_scroll)
+            {
+                music_scroll = menu.next_selection;
+            }
+            else if (menu.next_selection >= music_scroll + 10)
+            {
+                music_scroll = menu.next_selection - 9;
+            }
+            pos.x = 128.0f;
+            pos.y = (96.0f - music_scroll * 20.0f) * 2.0f;
+            pos.z = 0.0f;
+            for (i32 i = 0; i < music_track_count; i++)
+            {
+                AnmVm *vm = get_vm_or_clear(anm_ids_740[0x10 + i]);
+                if (i >= music_scroll && i < music_scroll + 10)
+                {
+                    vm->set_flag_lo_2_tree();
+                }
+                else
+                {
+                    vm->clear_flag_lo_2_tree_inline();
+                }
+                if (i == menu.next_selection)
+                {
+                    pos.x -= 8.0;
+                }
+                if ((f32)fabs(vm->pos.y - pos.y) < 80.0f)
+                {
+                    vm->set_pos_time(4, 0, &vm->pos, &pos);
+                }
+                else
+                {
+                    vm->pos = pos;
+                }
+                if (i == menu.next_selection)
+                {
+                    pos.x += 8.0;
+                }
+                pos.y += 40.0f;
+                vm->interrupt(i != menu.next_selection ? 3 : 2);
+            }
+            if (music_comment_line >= 8)
+            {
+                music_warning = 0;
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            for (i32 i = 0; i < 8; i++)
+            {
+                AnmManager::interrupt_tree(anm_ids_7d0[i], 3);
+            }
+            music_comment_track = menu.next_selection;
+            music_comment_line = 0;
+            time_in_state.reset();
+            if (!g_Scorefile->bgm_unlocked[music_comment_track] && music_warning == 0)
+            {
+                if (g_Supervisor.config.flags_2c & 0x10)
+                {
+                    g_SoundManager.modify_bgm(4, 0, "dummy");
+                }
+                else
+                {
+                    g_SoundManager.modify_bgm(3, 0, "dummy");
+                }
+                music_warning = 1;
+                return 0;
+            }
+            g_Supervisor.play_bgm_wav(0, music_filenames[menu.next_selection]);
+            if (g_Supervisor.config.flags_2c & 0x10)
+            {
+                g_SoundManager.modify_bgm(4, 0, "dummy");
+            }
+            g_SoundManager.modify_bgm(2, 0, "dummy");
+            g_Scorefile->bgm_unlocked[0] = 1;
+            music_warning = 0;
+            return 0;
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+        leave:
+            if (unk_5ce0 != NULL)
+            {
+                free(unk_5ce0);
+                unk_5ce0 = NULL;
+            }
+            unk_5ce0 = NULL;
+            for (i32 i = 0; i < music_track_count; i++)
+            {
+                AnmManager::interrupt_tree(anm_ids_740[0x10 + i], 1);
+            }
+            for (i32 i = 0; i < 8; i++)
+            {
+                AnmManager::interrupt_tree(anm_ids_7d0[i], 1);
+            }
+            g_SoundManager.play_sound_centered(9, 0);
+            substate = 3;
+            time_in_state.reset();
+            return 0;
+        }
+        break;
+    case 3:
+        if (time_in_state.current >= 10)
+        {
+            interrupt_and_clear(0x6e);
+            AnmManager::interrupt_tree(anm_id_73c, 1);
+            anm_id_73c.id = 0;
+            set_state(1);
+            g_Supervisor.play_bgm_wav(0, "th16_01");
+            g_Supervisor.play_bgm(0, 0);
+            menu.pop();
+        }
+        break;
+    }
+    return 0;
+}
+
 // Spell practice: picking the stage. Coming back from a game goes straight
 // on to the spell card list of the last stage.
 // TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
@@ -1607,11 +2745,11 @@ i32 TitleInf::do_spell_practice_character()
         g_Globals.character = character_menu->next_selection;
         if (state == 18)
         {
-            load_spell_list(spell_stage, menu.next_selection, spell_ids, 0);
+            load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
         }
         else if (state == 19)
         {
-            load_spell_list(spell_stage, spell_row, spell_ids, 0);
+            load_spell_list(spell_stage, spell_row, spell_ids, -1);
             highlight_spell_row(menu.next_selection);
         }
     }
@@ -1624,11 +2762,11 @@ i32 TitleInf::do_spell_practice_character()
         g_Globals.character = character_menu->next_selection;
         if (state == 18)
         {
-            load_spell_list(spell_stage, menu.next_selection, spell_ids, 0);
+            load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
         }
         else if (state == 19)
         {
-            load_spell_list(spell_stage, spell_row, spell_ids, 0);
+            load_spell_list(spell_stage, spell_row, spell_ids, -1);
             highlight_spell_row(menu.next_selection);
         }
     }
@@ -1663,13 +2801,13 @@ i32 TitleInf::do_spell_practice_row()
         {
             menu.set_cursor(g_spell_practice_last_row);
             g_spell_practice_last_row = -1;
-            load_spell_list(spell_stage, menu.next_selection, spell_ids, 0);
+            load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd8], 3);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd8], (i16)(menu.next_selection + 7));
             AnmManager::interrupt_tree_and_run(anm_ids[0xd8], 6);
             goto start_list;
         }
-        load_spell_list(spell_stage, menu.next_selection, spell_ids, 0);
+        load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
     case 1:
         if (time_in_state.current > 10)
         {
@@ -1693,7 +2831,7 @@ i32 TitleInf::do_spell_practice_row()
             g_SoundManager.play_sound_centered(10, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd8], 3);
             AnmManager::interrupt_tree(anm_ids[0xd8], (i16)(menu.next_selection + 7));
-            load_spell_list(spell_stage, menu.next_selection, spell_ids, 0);
+            load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
         }
         do_spell_practice_character();
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
@@ -1985,6 +3123,192 @@ i32 TitleInf::do_spell_practice_difficulty()
         break;
     }
     return 1;
+}
+
+// AnmManager::interrupt_tree as LTCG inlined it into load_spell_list.
+static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
+{
+    AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+    if (vm == NULL)
+    {
+        return;
+    }
+    vm->interrupt(interrupt);
+    for (ZunList<AnmVm> *node = vm->list_of_children.next; node != NULL; node = node->next)
+    {
+        node->entry->interrupt(interrupt);
+    }
+}
+
+// Whether the first count spell cards of a row are captured (in any mode),
+// which unlocks the row's overdrive card.
+static __forceinline i32 spell_row_captured(const i32 *row, i32 count)
+{
+    for (i32 i = 0; i < count; i++, row++)
+    {
+        if (g_Scorefile->characters[4].spells[*row].captures[0] == 0 &&
+            g_Scorefile->characters[4].spells[*row].captures[1] == 0)
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+// Spell practice: lists the spell cards of a stage's boss attack, one row
+// per difficulty (Extra and the overdrive card share the last rows), with
+// their names once attempted and the chosen character's captures
+// highlighted. Rows are highlighted with interrupt 2 when they are the
+// selected one (-1 at every call site; LTCG folded it).
+// TODO: the original keeps g_AnmManager in edi across the first lookups (get_vm_with_id is an opaque stub here) and this in ebx in the main loop.
+// FUNCTION: TH16 0x4560b0
+HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 selected)
+{
+    char name[0xc1];
+    ids[0] = -2;
+    ids[1] = -2;
+    ids[2] = -2;
+    ids[3] = -2;
+    ids[4] = -2;
+    for (i32 i = 0; i < 7; i++)
+    {
+        g_AnmManager->delete_vm_inline(anm_ids[0x10d + i]);
+    }
+    for (i32 i = 0; i < 5; i++)
+    {
+        if (get_vm_or_clear(anm_ids_740[i]) == NULL)
+        {
+            anm_ids_740[i] = title_anm->create_vm_inline(i + 0xd2, NULL, 0.0f, -1);
+        }
+        interrupt_tree_inline(anm_ids_740[i], 2);
+        g_AnmManager->draw_text(get_vm_or_clear(anm_ids_740[i]), 0x808080, 0, 0, 0, 0, " Nothing ... ");
+    }
+    if (stage != 6)
+    {
+        for (i32 i = 0; i < 4; i++)
+        {
+            anm_ids[0x10d + i] = title_anm->create_effect(i + 0x10d, -1, NULL);
+            AnmManager::interrupt_tree_and_run(anm_ids[0x10d + i], 3);
+        }
+    }
+    i32 last_slot = 0;
+    const i32 *row_ids = g_spell_practice_ids[stage][row];
+    const i32 *next_id = row_ids;
+    for (i32 i = 0; i < 5; i++, next_id++)
+    {
+        i32 id = *next_id;
+        if (id < 0)
+        {
+            break;
+        }
+        i8 difficulty;
+        i32 slot;
+        if (stage == 6)
+        {
+            if (g_spell_difficulty[id] == 4)
+            {
+                anm_ids[0x111] = title_anm->create_effect(0x111, -1, NULL);
+            }
+            else if (g_spell_difficulty[id] == 5)
+            {
+                anm_ids[0x113] = title_anm->create_effect(0x113, -1, NULL);
+            }
+            difficulty = g_spell_difficulty[id];
+            slot = difficulty != 4;
+        }
+        else
+        {
+            if (g_spell_difficulty[id] >= 5)
+            {
+                anm_ids[0x112] = title_anm->create_effect(0x112, -1, NULL);
+                AnmManager::interrupt_tree_and_run(anm_ids[0x112], 3);
+            }
+            difficulty = g_spell_difficulty[id];
+            slot = difficulty >= 5 ? 4 : difficulty;
+        }
+        i32 overdrive_open = 0;
+        if (difficulty >= 5)
+        {
+            overdrive_open = spell_row_captured(row_ids, i);
+        }
+        if (g_Scorefile->characters[4].spells[id].attempts[0] == 0 && !overdrive_open)
+        {
+            ids[slot] = -1;
+            g_AnmManager->draw_text(get_vm_or_clear(anm_ids_740[slot]), 0xb0b0b0, 0, 0, 0, 0,
+                                    " No.%3d  \x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H", id + 1);
+        }
+        else
+        {
+            ids[slot] = id;
+            if (g_Scorefile->characters[4].spells[id].attempts[0] == 0 &&
+                g_Scorefile->characters[4].spells[id].attempts[1] == 0)
+            {
+                if (difficulty >= 5)
+                {
+                    // オーバードライブモード挑戦可能！ ("Overdrive mode open!")
+                    strcpy(name, "\x83I\x81[\x83o\x81[\x83h\x83\x89\x83"
+                                 "C\x83u\x83\x82\x81[\x83h\x92\xa7\x90\xed\x89\xc2\x94\\\x81I");
+                }
+                else
+                {
+                    // 挑戦可能！ ("Open!")
+                    strcpy(name, "\x92\xa7\x90\xed\x89\xc2\x94\\\x81I");
+                }
+            }
+            else
+            {
+                strcpy(name, g_Scorefile->characters[4].spells[id].name);
+            }
+            i32 len = strlen(name);
+            for (; len < 42; len++)
+            {
+                name[len] = ' ';
+            }
+            name[len] = '\0';
+            ScorefileCharacter *character = &g_Scorefile->characters[menu_5cec.next_selection];
+            AnmVm *vm = get_vm_or_clear(anm_ids_740[slot]);
+            g_AnmManager->draw_text(vm, character->spells[id].captures[1] != 0 ? 0xffff80 : 0xefefef, 0, 0, 0, 0,
+                                    " No.%3d  %s", id + 1, name);
+        }
+        interrupt_tree_inline(anm_ids_740[slot], 2);
+        if (last_slot < slot)
+        {
+            last_slot = slot;
+        }
+    }
+    if (stage != 6)
+    {
+        for (i32 i = 0; i < 5; i++)
+        {
+            if (i == selected)
+            {
+                interrupt_tree_inline(anm_ids_740[i], 2);
+            }
+            else
+            {
+                interrupt_tree_inline(anm_ids_740[i], 3);
+            }
+        }
+    }
+    else
+    {
+        for (i32 i = 0; i < 2; i++)
+        {
+            if (i == selected)
+            {
+                interrupt_tree_inline(anm_ids_740[i], 2);
+            }
+            else
+            {
+                interrupt_tree_inline(anm_ids_740[i], 3);
+            }
+        }
+    }
+    for (i32 i = last_slot + 1; i < 5; i++)
+    {
+        delete_vm_inline_and_clear(anm_ids_740[i]);
+    }
+    return 0;
 }
 
 // Highlights the selected row of the spell list (interrupt 2) and dims the

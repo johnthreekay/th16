@@ -197,8 +197,8 @@ struct Supervisor
     // Runs a loader function on `thread`. Every caller passes NULL for arg,
     // which LTCG folds; the loaders themselves are plain void functions.
     HARNESS_CALLED i32 start_thread(ThreadStart start, void *arg);
-    i32 play_bgm_wav(i32 arg, const char *name);
-    i32 play_bgm(i32 arg, i32 track);
+    HARNESS_CALLED i32 play_bgm_wav(i32 arg, const char *name);
+    HARNESS_CALLED i32 play_bgm(i32 arg, i32 track);
     i32 stop_bgm();
     HARNESS_CALLED i32 fade_out_bgm(f32 seconds);
     // 0x43b480. Opens th16.dat and reads the version file from it, for

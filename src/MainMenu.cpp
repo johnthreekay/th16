@@ -18,6 +18,11 @@ static_assert(offsetof(TitleInf, menu) == 0x24, "TitleInf::menu");
 static_assert(offsetof(TitleInf, time_in_state) == 0x2ac, "TitleInf::time_in_state");
 static_assert(offsetof(TitleInf, anm_ids) == 0x2c0, "TitleInf::anm_ids");
 static_assert(offsetof(TitleInf, anm_id_73c) == 0x73c, "TitleInf::anm_id_73c");
+static_assert(offsetof(TitleInf, music_track_count) == 0x7f4, "TitleInf::music_track_count");
+static_assert(offsetof(TitleInf, music_filenames) == 0x804, "TitleInf::music_filenames");
+static_assert(offsetof(TitleInf, music_titles) == 0x1004, "TitleInf::music_titles");
+static_assert(offsetof(TitleInf, music_comments) == 0x1844, "TitleInf::music_comments");
+static_assert(offsetof(TitleInf, music_scroll) == 0x5a44, "TitleInf::music_scroll");
 static_assert(offsetof(TitleInf, replay_name) == 0x5a48, "TitleInf::replay_name");
 static_assert(offsetof(TitleInf, menu_5a5c) == 0x5a5c, "TitleInf::menu_5a5c");
 static_assert(offsetof(TitleInf, key_config) == 0x5b34, "TitleInf::key_config");
@@ -396,6 +401,134 @@ i32 TitleInf::do_options()
     return 1;
 }
 
+// Rows above the cursor get interrupt 30, rows below it 31; the digits of
+// the two volumes follow their rows.
+// TODO: the original keeps g_AnmManager in esi/ebx across the lookups (get_vm_with_id is an opaque stub here), which changes the inlined searches' registers.
+// FUNCTION: TH16 0x44c8c0
+void TitleInf::update_options_cursor()
+{
+    i32 i;
+    for (i = 0; i < menu.next_selection; i++)
+    {
+        interrupt_child_and_run(1, i + 0x17, 0x1e);
+        interrupt_child_and_run(1, i + 0x1c, 0x1e);
+    }
+    for (i++; i < 5; i++)
+    {
+        interrupt_child_and_run(1, i + 0x17, 0x1f);
+        interrupt_child_and_run(1, i + 0x1c, 0x1f);
+    }
+    if (menu.next_selection > 0)
+    {
+        interrupt_child_and_run_inline(anm_ids[1], 0x21, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x22, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x23, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x24, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x25, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x26, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x27, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x28, 0x1e);
+    }
+    if (menu.next_selection > 1)
+    {
+        interrupt_child_and_run_inline(anm_ids[1], 0x29, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2a, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2b, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2c, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2d, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2e, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2f, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x30, 0x1e);
+    }
+    else if (menu.next_selection < 1)
+    {
+        interrupt_child_and_run(1, 0x29, 0x1f);
+        interrupt_child_and_run(1, 0x2a, 0x1f);
+        interrupt_child_and_run(1, 0x2b, 0x1f);
+        interrupt_child_and_run(1, 0x2c, 0x1f);
+        interrupt_child_and_run(1, 0x2d, 0x1f);
+        interrupt_child_and_run(1, 0x2e, 0x1f);
+        interrupt_child_and_run(1, 0x2f, 0x1f);
+        interrupt_child_and_run(1, 0x30, 0x1f);
+    }
+}
+
+// Applies the volumes and shows them: three digits each, in two layers of
+// sprites, with leading zeros hidden.
+// TODO: the original keeps g_AnmManager in edi across the lookups (get_vm_with_id is an opaque stub here).
+// FUNCTION: TH16 0x44dc70
+void TitleInf::update_options_sprites()
+{
+    g_SoundManager.bgm_volume = g_Supervisor.config.bgm_volume;
+    g_SoundManager.modify_bgm(8, 0, "SetVol");
+    g_SoundManager.se_volume = g_Supervisor.config.se_volume;
+    if (g_SoundManager.se_volume != 0)
+    {
+        f32 x = g_SoundManager.bgm_volume / 100.0f;
+        f32 t = (1.0f - x) * (1.0f - x);
+        f32 u = 1.0f - t * t;
+        g_SoundManager.bgm_db = -5000 - (i32)(u * -5000.0f);
+    }
+    else
+    {
+        g_SoundManager.bgm_db = -10000;
+    }
+    set_child_sprite(get_child_vm(anm_ids[1], 0x21), g_Supervisor.config.bgm_volume / 100 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x22), g_Supervisor.config.bgm_volume / 10 % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x23), g_Supervisor.config.bgm_volume % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x25), g_Supervisor.config.bgm_volume / 100 + 0x35);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x26), g_Supervisor.config.bgm_volume / 10 % 10 + 0x35);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x27), g_Supervisor.config.bgm_volume % 10 + 0x35);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x29), g_Supervisor.config.se_volume / 100 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x2a), g_Supervisor.config.se_volume / 10 % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x2b), g_Supervisor.config.se_volume % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x2d), g_Supervisor.config.se_volume / 100 + 0x35);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x2e), g_Supervisor.config.se_volume / 10 % 10 + 0x35);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x2f), g_Supervisor.config.se_volume % 10 + 0x35);
+    if (g_Supervisor.config.bgm_volume < 10)
+    {
+        get_child_vm(anm_ids[1], 0x21)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x22)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x25)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x26)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+    }
+    else if (g_Supervisor.config.bgm_volume < 100)
+    {
+        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_FLAG_LO_2;
+    }
+    else
+    {
+        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_FLAG_LO_2;
+    }
+    if (g_Supervisor.config.se_volume < 10)
+    {
+        get_child_vm(anm_ids[1], 0x29)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x2a)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x2d)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x2e)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+    }
+    else if (g_Supervisor.config.se_volume < 100)
+    {
+        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_FLAG_LO_2;
+    }
+    else
+    {
+        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_FLAG_LO_2;
+    }
+}
+
 // TODO: the original realigns its frame to 8 bytes, and does not merge the two input tests into (pressed | repeat) & mask.
 // FUNCTION: TH16 0x44e930
 i32 TitleInf::do_key_config()
@@ -507,6 +640,33 @@ i32 TitleInf::do_key_config()
     return 1;
 }
 
+// Two digits per action, in two layers of sprites.
+// TODO: the original keeps g_AnmManager in edi across the lookups (get_vm_with_id is an opaque stub here).
+// FUNCTION: TH16 0x44ec60
+void TitleInf::update_key_config_sprites()
+{
+    set_child_sprite(get_child_vm(anm_ids[2], 0x3f), key_config[0] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x40), key_config[0] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x49), key_config[0] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4a), key_config[0] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x41), key_config[1] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x42), key_config[1] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4b), key_config[1] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4c), key_config[1] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x43), key_config[2] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x44), key_config[2] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4d), key_config[2] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4e), key_config[2] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x45), key_config[3] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x46), key_config[3] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4f), key_config[3] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x50), key_config[3] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x47), key_config[4] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x48), key_config[4] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x51), key_config[4] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x52), key_config[4] % 10 + 0x2a);
+}
+
 // FUNCTION: TH16 0x44f710
 void TitleInf::set_key(i32 action, i32 key)
 {
@@ -526,8 +686,41 @@ void TitleInf::set_key(i32 action, i32 key)
     g_SoundManager.play_sound_centered(7, 0);
 }
 
+// Rows above the cursor get interrupt 30, rows below it 31; the five
+// remappable actions have two more pairs of sprites each.
+// TODO: the original keeps g_AnmManager in edi across the lookups (get_vm_with_id is an opaque stub here) and reserves a 12-byte frame.
+// FUNCTION: TH16 0x44f810
+void TitleInf::update_key_config_cursor()
+{
+    i32 i;
+    for (i = 0; i < menu.next_selection; i++)
+    {
+        interrupt_child_and_run(2, i + 0x31, 0x1e);
+        interrupt_child_and_run(2, i + 0x38, 0x1e);
+        if (i < 5)
+        {
+            interrupt_child_and_run(2, i * 2 + 0x3f, 0x1e);
+            interrupt_child_and_run(2, i * 2 + 0x40, 0x1e);
+            interrupt_child_and_run(2, i * 2 + 0x49, 0x1e);
+            interrupt_child_and_run(2, i * 2 + 0x4a, 0x1e);
+        }
+    }
+    for (i++; i < 7; i++)
+    {
+        interrupt_child_and_run(2, i + 0x31, 0x1f);
+        interrupt_child_and_run(2, i + 0x38, 0x1f);
+    }
+    for (i = menu.next_selection + 1; i < 5; i++)
+    {
+        interrupt_child_and_run(2, i * 2 + 0x3f, 0x1f);
+        interrupt_child_and_run(2, i * 2 + 0x40, 0x1f);
+        interrupt_child_and_run(2, i * 2 + 0x49, 0x1f);
+        interrupt_child_and_run(2, i * 2 + 0x4a, 0x1f);
+    }
+}
+
 // FUNCTION: TH16 0x44a800
-i32 Scorefile::has_cleared(i32 character)
+HARNESS_CALLED i32 Scorefile::has_cleared(i32 character)
 {
     if (characters[character].clears[0] != 0 || characters[character].clears[1] != 0 ||
         characters[character].clears[2] != 0 || characters[character].clears[3] != 0)
@@ -540,7 +733,7 @@ i32 Scorefile::has_cleared(i32 character)
 // FUNCTION: TH16 0x44a850
 HARNESS_CALLED i32 Scorefile::any_cleared()
 {
-    if (has_cleared(0) || has_cleared(1) || has_cleared(2) || has_cleared(3))
+    if (has_cleared_inline(0) || has_cleared_inline(1) || has_cleared_inline(2) || has_cleared(3))
     {
         return 1;
     }
@@ -597,7 +790,7 @@ HARNESS_CALLED void Scorefile::unlock_all()
 // The spell cards of each stage (Extra last) in spell practice: one row per
 // boss attack, one id per difficulty, -1 after the last.
 // GLOBAL: TH16 0x490ee0
-const i32 g_spell_practice_ids[7][13][5] = {
+extern const i32 g_spell_practice_ids[7][13][5] = {
     {{0, 1, 2, 3, -1}, {4, 5, 6, 7, -1}},
     {{8, 9, 10, 11, -1}, {12, 13, 14, 15, -1}, {16, 17, 18, 19, -1}},
     {{20, 21, -1}, {22, 23, 24, 25, -1}, {26, 27, 28, 29, -1}, {30, 31, 32, 33, -1}},
@@ -664,7 +857,7 @@ char *__fastcall skip_line(char *p, i32 *remaining)
 
 // Copies the line starting at src into dst and returns the start of the
 // next line.
-// TODO: the second loop reloads *remaining each time; the original keeps the count in ecx and stores it at the loop top.
+// TODO: ours pads the second loop's head with a nop to 16 bytes; the original does not align it.
 // FUNCTION: TH16 0x455370
 char *__fastcall read_line(char *dst, char *src, i32 *remaining)
 {
@@ -686,15 +879,19 @@ char *__fastcall read_line(char *dst, char *src, i32 *remaining)
     *p = '\0';
     strcpy(dst, src);
     p++;
-    *remaining = left - 1;
-    while (*p == '\n' || *p == '\r')
+    for (i32 n = left - 1;; n--)
     {
-        if (*remaining == 0)
+        char c = *p;
+        *remaining = n;
+        if (c != '\n' && c != '\r')
+        {
+            break;
+        }
+        if (n == 0)
         {
             return p;
         }
         p++;
-        (*remaining)--;
     }
     return p;
 }
