@@ -264,44 +264,44 @@ int EnemyData::ecl_run_over_300()
     switch ((i16)instr->opcode)
     {
     // enmCreateF and its variants: only without a boss.
-    case 309:
-    case 310:
-    case 311:
-    case 312:
+    case ECL_OP_ENM_CREATE_F:
+    case ECL_OP_ENM_CREATE_AF:
+    case ECL_OP_ENM_CREATE_MF:
+    case ECL_OP_ENM_CREATE_AMF:
         if (g_EnemyManager->get_boss(0) != NULL)
         {
             break;
         }
     // enmCreate, enmCreateA, enmCreateM, enmCreateAM, enmCreate321.
-    case 300:
-    case 301:
-    case 304:
-    case 305:
-    case 321:
+    case ECL_OP_ENM_CREATE:
+    case ECL_OP_ENM_CREATE_A:
+    case ECL_OP_ENM_CREATE_M:
+    case ECL_OP_ENM_CREATE_AM:
+    case ECL_OP_ENM_CREATE_321:
         ecl_enm_create();
         break;
     // anmSelect(file)
-    case 302:
+    case ECL_OP_ANM_SELECT:
         selected_anm_index = full->context.current_context->get_int_arg(0);
         break;
     // moveSetMirror(mirrored)
-    case 424:
+    case ECL_OP_MOVE_SET_MIRROR:
         ((EnemyFlagsLow *)&flags_low)->mirrored = full->context.current_context->get_int_arg(0);
         break;
     // lifeHide(hide)
-    case 631:
+    case ECL_OP_LIFE_HIDE:
         g_EnemyManager->inner.life_bar_hidden = full->context.current_context->get_int_arg(0);
         break;
     // zIndex(layer)
-    case 552:
+    case ECL_OP_Z_INDEX:
         anm_layers = full->context.current_context->get_int_arg(0);
         break;
     // hitSound(sound)
-    case 553:
+    case ECL_OP_HIT_SOUND:
         hit_sound = full->context.current_context->get_int_arg(0);
         break;
     // scoreAdd(points)
-    case 638:
+    case ECL_OP_SCORE_ADD:
     {
         i32 points = full->context.current_context->get_int_arg(0);
         g_Globals.add_to_score(points);
@@ -309,11 +309,11 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // anmSetSprite(slot, script)
-    case 303:
+    case ECL_OP_ANM_SET_SPRITE:
         ecl_anm_set_sprite();
         break;
     // anmMove(slot, x, y): the offset of a slot's VM.
-    case 320:
+    case ECL_OP_ANM_MOVE:
     {
         i32 slot = full->context.current_context->get_int_arg(0);
         anm_pos_array[slot].x = full->context.current_context->get_float_arg(1);
@@ -322,35 +322,35 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // The instructions that change one of the enemy's VMs.
-    case 319:
-    case 325:
-    case 326:
-    case 327:
-    case 328:
-    case 329:
-    case 330:
-    case 331:
-    case 332:
-    case 333:
-    case 335:
-    case 336:
-    case 337:
+    case ECL_OP_ANM_ROTATE:
+    case ECL_OP_ANM_COLOR:
+    case ECL_OP_ANM_COLOR_TIME:
+    case ECL_OP_ANM_ALPHA:
+    case ECL_OP_ANM_ALPHA_TIME:
+    case ECL_OP_ANM_SCALE:
+    case ECL_OP_ANM_SCALE_TIME:
+    case ECL_OP_ANM_ALPHA2:
+    case ECL_OP_ANM_ALPHA2_TIME:
+    case ECL_OP_ANM_POS_TIME:
+    case ECL_OP_ANM_SCALE2:
+    case ECL_OP_ANM_LAYER:
+    case ECL_OP_ANM_BLEND_MODE:
         ecl_anm_vm_instr();
         break;
     // unknown566: dies now.
-    case 566:
+    case ECL_OP_DIE_NOW:
         if (full->die())
         {
             return 1;
         }
         break;
     // enm323(file, script): the death animation.
-    case 323:
+    case ECL_OP_DEATH_ANM:
         death_anm_index = full->context.current_context->get_int_arg(0);
         death_anm_script = full->context.current_context->get_int_arg(1);
         break;
     // die: the death sound and animation without dying.
-    case 561:
+    case ECL_OP_DIE:
         if (death_sound >= 0)
         {
             g_SoundManager.play_sound_at_position(death_sound, final_pos.pos.x);
@@ -368,15 +368,15 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // enm322(index, value)
-    case 322:
+    case ECL_OP_ANM_PARENT:
         anm_parent_slot[full->context.current_context->get_int_arg(0)] = full->context.current_context->get_int_arg(1);
         break;
     // stageLogo
-    case 554:
+    case ECL_OP_STAGE_LOGO:
         show_stage_logo();
         break;
     // anmPlayPos(file, script, x, y, rotation)
-    case 338:
+    case ECL_OP_ANM_PLAY_POS:
     {
         Float3 pos = final_pos.pos + Float3(full->context.current_context->get_float_arg(2), full->context.current_context->get_float_arg(3), 0.0f);
         g_EffectManager->track(create_vm_front_at(g_EnemyManager->anim_statement_anms[full->context.current_context->get_int_arg(0)], full->context.current_context->get_int_arg(1),
@@ -384,17 +384,17 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // anmPlay(file, script)
-    case 307:
+    case ECL_OP_ANM_PLAY:
         g_EffectManager->track(create_vm_front_at(g_EnemyManager->anim_statement_anms[full->context.current_context->get_int_arg(0)], full->context.current_context->get_int_arg(1),
                                                   &final_pos.pos, 0.0f));
         break;
     // anmPlayHigh(file, script)
-    case 314:
+    case ECL_OP_ANM_PLAY_HIGH:
         g_EffectManager->track(
             g_EnemyManager->anim_statement_anms[full->context.current_context->get_int_arg(0)]->create_vm(full->context.current_context->get_int_arg(1), &final_pos.pos, 0.0f, -1, 0));
         break;
     // anmPlayAbs(file, script)
-    case 308:
+    case ECL_OP_ANM_PLAY_ABS:
     {
         i32 file = full->context.current_context->get_int_arg(0);
         g_EffectManager->track(g_EnemyManager->anim_statement_anms[file]->create_vm_front(full->context.current_context->get_int_arg(1), -1, 0));
@@ -402,7 +402,7 @@ int EnemyData::ecl_run_over_300()
     }
     // anm339(file, script, frames): anmPlayAbs, then runs the VM for some
     // frames at once.
-    case 339:
+    case ECL_OP_ANM_339:
     {
         i32 file = full->context.current_context->get_int_arg(0);
         AnmId id = g_EnemyManager->anim_statement_anms[file]->create_vm_front(full->context.current_context->get_int_arg(1), -1, 0);
@@ -415,7 +415,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // anmPlayRotate(file, script, rotation)
-    case 315:
+    case ECL_OP_ANM_PLAY_ROTATE:
     {
         AnmId id = create_vm_front_at(g_EnemyManager->anim_statement_anms[full->context.current_context->get_int_arg(0)], full->context.current_context->get_int_arg(1),
                                       &final_pos.pos, 0.0f);
@@ -430,11 +430,11 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // anm334(effect)
-    case 334:
+    case ECL_OP_ANM_334:
         g_EffectManager->create_tracked(full->context.current_context->get_int_arg(0), &final_pos.pos, 0);
         break;
     // anmSetMain(slot, script)
-    case 306:
+    case ECL_OP_ANM_SET_MAIN:
     {
         i32 slot = full->context.current_context->get_int_arg(0);
         i32 script = full->context.current_context->get_int_arg(1);
@@ -461,7 +461,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // anmReset: back to the main script in slot 0.
-    case 318:
+    case ECL_OP_ANM_RESET:
         delete_vm_and_clear(anm_ids[0]);
         anm_ids[0] =
             g_EnemyManager->anim_statement_anms[selected_anm_index]->create_vm_front(anm_set_main, anm_layers + 7, 0);
@@ -471,7 +471,7 @@ int EnemyData::ecl_run_over_300()
         anm_slot_0_anm_index = selected_anm_index;
         break;
     // anmSelectedPlay(slot)
-    case 313:
+    case ECL_OP_ANM_SELECTED_PLAY:
     {
         i32 slot = full->context.current_context->get_int_arg(0);
         delete_vm_and_clear(anm_ids[slot]);
@@ -491,7 +491,7 @@ int EnemyData::ecl_run_over_300()
     }
     // anm316(slot, n): script n + 5 of the main set, or the main script
     // itself for negative n.
-    case 316:
+    case ECL_OP_ANM_316:
     {
         i32 slot = full->context.current_context->get_int_arg(0);
         i32 n = full->context.current_context->get_int_arg(1);
@@ -511,14 +511,14 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // anmSwitch(slot, interrupt)
-    case 317:
+    case ECL_OP_ANM_SWITCH:
     {
         i32 slot = full->context.current_context->get_int_arg(0);
         AnmManager::interrupt_tree(anm_ids[slot], (i16)full->context.current_context->get_int_arg(1));
         break;
     }
     // moveReset: folds rel_pos into abs_pos and stops all movement.
-    case 427:
+    case ECL_OP_MOVE_RESET:
         abs_pos.pos += rel_pos.pos;
         rel_pos.pos = g_zero_vec;
         rel_pos.speed = 0.0f;
@@ -539,10 +539,10 @@ int EnemyData::ecl_run_over_300()
         rel_ellipse_i.end_time = 0;
         break;
     // movePos(x, y), movePosRel(x, y): -999999 keeps a coordinate.
-    case 400:
-    case 402:
+    case ECL_OP_MOVE_POS:
+    case ECL_OP_MOVE_POS_REL:
     {
-        PosVel *pos_vel = instr->opcode == 400 ? &abs_pos : &rel_pos;
+        PosVel *pos_vel = instr->opcode == ECL_OP_MOVE_POS ? &abs_pos : &rel_pos;
         f32 x = full->context.current_context->get_float_arg(0);
         f32 y = full->context.current_context->get_float_arg(1);
         if (x > -999999.0)
@@ -559,10 +559,10 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // movePos3d(x, y, z), movePos3dRel(x, y, z): moves by the offset.
-    case 416:
-    case 417:
+    case ECL_OP_MOVE_POS_3D:
+    case ECL_OP_MOVE_POS_3D_REL:
     {
-        PosVel *pos_vel = instr->opcode == 416 ? &abs_pos : &rel_pos;
+        PosVel *pos_vel = instr->opcode == ECL_OP_MOVE_POS_3D ? &abs_pos : &rel_pos;
         f32 x = full->context.current_context->get_float_arg(0);
         f32 y = full->context.current_context->get_float_arg(1);
         f32 z = full->context.current_context->get_float_arg(2);
@@ -574,13 +574,13 @@ int EnemyData::ecl_run_over_300()
     }
     // movePosTime(time, mode, x, y) and movePosRelTime; 436/437 move by an
     // offset (mirrored with the enemy).
-    case 401:
-    case 403:
-    case 436:
-    case 437:
+    case ECL_OP_MOVE_POS_TIME:
+    case ECL_OP_MOVE_POS_REL_TIME:
+    case ECL_OP_MOVE_POS_TIME_OFFSET:
+    case ECL_OP_MOVE_POS_REL_TIME_OFFSET:
     {
-        PosVel *pos_vel = instr->opcode == 401 || instr->opcode == 436 ? &abs_pos : &rel_pos;
-        InterpStrange1 *interp = instr->opcode == 401 || instr->opcode == 436 ? &abs_pos_i : &rel_pos_i;
+        PosVel *pos_vel = instr->opcode == ECL_OP_MOVE_POS_TIME || instr->opcode == ECL_OP_MOVE_POS_TIME_OFFSET ? &abs_pos : &rel_pos;
+        InterpStrange1 *interp = instr->opcode == ECL_OP_MOVE_POS_TIME || instr->opcode == ECL_OP_MOVE_POS_TIME_OFFSET ? &abs_pos_i : &rel_pos_i;
         f32 x = full->context.current_context->get_float_arg(2);
         f32 y = full->context.current_context->get_float_arg(3);
         if (full->context.current_context->get_int_arg(0) <= 0)
@@ -588,7 +588,7 @@ int EnemyData::ecl_run_over_300()
             interp->end_time = 0;
             break;
         }
-        if (instr->opcode == 436 || instr->opcode == 437)
+        if (instr->opcode == ECL_OP_MOVE_POS_TIME_OFFSET || instr->opcode == ECL_OP_MOVE_POS_REL_TIME_OFFSET)
         {
             x = flags_low & ENEMY_FLAG_MIRRORED ? pos_vel->pos.x - x : pos_vel->pos.x + x;
             y = pos_vel->pos.y + y;
@@ -606,13 +606,13 @@ int EnemyData::ecl_run_over_300()
     }
     // moveCurve(time, mode_x, mode_y, x, y) and its variants: separate
     // modes for x and y.
-    case 434:
-    case 435:
-    case 438:
-    case 439:
+    case ECL_OP_MOVE_CURVE:
+    case ECL_OP_MOVE_CURVE_REL:
+    case ECL_OP_MOVE_CURVE_OFFSET:
+    case ECL_OP_MOVE_CURVE_REL_OFFSET:
     {
-        PosVel *pos_vel = instr->opcode == 434 || instr->opcode == 438 ? &abs_pos : &rel_pos;
-        InterpStrange1 *interp = instr->opcode == 434 || instr->opcode == 438 ? &abs_pos_i : &rel_pos_i;
+        PosVel *pos_vel = instr->opcode == ECL_OP_MOVE_CURVE || instr->opcode == ECL_OP_MOVE_CURVE_OFFSET ? &abs_pos : &rel_pos;
+        InterpStrange1 *interp = instr->opcode == ECL_OP_MOVE_CURVE || instr->opcode == ECL_OP_MOVE_CURVE_OFFSET ? &abs_pos_i : &rel_pos_i;
         f32 x = full->context.current_context->get_float_arg(3);
         f32 y = full->context.current_context->get_float_arg(4);
         if (full->context.current_context->get_int_arg(0) <= 0)
@@ -620,7 +620,7 @@ int EnemyData::ecl_run_over_300()
             interp->end_time = 0;
             break;
         }
-        if (instr->opcode == 438 || instr->opcode == 439)
+        if (instr->opcode == ECL_OP_MOVE_CURVE_OFFSET || instr->opcode == ECL_OP_MOVE_CURVE_REL_OFFSET)
         {
             x = flags_low & ENEMY_FLAG_MIRRORED ? pos_vel->pos.x - x : pos_vel->pos.x + x;
             y = pos_vel->pos.y + y;
@@ -639,11 +639,11 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // moveBezier(time, b1x, b1y, x, y, b2x, b2y), moveBezierRel
-    case 425:
-    case 426:
+    case ECL_OP_MOVE_BEZIER:
+    case ECL_OP_MOVE_BEZIER_REL:
     {
-        PosVel *pos_vel = instr->opcode == 425 ? &abs_pos : &rel_pos;
-        InterpStrange1 *interp = instr->opcode == 425 ? &abs_pos_i : &rel_pos_i;
+        PosVel *pos_vel = instr->opcode == ECL_OP_MOVE_BEZIER ? &abs_pos : &rel_pos;
+        InterpStrange1 *interp = instr->opcode == ECL_OP_MOVE_BEZIER ? &abs_pos_i : &rel_pos_i;
         f32 x = full->context.current_context->get_float_arg(3);
         f32 y = full->context.current_context->get_float_arg(4);
         Float3 bezier_1;
@@ -665,19 +665,19 @@ int EnemyData::ecl_run_over_300()
         pos_vel->flags &= ~0xf;
         break;
     }
-    // 404, 406, 428, 430: moveVel(angle, speed) and the relative and
+    // moveVel(angle, speed) and the relative and
     // no-mirror (428, 430) forms. -999999 keeps the current value.
-    case 404:
-    case 406:
-    case 428:
-    case 430:
+    case ECL_OP_MOVE_VEL:
+    case ECL_OP_MOVE_VEL_REL:
+    case ECL_OP_MOVE_VEL_NM:
+    case ECL_OP_MOVE_VEL_REL_NM:
     {
-        PosVel *pv = instr->opcode == 404 || instr->opcode == 428 ? &abs_pos : &rel_pos;
+        PosVel *pv = instr->opcode == ECL_OP_MOVE_VEL || instr->opcode == ECL_OP_MOVE_VEL_NM ? &abs_pos : &rel_pos;
         f32 angle = full->context.current_context->get_float_arg(0);
         f32 speed = full->context.current_context->get_float_arg(1);
         if (angle > -999999.0)
         {
-            if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == 404 || instr->opcode == 406))
+            if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == ECL_OP_MOVE_VEL || instr->opcode == ECL_OP_MOVE_VEL_REL))
             {
                 angle = mirror_angle(angle);
             }
@@ -690,16 +690,16 @@ int EnemyData::ecl_run_over_300()
         pv->flags &= ~0xf;
         break;
     }
-    // 405, 407, 429, 431: moveVelTime(time, mode, angle, speed). With mode 7
+    // moveVelTime(time, mode, angle, speed). With mode 7
     // (constant velocity) angle and speed are per-frame changes instead.
-    case 405:
-    case 407:
-    case 429:
-    case 431:
+    case ECL_OP_MOVE_VEL_TIME:
+    case ECL_OP_MOVE_VEL_REL_TIME:
+    case ECL_OP_MOVE_VEL_TIME_NM:
+    case ECL_OP_MOVE_VEL_REL_TIME_NM:
     {
-        PosVel *pv = instr->opcode == 405 || instr->opcode == 429 ? &abs_pos : &rel_pos;
-        InterpFloat *angle_i = instr->opcode == 405 || instr->opcode == 429 ? &abs_angle_i : &rel_angle_i;
-        InterpFloat *speed_i = instr->opcode == 405 || instr->opcode == 429 ? &abs_speed_i : &rel_speed_i;
+        PosVel *pv = instr->opcode == ECL_OP_MOVE_VEL_TIME || instr->opcode == ECL_OP_MOVE_VEL_TIME_NM ? &abs_pos : &rel_pos;
+        InterpFloat *angle_i = instr->opcode == ECL_OP_MOVE_VEL_TIME || instr->opcode == ECL_OP_MOVE_VEL_TIME_NM ? &abs_angle_i : &rel_angle_i;
+        InterpFloat *speed_i = instr->opcode == ECL_OP_MOVE_VEL_TIME || instr->opcode == ECL_OP_MOVE_VEL_TIME_NM ? &abs_speed_i : &rel_speed_i;
         f32 angle = full->context.current_context->get_float_arg(2);
         f32 speed = full->context.current_context->get_float_arg(3);
         if (full->context.current_context->get_int_arg(0) <= 0)
@@ -713,7 +713,7 @@ int EnemyData::ecl_run_over_300()
         {
             if (angle > -999999.0)
             {
-                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == 405 || instr->opcode == 407))
+                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == ECL_OP_MOVE_VEL_TIME || instr->opcode == ECL_OP_MOVE_VEL_REL_TIME))
                 {
                     angle = mirror_angle(angle);
                 }
@@ -728,7 +728,7 @@ int EnemyData::ecl_run_over_300()
         {
             if (angle > -999999.0)
             {
-                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == 405 || instr->opcode == 407))
+                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == ECL_OP_MOVE_VEL_TIME || instr->opcode == ECL_OP_MOVE_VEL_REL_TIME))
                 {
                     angle = -angle;
                 }
@@ -758,11 +758,11 @@ int EnemyData::ecl_run_over_300()
         pv->flags &= ~0xf;
         break;
     }
-    // 440, 442: moveAngle(angle). Mirrored whenever the flag is set.
-    case 440:
-    case 442:
+    // moveAngle(angle). Mirrored whenever the flag is set.
+    case ECL_OP_MOVE_ANGLE:
+    case ECL_OP_MOVE_ANGLE_REL:
     {
-        PosVel *pv = instr->opcode == 440 ? &abs_pos : &rel_pos;
+        PosVel *pv = instr->opcode == ECL_OP_MOVE_ANGLE ? &abs_pos : &rel_pos;
         f32 angle = get_float_arg(0);
         if (flags_low & ENEMY_FLAG_MIRRORED)
         {
@@ -772,12 +772,12 @@ int EnemyData::ecl_run_over_300()
         pv->flags &= ~0xf;
         break;
     }
-    // 441, 443: moveAngleTime(time, mode, angle).
-    case 441:
-    case 443:
+    // moveAngleTime(time, mode, angle).
+    case ECL_OP_MOVE_ANGLE_TIME:
+    case ECL_OP_MOVE_ANGLE_REL_TIME:
     {
-        PosVel *pv = instr->opcode == 441 ? &abs_pos : &rel_pos;
-        InterpFloat *angle_i = instr->opcode == 441 ? &abs_angle_i : &rel_angle_i;
+        PosVel *pv = instr->opcode == ECL_OP_MOVE_ANGLE_TIME ? &abs_pos : &rel_pos;
+        InterpFloat *angle_i = instr->opcode == ECL_OP_MOVE_ANGLE_TIME ? &abs_angle_i : &rel_angle_i;
         f32 angle = get_float_arg(2);
         if (get_int_arg(0) <= 0)
         {
@@ -789,7 +789,7 @@ int EnemyData::ecl_run_over_300()
         {
             if (angle > -999999.0)
             {
-                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == 441 || instr->opcode == 443))
+                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == ECL_OP_MOVE_ANGLE_TIME || instr->opcode == ECL_OP_MOVE_ANGLE_REL_TIME))
                 {
                     angle = mirror_angle(angle);
                 }
@@ -803,7 +803,7 @@ int EnemyData::ecl_run_over_300()
         {
             if (angle > -999999.0)
             {
-                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == 441 || instr->opcode == 443))
+                if ((flags_low & ENEMY_FLAG_MIRRORED) && (instr->opcode == ECL_OP_MOVE_ANGLE_TIME || instr->opcode == ECL_OP_MOVE_ANGLE_REL_TIME))
                 {
                     angle = -angle;
                 }
@@ -832,11 +832,11 @@ int EnemyData::ecl_run_over_300()
         pv->flags &= ~0xf;
         break;
     }
-    // 444, 446: moveSpeed(speed).
-    case 444:
-    case 446:
+    // moveSpeed(speed).
+    case ECL_OP_MOVE_SPEED:
+    case ECL_OP_MOVE_SPEED_REL:
     {
-        PosVel *pv = instr->opcode == 444 ? &abs_pos : &rel_pos;
+        PosVel *pv = instr->opcode == ECL_OP_MOVE_SPEED ? &abs_pos : &rel_pos;
         f32 speed = get_float_arg(0);
         if (speed > -999999.0)
         {
@@ -845,12 +845,12 @@ int EnemyData::ecl_run_over_300()
         pv->flags &= ~0xf;
         break;
     }
-    // 445, 447: moveSpeedTime(time, mode, speed).
-    case 445:
-    case 447:
+    // moveSpeedTime(time, mode, speed).
+    case ECL_OP_MOVE_SPEED_TIME:
+    case ECL_OP_MOVE_SPEED_REL_TIME:
     {
-        PosVel *pv = instr->opcode == 445 ? &abs_pos : &rel_pos;
-        InterpFloat *speed_i = instr->opcode == 445 ? &abs_speed_i : &rel_speed_i;
+        PosVel *pv = instr->opcode == ECL_OP_MOVE_SPEED_TIME ? &abs_pos : &rel_pos;
+        InterpFloat *speed_i = instr->opcode == ECL_OP_MOVE_SPEED_TIME ? &abs_speed_i : &rel_speed_i;
         f32 speed = get_float_arg(2);
         f32 initial = pv->speed;
         if (get_int_arg(0) <= 0)
@@ -871,12 +871,12 @@ int EnemyData::ecl_run_over_300()
         pv->flags &= ~0xf;
         break;
     }
-    // 408, 410: moveCircle(angle, angular speed, radius, radial speed),
+    // moveCircle(angle, angular speed, radius, radial speed),
     // around the current position unless already circling.
-    case 408:
-    case 410:
+    case ECL_OP_MOVE_CIRCLE:
+    case ECL_OP_MOVE_CIRCLE_REL:
     {
-        PosVel *pv = instr->opcode == 408 ? &abs_pos : &rel_pos;
+        PosVel *pv = instr->opcode == ECL_OP_MOVE_CIRCLE ? &abs_pos : &rel_pos;
         f32 angle = get_float_arg(0);
         f32 speed = get_float_arg(1);
         f32 radius = get_float_arg(2);
@@ -906,14 +906,14 @@ int EnemyData::ecl_run_over_300()
         update_final_pos();
         break;
     }
-    // 409, 411: moveCircleTime(time, mode, angular speed, radius, radial
+    // moveCircleTime(time, mode, angular speed, radius, radial
     // speed).
-    case 409:
-    case 411:
+    case ECL_OP_MOVE_CIRCLE_TIME:
+    case ECL_OP_MOVE_CIRCLE_REL_TIME:
     {
-        PosVel *pv = instr->opcode == 409 ? &abs_pos : &rel_pos;
-        InterpFloat *speed_i = instr->opcode == 409 ? &abs_speed_i : &rel_speed_i;
-        InterpFloat2 *radial_i = instr->opcode == 409 ? &abs_radial_dist_i : &rel_radial_dist_i;
+        PosVel *pv = instr->opcode == ECL_OP_MOVE_CIRCLE_TIME ? &abs_pos : &rel_pos;
+        InterpFloat *speed_i = instr->opcode == ECL_OP_MOVE_CIRCLE_TIME ? &abs_speed_i : &rel_speed_i;
+        InterpFloat2 *radial_i = instr->opcode == ECL_OP_MOVE_CIRCLE_TIME ? &abs_radial_dist_i : &rel_radial_dist_i;
         f32 speed = get_float_arg(2);
         f32 radius = get_float_arg(3);
         f32 radial_speed = get_float_arg(4);
@@ -938,12 +938,12 @@ int EnemyData::ecl_run_over_300()
         update_final_pos();
         break;
     }
-    // 418, 419 (ExpHP: moveAdd): sets the center of circular and elliptic
+    // moveAdd (ExpHP): sets the center of circular and elliptic
     // movement.
-    case 418:
-    case 419:
+    case ECL_OP_MOVE_ADD:
+    case ECL_OP_MOVE_ADD_REL:
     {
-        PosVel *pv = instr->opcode == 418 ? &abs_pos : &rel_pos;
+        PosVel *pv = instr->opcode == ECL_OP_MOVE_ADD ? &abs_pos : &rel_pos;
         f32 x = get_float_arg(0);
         f32 y = get_float_arg(1);
         if (x > -999999.0)
@@ -958,12 +958,12 @@ int EnemyData::ecl_run_over_300()
         update_final_pos();
     }
     // No break in the original: 418 and 419 go on into moveEllipse.
-    // 420, 422: moveEllipse(angle, angular speed, radius, radial speed,
+    // moveEllipse(angle, angular speed, radius, radial speed,
     // ellipse angle, ellipse ratio).
-    case 420:
-    case 422:
+    case ECL_OP_MOVE_ELLIPSE:
+    case ECL_OP_MOVE_ELLIPSE_REL:
     {
-        PosVel *pv = instr->opcode == 420 ? &abs_pos : &rel_pos;
+        PosVel *pv = instr->opcode == ECL_OP_MOVE_ELLIPSE ? &abs_pos : &rel_pos;
         f32 angle = get_float_arg(0);
         f32 speed = get_float_arg(1);
         f32 radius = get_float_arg(2);
@@ -1003,16 +1003,16 @@ int EnemyData::ecl_run_over_300()
         update_final_pos();
         break;
     }
-    // 421, 423: moveEllipseTime(time, mode, angular speed, radius, radial
+    // moveEllipseTime(time, mode, angular speed, radius, radial
     // speed, ellipse angle, ellipse ratio). Always restarts around the
     // current position.
-    case 421:
-    case 423:
+    case ECL_OP_MOVE_ELLIPSE_TIME:
+    case ECL_OP_MOVE_ELLIPSE_REL_TIME:
     {
-        PosVel *pv = instr->opcode == 421 ? &abs_pos : &rel_pos;
-        InterpFloat *speed_i = instr->opcode == 421 ? &abs_speed_i : &rel_speed_i;
-        InterpFloat2 *radial_i = instr->opcode == 421 ? &abs_radial_dist_i : &rel_radial_dist_i;
-        InterpFloat2 *ellipse_i = instr->opcode == 421 ? &abs_ellipse_i : &rel_ellipse_i;
+        PosVel *pv = instr->opcode == ECL_OP_MOVE_ELLIPSE_TIME ? &abs_pos : &rel_pos;
+        InterpFloat *speed_i = instr->opcode == ECL_OP_MOVE_ELLIPSE_TIME ? &abs_speed_i : &rel_speed_i;
+        InterpFloat2 *radial_i = instr->opcode == ECL_OP_MOVE_ELLIPSE_TIME ? &abs_radial_dist_i : &rel_radial_dist_i;
+        InterpFloat2 *ellipse_i = instr->opcode == ECL_OP_MOVE_ELLIPSE_TIME ? &abs_ellipse_i : &rel_ellipse_i;
         f32 speed = get_float_arg(2);
         f32 radius = get_float_arg(3);
         f32 radial_speed = get_float_arg(4);
@@ -1047,37 +1047,37 @@ int EnemyData::ecl_run_over_300()
         update_final_pos();
         break;
     }
-    // 414: moveBoss(): jumps to the boss.
-    case 414:
+    // moveBoss(): jumps to the boss.
+    case ECL_OP_MOVE_BOSS:
         abs_pos.pos = g_EnemyManager->get_boss(0)->enemy.final_pos.pos;
         break;
-    // 415: moveBossRel().
-    case 415:
+    // moveBossRel().
+    case ECL_OP_MOVE_BOSS_REL:
         rel_pos.pos = g_EnemyManager->get_boss(0)->enemy.final_pos.pos;
         break;
-    // 432: moveEnm(enemy id): jumps to another enemy.
-    case 432:
+    // moveEnm(enemy id): jumps to another enemy.
+    case ECL_OP_MOVE_ENM:
         abs_pos.pos = g_EnemyManager->find_enemy_by_id(get_int_arg(0))->enemy.final_pos.pos;
         break;
-    // 433: moveEnmRel(enemy id).
-    case 433:
+    // moveEnmRel(enemy id).
+    case ECL_OP_MOVE_ENM_REL:
         rel_pos.pos = g_EnemyManager->find_enemy_by_id(get_int_arg(0))->enemy.final_pos.pos;
         break;
-    // 504: moveLimit(x, y, width, height): keeps final_pos inside the
+    // moveLimit(x, y, width, height): keeps final_pos inside the
     // rectangle (see update_final_pos).
-    case 504:
+    case ECL_OP_MOVE_LIMIT:
         flags_low |= ENEMY_FLAG_MOVE_LIMIT;
         move_limit_center.x = get_float_arg(0);
         move_limit_center.y = get_float_arg(1);
         move_limit_size.x = get_float_arg(2);
         move_limit_size.y = get_float_arg(3);
         break;
-    // 505: moveLimitReset().
-    case 505:
+    // moveLimitReset().
+    case ECL_OP_MOVE_LIMIT_RESET:
         flags_low &= ~ENEMY_FLAG_MOVE_LIMIT;
         break;
-    // 526: etProtectRange(radius), kept squared.
-    case 526:
+    // etProtectRange(radius), kept squared.
+    case ECL_OP_ET_PROTECT_RANGE:
     {
         f32 range = get_float_arg(0);
         et_protect_range = range * range;
@@ -1087,12 +1087,12 @@ int EnemyData::ecl_run_over_300()
     // moveRand(time, mode, speed) and moveRandRel: picks a random direction
     // that keeps the enemy inside its movement limit (move_limit_center,
     // move_limit_size), then starts the angle and speed interpolations.
-    case 412:
-    case 413:
+    case ECL_OP_MOVE_RAND:
+    case ECL_OP_MOVE_RAND_REL:
     {
-        PosVel *pos = instr->opcode == 412 ? &abs_pos : &rel_pos;
-        InterpFloat *angle_i = instr->opcode == 412 ? &abs_angle_i : &rel_angle_i;
-        InterpFloat *speed_i = instr->opcode == 412 ? &abs_speed_i : &rel_speed_i;
+        PosVel *pos = instr->opcode == ECL_OP_MOVE_RAND ? &abs_pos : &rel_pos;
+        InterpFloat *angle_i = instr->opcode == ECL_OP_MOVE_RAND ? &abs_angle_i : &rel_angle_i;
+        InterpFloat *speed_i = instr->opcode == ECL_OP_MOVE_RAND ? &abs_speed_i : &rel_speed_i;
         f32 angle;
         if (move_limit_center.x - move_limit_size.x / 4.0f > final_pos.pos.x)
         {
@@ -1157,34 +1157,34 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // lifeMarker(index, life, color): a marker on the boss life bar.
-    case 527:
+    case ECL_OP_LIFE_MARKER:
         g_Gui->set_boss_life_marker(own_boss_id, get_int_arg(0), get_float_arg(1) / life.maximum, get_int_arg(2));
         break;
     // funcSet(index): a per-frame hook (g_ecl_func_sets).
-    case 632:
+    case ECL_OP_FUNC_SET:
         func_from_ecl_func_set = (void *)g_ecl_func_sets[get_int_arg(0)];
         is_func_set_2 = 0;
         break;
     // funcSet2(index): the same, flagged as the second kind.
-    case 639:
+    case ECL_OP_FUNC_SET2:
         func_from_ecl_func_set = (void *)g_ecl_func_sets[get_int_arg(0)];
         is_func_set_2 = 1;
         break;
     // flagExtDmg(index): a damage hook.
-    case 633:
+    case ECL_OP_FLAG_EXT_DMG:
         func_from_ecl_flag_ext_dmg = (void *)g_ecl_ext_damage_funcs[get_int_arg(0)];
         break;
     // unknown634(index)
-    case 634:
+    case ECL_OP_UNKNOWN_634:
         func_from_ecl_unknown_634 = g_ecl_unknown_634_funcs[get_int_arg(0)];
         break;
     // funcCall(index): runs a hook of g_ecl_func_sets once.
-    case 637:
+    case ECL_OP_FUNC_CALL:
         g_ecl_func_sets[get_int_arg(0)](this);
         break;
     // setHurtbox(w, h). The first call also counts the enemy as spawned in
     // the chapter.
-    case 500:
+    case ECL_OP_SET_HURTBOX:
         hurtbox_size.x = get_float_arg(0);
         hurtbox_size.y = get_float_arg(1);
         if (chapter_count == 0)
@@ -1194,13 +1194,13 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // setHitbox(w, h)
-    case 501:
+    case ECL_OP_SET_HITBOX:
         hitbox_size.x = get_float_arg(0);
         hitbox_size.y = get_float_arg(1);
         break;
     // unknown569(count): how many enemies this one counts as in the chapter
     // statistics.
-    case 569:
+    case ECL_OP_CHAPTER_COUNT:
         if (chapter_count == 0)
         {
             chapter_count = get_int_arg(0);
@@ -1216,7 +1216,7 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // unknown570(): counts the enemy as destroyed now.
-    case 570:
+    case ECL_OP_COUNT_DESTROYED:
         if (chapter_count != 0 && own_chapter == g_Globals.chapter)
         {
             g_Globals.enemies_destroyed_in_chapter += chapter_count;
@@ -1224,19 +1224,19 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // unknown563(on)
-    case 563:
+    case ECL_OP_RECT_HITBOX:
         ((EnemyFlagsLow *)&flags_low)->rect_hitbox = get_int_arg(0);
         break;
     // unknown564(angle): sets rotation.
-    case 564:
+    case ECL_OP_SET_ROTATION:
         rotation = get_float_arg(0);
         break;
     // bombInvuln(multiplier): damage taken from bombs.
-    case 565:
+    case ECL_OP_BOMB_INVULN:
         bomb_damage_multiplier = get_float_arg(0);
         break;
     // flagSet(flags)
-    case 502:
+    case ECL_OP_FLAG_SET:
         flags_low |= get_int_arg(0);
         if (flags_low & ENEMY_FLAG_INTANGIBLE)
         {
@@ -1247,7 +1247,7 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // flagClear(flags)
-    case 503:
+    case ECL_OP_FLAG_CLEAR:
         flags_low &= ~get_int_arg(0);
         if (!(flags_low & ENEMY_FLAG_INTANGIBLE))
         {
@@ -1258,7 +1258,7 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // dropClear(): forgets the extra drops except the season items.
-    case 506:
+    case ECL_OP_DROP_CLEAR:
     {
         i32 season_items = drops.extra_counts[15];
         memset(drops.extra_counts, 0, sizeof(drops.extra_counts));
@@ -1266,14 +1266,14 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // dropExtra(item_type, count)
-    case 507:
+    case ECL_OP_DROP_EXTRA:
     {
         i32 type = get_int_arg(0);
         drops.extra_counts[type - 1] = get_int_arg(1);
         break;
     }
     // dropArea(w, h)
-    case 508:
+    case ECL_OP_DROP_AREA:
     {
         f32 w = get_float_arg(0);
         f32 h = get_float_arg(1);
@@ -1283,7 +1283,7 @@ int EnemyData::ecl_run_over_300()
     }
     // dropItems(): drops everything now (not in spell practice). Season
     // items shrink with the bonus timer, as in EnemyInf::die.
-    case 509:
+    case ECL_OP_DROP_ITEMS:
         if (g_Globals.game_mode == 2)
         {
             break;
@@ -1300,15 +1300,15 @@ int EnemyData::ecl_run_over_300()
                 drop_season.min_count;
         }
     // unknown562(): drops everything now, in any mode.
-    case 562:
+    case ECL_OP_DROP_ITEMS_ANY_MODE:
         drops.eject_all_drops(&final_pos.pos);
         break;
     // dropMain(item_type)
-    case 510:
+    case ECL_OP_DROP_MAIN:
         drops.main_type = get_int_arg(0);
         break;
     // lifeSet(life)
-    case 511:
+    case ECL_OP_LIFE_SET:
     {
         i32 value = get_int_arg(0);
         life.current = value;
@@ -1322,7 +1322,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // lifeNow(life)
-    case 572:
+    case ECL_OP_LIFE_NOW:
     {
         i32 value = get_int_arg(0);
         life.current = value;
@@ -1331,7 +1331,7 @@ int EnemyData::ecl_run_over_300()
     }
     // setBoss(id): makes this enemy boss id, or stops being a boss if id
     // is negative.
-    case 512:
+    case ECL_OP_SET_BOSS:
     {
         i32 boss_id = get_int_arg(0);
         g_EnemyManager->set_life_bar_hidden(0);
@@ -1352,23 +1352,23 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // setInvuln(time)
-    case 515:
+    case ECL_OP_SET_INVULN:
         set_invuln.set_value(get_int_arg(0));
         break;
     // unknown541(time): no hitbox for a while.
-    case 541:
+    case ECL_OP_NO_HITBOX_TIME:
         no_hitbox_dur.set_value(get_int_arg(0));
         break;
     // unknown551(value): kills the enemies whose kill_group is value.
-    case 551:
+    case ECL_OP_KILL_GROUP:
         EnemyManager::kill_all_in_group(get_int_arg(0));
         break;
     // unknown571(): kills every enemy without running set_death.
-    case 571:
+    case ECL_OP_KILL_ALL_NO_DEATH:
         EnemyManager::kill_all_no_set_death();
         break;
     // diffI(var, easy, normal, hard, lunatic)
-    case 535:
+    case ECL_OP_DIFF_I:
     {
         i32 easy = get_int_arg(1);
         i32 normal = get_int_arg(2);
@@ -1393,7 +1393,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // diffF(var, easy, normal, hard, lunatic)
-    case 536:
+    case ECL_OP_DIFF_F:
     {
         f32 easy = get_float_arg(1);
         f32 normal = get_float_arg(2);
@@ -1418,7 +1418,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etNew(slot): resets a bullet shooter to one 2.0 speed bullet.
-    case 600:
+    case ECL_OP_ET_NEW:
     {
         i32 slot = get_int_arg(0);
         memset(&bullet_props[slot], 0, sizeof(EnemyBulletShooter));
@@ -1438,7 +1438,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etCopy(dst, src)
-    case 614:
+    case ECL_OP_ET_COPY:
     {
         i32 dst = get_int_arg(0);
         i32 src = get_int_arg(1);
@@ -1449,7 +1449,7 @@ int EnemyData::ecl_run_over_300()
     }
     // etOn(slot): fires the shooter from the enemy plus the offset, or
     // from the absolute origin set by etOffsetAbs.
-    case 601:
+    case ECL_OP_ET_ON:
     {
         i32 slot = get_int_arg(0);
         if (bullet_mgr_origins[slot].z > 0.9f)
@@ -1470,7 +1470,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etSprite(slot, type, color)
-    case 602:
+    case ECL_OP_ET_SPRITE:
     {
         i32 slot = get_int_arg(0);
         bullet_props[slot].type = get_int_arg(1);
@@ -1478,7 +1478,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etOffset(slot, x, y)
-    case 603:
+    case ECL_OP_ET_OFFSET:
     {
         i32 slot = get_int_arg(0);
         bullet_mgr_offsets[slot].xy.x = get_float_arg(1);
@@ -1486,7 +1486,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etOffsetRad(slot, angle, dist)
-    case 626:
+    case ECL_OP_ET_OFFSET_RAD:
     {
         i32 slot = get_int_arg(0);
         f32 angle = get_float_arg(1);
@@ -1497,7 +1497,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etDist(slot, dist)
-    case 627:
+    case ECL_OP_ET_DIST:
     {
         i32 slot = get_int_arg(0);
         bullet_props[slot].distance = get_float_arg(1);
@@ -1505,7 +1505,7 @@ int EnemyData::ecl_run_over_300()
     }
     // etOffsetAbs(slot, x, y): fire from an absolute position; x below
     // -990 goes back to firing from the enemy.
-    case 628:
+    case ECL_OP_ET_OFFSET_ABS:
     {
         i32 slot = get_int_arg(0);
         bullet_mgr_origins[slot].xy.x = get_float_arg(1);
@@ -1521,7 +1521,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etAngle(slot, aim, spread)
-    case 604:
+    case ECL_OP_ET_ANGLE:
     {
         i32 slot = get_int_arg(0);
         bullet_props[slot].ang_aim = get_float_arg(1);
@@ -1529,7 +1529,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etSpeed(slot, speed1, speed2)
-    case 605:
+    case ECL_OP_ET_SPEED:
     {
         i32 slot = get_int_arg(0);
         bullet_props[slot].spd1 = get_float_arg(1);
@@ -1537,7 +1537,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etCount(slot, count, layers)
-    case 606:
+    case ECL_OP_ET_COUNT:
     {
         i32 slot = get_int_arg(0);
         bullet_props[slot].count = get_int_arg(1);
@@ -1545,7 +1545,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etSpeedD(slot, speed1 x4, speed2 x4): etSpeed per difficulty.
-    case 624:
+    case ECL_OP_ET_SPEED_D:
     {
         i32 slot = get_int_arg(0);
         bullet_props[slot].spd1 = get_float_arg(ECL_DIFF_ARG(1));
@@ -1553,7 +1553,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etCountD(slot, count x4, layers x4): etCount per difficulty.
-    case 625:
+    case ECL_OP_ET_COUNT_D:
     {
         i32 slot = get_int_arg(0);
         bullet_props[slot].count = (u16)get_int_arg(ECL_DIFF_ARG(1));
@@ -1561,7 +1561,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etSpeedR3(slot, speed1, speed2 x3): etSpeed by rank (low, mid, high).
-    case 617:
+    case ECL_OP_ET_SPEED_R3:
     {
         i32 slot = get_int_arg(0);
         if (g_Globals.rank >= 512)
@@ -1582,7 +1582,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etSpeedR5(slot, speed1, speed2 x5): etSpeed by rank in five steps.
-    case 618:
+    case ECL_OP_ET_SPEED_R5:
     {
         i32 slot = get_int_arg(0);
         if (g_Globals.rank >= 600)
@@ -1614,7 +1614,7 @@ int EnemyData::ecl_run_over_300()
     }
     // etSpeedR2(slot, speed1, speed2 at rank -1024, then at rank 1024):
     // interpolated by rank.
-    case 619:
+    case ECL_OP_ET_SPEED_R2:
     {
         i32 slot = get_int_arg(0);
         f32 low1 = get_float_arg(1);
@@ -1626,7 +1626,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etCountR3(slot, count, layers x3)
-    case 620:
+    case ECL_OP_ET_COUNT_R3:
     {
         i32 slot = get_int_arg(0);
         if (g_Globals.rank >= 512)
@@ -1647,7 +1647,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etCountR5(slot, count, layers x5)
-    case 621:
+    case ECL_OP_ET_COUNT_R5:
     {
         i32 slot = get_int_arg(0);
         if (g_Globals.rank >= 600)
@@ -1678,7 +1678,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etCountR2(slot, count, layers at rank -1024, then at rank 1024)
-    case 622:
+    case ECL_OP_ET_COUNT_R2:
     {
         i32 slot = get_int_arg(0);
         i32 low_count = get_int_arg(1);
@@ -1690,14 +1690,14 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etAim(slot, aim_type)
-    case 607:
+    case ECL_OP_ET_AIM:
     {
         i32 slot = get_int_arg(0);
         bullet_props[slot].aim_type = get_int_arg(1);
         break;
     }
     // etSound(slot, shot_sfx, transform_sfx)
-    case 608:
+    case ECL_OP_ET_SOUND:
     {
         i32 slot = get_int_arg(0);
         bullet_props[slot].shot_sfx = get_int_arg(1);
@@ -1708,19 +1708,19 @@ int EnemyData::ecl_run_over_300()
     // etEx(et, ex_index, slot, type, a, b, r, s) and its variants: 610 adds
     // c, d and m, n; 611 and 612 take the next free ex slot instead of an
     // explicit index.
-    case 609:
-    case 610:
-    case 611:
-    case 612:
+    case ECL_OP_ET_EX:
+    case ECL_OP_ET_EX_FULL:
+    case ECL_OP_ET_EX_NEXT:
+    case ECL_OP_ET_EX_FULL_NEXT:
     {
         i32 idx = get_int_arg(0);
         if (idx >= 18 || idx < 0)
         {
             idx = 0;
         }
-        i32 n = instr->opcode == 611 || instr->opcode == 612 ? 1 : 2;
+        i32 n = instr->opcode == ECL_OP_ET_EX_NEXT || instr->opcode == ECL_OP_ET_EX_FULL_NEXT ? 1 : 2;
         i32 ex_idx;
-        if (instr->opcode == 611 || instr->opcode == 612)
+        if (instr->opcode == ECL_OP_ET_EX_NEXT || instr->opcode == ECL_OP_ET_EX_FULL_NEXT)
         {
             ex_idx = et_ex_index[idx];
         }
@@ -1732,19 +1732,19 @@ int EnemyData::ecl_run_over_300()
         bullet_props[idx].ex[ex_idx].type = get_int_arg(n++);
         bullet_props[idx].ex[ex_idx].a = get_int_arg(n++);
         bullet_props[idx].ex[ex_idx].b = get_int_arg(n++);
-        if (instr->opcode == 610 || instr->opcode == 612)
+        if (instr->opcode == ECL_OP_ET_EX_FULL || instr->opcode == ECL_OP_ET_EX_FULL_NEXT)
         {
             bullet_props[idx].ex[ex_idx].c = get_int_arg(n++);
             bullet_props[idx].ex[ex_idx].d = get_int_arg(n++);
         }
         bullet_props[idx].ex[ex_idx].r = get_float_arg(n++);
         bullet_props[idx].ex[ex_idx].s = get_float_arg(n++);
-        if (instr->opcode == 610 || instr->opcode == 612)
+        if (instr->opcode == ECL_OP_ET_EX_FULL || instr->opcode == ECL_OP_ET_EX_FULL_NEXT)
         {
             bullet_props[idx].ex[ex_idx].m = get_float_arg(n++);
             bullet_props[idx].ex[ex_idx].n = get_float_arg(n++);
         }
-        if (instr->opcode == 611 || instr->opcode == 612)
+        if (instr->opcode == ECL_OP_ET_EX_NEXT || instr->opcode == ECL_OP_ET_EX_FULL_NEXT)
         {
             et_ex_index[idx]++;
         }
@@ -1755,7 +1755,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etExSubtract(et): steps the next free ex slot back.
-    case 641:
+    case ECL_OP_ET_EX_SUBTRACT:
     {
         i32 idx = get_int_arg(0);
         et_ex_index[idx]--;
@@ -1766,14 +1766,14 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etExSub(et, ex_index, sub): the subroutine an ex transform calls.
-    case 640:
+    case ECL_OP_ET_EX_SUB:
     {
         i32 idx = get_int_arg(0);
         bullet_props[idx].ex[get_int_arg(1)].string = (char *)&instr->args[3];
         break;
     }
     // laserNew(et, a, b, c, d).
-    case 700:
+    case ECL_OP_LASER_NEW:
     {
         i32 idx = get_int_arg(0);
         bullet_props[idx].pos.x = get_float_arg(1);
@@ -1783,7 +1783,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // laserTiming(et, a, b, c, d, flags).
-    case 701:
+    case ECL_OP_LASER_TIMING:
     {
         i32 idx = get_int_arg(0);
         bullet_props[idx].laser_timing[0] = get_int_arg(1);
@@ -1795,7 +1795,7 @@ int EnemyData::ecl_run_over_300()
     }
     // setNext(index, life, time, sub). In spell practice the boss instead
     // ends its card when the interrupt fires, and escapes on timeout.
-    case 514:
+    case ECL_OP_SET_NEXT:
     {
         const char *sub = (const char *)&instr->args[4];
         if (g_Globals.game_mode == 2 && (flags_low & ENEMY_FLAG_BOSS))
@@ -1828,45 +1828,45 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // setTimeout(index, sub).
-    case 521:
+    case ECL_OP_SET_TIMEOUT:
         full->set_timeout(get_int_arg(0), (const char *)&instr->args[2]);
         break;
     // setDeath(sub).
-    case 556:
+    case ECL_OP_SET_DEATH:
         strcpy(set_death, (const char *)&instr->args[1]);
         break;
     // etClearAll().
-    case 613:
+    case ECL_OP_ET_CLEAR_ALL:
         g_BulletManager->clear_all(0);
         g_LaserManager->clear_all(1, 0);
         break;
     // playSound(id).
-    case 516:
+    case ECL_OP_PLAY_SOUND:
         g_SoundManager.play_sound_at_position(get_int_arg(0), final_pos.pos.x);
         break;
     // setScreenShake(a, b, c).
-    case 517:
+    case ECL_OP_SET_SCREEN_SHAKE:
         ScreenEffect::create(1, get_int_arg(0), get_int_arg(1), get_int_arg(2), 0, 0x54);
         break;
     // dialogRead(script): also clears every bullet, laser and enemy.
-    case 518:
+    case ECL_OP_DIALOG_READ:
         g_Gui->start_dialogue(get_int_arg(0));
         g_BulletManager->clear_all(0);
         g_LaserManager->clear_all(0, 0);
         // fall through
     // enmKillAll().
-    case 525:
+    case ECL_OP_ENM_KILL_ALL:
         EnemyManager::kill_all();
         break;
     // dialogWait(): waits while dialogue runs and no enemy is expected.
-    case 519:
+    case ECL_OP_DIALOG_WAIT:
         if (g_Gui->msg != NULL && g_Gui->msg->unk_18c == 0)
         {
             return -1;
         }
         break;
     // Waits while any boss is alive.
-    case 520:
+    case ECL_OP_WAIT_BOSSES:
         if (g_EnemyManager->get_boss(0) != NULL || g_EnemyManager->get_boss(1) != NULL ||
             g_EnemyManager->get_boss(2) != NULL)
         {
@@ -1874,17 +1874,17 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // flagMirror(on).
-    case 558:
+    case ECL_OP_FLAG_MIRROR:
         ((EnemyFlagsLow *)&flags_low)->mirrored = get_int_arg(0);
         break;
     // spell(id, a, b, name) and its per-difficulty forms: 537 to 539 add
     // the difficulty (minus 0, 1 or 2) to the id. The name is stored
     // encrypted.
-    case 522:
-    case 528:
-    case 537:
-    case 538:
-    case 539:
+    case ECL_OP_SPELL:
+    case ECL_OP_SPELL_528:
+    case ECL_OP_SPELL_537:
+    case ECL_OP_SPELL_538:
+    case ECL_OP_SPELL_539:
     {
         char name[0x80];
         i32 len = instr->args[3].i;
@@ -1902,13 +1902,13 @@ int EnemyData::ecl_run_over_300()
         i32 spell_id = full->context.current_context->get_int_arg(0);
         switch ((i16)instr->opcode)
         {
-        case 537:
+        case ECL_OP_SPELL_537:
             spell_id += g_Globals.difficulty;
             break;
-        case 538:
+        case ECL_OP_SPELL_538:
             spell_id += g_Globals.difficulty - 1;
             break;
-        case 539:
+        case ECL_OP_SPELL_539:
             spell_id += g_Globals.difficulty - 2;
             break;
         }
@@ -1919,53 +1919,53 @@ int EnemyData::ecl_run_over_300()
     }
         // fall through
     // timerReset().
-    case 513:
+    case ECL_OP_TIMER_RESET:
         time_in_ecl.set_value(0);
         break;
     // spellMode(on).
-    case 568:
+    case ECL_OP_SPELL_MODE:
         ((EnemyLifeSpellBits *)&life.is_spell)->active = get_int_arg(0);
         break;
     // spellEnd().
-    case 523:
+    case ECL_OP_SPELL_END:
         g_Spellcard->end();
         life.is_spell &= ~1;
         break;
     // spellTimeout(): no bonus decay.
-    case 542:
+    case ECL_OP_SPELL_TIMEOUT:
         g_Spellcard->flags |= SPELLCARD_NO_BONUS_DECAY;
         break;
     // unknown543(): removes the boss effect.
-    case 543:
+    case ECL_OP_HIDE_BOSS_EFFECT:
         g_Spellcard->flags |= SPELLCARD_FLAG_10;
         delete_vm_and_clear(g_Spellcard->boss_anm_id);
         break;
     // unknown567(on): the spell name at the bottom of the screen.
-    case 567:
+    case ECL_OP_SPELL_TEXT_AT_BOTTOM:
         ((SpellcardFlagBits *)&g_Spellcard->flags)->text_at_bottom = get_int_arg(0);
         break;
     // unknown544(on): ENEMY_FLAG_8000000.
-    case 544:
+    case ECL_OP_FLAG_8000000:
         ((EnemyFlagsLow *)&flags_low)->unk_27 = get_int_arg(0);
         break;
     // laserOn(et): a line laser from the shooter's settings.
-    case 702:
+    case ECL_OP_LASER_ON:
         ecl_laser_on(this);
         break;
     // laserStOn(et, a): an infinite laser.
-    case 703:
+    case ECL_OP_LASER_ST_ON:
         ecl_laser_st_on(this);
         break;
     // A beam laser (ExpHP: unknown713).
-    case 713:
+    case ECL_OP_LASER_BEAM_ON:
         ecl_laser_beam_on(this);
         break;
     // laserCuOn(et): a curvy laser.
-    case 711:
+    case ECL_OP_LASER_CU_ON:
         ecl_laser_cu_on(this);
         break;
     // laserStEnd(id): cancels every laser with the id.
-    case 710:
+    case ECL_OP_LASER_ST_END:
     {
         LaserDataInf *laser = g_LaserManager->find_by_id(get_int_arg(0), 0);
         while (laser != NULL)
@@ -1978,7 +1978,7 @@ int EnemyData::ecl_run_over_300()
     }
 
     // laserOffset(id, x, y)
-    case 704:
+    case ECL_OP_LASER_OFFSET:
     {
         LaserDataInf *laser = g_LaserManager->find_by_id(get_int_arg(0), 0);
         Float3 offset;
@@ -1992,7 +1992,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // laserTrajectory(id, x, y): infinite lasers only.
-    case 705:
+    case ECL_OP_LASER_TRAJECTORY:
     {
         LaserDataInf *laser = g_LaserManager->find_by_id(get_int_arg(0), 0);
         Float3 trajectory;
@@ -2006,7 +2006,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // laserStLength(id, length)
-    case 706:
+    case ECL_OP_LASER_ST_LENGTH:
     {
         LaserDataInf *laser = g_LaserManager->find_by_id(get_int_arg(0), 0);
         if (laser != NULL)
@@ -2016,7 +2016,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // laserStWidth(id, width)
-    case 707:
+    case ECL_OP_LASER_ST_WIDTH:
     {
         LaserDataInf *laser = g_LaserManager->find_by_id(get_int_arg(0), 0);
         if (laser != NULL)
@@ -2026,7 +2026,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // laserStAngle(id, angle)
-    case 708:
+    case ECL_OP_LASER_ST_ANGLE:
     {
         LaserDataInf *laser = g_LaserManager->find_by_id(get_int_arg(0), 0);
         if (laser != NULL)
@@ -2036,7 +2036,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // laserStRotation(id, rotation): infinite lasers only.
-    case 709:
+    case ECL_OP_LASER_ST_ROTATION:
     {
         LaserDataInf *laser = g_LaserManager->find_by_id(get_int_arg(0), 0);
         if (laser != NULL)
@@ -2046,7 +2046,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // unknown714(id, value): laser method_8.
-    case 714:
+    case ECL_OP_LASER_714:
     {
         LaserDataInf *laser = g_LaserManager->find_by_id(get_int_arg(0), 0);
         if (laser != NULL)
@@ -2057,7 +2057,7 @@ int EnemyData::ecl_run_over_300()
     }
     // etCancel(radius): cancels bullets and lasers around the enemy into
     // items.
-    case 615:
+    case ECL_OP_ET_CANCEL:
     {
         f32 radius = get_float_arg(0);
         g_BulletManager->cancel_radius(&final_pos.pos, radius, 1);
@@ -2066,7 +2066,7 @@ int EnemyData::ecl_run_over_300()
     }
     // hitboxRect(w, h): a rectangular bullet-cancelling hitbox, rotated like
     // the enemy's main sprite.
-    case 712:
+    case ECL_OP_HITBOX_RECT:
     {
         Float3 size;
         size.x = get_float_arg(0);
@@ -2075,7 +2075,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etClear(radius): the same without items.
-    case 616:
+    case ECL_OP_ET_CLEAR:
     {
         f32 radius = get_float_arg(0);
         g_BulletManager->cancel_radius(&final_pos.pos, radius, 0);
@@ -2083,7 +2083,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etCancel2(radius): etCancel that also takes protected bullets.
-    case 635:
+    case ECL_OP_ET_CANCEL2:
     {
         f32 radius = get_float_arg(0);
         g_BulletManager->cancel_radius_as_bomb(&final_pos.pos, radius, 1);
@@ -2091,7 +2091,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // etClear2(radius)
-    case 636:
+    case ECL_OP_ET_CLEAR2:
     {
         f32 radius = get_float_arg(0);
         g_BulletManager->cancel_radius_as_bomb(&final_pos.pos, radius, 0);
@@ -2099,7 +2099,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // setChapter(chapter)
-    case 524:
+    case ECL_OP_SET_CHAPTER:
     {
         i32 chapter = get_int_arg(0);
         g_Globals.chapter = chapter;
@@ -2109,7 +2109,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // rankF3(var, a, b, c): only two tiers survive in the binary.
-    case 529:
+    case ECL_OP_RANK_F3:
         if (g_Globals.rank >= 512)
         {
             *get_float_arg_ptr(0) = get_float_arg(2);
@@ -2120,7 +2120,7 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // rankF5(var, a, b, c, d, e)
-    case 530:
+    case ECL_OP_RANK_F5:
         if (g_Globals.rank >= 600)
         {
             *get_float_arg_ptr(0) = get_float_arg(4);
@@ -2143,7 +2143,7 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // rankF2(var, low, high): low at rank -1024, high at rank 1024.
-    case 531:
+    case ECL_OP_RANK_F2:
     {
         f32 low = get_float_arg(1);
         f32 high = get_float_arg(2);
@@ -2151,7 +2151,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // rankI3(var, a, b, c)
-    case 532:
+    case ECL_OP_RANK_I3:
         if (g_Globals.rank >= 512)
         {
             *get_int_arg_ptr(0) = get_int_arg(2);
@@ -2162,7 +2162,7 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // rankI5(var, a, b, c, d, e)
-    case 533:
+    case ECL_OP_RANK_I5:
         if (g_Globals.rank >= 600)
         {
             *get_int_arg_ptr(0) = get_int_arg(4);
@@ -2185,7 +2185,7 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // rankI2(var, low, high)
-    case 534:
+    case ECL_OP_RANK_I2:
     {
         i32 low = get_int_arg(1);
         i32 high = get_int_arg(2);
@@ -2193,35 +2193,35 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // stars(count): the boss's star count on the HUD.
-    case 540:
+    case ECL_OP_STARS:
         g_Gui->boss_star_count = get_int_arg(0);
         break;
     // reset: cancels every laser.
-    case 545:
+    case ECL_OP_RESET:
         g_LaserManager->cancel_all();
         break;
     // bombShield(on, anm_script)
-    case 546:
+    case ECL_OP_BOMB_SHIELD:
         ((EnemyFlagsLow *)&flags_low)->bombshield = get_int_arg(0);
         bombshield_on_anm_main = get_int_arg(1);
         flags_low &= ~(ENEMY_FLAG_BOMBSHIELD_UP | ENEMY_FLAG_NO_HURTBOX);
         bombshield_off_anm_main = anm_set_main;
         break;
     // unknown559(limit): the enemy limit.
-    case 559:
+    case ECL_OP_ENEMY_LIMIT:
         g_EnemyManager->inner.enemy_limit = get_int_arg(0);
         break;
     // gameSpeed(speed)
-    case 547:
+    case ECL_OP_GAME_SPEED:
         g_game_speed = get_float_arg(0);
         break;
     // angleToPlayer(var, x, y)
-    case 623:
+    case ECL_OP_ANGLE_TO_PLAYER:
         ecl_angle_to_player(this);
         break;
     // diffWait(easy, normal, hard, lunatic): waits the given number of
     // frames for the current difficulty.
-    case 548:
+    case ECL_OP_DIFF_WAIT:
     {
         i32 easy = get_int_arg(0);
         i32 normal = get_int_arg(1);
@@ -2248,7 +2248,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // fog(radius, color): replaces the enemy's fog; radius 0 removes it.
-    case 629:
+    case ECL_OP_FOG:
         if (fog.fog_ptr != NULL)
         {
             delete (Fog *)fog.fog_ptr;
@@ -2265,12 +2265,12 @@ int EnemyData::ecl_run_over_300()
         }
         break;
     // callSTD(label): jumps the stage script.
-    case 630:
+    case ECL_OP_CALL_STD:
         g_Stage->jump_to_label(get_int_arg(0));
         break;
     // unknown557(time, method, color, begin, end): interpolates the stage
     // fog (camera sky) towards the given distances and color.
-    case 557:
+    case ECL_OP_STAGE_FOG:
     {
         i32 time = get_int_arg(0);
         i32 method = get_int_arg(1);
@@ -2281,19 +2281,19 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // unknown549(flag)
-    case 549:
+    case ECL_OP_MAGENTA_FLASH:
         ((EnemyFlagsLow *)&flags_low)->magenta_flash = get_int_arg(0);
         break;
     // unknown550(value)
-    case 550:
+    case ECL_OP_SET_KILL_GROUP:
         kill_group = get_int_arg(0);
         break;
     // enmAlive(var, id)
-    case 555:
+    case ECL_OP_ENM_ALIVE:
         *get_int_arg_ptr(0) = g_EnemyManager->is_enemy_alive(get_int_arg(1));
         break;
     // enmPos(var_x, var_y, id)
-    case 801:
+    case ECL_OP_ENM_POS:
     {
         EnemyInf *enemy = g_EnemyManager->find_enemy_by_id(get_int_arg(2));
         *get_float_arg_ptr(0) = enemy->enemy.final_pos.pos.x;
@@ -2302,7 +2302,7 @@ int EnemyData::ecl_run_over_300()
     }
     // unknown802(index): makes the other bosses jump to their interrupt
     // index's subroutine, if it has a life threshold.
-    case 802:
+    case ECL_OP_BOSSES_INTERRUPT:
     {
         i32 index = get_int_arg(0);
         for (i32 i = 0; i < 3; i++)
@@ -2322,7 +2322,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // enmCall(id, sub): restarts another enemy at the named subroutine.
-    case 800:
+    case ECL_OP_ENM_CALL:
     {
         EnemyInf *enemy = g_EnemyManager->find_enemy_by_id(get_int_arg(0));
         if (enemy != NULL)
@@ -2334,7 +2334,7 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // enm324(var_x, var_y, id): enmPos that falls back to this enemy.
-    case 324:
+    case ECL_OP_ENM_POS_OR_SELF:
     {
         EnemyInf *enemy = g_EnemyManager->find_enemy_by_id(get_int_arg(2));
         *get_float_arg_ptr(0) = enemy != NULL ? enemy->enemy.final_pos.pos.x : final_pos.pos.x;
@@ -2342,24 +2342,24 @@ int EnemyData::ecl_run_over_300()
         break;
     }
     // unknown560(x, y)
-    case 560:
+    case ECL_OP_UNKNOWN_560:
         g_BulletManager->ecl_unknown_560.x = get_float_arg(0);
         g_BulletManager->ecl_unknown_560.y = get_float_arg(1);
         break;
     // spec0(max_time, count, min_count): the season item drop.
-    case 1000:
+    case ECL_OP_SPEC0:
         drop_season.max_time = get_int_arg(0);
         drop_season.bonus_timer.set_value(drop_season.max_time);
         drops.extra_counts[15] = get_int_arg(1);
         drop_season.min_count = get_int_arg(2);
         break;
     // spec1(damage_per_drop)
-    case 1001:
+    case ECL_OP_SPEC1:
         drop_season.damage_per_season_drop = get_int_arg(0);
         drop_season.damage_accounted_for_season_drops = life.total_damage_including_ignored;
         break;
     // anm340(id): sets flag 0x2000000 on another enemy.
-    case 340:
+    case ECL_OP_ENM_DELETE:
     {
         EnemyInf *enemy = g_EnemyManager->find_enemy_by_id(get_int_arg(0));
         if (enemy != NULL)
