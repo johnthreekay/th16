@@ -1,5 +1,6 @@
 // Stand-in callers for wave 3, range A (0x401000-0x4190b0).
 #include "../AnmManager.h"
+#include "../BulletManager.h"
 #include "../EffectManager.h"
 #include "../Fog.h"
 #include "../Gui.h"
@@ -91,4 +92,11 @@ f32 harness_vm_transformed_x(AnmVm *vm)
     Float3 pos;
     vm->get_own_transformed_pos(&pos);
     return pos.x + pos.y;
+}
+
+// Like ECL's bullet cancel instructions (0x4221b8, 0x422237).
+void harness_cancel_radius(D3DXVECTOR3 *pos, f32 radius, i32 mode)
+{
+    g_BulletManager->cancel_radius(pos, radius, mode);
+    g_BulletManager->cancel_radius(pos, radius * 2.0f, mode + 1);
 }

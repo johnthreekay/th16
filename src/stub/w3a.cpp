@@ -37,3 +37,9 @@ AnmId AnmManager::deserialize_vm_tree(void *buffer, AnmVm *parent, i32 *size)
     *size = 0;
     return AnmId();
 }
+
+// STUB: TH16 0x416840
+i32 Bullet::cancel(i32 mode)
+{
+    return mode;
+}

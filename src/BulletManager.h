@@ -103,6 +103,9 @@ struct Bullet
 
     i32 on_tick();
     i32 sub_4124b0(i32 arg);
+    // 0x416840. Turns the bullet into its cancel animation, dropping items
+    // by mode.
+    i32 cancel(i32 mode);
 };
 
 // A row of the bullet type table (ExpHP: zBulletType, which gives it 0x118
@@ -186,11 +189,14 @@ struct BulletManager
     i32 on_draw_body();
 
     // 0x416d20. Reaches the manager through its global, so LTCG drops the
-    // unused this; the radius arrives in xmm2.
-    HARNESS_CALLED void cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode);
+    // unused this; the radius arrives in xmm2. Spares bullets that are
+    // still invulnerable to cancels.
+    HARNESS_CALLED i32 cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode);
     // 0x416e20. The same for a rectangle of the given size, rotated by
     // angle (xmm3).
-    HARNESS_CALLED void cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3DXVECTOR3 *size, f32 angle, i32 mode);
+    HARNESS_CALLED i32 cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3DXVECTOR3 *size, f32 angle, i32 mode);
+    // 0x416c20. cancel_radius_as_bomb for every bullet (ECL).
+    HARNESS_CALLED i32 cancel_radius(D3DXVECTOR3 *pos, f32 radius, i32 mode);
 };
 
 extern BulletManager *g_BulletManager;

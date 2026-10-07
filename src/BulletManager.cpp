@@ -2,6 +2,7 @@
 
 #include "AnmManager.h"
 #include "BulletManager.h"
+#include "Collision.h"
 #include "GameErrorContext.h"
 #include "GameThread.h"
 #include "UpdateFunc.h"
@@ -247,4 +248,73 @@ int __fastcall bullet_map_sprite(AnmVm *vm, i32 sprite)
         return g_bullet_types[bullet->sprite].sprites[sprite + bullet->color * 4];
     }
     return sprite;
+}
+
+// Whether a bullet's hitbox touches a circle.
+static inline i32 bullet_in_circle(Bullet *bullet, D3DXVECTOR3 *pos, f32 radius)
+{
+    f32 r = bullet->hitbox_diameter * 0.5f + radius;
+    f32 dy = bullet->pos.y - pos->y;
+    f32 dx = bullet->pos.x - pos->x;
+    return dy * dy + dx * dx <= r * r;
+}
+
+// TODO: the original does not thread the jump after the iterator's NULL
+// entry, computes the y distance first and keeps 4 more frame bytes in the
+// bomb version.
+// FUNCTION: TH16 0x416c20
+HARNESS_CALLED i32 BulletManager::cancel_radius(D3DXVECTOR3 *pos, f32 radius, i32 mode)
+{
+    Bullet *bullet = g_BulletManager->iter_first();
+    while (bullet != NULL)
+    {
+        if (bullet->state == BULLET_STATE_2 || bullet->state == BULLET_STATE_1)
+        {
+            if (bullet_in_circle(bullet, pos, radius))
+            {
+                bullet->cancel(mode);
+            }
+        }
+        bullet = g_BulletManager->iter_advance();
+    }
+    return 0;
+}
+
+// TODO: as cancel_radius.
+// FUNCTION: TH16 0x416d20
+HARNESS_CALLED i32 BulletManager::cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode)
+{
+    for (Bullet *bullet = g_BulletManager->iter_first(); bullet != NULL; bullet = g_BulletManager->iter_advance())
+    {
+        if ((bullet->state == BULLET_STATE_2 || bullet->state == BULLET_STATE_1) &&
+            bullet->ex_invuln_remaining_frames == 0)
+        {
+            if (bullet_in_circle(bullet, pos, radius))
+            {
+                bullet->cancel(mode);
+            }
+        }
+    }
+    return 0;
+}
+
+// FUNCTION: TH16 0x416e20
+HARNESS_CALLED i32 BulletManager::cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3DXVECTOR3 *size, f32 angle, i32 mode)
+{
+    Bullet *bullet = bullets;
+    for (i32 i = 0; i < BULLET_COUNT; i++, bullet++)
+    {
+        if ((bullet->state == BULLET_STATE_2 || bullet->state == BULLET_STATE_1) &&
+            bullet->ex_invuln_remaining_frames == 0)
+        {
+            f32 radius = bullet->scale * bullet->hitbox_diameter;
+            if (collision_test_circle_rect(pos->x, pos->y, size->x, size->y, angle, bullet->pos.x, bullet->pos.y,
+                                           radius) &&
+                collision_test_circle_rect(0.0f, 224.0f, 384.0f, 448.0f, 0.0f, bullet->pos.x, bullet->pos.y, radius))
+            {
+                bullet->cancel(mode);
+            }
+        }
+    }
+    return 0;
 }
