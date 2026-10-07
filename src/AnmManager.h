@@ -451,6 +451,10 @@ struct AnmManager
     // 0x469a00. A circle outline of count segments around (x, y), from
     // angle on. draw_vm passes x, y and radius in xmm registers.
     HARNESS_CALLED i32 draw_circle_outline(f32 x, f32 y, f32 radius, f32 angle, i32 count, D3DCOLOR color);
+    // 0x469640. A filled circle of count segments around (x, y), fading
+    // from center_color to edge_color.
+    HARNESS_CALLED i32 draw_circle(f32 x, f32 y, f32 radius, f32 angle, i32 count, D3DCOLOR center_color,
+                                   D3DCOLOR edge_color);
     // 0x469bd0. A ring of count segments, width wide, around (x, y).
     HARNESS_CALLED i32 draw_ring(f32 x, f32 y, f32 radius, f32 width, f32 angle, i32 count, D3DCOLOR color);
 

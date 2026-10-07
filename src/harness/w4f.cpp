@@ -45,3 +45,11 @@ i32 harness_w4f_ring(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 radius)
     return g_AnmManager->draw_ring(x, y, radius, vm->scale.x, vm->rotation.z, vm->int_vars[0], vm->color_1.d3d) +
            other->draw_ring(x, y, radius, vm->scale.y, vm->rotation.z, vm->int_vars[1], vm->color_1.d3d);
 }
+
+// AnmManager::draw_vm (0x468b5e) draws filled circles for render mode 17.
+i32 harness_w4f_circle_fill(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 radius)
+{
+    return g_AnmManager->draw_circle(x, y, radius, vm->rotation.z, vm->int_vars[0], vm->color_1.d3d,
+                                     vm->color_2.d3d) +
+           other->draw_circle(x, y, radius, vm->rotation.z, vm->int_vars[1], vm->color_2.d3d, vm->color_1.d3d);
+}
