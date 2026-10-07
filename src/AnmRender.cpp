@@ -29,12 +29,16 @@ static_assert(sizeof(RenderVertex144) == 0x1c, "RenderVertex144 layout");
 
 // GLOBAL: TH16 0x4df4a8
 RenderVertexXyzrhwTex g_quad_vertices_4df4a8[4];
-
+// SYNTHETIC: TH16 0x4011f0
+// ??__Eg_quad_vertices_4df4a8@@YAXXZ
 // GLOBAL: TH16 0x4df830
 RenderVertex144 g_sprite_temp_buffer[4];
-
+// SYNTHETIC: TH16 0x401220
+// ??__Eg_sprite_temp_buffer@@YAXXZ
 // GLOBAL: TH16 0x4df8a0
 RenderVertexXyzDiffuseTex g_quad_vertices_4df8a0[4];
+// SYNTHETIC: TH16 0x401250
+// ??__Eg_quad_vertices_4df8a0@@YAXXZ
 
 // FUNCTION: TH16 0x464f10
 void AnmManager::setup_render_state_for_vm(AnmVm *vm)
@@ -323,6 +327,104 @@ HARNESS_CALLED void AnmManager::draw_triangle_fan(i32 count, Float3 *center, Flo
                                              sizeof(RenderVertex044));
     mgr->primitive_write_cursor += count;
     mgr->unk_cc++;
+}
+
+// The extra data of VMs drawn by anm_on_draw_masked (ExpHP:
+// AnmVm::on_draw__1): four VMs drawn onto a cleared alpha channel, and a
+// fifth drawn through it. Mode 2 masks the arcade region, mode 0 the whole
+// screen (only with an alpha channel in the back buffer).
+struct AnmMaskData
+{
+    AnmVm vms[4];
+    AnmVm overlay;
+    i32 mode;
+};
+
+// D3DFVF_XYZRHW | D3DFVF_DIFFUSE
+struct AnmMaskVertex
+{
+    D3DXVECTOR3 pos;
+    f32 rhw;
+    D3DCOLOR diffuse;
+};
+
+static __forceinline void anm_mask_set_vertex(AnmMaskVertex *v, f32 x, f32 y)
+{
+    v->pos = D3DXVECTOR3(x, y, 0.0f);
+    v->rhw = 1.0f;
+    v->diffuse = 0;
+}
+
+// Clears the alpha of the masked area: only alpha is written.
+static __forceinline void anm_mask_begin()
+{
+    g_AnmManager->flush_sprites();
+    IDirect3DDevice9 *d3d = g_Supervisor.d3d_device;
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, TRUE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ZERO);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_ONE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ZERO);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
+}
+
+static __forceinline void anm_mask_draw(AnmMaskVertex *vertices)
+{
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
+    g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, vertices, sizeof(AnmMaskVertex));
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    g_AnmManager->last_blend_mode = 10;
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_SRCALPHA);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ONE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
+}
+
+// TODO: the original keeps the extra data in ebx (ours spills it) and orders the rhw and color stores of the vertices differently.
+// FUNCTION: TH16 0x4073a0
+i32 __fastcall anm_on_draw_masked(AnmVm *vm)
+{
+    AnmMaskData *data = (AnmMaskData *)vm->ins_508_extra_data;
+    if (data->mode == 2)
+    {
+        anm_mask_begin();
+        AnmMaskVertex arcade[4];
+        anm_mask_set_vertex(&arcade[0], 128.0f, 16.0f);
+        anm_mask_set_vertex(&arcade[1], 512.0f, 16.0f);
+        anm_mask_set_vertex(&arcade[2], 128.0f, 464.0f);
+        anm_mask_set_vertex(&arcade[3], 512.0f, 464.0f);
+        anm_mask_draw(arcade);
+    }
+    else if (data->mode == 0 && g_Supervisor.present_params.BackBufferFormat == D3DFMT_A8R8G8B8)
+    {
+        anm_mask_begin();
+        AnmMaskVertex screen[4];
+        anm_mask_set_vertex(&screen[0], 0.0f, 0.0f);
+        anm_mask_set_vertex(&screen[1], (f32)g_resolution_x, 0.0f);
+        anm_mask_set_vertex(&screen[2], 0.0f, (f32)g_resolution_y);
+        anm_mask_set_vertex(&screen[3], (f32)g_resolution_x, (f32)g_resolution_y);
+        anm_mask_draw(screen);
+    }
+    for (i32 i = 0; i < 4; i++)
+    {
+        g_AnmManager->draw_vm(&data->vms[i]);
+    }
+    if (data->mode == 2 || (data->mode == 0 && g_Supervisor.present_params.BackBufferFormat == D3DFMT_A8R8G8B8))
+    {
+        g_Supervisor.d3d_device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, FALSE);
+        g_AnmManager->draw_vm(&data->overlay);
+        g_AnmManager->flush_sprites();
+    }
+    return 0;
 }
 
 // The extra data of the VMs drawn by anm_on_draw_fan: a fan of 33 vertices

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string.h>
 #include <windows.h>
 
 #include <d3d9.h>
@@ -10,6 +11,8 @@
 #include "Camera.h"
 #include "Thread.h"
 #include "types.h"
+
+extern i16 g_pad_mapping[10];
 
 // The game's settings, as stored in th16.cfg. Layout from ExpHP's
 // th-re-data; most fields are still unknown.
@@ -42,7 +45,13 @@ struct Config
     u8 unk_2a[0x2c - 0x2a];
     // 0x8 skips DirectInput setup.
     u32 flags_2c;
-    u8 unk_30[0x68 - 0x30];
+    u32 unk_30;
+    u32 unk_34;
+    u8 unk_38[0x68 - 0x38];
+
+    // The defaults ConfigData::set_defaults also writes, for the whole
+    // struct.
+    Config();
 };
 
 // A screenshot being saved: Supervisor's 0x43bbd0 copies the back buffer
@@ -155,6 +164,8 @@ struct Supervisor
     double frame_time;
     D3DCOLOR background_color;
 
+    Supervisor();
+
     u32 read_joypad(u32 input);
 
     HRESULT enable_d3d_fog();
@@ -162,6 +173,9 @@ struct Supervisor
     // draw callbacks, which use disable_d3d_fog_inline.
     DECOMP_NOINLINE HRESULT disable_d3d_fog();
     HRESULT disable_d3d_fog_inline();
+    HRESULT enable_d3d_fog_inline();
+    HRESULT enable_zwrite_inline();
+    HRESULT disable_zwrite_inline();
     HRESULT enable_zwrite();
     HRESULT disable_zwrite();
     void swap_transform_matrices(Camera *camera);
@@ -249,6 +263,41 @@ enum SupervisorFlags
 };
 
 extern Supervisor g_Supervisor;
+
+// enable_d3d_fog, enable_zwrite and disable_zwrite as the stage drawing code
+// has them inline.
+inline HRESULT Supervisor::enable_d3d_fog_inline()
+{
+    if (fog_enabled != 1)
+    {
+        g_AnmManager->flush_sprites();
+        fog_enabled = 1;
+        return d3d_device->SetRenderState(D3DRS_FOGENABLE, TRUE);
+    }
+    return 0;
+}
+
+inline HRESULT Supervisor::enable_zwrite_inline()
+{
+    if (zwrite_enabled != 1)
+    {
+        g_AnmManager->flush_sprites();
+        zwrite_enabled = 1;
+        return d3d_device->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
+    }
+    return 0;
+}
+
+inline HRESULT Supervisor::disable_zwrite_inline()
+{
+    if (zwrite_enabled != 0)
+    {
+        g_AnmManager->flush_sprites();
+        zwrite_enabled = 0;
+        return d3d_device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+    }
+    return 0;
+}
 
 inline HRESULT Supervisor::disable_d3d_fog_inline()
 {

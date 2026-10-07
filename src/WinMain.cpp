@@ -27,7 +27,6 @@ void read_resolution_dialog();
 INT_PTR CALLBACK resolution_dialog_proc(HWND dialog, UINT message, WPARAM wparam, LPARAM lparam);
 LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
 extern HANDLE g_app_mutex;
-extern u32 g_hardware_input_pressed;
 extern D3DThreadInf g_D3DThreadInf;
 
 // Something WinMain allocates first and frees last; nothing else is known
@@ -114,7 +113,7 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
         i32 height = GetSystemMetrics(SM_CYDLGFRAME) * 2 + GetSystemMetrics(SM_CYCAPTION) + g_resolution_y;
         g_GameWindow.window =
             CreateWindowExA(0, "BASE", "\x93\x8c\x95\xfb\x93V\x8b\xf3\xe0\xf6\x81@\x81` Hidden Star in Four Seasons. ver 1.00a",
-                            0x100b0000, *(i32 *)&g_Supervisor.config.unk_30[0], *(i32 *)&g_Supervisor.config.unk_30[4],
+                            0x100b0000, g_Supervisor.config.unk_30, g_Supervisor.config.unk_34,
                             width, height, NULL, NULL, instance, NULL);
     }
     GetWindowRect(g_GameWindow.window, &g_Supervisor.window_rect);
@@ -681,8 +680,8 @@ teardown:
     if (g_Supervisor.config.window_size >= 3)
     {
         GetWindowRect(g_GameWindow.window, &g_Supervisor.window_rect);
-        *(i32 *)&g_Supervisor.config.unk_30[0] = g_Supervisor.window_rect.left;
-        *(i32 *)&g_Supervisor.config.unk_30[4] = g_Supervisor.window_rect.top;
+        g_Supervisor.config.unk_30 = g_Supervisor.window_rect.left;
+        g_Supervisor.config.unk_34 = g_Supervisor.window_rect.top;
     }
     g_Supervisor.teardown_everything();
     delete g_UpdateFuncRegistry;

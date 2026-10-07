@@ -427,6 +427,24 @@ struct LaserManager
     // second argument is the same at every call site; LTCG folded it.
     HARNESS_CALLED LaserDataInf *find_by_id(i32 id, i32 unused);
 
+    // cancel_in_rectangle as Marisa's bomb has it inlined, without the
+    // count.
+    __forceinline void cancel_in_rectangle_inline(Float3 *a, Float3 *b, f32 angle, i32 mode, i32 e)
+    {
+        LaserDataInf *laser = list_head.next;
+        cancel_pos = *a;
+        cancel_pos_2 = *b;
+        while (laser != NULL)
+        {
+            LaserDataInf *next = laser->next;
+            if (laser->state != 1 && laser->ticked)
+            {
+                laser->cancel_as_bomb_rectangle(a, b, angle, mode, e);
+            }
+            laser = next;
+        }
+    }
+
     // cancel_in_radius as the season releases have it inlined, without the
     // count. Our build needs the __forceinline to agree.
     __forceinline void cancel_in_radius_inline(Float3 *pos, f32 radius, i32 c, i32 d)
@@ -467,9 +485,3 @@ struct LaserManager
 };
 
 extern LaserManager *g_LaserManager;
-
-// 0x404220. Where the line through (x1, y1) at angle1 meets the line
-// through (x2, y2) at angle2; the laser graze checks use it to find the
-// point of the laser closest to the player.
-HARNESS_CALLED i32 __stdcall line_intersection(f32 *out_x, f32 *out_y, f32 x1, f32 y1, f32 angle1, f32 x2, f32 y2,
-                                               f32 angle2);

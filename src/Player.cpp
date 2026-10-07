@@ -144,7 +144,9 @@ HARNESS_CALLED f32 Player::angle_to_player(Float3 *pos)
     {
         return ZUN_PI / 2;
     }
-    return atan2f(dy, dx);
+    // atan2f's body: whether LTCG inlines atan2f here depends on how many
+    // other callers it has.
+    return (f32)atan2((double)dy, (double)dx);
 }
 
 // TODO: register allocation: the original keeps size in ecx and the player
@@ -457,6 +459,13 @@ static_assert(sizeof(Player) == 0x2c828, "Player");
 PlayerInner::PlayerInner()
 {
 }
+
+// A PlayerInner nothing uses besides its static constructor (ExpHP:
+// STATIC_PLAYER_INNER__CAUSE_THAT_MAKES_SENSE).
+// GLOBAL: TH16 0x4c1b10
+PlayerInner g_static_player_inner;
+// SYNTHETIC: TH16 0x401100
+// ??__Eg_static_player_inner@@YAXXZ
 
 // FUNCTION: TH16 0x441a50
 Player::~Player()

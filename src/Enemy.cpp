@@ -1,4 +1,5 @@
 #include "Enemy.h"
+#include "Ecl.h"
 #include "Fog.h"
 #include "AnmManager.h"
 #include "BulletManager.h"
@@ -19,6 +20,7 @@
 #include "SoundManager.h"
 #include "Supervisor.h"
 #include "UpdateFunc.h"
+#include "ZunMath.h"
 
 static_assert(sizeof(PosVel) == 0x44, "PosVel size");
 static_assert(sizeof(EnemyBulletShooter) == 0x380, "EnemyBulletShooter size");
@@ -533,13 +535,297 @@ int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage)
     {
         pos.y += 24.0f;
         Float2 size(vm->scale.x * 192.0f, vm->scale.y * 32.0f);
-        bar_damage = g_Player->compute_damage_to_enemy(&pos, &size, vm->rotation.z, 0.0f, &hit, 0, 0,
+        bar_damage = g_Player->compute_damage_to_enemy(&pos, &size, vm->rotation.z, 0.0f, &hit, NULL, 0,
                                                        enemy->full->enemy_id);
         pos.y += 32.0f;
         circle_damage =
-            g_Player->compute_damage_to_enemy(&pos, NULL, 0.0f, 48.0f, &hit, 0, 0, enemy->full->enemy_id);
+            g_Player->compute_damage_to_enemy(&pos, NULL, 0.0f, 48.0f, &hit, NULL, 0, enemy->full->enemy_id);
     }
     return damage + bar_damage + circle_damage;
+}
+
+// The hit sound of a damaged enemy: quieter unless it is a boss whose
+// attack is nearly over.
+static inline void enemy_play_hit_sound(EnemyData *enemy, i32 low_life_spell, i32 low_life)
+{
+    u32 spell_flags = g_Spellcard->flags;
+    if ((enemy->flags_low & 0x40800000) && (spell_flags & 9) != 9 &&
+        (((spell_flags & 1) && enemy->full->enemy.life.remaining_for_cur_attack < low_life_spell) ||
+         (!(spell_flags & 1) && enemy->full->enemy.life.remaining_for_cur_attack < low_life)))
+    {
+        g_SoundManager.play_sound_at_position(0x23, enemy->final_pos.pos.x);
+    }
+    else
+    {
+        g_SoundManager.play_sound_at_position(0x22, enemy->final_pos.pos.x);
+    }
+}
+
+// Bomb shields, damage from the player's shots and bombs (with the life
+// and time interrupts it can trigger), collision with the player and the
+// damage flash of the main VM.
+// TODO: functionally complete; register allocation and block order differ.
+// FUNCTION: TH16 0x41c330
+int EnemyData::step_logic()
+{
+    if ((flags_low & 0x10000000) && (g_MainBomb->in_use == 1 || g_SubseasonBomb->in_use == 1) &&
+        !(flags_low & 0x20000000))
+    {
+        anm_set_main = bombshield_on_anm_main;
+        anm_ids[0].replace_with_effect(bombshield_on_anm_main);
+        flags_low |= 0x20000001;
+    }
+    else if (g_MainBomb->in_use != 1 && g_SubseasonBomb->in_use != 1 && (flags_low & 0x20000000))
+    {
+        anm_set_main = bombshield_off_anm_main;
+        anm_ids[0].replace_with_effect(bombshield_off_anm_main);
+        flags_low &= ~0x20000001;
+    }
+    if (flags_low & 0x800)
+    {
+        i32 hit = 0;
+        i32 result;
+        if (!(flags_low & 0x1000))
+        {
+            result = g_Player->compute_damage_to_enemy(&final_pos.pos, NULL, 0.0f, hurtbox_size.x * 0.5f, &hit,
+                                                       &last_damage_pos, 1, full->enemy_id);
+        }
+        else
+        {
+            result = g_Player->compute_damage_to_enemy(&final_pos.pos, &hurtbox_size, rotation, 0.0f, &hit,
+                                                       &last_damage_pos, 1, full->enemy_id);
+        }
+        if (result != 0 && hit != 0 && full->die() != 0)
+        {
+            return 1;
+        }
+    }
+    const char *sub = full->check_time_interrupts();
+    if (sub != NULL)
+    {
+        time_in_ecl = 0;
+        full->free_all_async();
+        full->reset_run_context();
+        EnemyInf *inf = full;
+        inf->context.current_context->cur_location.subroutine_index = inf->file_manager->find_sub_by_name(sub);
+        inf->context.current_context->cur_location.offset_from_first_instruction = 0;
+        inf->context.current_context->time = 0.0f;
+        if (full->run_ecl(*g_timer_speed_ptrs[time_in_ecl.speed_index]) != 0)
+        {
+            return -1;
+        }
+    }
+    flags_low &= ~0x200000;
+    i32 hit = 0;
+    if (!(flags_low & 0x21))
+    {
+        i32 damage = 0;
+        if (hurtbox_size.x > 0.0f)
+        {
+            if (!(flags_low & 0x1000))
+            {
+                damage = g_Player->compute_damage_to_enemy(&final_pos.pos, NULL, 0.0f, hurtbox_size.x * 0.5f, &hit,
+                                                           &last_damage_pos, 0, full->enemy_id);
+            }
+            else
+            {
+                damage = g_Player->compute_damage_to_enemy(&final_pos.pos, &hurtbox_size, rotation, 0.0f, &hit,
+                                                           &last_damage_pos, 0, full->enemy_id);
+            }
+            damage = damage * g_Player->damage_multiplier;
+        }
+        if (func_from_ecl_flag_ext_dmg != NULL)
+        {
+            damage += ((EnemyExtDamageFunc)func_from_ecl_flag_ext_dmg)(this, damage);
+        }
+        if (unk_3fe0 > 0)
+        {
+            damage += unk_3fe0;
+            unk_3fe0 = 0;
+        }
+        if (g_Player->inner.state == 2 || g_Player->inner.state == 0)
+        {
+            damage /= 5;
+        }
+        i32 dealt = g_Gui->msg == NULL ? damage : 0;
+        if (dealt > 0)
+        {
+            if (hit)
+            {
+                if (dealt >= life.current)
+                {
+                    g_EnemyManager->inner.unk_a0[0] += (dealt - life.current) / 4 + life.current;
+                }
+                else
+                {
+                    g_EnemyManager->inner.unk_a0[0] += dealt;
+                }
+            }
+            else
+            {
+                g_EnemyManager->inner.unk_a0[1] += dealt;
+            }
+        }
+        i32 life_damage = dealt;
+        if (g_MainBomb->in_use == 1 && bomb_damage_multiplier < 1.0f)
+        {
+            if (dealt != 0 && 0.0f >= bomb_damage_multiplier)
+            {
+                g_SoundManager.play_sound_at_position(0x24, final_pos.pos.x);
+            }
+            life_damage = dealt * bomb_damage_multiplier;
+        }
+        if (life_damage != 0)
+        {
+            if ((g_Spellcard->flags & 0x21) == 0x21)
+            {
+                life_damage /= 30;
+            }
+            if (!(flags_low & 0x10) && set_invuln.current <= 0)
+            {
+                life.receive_damage(life_damage);
+            }
+            else
+            {
+                life.total_damage_including_ignored += life_damage;
+            }
+            if (drop_season.damage_per_season_drop > 0)
+            {
+                while (drop_season.damage_accounted_for_season_drops < life.total_damage_including_ignored)
+                {
+                    drop_season.damage_accounted_for_season_drops += drop_season.damage_per_season_drop;
+                    g_ItemManager->spawn_item(0x10, &final_pos.pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
+                                              g_replay_safe_rng.randf_0_to_1() + 1.2f, 0, 0);
+                }
+            }
+            unk_4024.set_value(30);
+            sub = full->check_life_interrupts();
+            if (sub != NULL)
+            {
+                time_in_ecl.set_value(0);
+                full->free_all_async();
+                full->reset_run_context();
+                full->load_sub_by_name(sub);
+                if (full->run_ecl(*g_timer_speed_ptrs[time_in_ecl.speed_index]) != 0)
+                {
+                    return -1;
+                }
+            }
+            if ((life.current <= 0) & ~(flags_low >> 7))
+            {
+                if (full->die() != 0)
+                {
+                    return 1;
+                }
+            }
+            flags_low |= 0x200000;
+        }
+    }
+    if (life.is_spell & 2)
+    {
+        if (full->die() != 0)
+        {
+            return 1;
+        }
+    }
+    if (!(flags_low & 0x22) && no_hitbox_dur.current <= 0 && !(flags_low & 0x4000000))
+    {
+        if (func_from_ecl_unknown_634 != NULL)
+        {
+            ((EnemyFuncSetFunc)func_from_ecl_unknown_634)(this);
+        }
+        else
+        {
+            i32 result;
+            if (!(flags_low & 0x1000))
+            {
+                result = g_Player->check_hit_circle(&final_pos.pos, hitbox_size.x * 0.5f, 0);
+            }
+            else
+            {
+                AnmVm *vm = anm_ids[0].find_or_clear();
+                f32 half = hitbox_size.y * 0.5f;
+                f32 x = 0.0f;
+                f32 y = half;
+                if (vm != NULL)
+                {
+                    f32 angle = normalize_angle(vm->rotation.z + ZUN_PI / 2);
+                    f32 s = zun_sinf(angle);
+                    f32 c = zun_cosf(angle);
+                    x = c * 0.0f - s * half;
+                    y = c * half + s * 0.0f;
+                }
+                D3DXVECTOR3 pos;
+                pos.x = x + final_pos.pos.x;
+                pos.y = final_pos.pos.y + y;
+                pos.z = final_pos.pos.z + 0.0f;
+                result = g_Player->check_hit_rotated_rect(&pos, rotation, hitbox_size.x, hitbox_size.y, 0);
+            }
+            if ((flags_low & 0x200) && result == 2 && time_in_ecl.current % 6 == 0)
+            {
+                g_Player->do_graze(&g_Player->inner.pos);
+            }
+        }
+    }
+    AnmVm *vm = g_AnmManager->get_vm_with_id(anm_ids[0]);
+    if (vm == NULL)
+    {
+        anm_ids[0].id = 0;
+    }
+    else if (unk_3ff0 == 0)
+    {
+        if (flags_low >= 0x80000000)
+        {
+            if (time_in_ecl.current % 4 == 0)
+            {
+                vm->color_2.d3d = 0xffff00ff;
+                vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
+            }
+            else
+            {
+                vm->flags_lo &= ~0x60000;
+            }
+        }
+        if ((flags_low & 0x200000) && !(flags_low & 0x2000))
+        {
+            vm->color_2.d3d = 0xff0000ff;
+            vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
+            unk_3ff0 = 4;
+            if (hit_sound < 0)
+            {
+                enemy_play_hit_sound(this, 200, 900);
+            }
+            else
+            {
+                g_SoundManager.play_sound_at_position(hit_sound, final_pos.pos.x);
+            }
+        }
+        else if (time_in_ecl.current % 4 == 0)
+        {
+            u32 spell_flags = g_Spellcard->flags;
+            if ((flags_low & 0x40800000) && (spell_flags & 9) != 9 &&
+                (((spell_flags & 1) && full->enemy.life.remaining_for_cur_attack < 100) ||
+                 (!(spell_flags & 1) && full->enemy.life.remaining_for_cur_attack < 500)))
+            {
+                vm->color_2.d3d = 0xff0000ff;
+                vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
+            }
+        }
+        else
+        {
+            vm->flags_lo &= ~0x60000;
+        }
+    }
+    else
+    {
+        vm->flags_lo &= ~0x60000;
+        unk_3ff0--;
+    }
+    if (unk_4024.current > 0)
+    {
+        unk_4024--;
+    }
+    return 0;
 }
 
 // GLOBAL: TH16 0x4a6dc0

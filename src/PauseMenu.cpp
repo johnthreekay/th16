@@ -127,7 +127,7 @@ PauseMenu *PauseMenu::create()
     return menu;
 }
 
-extern u32 g_hardware_input_pressed;
+#include "Input.h"
 
 // TODO: the inlined timer ticks use other xmm registers for 1.0, 1.01 and the speed.
 // FUNCTION: TH16 0x43e5f0

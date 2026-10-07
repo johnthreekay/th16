@@ -50,7 +50,7 @@ DECOMP_NOINLINE f32 LTCG_VECTORCALL normalize_angle(f32 a)
 }
 
 // FUNCTION: TH16 0x4054d0
-void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius)
+HARNESS_CALLED void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius)
 {
     __asm
     {

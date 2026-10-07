@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "AnmManager.h"
+#include "Collision.h"
 #include "CriticalSections.h"
 #include "EffectManager.h"
 #include "Enemy.h"
@@ -1128,8 +1129,8 @@ i32 LaserLineInf::check_graze_or_kill(i32 graze_only)
             {
                 f32 x;
                 f32 y;
-                line_intersection(&x, &y, start.x, start.y, angle, g_Player->inner.pos.x, g_Player->inner.pos.y,
-                                  normalize_angle(angle + ZUN_PI / 2));
+                collision_line_intersection(&x, &y, start.x, start.y, angle, g_Player->inner.pos.x,
+                                            g_Player->inner.pos.y, normalize_angle(angle + ZUN_PI / 2));
                 start.x = x;
                 start.y = y;
                 g_Player->do_graze(&start);
@@ -1170,8 +1171,8 @@ i32 LaserInfiniteInf::check_graze_or_kill(i32 graze_only)
             {
                 f32 x;
                 f32 y;
-                line_intersection(&x, &y, start.x, start.y, angle, g_Player->inner.pos.x, g_Player->inner.pos.y,
-                                  normalize_angle(angle + ZUN_PI / 2));
+                collision_line_intersection(&x, &y, start.x, start.y, angle, g_Player->inner.pos.x,
+                                            g_Player->inner.pos.y, normalize_angle(angle + ZUN_PI / 2));
                 start.x = x;
                 start.y = y;
                 g_Player->do_graze(&start);

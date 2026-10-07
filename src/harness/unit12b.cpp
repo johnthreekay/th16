@@ -28,12 +28,6 @@ void harness_stage(const char *path, i32 n, CameraSky *sky)
     delete g_Stage;
 }
 
-// ECL builds fog colors (0x422823) and steps them (InterpCameraSky::step).
-CameraSky harness_camera_sky(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, CameraSky *other)
-{
-    return CameraSky(a, b, c, d, e, f) + *other;
-}
-
 // Other bullet cancels (the player around 0x442669) use other modes.
 void harness_cancel_rectangle(D3DXVECTOR3 *pos, D3DXVECTOR3 *size, f32 angle, i32 mode)
 {

@@ -7,6 +7,10 @@
 
 // GLOBAL: TH16 0x4c10b8
 Arcfile g_Arcfile;
+// SYNTHETIC: TH16 0x401000
+// ??__Eg_Arcfile@@YAXXZ
+// SYNTHETIC: TH16 0x48ac10
+// ??__Fg_Arcfile@@YAXXZ
 // GLOBAL: TH16 0x4d7ba0
 Arcfile g_arcfiles[0x14];
 // Its dynamic initializer and atexit destructor:

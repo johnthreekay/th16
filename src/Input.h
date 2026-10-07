@@ -4,6 +4,7 @@
 
 #include <mmsystem.h>
 
+#include "InputManager.h"
 #include "decomp.h"
 #include "types.h"
 
@@ -13,10 +14,6 @@ extern JOYCAPSA g_joypad_caps;
 // capabilities; 1 (and a log line) if neither does.
 i32 get_joypad_capabilities();
 void clear_all_keydown_states();
-
-// The buttons held this frame, straight from the devices (replays do not
-// overwrite it).
-extern u32 g_hardware_input;
 
 // Button state block around ExpHP's INPUT (0x4a52c8).
 struct InputState
@@ -38,11 +35,48 @@ struct InputState
     static void update();
 };
 
-extern InputState g_InputState;
+// The input globals from ExpHP's HARDWARE_INPUT (0x4a50b0) on are one
+// object: the devices' InputManager, whose hold counters have room for 64
+// buttons, and the game's InputState, which overlaps the end of it and
+// keeps its counters in the upper 32 (InputState::update addresses them
+// from the start of the object).
+union InputGlobals
+{
+    InputManager hardware;
+    struct
+    {
+        u8 unk_0[0x94];
+        // Per button: frames until InputState::update repeats it in
+        // unk_8c (hardware.hold_frames[0x20 + i]).
+        i32 repeat_time[0x20];
+    };
+    struct
+    {
+        u8 unk_0_[0x194];
+        InputState state;
+    };
+    // The hold counters by device: [0] the hardware's, [1] the game's.
+    struct
+    {
+        u8 unk_0__[0x14];
+        u32 hold[2][0x20];
+        u32 hold_total[2][0x20];
+    };
+};
 
-// Per button: frames until InputState::update repeats it in unk_8c (ExpHP
-// has no name).
-extern i32 g_input_repeat_time[0x20];
+extern InputGlobals g_input;
+
+// The parts other code names on their own.
+// The buttons held this frame, straight from the devices (replays do not
+// overwrite it).
+#define g_hardware_input (g_input.hardware.cur)
+// Hardware buttons auto-repeating and newly pressed this frame.
+#define g_hardware_input_repeat (g_input.hardware.repeat)
+#define g_hardware_input_pressed (g_input.hardware.rising_edge)
+// Frames the shot button has been held (hardware.hold_frames_total[0]).
+#define g_hardware_input_held_4a51c4 (g_input.hardware.hold_frames_total[0])
+#define g_input_repeat_time (g_input.repeat_time)
+#define g_InputState (g_input.state)
 
 // Game buttons in g_hardware_input and the replay input words.
 enum InputButton

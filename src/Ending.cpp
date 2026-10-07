@@ -25,12 +25,10 @@ extern i32 g_unk_4c0f40;
 
 // How many frames the bit at 0x114 / 4 of the raw button state has been
 // held.
-extern u32 g_hardware_input_held_4a51c4;
 
 #define BUTTON_SHOT (1 << 0)
 #define BUTTON_SKIP (1 << 9)
 
-extern u32 g_hardware_input_pressed;
 
 i32 ending_load_anm();
 

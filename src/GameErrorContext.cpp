@@ -7,6 +7,33 @@
 
 // GLOBAL: TH16 0x4a30a8
 GameErrorContext g_GameErrorContext;
+// SYNTHETIC: TH16 0x401010
+// ??__Eg_GameErrorContext@@YAXXZ
+// SYNTHETIC: TH16 0x48ac20
+// ??__Fg_GameErrorContext@@YAXXZ
+
+// TH06's ZunMemory: an allocation registry that only exists in debug
+// builds. The release build keeps an instance whose empty destructor is
+// still registered (0x401020). Which global it really is, and where, is a
+// guess.
+struct ZunMemory
+{
+    bool registry_in_use;
+
+    ZunMemory()
+    {
+        registry_in_use = false;
+    }
+    ~ZunMemory()
+    {
+    }
+};
+
+ZunMemory g_ZunMemory;
+// SYNTHETIC: TH16 0x401020
+// ??__Eg_ZunMemory@@YAXXZ
+// SYNTHETIC: TH16 0x48ac30
+// ??__Fg_ZunMemory@@YAXXZ
 
 // FUNCTION: TH16 0x4029d0
 const char *GameErrorContext::log(const char *fmt, ...)

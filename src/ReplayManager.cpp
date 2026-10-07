@@ -448,9 +448,6 @@ HARNESS_CALLED void ReplayManager::begin_stage()
     current_tick_num_in_stage = 0;
 }
 
-// GLOBAL: TH16 0x4a5144
-i32 g_input_repeat_time[0x20];
-
 // FUNCTION: TH16 0x449120
 void clear_input_state()
 {

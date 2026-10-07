@@ -1,11 +1,80 @@
 #include <stdlib.h>
+#include <string.h>
 
+#include "Arcfile.h"
 #include "CriticalSections.h"
 #include "FileSystem.h"
 #include "Log.h"
 
 // GLOBAL: TH16 0x49f270
 HANDLE g_file = INVALID_HANDLE_VALUE;
+
+// TODO: register allocation differs: the original keeps path on the stack and size in [ebp-8] in the archive branch, and data in esi throughout.
+// FUNCTION: TH16 0x402440
+u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size, i32 not_in_archive)
+{
+    u8 *data;
+    DWORD file_size;
+
+    ENTER_CS(CS_FILE);
+    if (!not_in_archive)
+    {
+        // The archive only knows file names.
+        const char *name = strrchr(path, '\\');
+        name = name == NULL ? path : name + 1;
+        name = strrchr(name, '/');
+        name = name == NULL ? path : name + 1;
+        ArcfileEntry *entry = g_Arcfile.find_entry_inline(name);
+        file_size = entry != NULL ? entry->size : 0;
+        if (size != NULL)
+        {
+            *size = file_size;
+        }
+        if (file_size == 0)
+        {
+            goto fail;
+        }
+        zun_log("%s Decode ... \r\n", name);
+        data = (u8 *)malloc(file_size);
+        if (data == NULL)
+        {
+            goto fail;
+        }
+        g_Arcfile.read_file(name, data);
+        g_CriticalSections.leave(CS_FILE);
+        return data;
+    }
+    else
+    {
+        zun_log("%s Load ... \r\n", path);
+        HANDLE h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+        if (h == INVALID_HANDLE_VALUE)
+        {
+            zun_log("error : %s is not found.\r\n", path);
+            goto fail;
+        }
+        file_size = GetFileSize(h, NULL);
+        data = (u8 *)malloc(file_size);
+        if (data == NULL)
+        {
+            zun_log("error : %s allocation error.\r\n", path);
+            CloseHandle(h);
+            goto fail;
+        }
+        ReadFile(h, data, file_size, &file_size, NULL);
+        if (size != NULL)
+        {
+            *size = file_size;
+        }
+        CloseHandle(h);
+        LEAVE_CS(CS_FILE);
+        return data;
+    }
+fail:
+    LEAVE_CS(CS_FILE);
+    return NULL;
+}
 
 // FUNCTION: TH16 0x402600
 BOOL LTCG_FASTCALL file_exists(const char *path)

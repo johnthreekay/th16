@@ -405,10 +405,11 @@ decompiled code the surroundings it had in the original:
 
 - The input words g_hardware_input_pressed/_repeat are fields of the
   address-taken input struct at 0x4a50b0 in the original; ours must be
-  address-exposed (harness_w5d_input_words) or menu code keeps them in
-  registers. input_pressed_or_repeating inlines as an if/return pair:
-  `(p & m) || (r & m)` merges into `(p | r) & m`, a forceinline helper does
-  not.
+  address-exposed or menu code keeps them in registers. They are now macros
+  for fields of `g_input` (src/Input.h), whose address InputState::update
+  and WinMain take, which is enough. input_pressed_or_repeating inlines as
+  an if/return pair: `(p & m) || (r & m)` merges into `(p | r) & m`, a
+  forceinline helper does not.
 - Shared tail blocks come from duplicated statements the compiler
   tail-merged, not from goto: write the statements twice.
 - AnmId::find_or_clear is called at all 25 original sites (DECOMP_NOINLINE).
@@ -438,6 +439,14 @@ decompiled code the surroundings it had in the original:
   0x46a380, 0x46a390) stay out of line, called from the dynamic
   initializers of g_quad_vertices_4df4a8, g_sprite_temp_buffer and
   g_quad_vertices_4df8a0 (`// SYNTHETIC:` with `X::X`).
+- Real callers replacing stand-ins settle matches:
+  collision_line_intersection (0x404220) matched once the laser graze
+  checks called it instead of a harness, and StageInner::draw_vms once
+  AnmManager::draw_vm had a real body (draw_vms then realigns through ebx
+  like the original).
+- More callers can stop LTCG inlining a UCRT inline in one place: with
+  Bullet::run_ex's calls, Player::angle_to_player had to spell out
+  atan2f's body to keep it inline.
 
 ### Compiler-generated and CRT functions
 
@@ -467,6 +476,9 @@ Name-based annotations: the marker, then a comment line naming the function.
   static functions defined in a header, such as the per-file `sincosmul`
   copies, cannot, and neither can anything annotated inside a header: move
   an out-of-line copy into a .cpp instead.
+- The `// GLOBAL:` parser does not take a constructor call with
+  arguments (`ScreenEffect g_screen_effect(...);`); write it as copy
+  initialization (`= ScreenEffect(...)`), which compiles the same.
 - Comments must go above `// FUNCTION:`, not between it and the signature:
   reccmp then loses the function and build.py may misread the declaration.
 - quickdiff misreports jump thunks and tail jumps; check those with

@@ -359,9 +359,10 @@ struct Player
     // 0x445a30 (ExpHP: enm_compute_damage_sources_445a30). Damage the
     // player's damage sources deal to an enemy hurtbox at pos: a rectangle
     // of size rotated by angle, or a circle of radius when size is NULL.
-    // *hit tells whether anything hit.
-    HARNESS_CALLED i32 compute_damage_to_enemy(Float3 *pos, Float2 *size, f32 angle, f32 radius, i32 *hit, i32 unk_5,
-                                               i32 unk_6, i32 enemy_id);
+    // *hit tells whether anything hit, *hit_pos (if not NULL) where; no_score
+    // skips the score.
+    HARNESS_CALLED i32 compute_damage_to_enemy(Float3 *pos, Float2 *size, f32 angle, f32 radius, i32 *hit,
+                                               Float3 *hit_pos, i32 no_score, i32 enemy_id);
 };
 
 // .sht files kept by ~Player when the next Player reuses them.

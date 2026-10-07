@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -7,8 +8,11 @@
 #include "FileSystem.h"
 #include "GameErrorContext.h"
 #include "Globals.h"
+#include "Rng.h"
 #include "ScreenEffect.h"
+#include "Spellcard.h"
 #include "Supervisor.h"
+#include "ZunAngle.h"
 
 // GLOBAL: TH16 0x4a6da0
 Stage *g_Stage;
@@ -25,6 +29,9 @@ void StageInner::set_sky_interp(i32 end_time, i32 method, CameraSky *goal)
     camera_sky_i.goal = *goal;
     camera_sky_i.time.reset();
 }
+
+// SYNTHETIC: TH16 0x409d90
+// Fog::`scalar deleting destructor'
 
 // TODO: the original computes &vm_ids[i] after pushing it and loads the
 // child list only after storing flags_hi.
@@ -245,19 +252,507 @@ int __fastcall Stage::on_tick_callback(void *arg)
     return ((Stage *)arg)->on_tick();
 }
 
+// Applies camera 3 and makes it the current camera.
+static __forceinline void stage_apply_camera_3()
+{
+    g_Supervisor.current_camera = &g_Supervisor.cameras[3];
+    camera_apply_43c940(&g_Supervisor.cameras[3]);
+    g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
+    g_Supervisor.current_camera_index = 3;
+}
+
+__forceinline void Stage::use_camera()
+{
+    g_AnmManager->flush_sprites();
+    inner.camera.unk_fc.x = g_Supervisor.cameras[3].unk_fc.x;
+    inner.camera.unk_fc.y = g_Supervisor.cameras[3].unk_fc.y;
+    g_Supervisor.cameras[3] = inner.camera;
+    stage_apply_camera_3();
+}
+
+// Passes a color change on to the ANM manager.
+static __forceinline void stage_set_anm_color(u32 color)
+{
+    g_AnmManager->unk_1c7fd8c = 1;
+    g_AnmManager->unk_1c7fd88.d3d = color;
+}
+
+static __forceinline void stage_set_render_state(D3DRENDERSTATETYPE state, DWORD value)
+{
+    g_AnmManager->flush_sprites();
+    g_Supervisor.d3d_device->SetRenderState(state, value);
+}
+
+// Clears camera 3's viewport.
+static __forceinline void stage_clear_viewport(D3DCOLOR color)
+{
+    D3DRECT rect;
+    D3DVIEWPORT9 &vp = g_Supervisor.cameras[3].viewport;
+    rect.x1 = vp.X;
+    rect.y1 = vp.Y;
+    rect.x2 = vp.X + vp.Width;
+    rect.y2 = vp.Y + vp.Height;
+    g_Supervisor.d3d_device->Clear(1, &rect, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, color, 1.0f, 0);
+}
+
+// Sets up the camera and fog, clears the background and draws layers 0-7.
+// TODO: around the inlined ScreenEffect allocation the original pops operator new's argument together with memset's and spills the effect later.
+// FUNCTION: TH16 0x409f90
+i32 Stage::on_draw_03()
+{
+    if (stage_flags & STAGE_DISABLED)
+    {
+        return 1;
+    }
+    if (!(stage_flags & STAGE_FADING_OUT) || fade_timer.current < 60)
+    {
+        use_camera();
+        g_Supervisor.enable_zwrite_inline();
+        stage_set_render_state(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+        stage_set_render_state(D3DRS_FOGCOLOR, *(D3DCOLOR *)inner.camera.sky.color);
+        stage_set_render_state(D3DRS_FOGSTART, *(DWORD *)&inner.camera.sky.begin_distance);
+        stage_set_render_state(D3DRS_FOGEND, *(DWORD *)&inner.camera.sky.end_distance);
+        if ((stage_flags & STAGE_FADING_OUT) && frame_count < 34)
+        {
+            stage_clear_viewport(0);
+        }
+        else
+        {
+            stage_clear_viewport(*(D3DCOLOR *)inner.camera.sky.color);
+        }
+    }
+    if (stage_flags & STAGE_FADING_OUT)
+    {
+        if (fade_timer.current < 30)
+        {
+            ScreenEffect::create_inline(3, 30, 0, 0, 0, 10);
+            stage_flags |= STAGE_FLAG_1;
+            fade_timer.set_value(1);
+        }
+        else
+        {
+            stage_flags &= ~STAGE_FLAG_1;
+            inner.color_changed = 0;
+        }
+    }
+    if (inner.color_changed)
+    {
+        stage_set_anm_color(inner.color_3344);
+        inner.color_changed = 0;
+    }
+    instances_drawn = 0;
+    instances_culled = 0;
+    quads_drawn = 0;
+    if (stage_flags & STAGE_FLAG_1)
+    {
+        g_Supervisor.enable_d3d_fog_inline();
+        draw_layer(0);
+        draw_layer(1);
+        draw_layer(2);
+        draw_layer(3);
+        draw_layer(4);
+        draw_layer(5);
+        draw_layer(6);
+        draw_layer(7);
+        g_AnmManager->flush_sprites();
+    }
+    g_AnmManager->unk_1c7fd8c = 0;
+    g_AnmManager->unk_1c7fd88.d3d = 0x80808080;
+    g_Supervisor.disable_zwrite_inline();
+    stage_set_render_state(D3DRS_ZFUNC, D3DCMP_ALWAYS);
+    return 1;
+}
+
+// Draws layers 32 and 33 of the ANM manager and layers 8-11 of the stage,
+// and runs the fade timer.
+// TODO: the original realigns its frame through ebx and stores 0xff into the color byte after loading the flags.
+// FUNCTION: TH16 0x40a410
+i32 Stage::on_draw_06()
+{
+    if (stage_flags & STAGE_DISABLED)
+    {
+        return 1;
+    }
+    if (!(stage_flags & STAGE_FADING_OUT) || fade_timer.current < 60)
+    {
+        use_camera();
+        g_Supervisor.disable_d3d_fog_inline();
+        g_Supervisor.disable_zwrite_inline();
+        stage_set_render_state(D3DRS_ZFUNC, D3DCMP_ALWAYS);
+        g_AnmManager->render_layer(0x20);
+        stage_set_render_state(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+        g_AnmManager->render_layer(0x21);
+        stage_set_render_state(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+        stage_set_render_state(D3DRS_FOGCOLOR, *(D3DCOLOR *)inner.camera.sky.color);
+        stage_set_render_state(D3DRS_FOGSTART, *(DWORD *)&inner.camera.sky.begin_distance);
+        stage_set_render_state(D3DRS_FOGEND, *(DWORD *)&inner.camera.sky.end_distance);
+    }
+    if ((stage_flags & STAGE_FADING_OUT) && fade_timer.current >= 30)
+    {
+        inner.color_changed = 0;
+    }
+    if (stage_flags & STAGE_FLAG_1)
+    {
+        g_Supervisor.disable_zwrite_inline();
+        g_Supervisor.enable_d3d_fog_inline();
+        draw_layer(8);
+        draw_layer(9);
+        draw_layer(10);
+        draw_layer(11);
+        g_AnmManager->flush_sprites();
+    }
+    g_AnmManager->unk_1c7fd8c = 0;
+    g_AnmManager->unk_1c7fd88.d3d = 0x80808080;
+    if (fade_timer.current > 0)
+    {
+        fade_timer--;
+        if (fade_timer.current <= 0)
+        {
+            inner.color_changed = 0xff;
+            if (stage_flags & STAGE_FADING_IN)
+            {
+                stage_flags |= STAGE_DISABLED;
+            }
+            stage_flags &= ~(STAGE_FADING_IN | STAGE_FADING_OUT);
+            inner.color_3344 = 0xffffff;
+        }
+    }
+    g_Supervisor.disable_zwrite_inline();
+    stage_set_render_state(D3DRS_ZFUNC, D3DCMP_ALWAYS);
+    g_Supervisor.disable_d3d_fog_inline();
+    return 1;
+}
+
+// TODO: the float math and the corner stores are scheduled differently (the original reloads center.x and groups the stores by value).
+// FUNCTION: TH16 0x40a7d0
+HARNESS_CALLED i32 StdObject::is_culled(D3DXVECTOR3 *pos, f32 max_distance_sq, Camera *camera)
+{
+    D3DXVECTOR3 corners[16];
+    D3DXVECTOR3 projected[16];
+    D3DXMATRIX world;
+
+    corners[0] = (center + *pos) - (camera->position + camera->rocking_vector_1);
+    if (D3DXVec3LengthSq(&corners[0]) > max_distance_sq)
+    {
+        return 1;
+    }
+    f32 hx = size.x * 0.5f;
+    f32 hy = size.y * 0.5f;
+    f32 hz = size.z * 0.5f;
+    f32 x_max = center.x + hx;
+    f32 x_min = center.x - hx;
+    f32 y_max = center.y + hy;
+    f32 y_min = center.y - hy;
+    f32 z_max = center.z + hz;
+    f32 z_min = center.z - hz;
+    corners[0].x = x_max;
+    corners[0].y = y_max;
+    corners[0].z = z_max;
+    corners[1].x = x_max;
+    corners[1].y = y_max;
+    corners[1].z = z_min;
+    corners[2].x = x_max;
+    corners[2].y = y_min;
+    corners[2].z = z_max;
+    corners[3].x = x_max;
+    corners[3].y = y_min;
+    corners[3].z = z_min;
+    corners[4].x = x_min;
+    corners[4].y = y_max;
+    corners[4].z = z_max;
+    corners[5].x = x_min;
+    corners[5].y = y_max;
+    corners[5].z = z_min;
+    corners[6].x = x_min;
+    corners[6].y = y_min;
+    corners[6].z = z_max;
+    corners[7].x = x_min;
+    corners[7].y = y_min;
+    corners[7].z = z_min;
+    corners[8].x = center.x;
+    corners[8].y = y_min;
+    corners[8].z = z_min;
+    corners[9].x = center.x;
+    corners[9].y = y_max;
+    corners[9].z = z_min;
+    corners[10].x = center.x;
+    corners[10].y = y_min;
+    corners[10].z = z_max;
+    corners[11].x = center.x;
+    corners[11].y = y_max;
+    corners[11].z = z_max;
+    corners[12].x = center.x;
+    corners[12].y = y_min;
+    corners[12].z = center.z;
+    corners[13].x = center.x;
+    corners[13].y = y_max;
+    corners[13].z = center.z;
+    corners[14].x = center.x;
+    corners[14].y = y_min;
+    corners[14].z = center.z - hz * 0.5f;
+    corners[15].x = center.x;
+    corners[15].y = y_max;
+    corners[15].z = center.z + hz * 0.5f;
+    D3DXMatrixIdentity(&world);
+    D3DXMatrixTranslation(&world, pos->x, pos->y, pos->z);
+    D3DXVec3ProjectArray(projected, sizeof(D3DXVECTOR3), corners, sizeof(D3DXVECTOR3), &camera->viewport,
+                         (D3DXMATRIX *)&camera->projection_matrix, (D3DXMATRIX *)&camera->view_matrix, &world, 16);
+    f32 left = (f32)g_early_arcade_offset_x;
+    f32 top = (f32)g_early_arcade_offset_y;
+    f32 right = left + 384.0f;
+    f32 bottom = top + 448.0f;
+    f32 max_x = left - 8.0f;
+    f32 min_x = right + 8.0f;
+    f32 max_y = top - 8.0f;
+    f32 min_y = bottom + 8.0f;
+    for (i32 i = 0; i < 16; i++)
+    {
+        if (projected[i].z >= 0.0f && 1.0f >= projected[i].z)
+        {
+            max_x = projected[i].x > max_x ? projected[i].x : max_x;
+            min_x = projected[i].x < min_x ? projected[i].x : min_x;
+            min_y = projected[i].y < min_y ? projected[i].y : min_y;
+            max_y = projected[i].y > max_y ? projected[i].y : max_y;
+        }
+    }
+    if (max_x >= (f32)g_early_arcade_offset_x && right >= min_x && max_y >= (f32)g_early_arcade_offset_y &&
+        bottom >= min_y)
+    {
+        return 0;
+    }
+    return 1;
+}
+
+// Draws the instances of objects on a layer, culling those out of view.
+// FUNCTION: TH16 0x40af70
+i32 Stage::draw_layer(i32 layer)
+{
+    StdInstance *instance = instances;
+    inner.draw_vms(layer);
+    g_AnmManager->flush_sprites();
+    g_Supervisor.enable_d3d_fog_inline();
+    stage_apply_camera_3();
+    g_AnmManager->render_cache_184fbb8 = 1;
+    for (; instance->object_id >= 0; instance++)
+    {
+        StdObject *object = objects[instance->object_id];
+        if (object->layer != layer)
+        {
+            continue;
+        }
+        D3DXVECTOR3 pos(instance->pos.x, instance->pos.y, instance->pos.z);
+        if (object->is_culled(&pos, inner.unk_3310, &g_Supervisor.cameras[3]))
+        {
+            instances_culled++;
+            instance->unk_2 &= 0xfffe;
+            continue;
+        }
+        object->flags |= 2;
+        for (StdQuad *quad = object->quads; quad->type >= 0; quad = (StdQuad *)((u8 *)quad + quad->size))
+        {
+            AnmVm *vm = &vms[quad->vm_index];
+            if (quad->type != 0)
+            {
+                continue;
+            }
+            if ((vm->flags_lo & (0x1f << ANM_VM_RENDER_MODE_SHIFT)) >= (4 << ANM_VM_RENDER_MODE_SHIFT))
+            {
+                vm->entity_pos.x = quad->pos.x + instance->pos.x;
+                vm->entity_pos.y = quad->pos.y + instance->pos.y;
+                vm->entity_pos.z = quad->pos.z + instance->pos.z;
+                if (quad->width != 0.0f)
+                {
+                    vm->scale.x = quad->width /
+                                  g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_width;
+                    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
+                }
+                if (quad->height != 0.0f)
+                {
+                    vm->scale.y = quad->height /
+                                  g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_height;
+                    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
+                }
+            }
+            u32 mode = vm->flags_lo & (0x1f << ANM_VM_RENDER_MODE_SHIFT);
+            if (mode == (8 << ANM_VM_RENDER_MODE_SHIFT) || mode == (24 << ANM_VM_RENDER_MODE_SHIFT))
+            {
+                g_Supervisor.enable_d3d_fog_inline();
+            }
+            else
+            {
+                g_Supervisor.disable_d3d_fog_inline();
+            }
+            if (vm->flags_lo & 0x2000)
+            {
+                g_Supervisor.disable_zwrite_inline();
+            }
+            else
+            {
+                g_Supervisor.enable_zwrite_inline();
+            }
+            g_AnmManager->draw_vm(vm);
+            quads_drawn++;
+        }
+        instance->unk_2 |= 1;
+        instances_drawn++;
+    }
+    g_Supervisor.disable_zwrite_inline();
+    return 0;
+}
+
+// FUNCTION: TH16 0x40c280
+void StageInner::draw_vms(i32 layer)
+{
+    for (i32 i = 0; i < 8; i++)
+    {
+        AnmVm *vm = &anm_vms[i];
+        if (&g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id] == NULL || unk_32f0[i] != layer)
+        {
+            continue;
+        }
+        g_Supervisor.current_camera = &g_Supervisor.cameras[3];
+        if (g_AnmManager != NULL)
+        {
+            g_AnmManager->flush_sprites();
+        }
+        g_Supervisor.d3d_device->SetTransform(D3DTS_VIEW, &g_Supervisor.cameras[3].view_matrix);
+        g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &g_Supervisor.cameras[3].projection_matrix);
+        if (g_AnmManager != NULL)
+        {
+            g_AnmManager->camera_unk_fc.x = g_Supervisor.cameras[3].unk_fc.x;
+            g_AnmManager->camera_unk_fc.y = g_Supervisor.cameras[3].unk_fc.y;
+        }
+        g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
+        g_Supervisor.current_camera_index = 3;
+        g_Supervisor.disable_d3d_fog_inline();
+        g_AnmManager->flush_sprites();
+        g_Supervisor.disable_zwrite_inline();
+        if (&g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id] != NULL)
+        {
+            g_AnmManager->draw_vm(vm);
+        }
+        g_Supervisor.enable_zwrite_inline();
+        stage_apply_camera_3();
+    }
+}
+
+// TODO: register and stack slot allocation differ (the original keeps 255.0f in memory and adds d.x to pos.x the other way round).
+// Moves the fog mesh: kind 1 waves the bottom of the screen while no spell
+// card is active, kind 2 bulges a disc around the center of the game area
+// whose radius shrinks towards unk_3318.
+// FUNCTION: TH16 0x40c4a0
+void StageInner::step_fog()
+{
+    if (fog == NULL)
+    {
+        return;
+    }
+    // The angles are ZunAngles in ZUN's struct: copied as such.
+    ZunAngle angle_a = *(ZunAngle *)&unk_3338;
+    ZunAngle angle_b = *(ZunAngle *)&unk_333c;
+    D3DXVECTOR3 *point = (D3DXVECTOR3 *)fog->buffer_18;
+    D3DXVECTOR3 d;
+    if (fog_kind == 1)
+    {
+        if (g_Spellcard != NULL && (g_Spellcard->flags & 1))
+        {
+            goto tick;
+        }
+        fog->set_rect(-192.0f, 320.0f, 384.0f, 128.0f);
+        f32 amplitude;
+        if (fog_timer.current_f < 60.0f)
+        {
+            amplitude = fog_timer.current_f * 6.0f / 60.0f;
+        }
+        else
+        {
+            amplitude = 6.0f;
+        }
+        FogVertex *vertex = (FogVertex *)fog->buffer_14;
+        for (i32 i = 0; i < fog->vm_count; i++)
+        {
+            for (i32 j = 0; j < fog->unk_4; j++)
+            {
+                ((u8 *)&vertex->diffuse)[3] = 0x80;
+                f32 t = j * amplitude / (fog->unk_4 - 1);
+                d.x = sinf(angle_a.value) * t;
+                d.y = sinf(angle_b.value) * t;
+                if (i != 0 && j != 0 && i != fog->vm_count - 1 && j != fog->unk_4 - 1)
+                {
+                    vertex->pos.x = vertex->pos.x + d.x;
+                    vertex->pos.y = vertex->pos.y + d.y;
+                    vertex->pos.z = 0.0f;
+                    point->z = 0.0f;
+                }
+                angle_a.value = wrap_angle(angle_a.value + 0.66842401f);
+                vertex++;
+                point++;
+            }
+            angle_b.value = wrap_angle(angle_b.value - ZUN_PI * 10.0f / 21.0f);
+        }
+        unk_3338 = wrap_angle(unk_3338 + ZUN_PI / 64);
+        unk_333c = wrap_angle(unk_333c + ZUN_PI / 80);
+    }
+    else if (fog_kind == 2)
+    {
+        f32 radius = unk_331c;
+        if (radius > unk_3318)
+        {
+            unk_331c = radius - 2.0f;
+        }
+        fog->set_rect(-radius, 224.0f - radius, radius + radius, radius + radius);
+        FogVertex *vertex = (FogVertex *)fog->buffer_14;
+        for (i32 i = 0; i < fog->vm_count; i++)
+        {
+            for (i32 j = 0; j < fog->unk_4; j++)
+            {
+                d = D3DXVECTOR3(point->x - 224.0f, point->y - 240.0f, point->z - radius * radius);
+                f32 t = radius * radius - (d.x * d.x + d.y * d.y);
+                if (t >= 0.0f)
+                {
+                    t /= radius * radius;
+                    vertex->diffuse = 0xffffffff;
+                    ((u8 *)&vertex->diffuse)[3] = 0x60;
+                    ((u8 *)&vertex->diffuse)[2] = 255.0f - (255 - ((u8 *)&vertex->diffuse)[2]) * t;
+                    ((u8 *)&vertex->diffuse)[1] = 255.0f - (255 - ((u8 *)&vertex->diffuse)[1]) * t;
+                    ((u8 *)&vertex->diffuse)[0] = 255.0f - (255 - ((u8 *)&vertex->diffuse)[0]) * t;
+                    f32 scale = t * 32.0f;
+                    D3DXVec3Normalize(&d, &d);
+                    d *= scale;
+                    d.x += sinf(angle_a.value) * t * 8.0f;
+                    d.y += sinf(angle_b.value) * t * 8.0f;
+                    vertex->pos.x += d.x;
+                    vertex->pos.y += d.y;
+                    vertex->pos.z = 0.0f;
+                    point->z = 0.0f;
+                }
+                else
+                {
+                    ((u8 *)&vertex->diffuse)[3] = 0;
+                }
+                angle_a.value = wrap_angle(angle_a.value + ZUN_PI / 2);
+                angle_b.value = wrap_angle(angle_b.value - ZUN_PI * 2 / 9);
+                vertex++;
+                point++;
+            }
+        }
+        unk_3338 = wrap_angle(unk_3338 + ZUN_PI / 64);
+        unk_333c = wrap_angle(g_replay_unsafe_rng.randf_0_to_1() * ZUN_PI / 40.0f + ZUN_PI / 80 + unk_333c);
+    }
+tick:
+    fog_timer.tick_in_place();
+}
+
 // FUNCTION: TH16 0x40a7b0
 int __fastcall Stage::on_draw_03_callback(void *arg)
 {
     return ((Stage *)arg)->on_draw_03();
 }
 
-// TODO: the original pads the stack around the call (push ecx/pop ecx) and
-// returns on_draw_06's eax; needs on_draw_06 decompiled.
 // FUNCTION: TH16 0x40a7c0
 int __fastcall Stage::on_draw_06_callback(void *arg)
 {
-    ((Stage *)arg)->on_draw_06();
-    return 1;
+    return ((Stage *)arg)->on_draw_06();
 }
 
 // TODO: ours saves esi/edi late (shrink-wrapped) and merges the stack
@@ -382,6 +877,62 @@ HARNESS_CALLED void Stage::start_fade_out()
 {
     fade_timer = 60;
     stage_flags |= STAGE_FADING_OUT;
+}
+
+// TODO: ours gets a /GS cookie (the CameraSky temporaries), which shifts every stack slot; the original also shares one return path per result.
+// FUNCTION: TH16 0x40cd10
+CameraSky InterpCameraSky::step()
+{
+    if (end_time > 0)
+    {
+        time.tick();
+        if (time.current >= end_time)
+        {
+            time.set(end_time);
+            end_time = 0;
+            if (method == 7 || method == 17)
+            {
+                return initial;
+            }
+            return goal;
+        }
+    }
+    else if (end_time == 0)
+    {
+        if (method == 7 || method == 17)
+        {
+            return initial;
+        }
+        return goal;
+    }
+    if (method == 7)
+    {
+        CameraSky tmp = initial;
+        initial = tmp.add_inline(goal);
+        current = initial;
+    }
+    else if (method == 17)
+    {
+        CameraSky tmp = initial;
+        initial = tmp + bezier_2;
+        bezier_2 = bezier_2 + goal;
+        current = initial;
+    }
+    else if (method == 8)
+    {
+        f32 t = time.current_f / (f32)end_time;
+        f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
+        f32 c_goal = t * t * (3.0f - 2.0f * t);
+        f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
+        f32 c_bezier_2 = (t - 1.0f) * t * t;
+        current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+    }
+    else
+    {
+        f32 x = interp_common_methods(method, time.current_f, (f32)end_time);
+        current = (goal - initial) * x + initial;
+    }
+    return current;
 }
 
 // FUNCTION: TH16 0x40d370

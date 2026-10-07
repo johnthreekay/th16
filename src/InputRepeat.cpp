@@ -1,8 +1,5 @@
+#include "Input.h"
 #include "types.h"
-
-// Hardware button state (ExpHP: HARDWARE_INPUT and the fields after it).
-extern u32 g_hardware_input_repeat;
-extern u32 g_hardware_input_pressed;
 
 // Menus move their cursor on a fresh press or on key repeat.
 // TODO: our compiler turns the second test into a branchless setcc.
