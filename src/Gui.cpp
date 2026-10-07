@@ -925,27 +925,23 @@ void GuiMsgVm::show()
     }
 }
 
-// TODO: the original keeps g_AnmManager in ebx across the lookups; LTCG
-// knows get_vm_with_id and search_children leave it alone.
 // FUNCTION: TH16 0x42ba30
 HARNESS_CALLED void GuiMsgVm::set_textbox(f32 x, f32 y, f32 width, i32 kind)
 {
     delete_vm_and_clear(textbox);
+    AnmLoaded *anm = g_Gui->front_anm;
     Float3 pos(x, y, 0.0f);
-    textbox = g_Gui->front_anm->create_vm(kind + 0xe4, &pos, 0.0f, -1, 0);
+    textbox = anm->create_vm(kind + 0xe4, &pos, 0.0f, -1, 0);
     find_child_of(textbox, kind + 0xb4)->float_vars[0] = width;
     find_child_of(textbox, kind + 0xd4)->float_vars[0] = width;
     textbox_kind = kind;
 }
 
-// TODO: the original keeps g_AnmManager in edi and the width in xmm1
-// across the lookups (LTCG knows the callees leave them alone).
 // FUNCTION: TH16 0x42bb30
 HARNESS_CALLED void GuiMsgVm::set_textbox_width(f32 width, i32 kind)
 {
-    width += 16.0f;
-    find_child_of(textbox, kind + 0xb4)->float_vars[0] = width;
-    find_child_of(textbox, kind + 0xd4)->float_vars[0] = width;
+    find_child_of(textbox, kind + 0xb4)->float_vars[0] = width + 16.0f;
+    find_child_of(textbox, kind + 0xd4)->float_vars[0] = width + 16.0f;
 }
 
 // TODO: the original aligns its frame to 8 bytes, which LTCG adds for

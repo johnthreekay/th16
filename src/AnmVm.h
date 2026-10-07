@@ -471,7 +471,7 @@ struct AnmVm
     Float3 *get_own_transformed_pos(Float3 *out);
     // 0x46f510. The nth descendant (depth first) running the given script
     // (unk_49c; -1 for any).
-    AnmVm *search_children(i32 script, i32 nth);
+    HARNESS_CALLED AnmVm *search_children(i32 script, i32 nth);
     // 0x46f380 and 0x46f3b0 (ExpHP: set/clear_ins_316_flag_recursively).
     HARNESS_CALLED void set_flag_lo_2_tree();
     HARNESS_CALLED void clear_flag_lo_2_tree();
