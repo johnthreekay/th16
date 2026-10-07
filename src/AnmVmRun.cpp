@@ -321,10 +321,7 @@ int __fastcall anm_effect_4_init(AnmVm *vm);
 __forceinline i32 AnmVm::run_script()
 {
     AnmRawInstr *ins;
-    if (index_of_on_tick != 0 && g_anm_on_tick_funcs[index_of_on_tick](this) != 0)
-    {
-        return 1;
-    }
+    i32 result = 0;
     if (instr_offset < 0 || (flags_lo & ANM_VM_FLAG_LO_100000))
     {
         return 0;
@@ -1191,12 +1188,11 @@ __forceinline i32 AnmVm::run_script()
         case -1:
         case 1:
             flags_lo &= ~ANM_VM_VISIBLE;
-            instr_offset = -1;
-            return 1;
+            result = 1;
         // static
         case 2:
             instr_offset = -1;
-            return 0;
+            return result;
         }
         instr_offset += ins->offset_to_next;
     }
@@ -1248,6 +1244,11 @@ i32 AnmVm::run()
         {
             g_game_speed = 0.0f;
         }
+    }
+    if (index_of_on_tick != 0 && g_anm_on_tick_funcs[index_of_on_tick](this) != 0)
+    {
+        g_game_speed = saved_game_speed;
+        return 1;
     }
     i32 result = run_script();
     g_game_speed = saved_game_speed;
