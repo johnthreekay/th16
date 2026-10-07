@@ -79,8 +79,8 @@ i32 BombAyaAInf::begin()
     D3DXVECTOR3 pos_2;
     pos_2 = player->inner.pos;
     pos.y = 224.0f;
-    angle = player->inner.unk_16050 * (1.0f / 128.0f) * 0.017453292f * 0.5f - ZUN_PI / 2;
-    speed = player->inner.unk_16050 * (1.0f / 128.0f) * 0.05f;
+    angle = player->inner.attempted_delta_pos_subpixel.x * (1.0f / 128.0f) * 0.017453292f * 0.5f - ZUN_PI / 2;
+    speed = player->inner.attempted_delta_pos_subpixel.x * (1.0f / 128.0f) * 0.05f;
     g_SoundManager.play_sound_centered(30, 0);
 
     anm_id = player->anm_file->create_vm(14, &pos, 0.0f, -1, 0);
@@ -246,11 +246,11 @@ i32 BombMarisaAInf::on_tick()
     vm->rotation.z = angle;
     vm->flags_lo |= 4;
     Player *player = g_Player;
-    if (0.0f > player->inner.unk_16050)
+    if (0.0f > player->inner.attempted_delta_pos_subpixel.x)
     {
         angle -= 0.0026179939f;
     }
-    else if (player->inner.unk_16050 > 0.0f)
+    else if (player->inner.attempted_delta_pos_subpixel.x > 0.0f)
     {
         angle += 0.0026179939f;
     }
@@ -513,7 +513,7 @@ i32 BombReimuAInf::on_tick()
             motion->radial_dist = 0.0f;
             motion->angle.value = wrap_angle(angle);
             motion->radial_speed = ZUN_PI / 64;
-            g_Player->get_damage_source(orb->damage_source)->unk_7c = 300;
+            g_Player->get_damage_source(orb->damage_source)->damage_limit = 300;
             angle = wrap_angle(angle + ZUN_PI / 4);
         }
     }
@@ -569,7 +569,7 @@ void BombReimuAOrb::start(i32 index, D3DXVECTOR3 *pos)
     damage_source = g_Player->create_damage_source(&this->pos, 56.0f, 0.0f, 9999, 0xf);
     PlayerDamageSource *source = g_Player->get_damage_source(damage_source);
     source->flags |= 4;
-    source->unk_80 = 3;
+    source->hit_interval = 3;
 }
 
 // The orb bursts: cancels bullets and lasers around it and hurts enemies

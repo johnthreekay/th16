@@ -1,5 +1,6 @@
 // Shot type callbacks: the functions a .sht file's shooters name by index
-// (g_sht_*_funcs), called with the bullet in ecx.
+// (g_sht_*_funcs), called with the bullet in ecx, and the damage source hit
+// callbacks. Also PlayerBullet::create and hit.
 #include <math.h>
 
 #include <dsound.h>
@@ -15,44 +16,48 @@
 #include "Rng.h"
 #include "SoundManager.h"
 
-i32 __fastcall sht_on_init_445ed0(PlayerBullet *bullet);
-i32 __fastcall sht_on_init_446200(PlayerBullet *bullet);
-i32 __fastcall sht_on_init_4470e0(PlayerBullet *bullet);
-i32 __fastcall sht_on_init_447450(PlayerBullet *bullet);
-i32 __fastcall sht_on_init_4474d0(PlayerBullet *bullet);
-i32 __fastcall sht_on_tick_445ee0(PlayerBullet *bullet);
-i32 __fastcall sht_on_tick_446260(PlayerBullet *bullet);
-i32 __fastcall sht_on_tick_446e00(PlayerBullet *bullet);
-i32 __fastcall sht_on_tick_4470f0(PlayerBullet *bullet);
-i32 __fastcall sht_on_tick_447480(PlayerBullet *bullet);
-i32 __fastcall sht_on_hit_4460c0(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall sht_on_hit_447270(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall damage_source_on_hit_445d40(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y);
-i32 __fastcall damage_source_on_hit_4474a0(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y);
+i32 __fastcall sht_on_init_homing(PlayerBullet *bullet);
+i32 __fastcall sht_on_init_laser(PlayerBullet *bullet);
+i32 __fastcall sht_on_init_sideways(PlayerBullet *bullet);
+i32 __fastcall sht_on_init_piercing(PlayerBullet *bullet);
+i32 __fastcall sht_on_init_spread(PlayerBullet *bullet);
+i32 __fastcall sht_on_tick_homing(PlayerBullet *bullet);
+i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet);
+i32 __fastcall sht_on_tick_accelerate(PlayerBullet *bullet);
+i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet);
+i32 __fastcall sht_on_tick_accelerate_slow(PlayerBullet *bullet);
+i32 __fastcall sht_on_hit_spark_back(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius);
+i32 __fastcall sht_on_hit_laser(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius);
+i32 __fastcall sht_on_hit_burst_rising(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation,
+                                       f32 radius);
+i32 __fastcall sht_on_hit_burst(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius);
+i32 __fastcall sht_on_hit_spark(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius);
+i32 __fastcall sht_on_hit_spark_grow(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius);
+i32 __fastcall damage_source_on_hit_bullet(PlayerDamageSource *source, i32 enemy_pos, i32 enemy_size, f32 rotation,
+                                           f32 radius);
+i32 __fastcall damage_source_on_hit_piercing(PlayerDamageSource *source, i32 enemy_pos, i32 enemy_size,
+                                             f32 rotation, f32 radius);
 
+// ShtShooter::func_on_init, func_on_tick and func_on_hit by index.
 // GLOBAL: TH16 0x4919c0
 ShtBulletFunc const g_sht_on_init_funcs[7] = {
     NULL,
-    sht_on_init_445ed0,
-    sht_on_init_446200,
-    sht_on_init_4470e0,
-    sht_on_init_447450,
-    sht_on_init_4474d0,
+    sht_on_init_homing,
+    sht_on_init_laser,
+    sht_on_init_sideways,
+    sht_on_init_piercing,
+    sht_on_init_spread,
     NULL,
 };
 
 // GLOBAL: TH16 0x4919a0
 ShtBulletFunc const g_sht_on_tick_funcs[8] = {
     NULL,
-    sht_on_tick_445ee0,
-    sht_on_tick_446260,
-    sht_on_tick_446e00,
-    sht_on_tick_4470f0,
-    sht_on_tick_447480,
+    sht_on_tick_homing,
+    sht_on_tick_laser,
+    sht_on_tick_accelerate,
+    sht_on_tick_sideways,
+    sht_on_tick_accelerate_slow,
     NULL,
     NULL,
 };
@@ -60,37 +65,40 @@ ShtBulletFunc const g_sht_on_tick_funcs[8] = {
 // GLOBAL: TH16 0x491980
 ShtHitFunc const g_sht_on_hit_funcs[8] = {
     NULL,
-    sht_on_hit_4460c0,
-    sht_on_hit_446870,
-    sht_on_hit_446e20,
-    sht_on_hit_446f80,
-    sht_on_hit_447270,
-    sht_on_hit_447320,
+    sht_on_hit_spark_back,
+    sht_on_hit_laser,
+    sht_on_hit_burst_rising,
+    sht_on_hit_burst,
+    sht_on_hit_spark,
+    sht_on_hit_spark_grow,
     NULL,
 };
 
-// Nothing uses the third callback; its table has only the empty entry.
+// Nothing uses the third callback; its table has only the empty entry
+// (ExpHP: SHT_SHOOTER_30_TABLE).
 // GLOBAL: TH16 0x4a6f04
 ShtBulletFunc g_sht_func_3_table[1];
 
+// PlayerDamageSource::hit_func: 1 for player bullets (their shooter's
+// on_hit), 2 for piercing ones.
 // GLOBAL: TH16 0x4919dc
 DamageSourceHitFunc const g_damage_source_hit_funcs[4] = {
     NULL,
-    damage_source_on_hit_445d40,
-    damage_source_on_hit_4474a0,
+    damage_source_on_hit_bullet,
+    damage_source_on_hit_piercing,
     NULL,
 };
 
 // Homing: turns toward the nearest enemy, slowing down while the turn is
 // sharp and speeding up once it is on course.
 // FUNCTION: TH16 0x445ee0
-i32 __fastcall sht_on_tick_445ee0(PlayerBullet *bullet)
+i32 __fastcall sht_on_tick_homing(PlayerBullet *bullet)
 {
-    if (bullet->state == 2)
+    if (bullet->state == PLAYER_BULLET_HIT)
     {
         return 0;
     }
-    EnemyRef *target = (EnemyRef *)&bullet->unk_90;
+    EnemyRef *target = (EnemyRef *)&bullet->target_enemy_id;
     if (g_EnemyManager == NULL)
     {
         target->id = 0;
@@ -100,11 +108,11 @@ i32 __fastcall sht_on_tick_445ee0(PlayerBullet *bullet)
         Float3 pos = bullet->pos.pos;
         *target = g_EnemyManager->find_closest(&pos, 256.0f);
     }
-    if (bullet->unk_90 != 0)
+    if (bullet->target_enemy_id != 0)
     {
-        if (!g_EnemyManager->is_enemy_alive(bullet->unk_90))
+        if (!g_EnemyManager->is_enemy_alive(bullet->target_enemy_id))
         {
-            bullet->unk_90 = 0;
+            bullet->target_enemy_id = 0;
         }
         else
         {
@@ -128,7 +136,7 @@ i32 __fastcall sht_on_tick_445ee0(PlayerBullet *bullet)
                     diff = angle - current;
                 }
                 f32 speed = bullet->pos.speed;
-                if (bullet->timer_c.current < 60)
+                if (bullet->age.current < 60)
                 {
                     f32 turn = (f32)fabs(diff);
                     if (turn >= ZUN_PI / 4)
@@ -158,32 +166,35 @@ i32 __fastcall sht_on_tick_445ee0(PlayerBullet *bullet)
 }
 
 // FUNCTION: TH16 0x445ed0
-i32 __fastcall sht_on_init_445ed0(PlayerBullet *bullet)
+i32 __fastcall sht_on_init_homing(PlayerBullet *bullet)
 {
-    bullet->unk_90 = 0;
+    bullet->target_enemy_id = 0;
     return 0;
 }
 
+// Marisa's laser starts with length 0, with its sound and a damage source
+// that hits every frame and that sht_on_tick_laser places itself.
 // FUNCTION: TH16 0x446200
-i32 __fastcall sht_on_init_446200(PlayerBullet *bullet)
+i32 __fastcall sht_on_init_laser(PlayerBullet *bullet)
 {
     Player *player = g_Player;
-    bullet->unk_a0 = 0;
+    bullet->hitbox_width_i = 0;
     g_SoundManager.play_sound_at_position(0x14, player->inner.pos.x);
     // The original reuses g_Player across the sound call, which LTCG knows
     // leaves it alone; with the sound code still a placeholder, spell that out.
     PlayerDamageSource *source =
         bullet->damage_source_index == 0 ? NULL : &player->inner.damage_sources[bullet->damage_source_index - 1];
-    source->unk_80 = 1;
-    source->unk_14 = 0.0f;
-    bullet->flags &= ~1;
+    source->hit_interval = 1;
+    source->width = 0.0f;
+    bullet->flags &= ~PLAYER_BULLET_MOVES_DAMAGE_SOURCE;
     return 0;
 }
 
+// Speeds up by 1 every frame.
 // FUNCTION: TH16 0x446e00
-i32 __fastcall sht_on_tick_446e00(PlayerBullet *bullet)
+i32 __fastcall sht_on_tick_accelerate(PlayerBullet *bullet)
 {
-    if (bullet->state == 1)
+    if (bullet->state == PLAYER_BULLET_ACTIVE)
     {
         bullet->pos.speed += 1.0f;
     }
@@ -191,31 +202,31 @@ i32 __fastcall sht_on_tick_446e00(PlayerBullet *bullet)
 }
 
 // FUNCTION: TH16 0x4470e0
-i32 __fastcall sht_on_init_4470e0(PlayerBullet *bullet)
+i32 __fastcall sht_on_init_sideways(PlayerBullet *bullet)
 {
-    bullet->flags &= ~0x3c;
-    bullet->unk_90 = 0;
+    bullet->flags &= ~PLAYER_BULLET_PHASE_MASK;
+    bullet->target_enemy_id = 0;
     return 0;
 }
 
 // Waits for an enemy in the same row, then stops and flies at it
-// sideways.
+// sideways. (The masks that clear the phase before setting it are ZUN's.)
 // TODO: ours gets a /GS cookie for pos and merges the flags_low & 1 test into the 0xc000021 one.
 // FUNCTION: TH16 0x4470f0
-i32 __fastcall sht_on_tick_4470f0(PlayerBullet *bullet)
+i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet)
 {
-    if (bullet->state == 2)
+    if (bullet->state == PLAYER_BULLET_HIT)
     {
         return 0;
     }
-    if (!(bullet->flags & 0x3c))
+    if (!(bullet->flags & PLAYER_BULLET_PHASE_MASK))
     {
         EnemyManager *mgr = g_EnemyManager;
         if (mgr == NULL)
         {
-            bullet->unk_90 = 0;
+            bullet->target_enemy_id = 0;
         }
-        else if (bullet->unk_90 == 0)
+        else if (bullet->target_enemy_id == 0)
         {
             mgr->unk_15c = mgr->active_enemy_list_head;
             EnemyInf *enemy = mgr->unk_15c->entry;
@@ -226,9 +237,9 @@ i32 __fastcall sht_on_tick_4470f0(PlayerBullet *bullet)
                     pos.y >= enemy->enemy.final_pos.pos.y - 16.0f && enemy->enemy.final_pos.pos.y + 16.0f >= pos.y &&
                     (enemy->enemy.final_pos.pos.x - 16.0f >= pos.x || pos.x >= enemy->enemy.final_pos.pos.x + 16.0f))
                 {
-                    bullet->flags = (bullet->flags & ~0x38) | 4;
+                    bullet->flags = (bullet->flags & ~0x38) | PLAYER_BULLET_PHASE_LINED_UP;
                     AnmManager::interrupt_tree(bullet->anm_id, 2);
-                    bullet->timer_20.set_value(0);
+                    bullet->phase_timer.set_value(0);
                     bullet->pos.speed = 0.0f;
                     bullet->target_pos = enemy->enemy.final_pos.pos;
                     break;
@@ -238,30 +249,32 @@ i32 __fastcall sht_on_tick_4470f0(PlayerBullet *bullet)
             }
         }
     }
-    if ((bullet->flags & 0x3c) == 4)
+    if ((bullet->flags & PLAYER_BULLET_PHASE_MASK) == PLAYER_BULLET_PHASE_LINED_UP)
     {
-        if (bullet->timer_20.current == 4)
+        if (bullet->phase_timer.current == 4)
         {
             bullet->pos.set_angle(bullet->pos.pos.x > bullet->target_pos.x ? -ZUN_PI : 0.0f);
             bullet->pos.speed = 14.0f;
-            bullet->flags = (bullet->flags & ~0x34) | 8;
+            bullet->flags = (bullet->flags & ~0x34) | PLAYER_BULLET_PHASE_DASHING;
         }
-        bullet->timer_20++;
+        bullet->phase_timer++;
     }
     return 0;
 }
 
+// The bullet's damage source becomes piercing.
 // FUNCTION: TH16 0x447450
-i32 __fastcall sht_on_init_447450(PlayerBullet *bullet)
+i32 __fastcall sht_on_init_piercing(PlayerBullet *bullet)
 {
-    bullet->damage_source()->unk_90 = 2;
+    bullet->damage_source()->hit_func = 2;
     return 0;
 }
 
+// Speeds up by 0.5 every frame.
 // FUNCTION: TH16 0x447480
-i32 __fastcall sht_on_tick_447480(PlayerBullet *bullet)
+i32 __fastcall sht_on_tick_accelerate_slow(PlayerBullet *bullet)
 {
-    if (bullet->state == 1)
+    if (bullet->state == PLAYER_BULLET_ACTIVE)
     {
         bullet->pos.speed += 0.5f;
     }
@@ -271,17 +284,21 @@ i32 __fastcall sht_on_tick_447480(PlayerBullet *bullet)
 // TODO: the original loads g_Player into ecx before scaling the index and
 // reads the old value straight into eax; ours loads g_Player into eax after
 // the scaling and moves the value over from ecx.
+// Piercing bullets deal their full damage on the first hit and 1 after
+// that.
 // FUNCTION: TH16 0x4474a0
-i32 __fastcall damage_source_on_hit_4474a0(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall damage_source_on_hit_piercing(PlayerDamageSource *source, i32 enemy_pos, i32 enemy_size,
+                                             f32 rotation, f32 radius)
 {
     i32 index = source->bullet_index;
-    i32 was_hit = g_Player->inner.bullets[index].unk_9c;
-    g_Player->inner.bullets[index].unk_9c = 1;
+    i32 was_hit = g_Player->inner.bullets[index].damage;
+    g_Player->inner.bullets[index].damage = 1;
     return was_hit;
 }
 
+// Fires up to 15 degrees off the shooter's angle.
 // FUNCTION: TH16 0x4474d0
-i32 __fastcall sht_on_init_4474d0(PlayerBullet *bullet)
+i32 __fastcall sht_on_init_spread(PlayerBullet *bullet)
 {
     bullet->pos.angle.value = wrap_angle(bullet->pos.angle.value +
                                          g_replay_safe_rng.randf_neg_1_to_1() * (ZUN_PI / 180.0f) * 15.0f);
@@ -290,15 +307,18 @@ i32 __fastcall sht_on_init_4474d0(PlayerBullet *bullet)
 
 // TODO: the original computes the shooter twice from scratch (keeping ref in
 // ebx); ours shares the common parts and spills them.
+// A player bullet's damage source hit an enemy: the shooter's on_hit, or
+// PlayerBullet::hit.
 // FUNCTION: TH16 0x445d40
-i32 __fastcall damage_source_on_hit_445d40(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall damage_source_on_hit_bullet(PlayerDamageSource *source, i32 enemy_pos, i32 enemy_size, f32 rotation,
+                                           f32 radius)
 {
     Player *player = g_Player;
     i32 ref = player->inner.bullets[source->bullet_index].shooter_ref;
     if (player->get_shooter(ref)->func_on_hit != NULL)
     {
-        return player->get_shooter(ref)->func_on_hit(&player->inner.bullets[source->bullet_index], unk, enemy, x,
-                                                      y);
+        return player->get_shooter(ref)->func_on_hit(&player->inner.bullets[source->bullet_index], enemy_pos,
+                                                      enemy_size, rotation, radius);
     }
     return player->inner.bullets[source->bullet_index].hit();
 }
@@ -310,40 +330,42 @@ i32 PlayerBullet::hit()
     pos.pos.z = 0.1f;
     vm->interrupt(1);
     pos.speed *= 0.125f;
-    state = 2;
+    state = PLAYER_BULLET_HIT;
     vm->entity_pos = pos.pos;
-    damage_source()->flags &= ~1;
-    i32 result = unk_9c;
+    damage_source()->flags &= ~DAMAGE_SOURCE_ACTIVE;
+    i32 result = damage;
     damage_source_index = 0;
     return result;
 }
 
+// Bursts into a damage source that grows and drifts upward for 20 frames.
 // TODO: the original pushes interrupt_tree's 1 between the stores to the new
 // damage source; ours pushes it first.
 // FUNCTION: TH16 0x446e20
-i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_burst_rising(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation,
+                                       f32 radius)
 {
     i32 damage = g_Player->get_shooter(bullet->shooter_ref)->damage;
     PlayerDamageSource *source =
         g_Player->get_damage_source(g_Player->create_damage_source(&bullet->pos.pos, 24.0f, 1.0f, 0x14, damage));
-    source->unk_80 = 4;
+    source->hit_interval = 4;
     source->pos.speed = 0.3f;
     source->pos.angle.value = -ZUN_PI / 2;
     AnmManager::interrupt_tree(bullet->anm_id, 1);
-    bullet->state = 2;
+    bullet->state = PLAYER_BULLET_HIT;
     source = bullet->damage_source();
-    source->flags &= ~1;
+    source->flags &= ~DAMAGE_SOURCE_ACTIVE;
     bullet->damage_source_index = 0;
     bullet->pos.speed = 0.3f;
     source->pos = bullet->pos;
     g_SoundManager.play_sound_at_position(0x41, bullet->pos.pos.x);
-    return bullet->unk_9c;
+    return bullet->damage;
 }
 
-// A tinted effect pointing back the way the bullet came, give or take 20
-// degrees.
+// A randomly tinted spark (effect.anm script 0x98) pointing back the way
+// the bullet came, give or take 20 degrees.
 // FUNCTION: TH16 0x4460c0
-i32 __fastcall sht_on_hit_4460c0(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_spark_back(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius)
 {
     f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * 0.34906584f);
     angle = wrap_angle(angle + ZUN_PI);
@@ -356,38 +378,42 @@ i32 __fastcall sht_on_hit_4460c0(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     return bullet->hit();
 }
 
-// Turns the effect up to 20 degrees either way.
+// A spark (effect.anm script 0x98) along the bullet, give or take 20
+// degrees.
 // FUNCTION: TH16 0x447270
-i32 __fastcall sht_on_hit_447270(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_spark(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius)
 {
     f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * 0.34906584f);
     g_EffectManager->effect_anm->create_vm(0x98, &bullet->pos.pos, angle, -1, 0);
     return bullet->hit();
 }
 
+// Bursts into a damage source that grows and moves on with the bullet for
+// 20 frames.
 // TODO: register allocation: the original keeps the player in edi and the
 // bullet in esi throughout (with an unused stack slot); ours reloads the
 // player for create_damage_source.
 // FUNCTION: TH16 0x446f80
-i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_burst(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius)
 {
     Player *player = g_Player;
     i32 damage = player->get_shooter(bullet->shooter_ref)->damage;
     i32 index = player->create_damage_source(&bullet->pos.pos, 24.0f, 2.0f, 0x14, damage);
     PlayerDamageSource *source = index != 0 ? &player->inner.damage_sources[index - 1] : NULL;
-    source->unk_80 = 4;
+    source->hit_interval = 4;
     AnmManager::interrupt_tree(bullet->anm_id, 1);
-    bullet->state = 2;
+    bullet->state = PLAYER_BULLET_HIT;
     bullet->pos.speed = 2.0f;
     source->pos = bullet->pos;
-    bullet->damage_source()->flags &= ~1;
+    bullet->damage_source()->flags &= ~DAMAGE_SOURCE_ACTIVE;
     bullet->damage_source_index = 0;
     g_SoundManager.play_sound_at_position(0x41, bullet->pos.pos.x);
-    return bullet->unk_9c;
+    return bullet->damage;
 }
 
+// A randomly tinted spark that grows threefold over 20 frames.
 // FUNCTION: TH16 0x447320
-i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_spark_grow(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius)
 {
     f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * 0.34906584f);
     AnmId id = g_EffectManager->effect_anm->create_vm(0x98, &bullet->pos.pos, angle, -1, 0);
@@ -456,19 +482,20 @@ static __forceinline ZunAngle angle_add(const ZunAngle &a, const ZunAngle &b)
 // The position of the option a shooter names (option number minus one).
 static __forceinline Int2 *option_pos(Player *player, i32 index)
 {
-    return index >= 100 ? &player->inner.subseason_options[index - 100].scaled_cur_pos
-                        : &player->inner.main_options[index].scaled_cur_pos;
+    return index >= SEASON_OPTION_INDEX_BASE
+               ? &player->inner.subseason_options[index - SEASON_OPTION_INDEX_BASE].scaled_cur_pos
+               : &player->inner.main_options[index].scaled_cur_pos;
 }
 
 // The index into Player::inner.option_lasers of a shooter's option.
 static __forceinline i32 option_laser_index(ShtShooter *shooter, i32 shooter_ref)
 {
     i32 option = (i8)shooter->option - 1;
-    if (option >= 100)
+    if (option >= SEASON_OPTION_INDEX_BASE)
     {
-        option -= 100;
+        option -= SEASON_OPTION_INDEX_BASE;
     }
-    return ((shooter_ref & 0xf0000) != 0) * 8 + option;
+    return ((shooter_ref & SHOOTER_REF_SEASON_MASK) != 0) * OPTION_LASER_SEASON_BASE + option;
 }
 
 // Marisa's laser: follows its option, turns toward the shot angle and
@@ -476,7 +503,7 @@ static __forceinline i32 option_laser_index(ShtShooter *shooter, i32 shooter_ref
 // option is gone or the power level changed.
 // TODO: ours gets a /GS cookie (offset goes to the asm sincosmul) and no 8-byte frame alignment; g_AnmManager is reloaded where the original keeps it in edi.
 // FUNCTION: TH16 0x446260
-i32 __fastcall sht_on_tick_446260(PlayerBullet *bullet)
+i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet)
 {
     ShtShooter *shooter = g_Player->get_shooter(bullet->shooter_ref);
     Int2 *option = option_pos(g_Player, (i8)shooter->option - 1);
@@ -493,7 +520,7 @@ i32 __fastcall sht_on_tick_446260(PlayerBullet *bullet)
     {
         bullet->pos.angle.value = wrap_angle(target.value);
     }
-    if (bullet->state == 2)
+    if (bullet->state == PLAYER_BULLET_HIT)
     {
         return 0;
     }
@@ -501,7 +528,7 @@ i32 __fastcall sht_on_tick_446260(PlayerBullet *bullet)
     if (bullet->laser_length < 512.0f)
     {
         bullet->laser_length += 18.0f;
-        bullet->damage_source()->unk_14 = bullet->laser_length;
+        bullet->damage_source()->width = bullet->laser_length;
     }
     option = option_pos(g_Player, (i8)shooter->option - 1);
     f32 x = option->x / 128.0f;
@@ -521,30 +548,32 @@ i32 __fastcall sht_on_tick_446260(PlayerBullet *bullet)
         vm->uv_scale.x = bullet->laser_length / 512.0f;
     }
     bullet->damage_source()->pos.pos = pos;
-    if (bullet->unk_94 == 0 && bullet->state == 1 && bullet->unk_98 == 1)
+    if (bullet->laser_hitting == 0 && bullet->state == PLAYER_BULLET_ACTIVE && bullet->laser_hit_anim == 1)
     {
         AnmManager::interrupt_tree(bullet->anm_id, 3);
-        bullet->unk_98 = 0;
+        bullet->laser_hit_anim = 0;
     }
-    if (bullet->state == 1)
+    if (bullet->state == PLAYER_BULLET_ACTIVE)
     {
         Player *player = g_Player;
         if (player->inner.shoot_key_short_timer.current < 0 ||
-            (!(bullet->shooter_ref & 0xf0000) && (i8)shooter->option - 1 >= player->inner.num_main_options) ||
-            ((bullet->shooter_ref & 0xf0000) && (i8)shooter->option - 101 >= player->inner.num_season_options) ||
-            player->inner.state == 2 || player->inner.state == 4 ||
+            (!(bullet->shooter_ref & SHOOTER_REF_SEASON_MASK) &&
+             (i8)shooter->option - 1 >= player->inner.num_main_options) ||
+            ((bullet->shooter_ref & SHOOTER_REF_SEASON_MASK) &&
+             (i8)shooter->option - (SEASON_OPTION_INDEX_BASE + 1) >= player->inner.num_season_options) ||
+            player->inner.state == PLAYER_STATE_DEAD || player->inner.state == PLAYER_STATE_HIT ||
             player->inner.option_lasers[option_laser_index(shooter, bullet->shooter_ref)] !=
                 g_Globals.power / g_Globals.power_per_level ||
             (g_Gui != NULL && g_Gui->msg != NULL) || g_EnemyManager == NULL)
         {
-            bullet->damage_source()->flags &= ~1;
-            bullet->state = 2;
+            bullet->damage_source()->flags &= ~DAMAGE_SOURCE_ACTIVE;
+            bullet->state = PLAYER_BULLET_HIT;
             AnmManager::interrupt_tree(bullet->anm_id, 1);
             g_Player->inner.option_lasers[option_laser_index(shooter, bullet->shooter_ref)] = 0;
             g_SoundManager.stop_sound(20);
         }
     }
-    bullet->unk_94 = 0;
+    bullet->laser_hitting = 0;
     return 0;
 }
 
@@ -552,51 +581,51 @@ i32 __fastcall sht_on_tick_446260(PlayerBullet *bullet)
 // size for rectangles, else radius) and spray sparks along it.
 // TODO: the original looks the damage source up in each branch (hoisting only g_Player) and spills more locals; frame and registers differ.
 // FUNCTION: TH16 0x446870
-i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+i32 __fastcall sht_on_hit_laser(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius)
 {
-    Float3 *enemy_pos = (Float3 *)unk;
-    Float3 *enemy_size = (Float3 *)enemy;
-    bullet->unk_94 = 1;
-    if (bullet->unk_98 == 0)
+    Float3 *pos = (Float3 *)enemy_pos;
+    Float3 *size = (Float3 *)enemy_size;
+    bullet->laser_hitting = 1;
+    if (bullet->laser_hit_anim == 0)
     {
         AnmManager::interrupt_tree(bullet->anm_id, 2);
-        bullet->unk_98 = 1;
+        bullet->laser_hit_anim = 1;
     }
     PlayerDamageSource *source = bullet->damage_source();
-    if (enemy_size == NULL)
+    if (size == NULL)
     {
-        f32 radius = source->unk_18 * 0.5f + y;
-        f32 dx = enemy_pos->x - bullet->pos.pos.x;
-        f32 dy = enemy_pos->y - bullet->pos.pos.y;
+        f32 reach = source->height * 0.5f + radius;
+        f32 dx = pos->x - bullet->pos.pos.x;
+        f32 dy = pos->y - bullet->pos.pos.y;
         f32 angle = -bullet->pos.angle.value;
         f32 s = zun_sinf(angle);
         f32 c = zun_cosf(angle);
         f32 rx = dx * c - dy * s;
         f32 ry = dy * c + dx * s;
         f32 length;
-        if ((f32)fabs(ry) > radius || -radius > rx || (0.0f > rx && rx * rx + ry * ry > radius * radius))
+        if ((f32)fabs(ry) > reach || -reach > rx || (0.0f > rx && rx * rx + ry * ry > reach * reach))
         {
             length = rx;
         }
         else
         {
-            f32 t = ry / radius;
-            length = rx - sqrtf(1.0f - t * t) * radius;
+            f32 t = ry / reach;
+            length = rx - sqrtf(1.0f - t * t) * reach;
         }
         bullet->laser_length = length + 8.0f;
         if (bullet->laser_length < 0.0f)
         {
             bullet->laser_length = 0.0f;
         }
-        source->unk_14 = bullet->laser_length;
+        source->width = bullet->laser_length;
     }
     else
     {
         Float3 *start = &bullet->pos.pos;
         Float3 hit;
         Float3 exit;
-        if (collision_line_rect((Float2 *)&hit, (Float2 *)&exit, start, bullet->pos.angle.value, enemy_pos->x, enemy_pos->y,
-                               source->unk_18 + enemy_size->x, enemy_size->y + source->unk_18, x))
+        if (collision_line_rect((Float2 *)&hit, (Float2 *)&exit, start, bullet->pos.angle.value, pos->x, pos->y,
+                               source->height + size->x, size->y + source->height, rotation))
         {
             f32 angle = atan2f(hit.y - bullet->pos.pos.y, hit.x - bullet->pos.pos.x);
             if ((f32)fabs(angle_sub_unwrapped(angle, bullet->pos.angle.value)) < ZUN_PI / 2)
@@ -613,22 +642,22 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
             {
                 bullet->laser_length = 0.0f;
             }
-            source->unk_14 = bullet->laser_length;
+            source->width = bullet->laser_length;
         }
         else
         {
             hit = bullet->pos.pos;
-            f32 dx = enemy_pos->x - hit.x;
-            f32 dy = enemy_pos->y - hit.y;
+            f32 dx = pos->x - hit.x;
+            f32 dy = pos->y - hit.y;
             bullet->laser_length = sqrtf(dx * dx + dy * dy) - 24.0f;
             if (bullet->laser_length < 0.0f)
             {
                 bullet->laser_length = 0.0f;
             }
-            source->unk_14 = bullet->laser_length + 16.0f;
+            source->width = bullet->laser_length + 16.0f;
         }
     }
-    if (bullet->timer_c.current != bullet->timer_c.previous && !(bullet->timer_c.current & 1))
+    if (bullet->age.current != bullet->age.previous && !(bullet->age.current & 1))
     {
         Float3 end;
         player_sincosmul(&end, bullet->pos.angle.value, bullet->laser_length);
@@ -641,7 +670,7 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
         end.z = 0.0f;
         velocity.z = 0.0f;
         AnmId id;
-        if (!(bullet->shooter_ref & 0xf0000))
+        if (!(bullet->shooter_ref & SHOOTER_REF_SEASON_MASK))
         {
             id = g_Player->anm_file->create_vm(8, &end, 0.0f, -1, 0);
         }
@@ -662,7 +691,7 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
         }
         g_AnmManager->get_vm_with_id(id)->set_pos_time(0x14, 4, &g_zero_vec, &velocity);
     }
-    if (bullet->timer_c.current != bullet->timer_c.previous && bullet->timer_c.current % 4 == 0)
+    if (bullet->age.current != bullet->age.previous && bullet->age.current % 4 == 0)
     {
         return bullet->damage_source()->damage;
     }
@@ -672,17 +701,21 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
 // A shooter's on_init callback also gets the shot key timer.
 typedef i32(__fastcall *ShtInitFunc)(PlayerBullet *bullet, i32 time);
 
+// Takes the shooter's damage and hitbox, starts at the player or the
+// option, picks the angle and speed (see ShtShooter::angle), starts the
+// ANM script and a rectangular damage source that hits through the
+// shooter's on_hit, then runs on_init and plays the shot sound.
 // FUNCTION: TH16 0x444e10
 i32 PlayerBullet::create(i32 shooter_ref, i32 time, PlayerInner *inner)
 {
     Player *player = g_Player;
     ShtShooter *shooter = player->get_shooter(shooter_ref);
-    state = 1;
+    state = PLAYER_BULLET_ACTIVE;
     this->shooter_ref = shooter_ref;
-    timer_c.reset_inline();
-    unk_9c = shooter->damage;
-    laser_length = shooter->hitbox.x;
-    unk_a4_f = shooter->hitbox.y;
+    age.reset_inline();
+    damage = shooter->damage;
+    hitbox_width = shooter->hitbox.x;
+    hitbox_height = shooter->hitbox.y;
     ((PlayerBulletFlags *)&flags)->focused = player->inner.is_focused;
     memset(&pos, 0, sizeof(pos));
     if (shooter->option == 0)
@@ -694,7 +727,7 @@ i32 PlayerBullet::create(i32 shooter_ref, i32 time, PlayerInner *inner)
         Int2 *option = option_pos(player, (i8)shooter->option - 1);
         pos.pos = Float3(option->x / 128.0f, option->y / 128.0f, 0.0f);
     }
-    if (shooter->unk_21 == 2)
+    if (shooter->kind == SHT_SHOOTER_LASER)
     {
         player->inner.option_lasers[option_laser_index(shooter, shooter_ref)] =
             g_Globals.power / g_Globals.power_per_level;
@@ -731,8 +764,9 @@ i32 PlayerBullet::create(i32 shooter_ref, i32 time, PlayerInner *inner)
     pos.update_secondary_fields();
     pos.pos.x += shooter->offset_from_option.x - pos.velocity.x;
     pos.pos.y += shooter->offset_from_option.y - pos.velocity.y;
-    if (!(shooter_ref & 0xf0000))
+    if (!(shooter_ref & SHOOTER_REF_SEASON_MASK))
     {
+        // The character's shot scripts start at 5 in pl0X.anm.
         AnmLoaded *anm = g_Player->anm_file;
         anm_id = anm->create_effect(shooter->anm_script + 5, -1, NULL);
     }
@@ -742,23 +776,24 @@ i32 PlayerBullet::create(i32 shooter_ref, i32 time, PlayerInner *inner)
         anm_id = anm->create_effect(shooter->anm_script, -1, NULL);
     }
     AnmVm *vm = get_vm_or_clear(anm_id);
-    if (vm->flags_hi & 0x80)
+    if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
     {
         vm->rotation.z = shooter->angle;
         vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
     }
     damage_source_index =
-        g_Player->create_rect_damage_source(&pos.pos, laser_length, unk_a4_f, pos.angle.value, 9999999, unk_9c);
+        g_Player->create_rect_damage_source(&pos.pos, hitbox_width, hitbox_height, pos.angle.value, 9999999, damage);
     PlayerDamageSource *source = damage_source();
-    source->unk_90 = 1;
-    source->unk_7c = 10000000;
+    source->hit_func = 1;
+    source->damage_limit = 10000000;
     source->bullet_index = index_of_self;
-    flags |= 1;
+    flags |= PLAYER_BULLET_MOVES_DAMAGE_SOURCE;
     if (shooter->func_on_init != NULL && ((ShtInitFunc)shooter->func_on_init)(this, time) != 0)
     {
-        state = 0;
+        state = PLAYER_BULLET_FREE;
         delete_vm_and_clear(anm_id);
-        source->flags &= ~1;
+        source->flags &= ~DAMAGE_SOURCE_ACTIVE;
+
         return -1;
     }
     if (shooter->sfx_id >= 0)

@@ -53,9 +53,9 @@ void harness_w3c_gui_spell_bonus(i32 captured, i32 bonus)
 }
 
 // Like the game start code at 0x42e171.
-void harness_w3c_player_resume_options()
+void harness_w3c_player_withdraw_options()
 {
-    g_Player->resume_options();
+    g_Player->withdraw_options();
 }
 
 Supervisor *w3c_stub_supervisor();
