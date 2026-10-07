@@ -1,6 +1,6 @@
 // The MSVC CRT functions the game uses that the C library here lacks:
-// port_crt.h, process.h and direct.h. These are complete implementations,
-// not stubs: they need nothing from the platform.
+// port_crt.h and direct.h (process.h's thread functions are in
+// win32_thread.cpp).
 #include <ctype.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -13,7 +13,12 @@
 #include <direct.h>
 #include <process.h>
 
+#include <string>
+
+#include <windows.h>
+
 #include "port_stub.h"
+#include "port_vfs.h"
 
 extern "C" {
 
@@ -114,58 +119,45 @@ struct tm *_localtime64(const __time64_t *t)
     return localtime(&value);
 }
 
-// The game passes relative paths with either separator; the host wants '/'.
-static void to_host_path(char *out, size_t size, const char *path)
-{
-    size_t i = 0;
-    for (; path[i] != '\0' && i + 1 < size; i++)
-    {
-        out[i] = path[i] == '\\' ? '/' : path[i];
-    }
-    out[i] = '\0';
-}
-
+// The current directory and new directories live in the game's file
+// namespace (port_vfs.h), like CreateFileA's paths.
 int _chdir(const char *dirname)
 {
-    char path[4096];
-    to_host_path(path, sizeof(path), dirname);
-    return chdir(path);
+    if (!port_vfs_set_cwd(dirname))
+    {
+        errno = ENOENT;
+        return -1;
+    }
+    return 0;
 }
 
 int _mkdir(const char *dirname)
 {
-    char path[4096];
-    to_host_path(path, sizeof(path), dirname);
-    return mkdir(path, 0777);
+    if (!CreateDirectoryA(dirname, NULL))
+    {
+        errno = GetLastError() == ERROR_ALREADY_EXISTS ? EEXIST : ENOENT;
+        return -1;
+    }
+    return 0;
 }
 
 char *_getcwd(char *buffer, int maxlen)
 {
-    return getcwd(buffer, (size_t)maxlen);
+    std::string cwd = port_vfs_get_cwd();
+    if (buffer == NULL)
+    {
+        return strdup(cwd.c_str());
+    }
+    if ((size_t)maxlen <= cwd.size())
+    {
+        errno = ERANGE;
+        return NULL;
+    }
+    memcpy(buffer, cwd.c_str(), cwd.size() + 1);
+    return buffer;
 }
 
-// Threads: the platform layer will start these with std::thread or SDL.
-uintptr_t _beginthread(void(__cdecl *start_address)(void *), unsigned stack_size, void *arglist)
-{
-    PORT_UNIMPLEMENTED();
-    return (uintptr_t)-1;
-}
-
-uintptr_t _beginthreadex(void *security, unsigned stack_size, unsigned(__stdcall *start_address)(void *),
-                         void *arglist, unsigned initflag, unsigned *thrdaddr)
-{
-    PORT_UNIMPLEMENTED();
-    return 0;
-}
-
-void _endthread(void)
-{
-    PORT_UNIMPLEMENTED();
-}
-
-void _endthreadex(unsigned retval)
-{
-    PORT_UNIMPLEMENTED();
-}
+// _beginthread and _beginthreadex are with the other thread functions in
+// win32_thread.cpp.
 
 } // extern "C"

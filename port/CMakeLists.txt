@@ -29,6 +29,17 @@ set(TH16_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 file(GLOB TH16_GAME_SOURCES CONFIGURE_DEPENDS ${TH16_ROOT}/src/*.cpp)
 file(GLOB TH16_PORT_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
+# TH16_NULL_RENDERER builds d3d9_null.cpp (a Direct3D 9 that draws nothing,
+# for headless tests) in place of the renderer: every other d3d9_*.cpp and
+# the D3DX texture functions (d3dx9_tex*.cpp).
+option(TH16_NULL_RENDERER "Build the null Direct3D 9 instead of the renderer" OFF)
+if(TH16_NULL_RENDERER)
+    list(FILTER TH16_PORT_SOURCES EXCLUDE REGEX "/src/(d3d9_|d3dx9_tex)[^/]*\\.cpp$")
+    list(APPEND TH16_PORT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/d3d9_null.cpp)
+else()
+    list(FILTER TH16_PORT_SOURCES EXCLUDE REGEX "/src/d3d9_null\\.cpp$")
+endif()
+
 add_executable(th16 ${TH16_GAME_SOURCES} ${TH16_PORT_SOURCES})
 
 target_include_directories(th16 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${TH16_ROOT}/src)
@@ -104,3 +115,24 @@ endif()
 
 find_package(Threads REQUIRED)
 target_link_libraries(th16 PRIVATE Threads::Threads m)
+
+# The platform layer: SDL2 (window, events, input), FreeType and fontconfig
+# (the GDI text renderer), iconv (Shift-JIS; part of glibc, a library on
+# macOS). For -m32, pkg-config has to report the 32-bit libraries; where
+# they have their own pkg-config directory (Arch's lib32-*, Debian's
+# i386-linux-gnu) it is used unless PKG_CONFIG_LIBDIR is set.
+if(TH16_M32 AND NOT DEFINED ENV{PKG_CONFIG_LIBDIR})
+    foreach(dir /usr/lib32/pkgconfig /usr/lib/i386-linux-gnu/pkgconfig)
+        if(IS_DIRECTORY ${dir})
+            set(ENV{PKG_CONFIG_LIBDIR} "${dir}:/usr/share/pkgconfig")
+            break()
+        endif()
+    endforeach()
+endif()
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(TH16_DEPS REQUIRED IMPORTED_TARGET sdl2 freetype2 fontconfig)
+target_link_libraries(th16 PRIVATE PkgConfig::TH16_DEPS)
+if(APPLE)
+    find_library(ICONV_LIBRARY iconv REQUIRED)
+    target_link_libraries(th16 PRIVATE ${ICONV_LIBRARY})
+endif()
