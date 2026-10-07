@@ -572,13 +572,12 @@ i32 BombReimuAInf::method_10()
     return 0;
 }
 
-// TODO: register choice around the create_vm call (the original keeps the
-// return slot in ecx and g_Player in eax).
 // FUNCTION: TH16 0x4109d0
 void BombReimuAOrb::start(i32 index, D3DXVECTOR3 *pos)
 {
     start_pos = *pos;
-    anm_id = g_Player->anm_file->create_vm(0xf, &this->pos, 0.0f, -1, 0);
+    AnmLoaded *anm = g_Player->anm_file;
+    anm_id = anm->create_vm(0xf, &this->pos, 0.0f, -1, 0);
     active = 1;
     timer.reset();
     this->index = index;

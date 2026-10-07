@@ -219,8 +219,8 @@ void BombInf::destroy_all()
     g_SubseasonBomb = NULL;
 }
 
-// TODO: the season level loop tests its counter where the original tests
-// the pointer, and edi is saved late instead of in the prologue.
+// The season level loop is written out: through Globals::season_level it
+// tests its counter instead of the pointer.
 // FUNCTION: TH16 0x40db20
 i32 BombInf::activate()
 {
@@ -272,7 +272,16 @@ i32 BombInf::activate()
             release_bonus_pos = g_Player->inner.pos;
             release_bonus_pos.y -= 32.0f;
         }
-        season_level = g_Globals.season_level();
+        i32 level = 0;
+        for (i32 i = 1; i < 7; i++)
+        {
+            if (g_Globals.season_power < g_Globals.season_level_thresholds[i])
+            {
+                break;
+            }
+            level++;
+        }
+        season_level = level;
         release_bonus = 0.0f;
         if (g_Globals.subseason == 1 || g_Globals.subseason == 4)
         {

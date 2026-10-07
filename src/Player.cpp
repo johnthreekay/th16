@@ -324,8 +324,9 @@ i32 __fastcall Player::on_tick_callback(Player *player)
     return player->on_tick_body();
 }
 
-// TODO: the original pushes the player (push ecx/pop ecx) as an unused
-// stack slot, like on_tick_callback.
+// TODO: the original pads the draw_vm call with push ecx/pop ecx for 8-byte
+// alignment, like on_tick_callback; ours does not, most likely because LTCG
+// does not see draw_vm needing alignment early (draw_vm does not match yet).
 // FUNCTION: TH16 0x443730
 i32 __fastcall Player::on_draw_callback(Player *player)
 {
