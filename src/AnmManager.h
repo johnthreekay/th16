@@ -222,7 +222,8 @@ struct AnmManager
     u8 last_address_v;
     u8 unk_184fbbe[2];
     i32 render_cache_184fbc0;
-    u8 unk_184fbc4[0x184fc18 - 0x184fbc4];
+    IDirect3DVertexBuffer9 *vertex_buffer;
+    u8 unk_184fbc8[0x184fc18 - 0x184fbc8];
     // Sprites waiting for flush_sprites, six vertices each (ExpHP:
     // zAnmVertexBuffers).
     i32 unrendered_sprite_count;

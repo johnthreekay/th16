@@ -11,6 +11,13 @@
 #include "Fog.h"
 #include "GameErrorContext.h"
 #include "Input.h"
+#include "EffectManager.h"
+#include "Ending.h"
+#include "GameThread.h"
+#include "HelpManual.h"
+#include "LoadingThread.h"
+#include "ReplayManager.h"
+#include "TitleInf.h"
 
 #include "CriticalSections.h"
 #include "FpsCounter.h"
@@ -243,6 +250,9 @@ HARNESS_CALLED void Supervisor::swap_transform_matrices(Camera *camera)
 // vertex data through g_AnmManager, 0x458db0 creates a font.
 void anm_manager_46b900();
 void supervisor_458db0();
+// 0x458520 releases the text rendering DC; the fonts come from 0x458db0.
+bool supervisor_458520();
+extern HFONT g_fonts_4df904[10];
 
 // The tanf from the CRT headers stays out of line (0x43dc90).
 DECOMP_NOINLINE float __CRTDECL tanf(float);
@@ -612,6 +622,89 @@ int __fastcall Supervisor::on_registration(void *arg)
     g_unk_4a6eec = 0;
     g_draw_hook_4a6ee8 = NULL;
     return 0;
+}
+
+// FUNCTION: TH16 0x43b660
+int Supervisor::teardown_everything()
+{
+    while (SoundManager::update_sound_thread() != 0)
+    {
+    }
+    g_SoundManager.thread_state = SOUND_THREAD_QUIT;
+    g_Supervisor.thread.join_if_running();
+    if (g_Supervisor.ver_file_data != NULL)
+    {
+        free(g_Supervisor.ver_file_data);
+        g_Supervisor.ver_file_data = NULL;
+    }
+    destroy_game_objects();
+    if (g_FpsCounter != NULL)
+    {
+        delete g_FpsCounter;
+    }
+    AnmManager *anm = g_AnmManager;
+    if (anm->vertex_buffer != NULL)
+    {
+        anm->vertex_buffer->Release();
+        anm->vertex_buffer = NULL;
+    }
+    g_SoundManager.modify_bgm(4, 0, "dummy");
+    supervisor_458520();
+    DeleteObject(g_fonts_4df904[0]);
+    DeleteObject(g_fonts_4df904[2]);
+    DeleteObject(g_fonts_4df904[4]);
+    DeleteObject(g_fonts_4df904[6]);
+    DeleteObject(g_fonts_4df904[8]);
+    DeleteObject(g_fonts_4df904[3]);
+    DeleteObject(g_fonts_4df904[5]);
+    DeleteObject(g_fonts_4df904[7]);
+    DeleteObject(g_fonts_4df904[9]);
+    if (keyboard != NULL)
+    {
+        keyboard->Unacquire();
+        if (keyboard != NULL)
+        {
+            keyboard->Release();
+            keyboard = NULL;
+        }
+    }
+    if (joystick != NULL)
+    {
+        joystick->Unacquire();
+        if (joystick != NULL)
+        {
+            joystick->Release();
+            joystick = NULL;
+        }
+    }
+    if (dinput != NULL)
+    {
+        dinput->Release();
+        dinput = NULL;
+    }
+    g_Arcfile.close();
+    delete g_Supervisor.vm_1bc;
+    g_Supervisor.vm_1bc = NULL;
+    delete g_Supervisor.vm_1c0;
+    g_Supervisor.vm_1c0 = NULL;
+    delete g_Supervisor.vm_1c4;
+    g_Supervisor.vm_1c4 = NULL;
+    delete g_Supervisor.vm_1c8;
+    g_Supervisor.vm_1c8 = NULL;
+    return 0;
+}
+
+// FUNCTION: TH16 0x43b950
+void Supervisor::destroy_game_objects()
+{
+    GameThread::destroy();
+    delete g_TitleInf;
+    delete g_LoadingThread;
+    delete g_Ending;
+    delete g_ReplayManager;
+    delete g_EffectManager;
+    g_EffectManager = NULL;
+    delete g_HelpManual;
 }
 
 // FUNCTION: TH16 0x43ba40

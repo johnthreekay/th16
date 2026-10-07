@@ -111,6 +111,8 @@ struct Supervisor
     void setup_cameras();
 
     int switch_gamemodes();
+    // 0x43b660. Frees everything on exit.
+    int teardown_everything();
     void setup_special_anms();
     // Members that do not use this; LTCG dropped it.
     // 0x401d50. Reads keyboard and pad into g_hardware_input and returns
@@ -127,6 +129,9 @@ struct Supervisor
     // 0x43b480. Opens th16.dat and reads the version file from it, for
     // on_registration.
     static i32 open_data_files();
+    // 0x43b950. Deletes the game, menu, loading, ending, replay, effect and
+    // manual objects.
+    static void destroy_game_objects();
     // 0x43d8b0. A text.anm effect VM (script 0x3b at the one call site,
     // which LTCG folds) with vertices for count * 2 points as its extra
     // data; render mode 12 when count > 2. Fog's initialize uses it.

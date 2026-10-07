@@ -33,3 +33,30 @@ Scorefile::Scorefile()
 void scorefile_save_449a00()
 {
 }
+
+#include "../TitleInf.h"
+
+// GLOBAL: TH16 0x4a6f20
+TitleInf *g_TitleInf;
+
+// STUB: TH16 0x44ad20
+TitleInf::~TitleInf()
+{
+}
+
+u32 TitleInf::get_size()
+{
+    return sizeof(TitleInf);
+}
+
+// STUB: TH16 0x458520
+bool supervisor_458520()
+{
+    return false;
+}
+
+#include <windows.h>
+
+// Fonts 0x458db0 creates (only 1 is never deleted).
+// GLOBAL: TH16 0x4df904
+HFONT g_fonts_4df904[10];
