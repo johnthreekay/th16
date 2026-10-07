@@ -8,6 +8,12 @@
 // of the call graph exists for LTCG to reach the same decision on its own.
 #define DECOMP_NOINLINE __declspec(noinline)
 
+// A global the compiler must know to be 16-byte aligned, as the original's
+// was as part of a larger struct (merged movaps stores). A plain name rather
+// than __declspec(align(16)) on the annotated line: reccmp's GLOBAL parser
+// would take __declspec for the variable's name.
+#define DECOMP_ALIGN16 __declspec(align(16))
+
 // Functions whose callers are all known get a custom calling convention from
 // link-time code generation: the first arguments move into ecx/edx, while
 // stack cleanup stays as declared (cdecl: caller pops; thiscall/stdcall:

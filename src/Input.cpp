@@ -109,8 +109,6 @@ u8 *get_controller_state()
 
 #define KEY_PRESSED(button, key) (keys[key] & 0x80 ? (button) : 0)
 
-// TODO: the DirectInput failure branch (Acquire) is placed after the key
-// reads instead of before them; everything else matches.
 // FUNCTION: TH16 0x401d50
 u32 Supervisor::read_keyboard_input()
 {
@@ -154,7 +152,11 @@ u32 Supervisor::read_keyboard_input()
         {
             HRESULT hr = g_Supervisor.keyboard->GetDeviceState(sizeof(keys), keys);
             input = 0;
-            if (hr == DIERR_INPUTLOST || hr != DI_OK)
+            if (hr == DIERR_INPUTLOST)
+            {
+                g_Supervisor.keyboard->Acquire();
+            }
+            else if (hr != DI_OK)
             {
                 g_Supervisor.keyboard->Acquire();
             }

@@ -23,7 +23,6 @@ static_assert(offsetof(Supervisor, exe_checksum) == 0xa14, "Supervisor layout");
 // GLOBAL: TH16 0x4bef3c
 i32 g_joystick_index;
 
-// TODO: the two final stores (exe_size, exe_checksum) are scheduled the other way round.
 // FUNCTION: TH16 0x45bef0
 i32 Supervisor::compute_exe_checksum()
 {
@@ -255,7 +254,7 @@ void read_resolution_dialog()
     }
 }
 
-// TODO: the first two failures do not share their tail, and the flags test comes before the pushes.
+// TODO: code identical; reccmp does not know the addresses of dinput8.lib's c_dfDIKeyboard (0x48b53c) and c_dfDIJoystick2 (0x48b744).
 // FUNCTION: TH16 0x45c360
 i32 Supervisor::dx_direct_input_initialize()
 {
@@ -338,7 +337,6 @@ BOOL CALLBACK enum_game_controllers(LPCDIDEVICEINSTANCEA instance, LPVOID contex
 }
 
 // Gives every axis of the controller the range -1000 to 1000.
-// TODO: the original frame is 4 bytes larger (sub esp, 0x20).
 // FUNCTION: TH16 0x45c550
 BOOL CALLBACK enum_controller_axes(LPCDIDEVICEOBJECTINSTANCEA object, LPVOID context)
 {

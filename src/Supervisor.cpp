@@ -762,7 +762,7 @@ int __fastcall Supervisor::on_draw_55(void *arg)
     return 1;
 }
 
-// TODO: the original schedules the int_vars store between the flags and/or, and moves eax before pop edi after the loop.
+// TODO: the original schedules the int_vars store between the flags and/or (ours stores it after the flags; split &=/|= or a bitfield are worse), and moves eax before pop edi after the loop.
 // FUNCTION: TH16 0x43d8b0
 HARNESS_CALLED AnmId Supervisor::create_fog_vm(i32 count, i32 script)
 {
@@ -772,8 +772,8 @@ HARNESS_CALLED AnmId Supervisor::create_fog_vm(i32 count, i32 script)
     if (count > 2)
     {
         RenderVertex144 *vertices = (RenderVertex144 *)vm->ins_508_extra_data;
-        vm->int_vars[0] = count;
         vm->flags_lo = (vm->flags_lo & ~(0x1f << ANM_VM_RENDER_MODE_SHIFT)) | (12 << ANM_VM_RENDER_MODE_SHIFT);
+        vm->int_vars[0] = count;
         for (i32 i = 0; i < count * 2; i++)
         {
             vertices[i].pos.z = 0.0f;
@@ -918,7 +918,7 @@ void Supervisor::release_dinput()
 // GLOBAL: TH16 0x4d9d20
 i32 g_unk_4d9d20;
 // GLOBAL: TH16 0x4d9d90
-i32 g_unk_4d9d90;
+DECOMP_ALIGN16 FramePacingTable g_frame_pacing;
 // GLOBAL: TH16 0x4a5788
 f32 g_game_speed;
 
@@ -1294,9 +1294,6 @@ int Supervisor::initialize()
     return 0;
 }
 
-// TODO: the original stores ".wav" as an immediate (no literal in .rdata);
-// ours copies it from a literal.
-// TODO: the original pops call arguments right after each call and restores ebx/esi/edi only at the end; ours merges the pops and restores early.
 // FUNCTION: TH16 0x43c050
 HARNESS_CALLED int Supervisor::load_game_config(const char *path)
 {

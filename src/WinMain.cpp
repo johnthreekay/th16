@@ -61,7 +61,6 @@ const ScreenSize g_screen_sizes[15] = {
 
 // Registers the window class and opens the game window: a popup covering
 // the screen, or a captioned window for the windowed sizes. 1 on failure.
-// TODO: 84%; the pacing stores and the window size computation are scheduled differently.
 // FUNCTION: TH16 0x45b330
 HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
 {
@@ -76,8 +75,7 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
     RegisterClassA(&window_class);
     u32 flags = g_unk_4d9d1c;
     flags ^= (g_Supervisor.config.window_size << 2 ^ flags) & 0x3c;
-    BOOL windowed = (flags & 0x3c) >= 0xc;
-    g_Supervisor.present_params.Windowed = windowed;
+    g_Supervisor.present_params.Windowed = (flags & 0x3c) >= 0xc;
     if (g_Supervisor.config.frame_skip == 0 && g_Supervisor.config.unk_29 == 2)
     {
         flags |= 0x40;
@@ -87,21 +85,21 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
         flags &= ~0x40;
     }
     g_unk_4d9d1c = flags;
-    g_GameWindow.pacing[0].max_sleep_ms = 15;
-    g_GameWindow.pacing[0].sleep_ms = 15;
-    g_GameWindow.pacing[0].late_frames = 0;
-    g_GameWindow.pacing[1].max_sleep_ms = 12;
-    g_GameWindow.pacing[1].sleep_ms = 12;
-    g_GameWindow.pacing[1].late_frames = 0;
-    g_GameWindow.pacing[2].max_sleep_ms = 12;
-    g_GameWindow.pacing[2].sleep_ms = 12;
-    g_GameWindow.pacing[2].late_frames = 0;
-    g_GameWindow.pacing[3].max_sleep_ms = 8;
-    g_GameWindow.pacing[3].sleep_ms = 8;
-    g_GameWindow.pacing[3].late_frames = 0;
-    g_GameWindow.pacing_mode = 0;
+    g_frame_pacing.pacing[0].max_sleep_ms = 15;
+    g_frame_pacing.pacing[0].sleep_ms = 15;
+    g_frame_pacing.pacing[0].late_frames = 0;
+    g_frame_pacing.pacing[1].max_sleep_ms = 12;
+    g_frame_pacing.pacing[1].sleep_ms = 12;
+    g_frame_pacing.pacing[1].late_frames = 0;
+    g_frame_pacing.pacing[2].max_sleep_ms = 12;
+    g_frame_pacing.pacing[2].sleep_ms = 12;
+    g_frame_pacing.pacing[2].late_frames = 0;
+    g_frame_pacing.pacing[3].max_sleep_ms = 8;
+    g_frame_pacing.pacing[3].sleep_ms = 8;
+    g_frame_pacing.pacing[3].late_frames = 0;
+    g_frame_pacing.mode = 0;
     g_GameWindow.set_resolution_from_config();
-    if (!windowed)
+    if (!g_Supervisor.present_params.Windowed)
     {
         g_GameWindow.window =
             CreateWindowExA(0, "BASE", "\x93\x8c\x95\xfb\x93V\x8b\xf3\xe0\xf6\x81@\x81` Hidden Star in Four Seasons. ver 1.00a",
