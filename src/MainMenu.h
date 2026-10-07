@@ -104,6 +104,7 @@ class TitleInf : public TaskInf
     HARNESS_CALLED i32 on_draw__spell_practice_histories();
 
     // States of on_tick (ExpHP: do_*).
+    i32 do_subseason_select();
     i32 do_manual();
     i32 do_spell_practice_stage_select();
     i32 do_spell_practice_character();

@@ -96,6 +96,145 @@ void TitleInf::load_replay_list()
 const char *const g_stage_names[10] = {"test   ",  "Stage 1", "Stage 2", "Stage 3", "Stage 4",
                                        "Stage 5", "Stage 6", "Extra  ", "Clear  ", "ExClear"};
 
+// Picking the subseason before a game (Extra has only one). In stage
+// practice this goes on to the stage select instead of starting.
+// TODO: the original realigns its frame (and esp, -8).
+// FUNCTION: TH16 0x450af0
+i32 TitleInf::do_subseason_select()
+{
+    i32 script = (g_Globals.difficulty == 4) * 2 + 0x97;
+    switch (substate)
+    {
+    case 0:
+        menu.num_choices = 4;
+        if (g_Globals.difficulty == 4)
+        {
+            menu.set_cursor(0);
+            menu.num_choices = 1;
+        }
+        AnmManager::interrupt_tree(anm_ids[script], 1);
+        anm_ids[script].id = 0;
+        anm_ids[script] = title_anm->create_effect(script, -1, NULL);
+        AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
+        AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 7));
+        AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(g_Globals.character + 31));
+        set_substate(1);
+        anm_ids[0x6a] = title_anm->create_effect(0x6a, -1, NULL);
+        if (g_unk_4a6f1c == 4)
+        {
+            menu.set_cursor(g_Globals.subseason);
+            goto confirm;
+        }
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        menu.current_selection = menu.next_selection;
+        if (g_Globals.difficulty != 4)
+        {
+            if (input_pressed_or_repeating(INPUT_LEFT))
+            {
+                g_SoundManager.play_sound_centered(10, 0);
+                AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 25));
+                menu.move_cursor(-1);
+                AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 13));
+            }
+            if (input_pressed_or_repeating(INPUT_RIGHT))
+            {
+                g_SoundManager.play_sound_centered(10, 0);
+                AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 19));
+                menu.move_cursor(1);
+                AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 7));
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            set_substate(4);
+            g_SoundManager.play_sound_centered(9, 0);
+            return 1;
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            g_SoundManager.play_sound_centered(7, 0);
+            set_substate(3);
+            g_SoundManager.play_sound_centered(50, 0);
+            if (g_Globals.game_mode == 0)
+            {
+                g_Supervisor.fade_out_bgm(0.05f);
+                return 1;
+            }
+        }
+        break;
+    case 3:
+        if (time_in_state.current == 10)
+        {
+            if (g_Globals.game_mode != 0)
+            {
+                goto confirm;
+            }
+            g_AsciiManager->show_now_loading(480.0f, 392.0f);
+            AnmId id;
+            id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+            g_Supervisor.config.unk_0 = id.id;
+            AnmManager::interrupt_tree(id, 7);
+        }
+        goto start;
+    confirm:
+        g_Globals.subseason = menu.next_selection;
+        menu.push();
+        AnmManager::interrupt_tree(anm_ids[script], 1);
+        anm_ids[script].id = 0;
+        AnmManager::interrupt_tree(anm_ids[0x6a], 1);
+        anm_ids[0x6a].id = 0;
+        set_state(8);
+    start:
+        if (time_in_state.current >= 40)
+        {
+            if (g_Globals.difficulty != 4)
+            {
+                g_Globals.subseason = menu.next_selection;
+            }
+            else
+            {
+                g_Globals.subseason = 4;
+            }
+            menu.push();
+            g_Globals.spell_id = -1;
+            set_state(2);
+            if (g_Globals.difficulty < 4)
+            {
+                g_stage_data = &g_stage_table[1];
+                g_Globals.stage_num = 1;
+                g_Globals.weird_stage_num = 1;
+                g_Supervisor.gamemode_to_switch_to = 7;
+                return 1;
+            }
+            g_stage_data = &g_stage_table[7];
+            g_Globals.stage_num = 7;
+            g_Globals.weird_stage_num = 7;
+            g_Supervisor.gamemode_to_switch_to = 7;
+            return 1;
+        }
+        break;
+    case 4:
+        if (time_in_state.current >= 6)
+        {
+            g_Globals.subseason = menu.next_selection;
+            interrupt_and_clear(script);
+            AnmManager::interrupt_tree(anm_ids[0x6a], 1);
+            anm_ids[0x6a].id = 0;
+            set_state(6);
+            menu.pop();
+        }
+        break;
+    }
+    return 1;
+}
+
 // The stages and practice high scores of stage practice.
 // FUNCTION: TH16 0x4513c0
 HARNESS_CALLED i32 TitleInf::on_draw__practice_stage_select()
