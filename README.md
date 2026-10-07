@@ -213,6 +213,32 @@ decompiled code the surroundings it had in the original:
 - `D3DXMATRIX.m[i][j]` and `._ij` compile differently (the former reloads
   the other floats); chained assignments store right to left.
 
+- HARNESS_CALLED also changes alias analysis inside the callee: with every
+  caller visible, LTCG knows pointer arguments only point at callers'
+  locals and keeps loads cached across stores and calls. An /INCLUDE'd
+  function loses that (CWaveFile::Read, save_vm_tree).
+- Pass-through members (every caller goes through `g_X->`): write the body
+  with `this`; naming the global explicitly drops the `push ecx` slot.
+- Taking a global's address anywhere (even in a harness) keeps stores to it
+  ordered with pointer stores.
+- LTCG can split a function: an early check stays inlined in the callers and
+  the rest is out of line (RestoreBuffer). A stand-in struct whose member
+  gets the remaining argument as `this` reproduces it.
+- Nested inlining can differ per call site (the CSound ctor inlines
+  FillBufferWithSound and ResetFile; the out-of-line FillBufferWithSound
+  calls ResetFile). Each shape needs its own `__forceinline` copy.
+- A folded constant argument can move into the callee (CreateStreaming
+  pushes the "thbgm.dat" literal itself).
+- `delete p` goes through a `??_G` helper LTCG may not inline;
+  `p->~T(); operator delete(p, sizeof(T));` gives the inlined form.
+- A class with a vtable and double members needs `#pragma pack(4)`, or the
+  vfptr is padded to 8 bytes (CSound).
+- An array of a class with a constructor nested in an array element stops
+  LTCG from unrolling the construction loop (PlayerOption::unk_4).
+- How a struct is split into members picks `rep stosd` vs `movups` for its
+  zeroing (TitleInf ctor: `AnmId; AnmId[0x24]; AnmId[9]`).
+- dxguid IIDs can be defined in source to carry a GLOBAL annotation.
+
 ### Known tooling gaps
 
 - Template members cannot be annotated: build.py's name parsing does not
@@ -225,6 +251,11 @@ decompiled code the surroundings it had in the original:
   reccmp then loses the function and build.py may misread the declaration.
 - quickdiff misreports jump thunks and tail jumps; check those with
   compare.py.
+- build.py cannot tell overloads apart (two `ZunAngle::operator+` give "2
+  matching symbols"), so 0x447650 is named `ZunAngle::add` for now.
+- SYNTHETIC only takes scalar deleting destructors, so implicit
+  constructors and destructors (AnmFastVm at 0x46b770/0x46b790) need an
+  explicit definition to be annotated.
 - The TH06 decomp's `Chain` code (`src/Global.cpp` there) is a close ancestor
   of TH16's `UpdateFuncRegistry`: same callback result codes, same case
   order in the switch, same search-then-cut structure in `unregister`.
