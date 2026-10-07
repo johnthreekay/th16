@@ -1892,3 +1892,143 @@ i32 LaserLineInf::on_tick()
     timer.tick();
     return 0;
 }
+
+// One frame: the et_ex steps, then each segment follows the node list to
+// its place at timer_40 minus its index (segments not out yet stay at the
+// start), leaving the screen once every segment is off it.
+// TODO: ours speculatively devirtualizes run_ex and the small et_ex steps; register allocation differs.
+// FUNCTION: TH16 0x4377d0
+i32 LaserCurveInf::on_tick()
+{
+    i32 again;
+    do
+    {
+        run_ex();
+        if (ex_flags == 0)
+        {
+            break;
+        }
+        again = 0;
+        if (ex_flags & 1)
+        {
+            again = method_38();
+        }
+        if (ex_flags & 4)
+        {
+            again += method_3c();
+        }
+        if (ex_flags & 8)
+        {
+            again += method_40();
+        }
+        if (ex_flags & 0x10)
+        {
+            switch (ex_state[3].ints[3])
+            {
+            case 0:
+                again += method_44();
+                break;
+            case 1:
+                again += method_4c();
+                break;
+            case 4:
+                again += method_48();
+                break;
+            }
+        }
+        if (ex_flags & 0x40)
+        {
+            again += method_50();
+        }
+        if (ex_flags & 0x1000)
+        {
+            again += method_54();
+        }
+        if (ex_flags & 0x100)
+        {
+            again += method_60();
+        }
+        if ((i32)ex_flags < 0)
+        {
+            if (ex_state[5].timer.current <= 0)
+            {
+                ex_flags ^= 0x80000000;
+                again++;
+            }
+            else
+            {
+                ex_state[5].timer.decrement(1.0f);
+            }
+        }
+        if (countdown_5c8 != 0)
+        {
+            countdown_5c8--;
+        }
+    } while (again != 0);
+    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    if (!(flags_rest & 1))
+    {
+        i32 placed = 0;
+        for (i32 i = 0; i < inner.segment_count; i++, segment++)
+        {
+            f32 t = timer_40.current_f - (f32)i;
+            if (t >= 0.0f)
+            {
+                LaserCurveNode *node;
+                for (node = &nodes; node != NULL; node = node->next)
+                {
+                    if (t >= node->unk_8 && node->unk_c > t)
+                    {
+                        if (!placed)
+                        {
+                            node->get_state(&segment->pos, &segment->length, &segment->angle, t);
+                        }
+                        else
+                        {
+                            node->step_back(&segment->pos, &segment->length, &segment->angle, &segment[-1].pos,
+                                            segment[-1].length, segment[-1].angle, t);
+                        }
+                        break;
+                    }
+                }
+                placed = 1;
+            }
+            else
+            {
+                segment->pos = inner.start_pos;
+                *(Float3 *)segment->unk_c = g_zero_vec;
+                segment->angle = inner.ang_aim;
+                segment->length = inner.speed;
+            }
+        }
+    }
+    segment = (LaserCurveSegment *)unk_1524;
+    if (timer_5a0.current > 0 || (ex_flags & 0x100))
+    {
+        timer_5a0.decrement(1.0f);
+    }
+    else
+    {
+        i32 i;
+        for (i = 0; i < inner.segment_count; i++, segment++)
+        {
+            Float3 head;
+            laser_sincosmul(&head, angle, unk_70);
+            head += position;
+            if (!(segment->pos.x + width <= -192.0f || segment->pos.x - width >= 192.0f ||
+                  segment->pos.y + width <= 0.0f || segment->pos.y - width >= 448.0f))
+            {
+                break;
+            }
+        }
+        if (i >= inner.segment_count)
+        {
+            return 1;
+        }
+    }
+    check_graze_or_kill(0);
+    vm_92c.run();
+    vm_f28.run();
+    timer_40.tick();
+    return 0;
+}

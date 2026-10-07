@@ -22,13 +22,6 @@ void LaserCurveInf::run_ex()
 }
 
 // Placeholder (not decompiled yet).
-// STUB: TH16 0x4377d0
-i32 LaserCurveInf::on_tick()
-{
-    return unit5_placeholder(this);
-}
-
-// Placeholder (not decompiled yet).
 // STUB: TH16 0x438750
 i32 LaserCurveInf::on_draw()
 {
