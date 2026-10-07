@@ -1,25 +1,26 @@
 #pragma once
 
+// Macros for reproducing what ZUN's whole-program build (/GL + /LTCG) did to
+// individual functions. None of them is ZUN's; see README.md, "Whole-program
+// optimization".
+
 #ifdef TH16_PORT
 // The portable build (port/CMakeLists.txt) compiles with GCC or Clang. The
-// matching-build annotations below are hints for MSVC's link-time code
-// generation; here they reduce to their plain meaning. The calling
-// convention keywords they expand to are defined away by
-// port/include/port_prelude.h.
+// macros below are hints for MSVC's link-time code generation; here they
+// reduce to their plain meaning. The calling convention keywords they
+// expand to are defined away by port/include/port_prelude.h.
 #define DECOMP_NOINLINE __attribute__((noinline))
 #define DECOMP_ALIGN16 __attribute__((aligned(16)))
 #define LTCG_FASTCALL
 #define LTCG_VECTORCALL
 #define HARNESS_CALLED
-#define LTCG_NOTHROW noexcept
 #else
 
-// Link-time code generation decides inlining with the whole program in view.
-// Until the callers of a function are decompiled too, our build sees far
-// fewer call sites than ZUN's did and inlines things the original calls.
-// DECOMP_NOINLINE marks functions the original keeps out of line, so their
-// callers match. It is a stand-in for missing context: remove it once enough
-// of the call graph exists for LTCG to reach the same decision on its own.
+// Link-time code generation decides inlining with the whole program in view,
+// and our build does not always reach the original's decision (callers
+// whose shape differs, functions kept alive with /INCLUDE). DECOMP_NOINLINE
+// marks functions the original keeps out of line where ours would inline
+// them, so that their callers match.
 #define DECOMP_NOINLINE __declspec(noinline)
 
 // A global the compiler must know to be 16-byte aligned, as the original's
@@ -42,19 +43,12 @@
 // them in xmm registers and returns in xmm0, which __vectorcall reproduces.
 #define LTCG_VECTORCALL __vectorcall
 
-// Marks a function kept alive by stand-in callers in src/harness/ rather
-// than by /INCLUDE. Only then does LTCG see every caller, and with every
-// caller known it picks a custom calling convention the same way it did in
-// ZUN's build (for example `this` in ecx and a float argument in xmm1, which
-// no declarable convention produces). The function must stay out of line
-// for that, hence noinline.
+// Marks a function kept alive by its callers (and, where those are not
+// enough, by stand-in callers in src/harness/) rather than by /INCLUDE. Only
+// then does LTCG see every caller, and with every caller known it picks a
+// custom calling convention the same way it did in ZUN's build (for example
+// `this` in ecx and a float argument in xmm1, which no declarable convention
+// produces). The function must stay out of line for that, hence noinline.
 #define HARNESS_CALLED __declspec(noinline)
-
-// LTCG works out which functions cannot throw and drops the unwind state
-// around calls to them (and around array members built from them). A
-// placeholder in src/stub/ hides the callee's body, so its declaration needs
-// the promise spelled out to keep callers shaped like the original. Remove
-// it once the callee is decompiled.
-#define LTCG_NOTHROW throw()
 
 #endif // TH16_PORT

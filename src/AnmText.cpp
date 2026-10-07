@@ -42,7 +42,7 @@ void AnmManager::draw_text(AnmVm *vm, D3DCOLOR color, i32 shadow_color, i32 font
     }
     if (height > 8)
     {
-        if (!(vm->flags_hi & 0x1000))
+        if (!(vm->flags_hi & ANM_VM_TEXT_NO_OUTLINE))
         {
             ::draw_text(&rect, x, height, color, shadow_color, buf, texture, font, spacing, 1);
         }
@@ -83,7 +83,7 @@ void AnmManager::draw_text_right(AnmVm *vm, D3DCOLOR color, D3DCOLOR shadow_colo
     }
     if (height > 8)
     {
-        if (!(vm->flags_hi & 0x1000))
+        if (!(vm->flags_hi & ANM_VM_TEXT_NO_OUTLINE))
         {
             ::draw_text(&rect, x, height, color, shadow_color, buf, texture, font, spacing, 1);
         }
@@ -124,7 +124,7 @@ void AnmManager::draw_text_centered(AnmVm *vm, D3DCOLOR color, D3DCOLOR shadow_c
     }
     if (height > 8)
     {
-        if (!(vm->flags_hi & 0x1000))
+        if (!(vm->flags_hi & ANM_VM_TEXT_NO_OUTLINE))
         {
             ::draw_text(&rect, x, height, color, shadow_color, buf, texture, font, spacing, 1);
         }

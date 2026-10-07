@@ -20,9 +20,17 @@
 #include "Supervisor.h"
 #include "Stage.h"
 #include "UpdateFunc.h"
+#include "ZunAsm.h"
 
 // GLOBAL: TH16 0x4a6db0
 Spellcard *g_Spellcard;
+
+// The difficulty of each spell card, indexed by spell id (0 Easy to 3
+// Lunatic, 4 Extra). A constant table in the original (0, 1, 2, 3 repeated
+// per card for the main game, then 4 for the Extra cards); not filled in
+// here.
+// GLOBAL: TH16 0x491700
+i8 g_spell_difficulty[0x78];
 
 Spellcard::Spellcard()
 {
@@ -109,6 +117,8 @@ HARNESS_CALLED i32 count_spells_of_difficulty(i32 difficulty)
     return count;
 }
 
+// Draws the bonus (or the failed glyph) and the capture history next to
+// the spell card name.
 // FUNCTION: TH16 0x417d70
 i32 Spellcard::on_draw_body()
 {
@@ -125,7 +135,7 @@ i32 Spellcard::on_draw_body()
     AsciiInf *ascii = g_AsciiManager;
     pos.y = 35.0f;
     pos.z = 0.0f;
-    ascii->font_id = 2;
+    ascii->font_id = ASCII_FONT_SMALL;
     ascii->group = 2;
     ascii->color.a = vm->color_1.a;
     if (flags & SPELLCARD_CAPTURABLE)
@@ -142,7 +152,7 @@ i32 Spellcard::on_draw_body()
     pos.x = 360.0f;
     pos.y = 35.0f;
     pos.z = 0.0f;
-    i32 practice = g_Globals.game_mode == 2;
+    i32 practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE;
     i32 captures = g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id].captures[practice];
     if (captures >= 100)
     {
@@ -160,7 +170,7 @@ i32 Spellcard::on_draw_body()
             g_AsciiManager->create_stringf(&pos, "%.2d/%.2d", captures, attempts);
         }
     }
-    g_AsciiManager->font_id = 0;
+    g_AsciiManager->font_id = ASCII_FONT_DEFAULT;
     g_AsciiManager->group = 0;
     g_AsciiManager->color.a = 0xff;
     return 1;
@@ -183,22 +193,18 @@ HARNESS_CALLED void Spellcard::decode_time_code(i32 *seconds, i32 *hundredths)
 
 // TODO: this and name trade esi/edi, and later code differs in register allocation.
 // FUNCTION: TH16 0x417f00
-void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
+void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_index)
 {
-#ifdef TH16_PORT
-    port_finit();
-#else
-    __asm finit;
-#endif
+    ZUN_ASM_FINIT();
     time = 0;
     this->spell_id = spell_id;
     strcpy(this->name, name);
-    flags |= 3;
-    flags &= ~0x98;
+    flags |= SPELLCARD_ACTIVE | SPELLCARD_CAPTURABLE;
+    flags &= ~(SPELLCARD_TIMED_OUT | SPELLCARD_FLAG_10 | SPELLCARD_NO_BONUS_DECAY);
     if (g_ReplayManager->mode != 1)
     {
         strcpy(g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id].name, name);
-        i32 practice = g_Globals.game_mode == 2;
+        i32 practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE;
         ScorefileSpell *spell = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id];
         if (spell->attempts[practice] < 99999)
         {
@@ -211,16 +217,16 @@ void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
             spell->attempts[practice]++;
         }
     }
-    g_Gui->interrupt_spell_vms_2();
-    flags &= ~0x20;
+    g_Gui->boss_timer_on_spell_start();
+    flags &= ~SPELLCARD_EARLY_BOMB;
     ticks = 1;
-    flags &= ~0x40;
+    flags &= ~SPELLCARD_TIMING;
     text_anm_ids[0] = g_AsciiManager->ascii_anm->create_effect(0, -1, NULL);
     text_anm_ids[1] = g_Supervisor.text_anm->create_effect(2, -1, NULL);
     text_anm_ids[2] = g_AsciiManager->ascii_anm->create_effect(1, -1, NULL);
     AnmManager *anm = g_AnmManager;
     g_AnmManager->draw_text_right(get_vm_or_clear(text_anm_ids[1]), 0xffffff, 0, 0, 0, name);
-    g_SoundManager.play_sound_centered(0x21, 0);
+    g_SoundManager.play_sound_centered(SE_CAT00, 0);
     boss_anm_id = g_EffectManager->effect_anm->create_effect(0xd, -1, NULL);
     EnemyInf *boss = NULL;
     i32 boss_id = g_EnemyManager->inner.boss_ids[0];
@@ -241,9 +247,9 @@ void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
     {
         vm->entity_pos = boss->enemy.final_pos.pos;
     }
-    find_child_of(boss_anm_id, 0xb)->int_vars[2] = arg_2;
-    find_child_of(boss_anm_id, 0xc)->int_vars[2] = arg_2;
-    timeout = arg_2;
+    find_child_of(boss_anm_id, 0xb)->int_vars[2] = time_limit;
+    find_child_of(boss_anm_id, 0xc)->int_vars[2] = time_limit;
+    timeout = time_limit;
     i32 bonuses[5] = {500000, 1000000, 1500000, 2000000, 1000000};
     bonus = bonuses[g_Globals.difficulty] * g_Globals.stage_num;
     bonus_max = bonus >= 1000000000 ? 999999999 : bonus;
@@ -251,8 +257,8 @@ void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
     StageBoss *stage_boss = &g_stage_data->bosses[g_Globals.chapter < 43 && g_stage_data->bosses[1].spell_bg_anm_slot != -1];
     background_anm_id = g_EnemyManager->anim_statement_anms[stage_boss->spell_bg_anm_slot]->create_effect(
         stage_boss->spell_bg_script, -1, NULL);
-    flags = (flags & ~0x200) | ((stage_boss->spell_flag_200 << 9) & 0x200);
-    stage_boss = &g_stage_data->bosses[arg_3];
+    flags = (flags & ~SPELLCARD_FLAG_200) | ((stage_boss->spell_flag_200 << 9) & SPELLCARD_FLAG_200);
+    stage_boss = &g_stage_data->bosses[boss_index];
     if (stage_boss->spell_anm_slot != -1)
     {
         g_EnemyManager->anim_statement_anms[stage_boss->spell_anm_slot]->create_effect(stage_boss->spell_script, -1,
@@ -263,26 +269,26 @@ void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
 // FUNCTION: TH16 0x4182f0
 HARNESS_CALLED void Spellcard::end()
 {
-    if (!(flags & 1))
+    if (!(flags & SPELLCARD_ACTIVE))
     {
         return;
     }
-    g_Stage->stage_flags |= STAGE_FLAG_1;
+    g_Stage->stage_flags |= STAGE_VISIBLE;
     AnmManager::interrupt_tree(text_anm_ids[0], 1);
     AnmManager::interrupt_tree(text_anm_ids[1], 1);
     AnmManager::interrupt_tree(text_anm_ids[2], 1);
-    flags &= ~1;
+    flags &= ~SPELLCARD_ACTIVE;
     delete_vm_and_clear(background_anm_id);
-    flags &= ~0x20;
-    g_Gui->interrupt_spell_vms_3();
+    flags &= ~SPELLCARD_EARLY_BOMB;
+    g_Gui->boss_timer_on_spell_end();
     delete_vm_and_clear(boss_anm_id);
-    if (flags & 2)
+    if (flags & SPELLCARD_CAPTURABLE)
     {
         g_Globals.add_to_score(bonus);
-        g_Gui->sub_42bcf0(bonus, 0);
+        g_Gui->show_notice(bonus, GUI_NOTICE_SPELL_BONUS);
         if (g_ReplayManager->mode != 1)
         {
-            i32 practice = g_Globals.game_mode == 2;
+            i32 practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE;
             ScorefileSpell *spell = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id];
             if (spell->captures[practice] < 99999)
             {
@@ -294,15 +300,15 @@ HARNESS_CALLED void Spellcard::end()
                 spell->captures[practice]++;
             }
         }
-        g_SoundManager.play_sound_centered(0x2e, 0);
+        g_SoundManager.play_sound_centered(SE_CARDGET_2, 0);
     }
     else
     {
-        g_Gui->sub_42bcf0(0, 1);
+        g_Gui->show_notice(0, GUI_NOTICE_BONUS_FAILED);
     }
-    if (flags & 0x80)
+    if (flags & SPELLCARD_TIMED_OUT)
     {
-        g_SoundManager.play_sound_centered(0x45, 0);
+        g_SoundManager.play_sound_centered(SE_FAULT, 0);
     }
 }
 
@@ -314,25 +320,25 @@ static_assert(sizeof(Spellcard) == 0xbc, "Spellcard size");
 
 // TODO: ours aligns the frame to 64 bytes for the doubles (the original
 // does not), keeps the rounded time on the stack across floor instead of
-// reloading it, and increments unk_88 through a register.
+// reloading it, and increments cards_in_stage through a register.
 // FUNCTION: TH16 0x417bc0
 void Spellcard::measure_real_time()
 {
     Spellcard *sc = g_Spellcard;
-    if (sc->flags & 1)
+    if (sc->flags & SPELLCARD_ACTIVE)
     {
-        if (!(sc->flags & 0x40))
+        if (!(sc->flags & SPELLCARD_TIMING))
         {
             sc->start_time = get_runtime();
-            sc->flags |= 0x40;
+            sc->flags |= SPELLCARD_TIMING;
         }
         return;
     }
-    if (!(sc->flags & 0x40))
+    if (!(sc->flags & SPELLCARD_TIMING))
     {
         return;
     }
-    sc->unk_90 = sc->ticks;
+    sc->frames_taken = sc->ticks;
     double elapsed = get_runtime() - sc->start_time;
     double rest = fmod(elapsed, 0.0167);
     sc->real_time_taken = elapsed - rest;
@@ -348,23 +354,23 @@ void Spellcard::measure_real_time()
         seconds = 999;
     }
     sc->real_time_taken = 0.0;
-    sc->flags &= ~0x40;
+    sc->flags &= ~SPELLCARD_TIMING;
     i32 hundredths = (i32)(fraction * 100.0);
     sc->time_code = ((seconds + 22 + hundredths) * 1000 + (seconds + 66) % 1000) * 100 + (hundredths + 33) % 100;
     if (g_GameThread->replay_mode == 0)
     {
         ((RpyGamestate *)g_ReplayManager->stage_gamestate_snapshots[g_Globals.stage_num])
-            ->spell_time_codes[sc->unk_88] = sc->time_code;
-        sc->unk_88++;
+            ->spell_time_codes[sc->cards_in_stage] = sc->time_code;
+        sc->cards_in_stage++;
     }
     else
     {
-        sc->time_code = g_ReplayManager->stages[g_Globals.stage_num].gamestate_at_stage_begin->spell_time_codes[sc->unk_88];
+        sc->time_code = g_ReplayManager->stages[g_Globals.stage_num].gamestate_at_stage_begin->spell_time_codes[sc->cards_in_stage];
         if (sc->is_time_code_bad())
         {
             sc->time_code = 0x6ad1584;
         }
-        sc->unk_88++;
+        sc->cards_in_stage++;
     }
 }
 
@@ -382,7 +388,7 @@ i32 Spellcard::on_tick_body()
     ticks++;
     if (time.current >= 60 && !(flags & SPELLCARD_FLAG_200))
     {
-        g_Stage->stage_flags &= ~STAGE_FLAG_1;
+        g_Stage->stage_flags &= ~STAGE_VISIBLE;
     }
     if (time.current >= 300 && !(flags & SPELLCARD_NO_BONUS_DECAY))
     {
@@ -426,13 +432,13 @@ i32 Spellcard::on_tick_body()
     {
         vm->entity_pos = boss_pos;
     }
-    if (flags & SPELLCARD_FLAG_20)
+    if (flags & SPELLCARD_EARLY_BOMB)
     {
         if (g_MainBomb->in_use == 1)
         {
             return 1;
         }
-        flags &= ~SPELLCARD_FLAG_20;
+        flags &= ~SPELLCARD_EARLY_BOMB;
     }
     return 1;
 }

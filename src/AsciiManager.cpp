@@ -26,8 +26,8 @@ AsciiInf::AsciiInf()
     scale.y = 1.0f;
     unk_1921c = 0;
     character_spacing_for_font_0 = 9;
-    align_h = 1;
-    align_v = 1;
+    align_h = ASCII_ALIGN_START;
+    align_v = ASCII_ALIGN_START;
 }
 
 // FUNCTION: TH16 0x409030
@@ -41,10 +41,10 @@ i32 AsciiInf::initialize()
 {
     const char *anm_names[3] = {"ascii.anm", "ascii_960.anm", "ascii_1280.anm"};
 
-    ascii_anm = AnmManager::preload_anm(2, anm_names[g_Supervisor.config.window_size % 3]);
+    ascii_anm = AnmManager::preload_anm(ANM_SLOT_ASCII, anm_names[g_Supervisor.config.window_size % 3]);
     if (ascii_anm == NULL)
     {
-        // データが壊れています
+        // "The data is corrupt."
         g_GameErrorContext.log("\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
@@ -73,7 +73,7 @@ i32 AsciiInf::initialize()
     g_UpdateFuncRegistry->register_on_draw(f, 0x42);
     on_draw_func_3 = f;
 
-    ascii_anm->init_vm_with_sprite(&vm_1, 0);
+    ascii_anm->init_vm_with_sprite(&glyph_vm, 0);
     ascii_anm->init_vm_with_sprite(&vm_2, 0x62);
     return 0;
 }
@@ -85,8 +85,8 @@ AsciiInf::~AsciiInf()
     g_UpdateFuncRegistry->unregister_locked(on_draw_func_1);
     g_UpdateFuncRegistry->unregister_locked(on_draw_func_2);
     g_UpdateFuncRegistry->unregister_locked(on_draw_func_3);
-    g_AnmManager->unload_anm(2);
-    g_AnmManager->unload_anm(0);
+    g_AnmManager->unload_anm(ANM_SLOT_ASCII);
+    g_AnmManager->unload_anm(ANM_SLOT_TEXT);
     g_AsciiManager = NULL;
 }
 
@@ -169,7 +169,7 @@ void AsciiInf::create_debug_stringf(Float3 *pos, const char *fmt, ...)
     va_start(args, fmt);
     _vsprintf_l(buf, fmt, NULL, args);
     create_string(pos, buf);
-    strings[num_strings - 1].font_id = 1;
+    strings[num_strings - 1].font_id = ASCII_FONT_DEBUG;
     va_end(args);
 }
 
@@ -274,17 +274,19 @@ __forceinline void AnmVm::set_sprite_uvs_inline(AnmManager *anm, i32 sprite)
     uv_quad_of_sprite[2].y = uv_quad_of_sprite[3].y = s->uv_end.y;
 }
 
-// Draws one string a character at a time with vm_1: picks the glyph for
+// Draws one string a character at a time with glyph_vm: picks the glyph for
 // the font, aligns the string and draws an optional shadow first.
 // TODO: same structure; the original keeps this in ecx (ours edx) and numbers the xmm registers differently, which shifts most of the function.
 // FUNCTION: TH16 0x408650
 void AsciiInf::draw_string(AsciiStr *str)
 {
     size_t len = strlen(str->text);
-    AnmVm *vm = &vm_1;
-    vm_1.flags_hi &= ~0x700000;
-    vm_1.flags_lo = (vm_1.flags_lo & 0xfebfffff) | 0xa00001;
-    vm_1.pos = str->pos;
+    AnmVm *vm = &glyph_vm;
+    glyph_vm.flags_hi &= ~ANM_VM_RESOLUTION_MODE_MASK;
+    // Anchored at its left and top, visible.
+    glyph_vm.flags_lo = (glyph_vm.flags_lo & ~(2 << ANM_VM_ANCHOR_X_SHIFT | 2 << ANM_VM_ANCHOR_Y_SHIFT)) |
+                        (1 << ANM_VM_ANCHOR_X_SHIFT | 1 << ANM_VM_ANCHOR_Y_SHIFT | ANM_VM_VISIBLE);
+    glyph_vm.pos = str->pos;
     vm->flags_lo |= ANM_VM_SCALE_CHANGED;
     vm->scale.x = str->scale.x;
     vm->scale.y = str->scale.y;
@@ -292,39 +294,39 @@ void AsciiInf::draw_string(AsciiStr *str)
     f32 line_height;
     switch (str->font_id)
     {
-    case 1:
-        vm_1.flags_hi &= ~0x800;
+    case ASCII_FONT_DEBUG:
+        glyph_vm.flags_hi &= ~ANM_VM_FILTER_POINT;
         advance = str->scale.x * 6.0f;
         line_height = 9.0f;
         break;
-    case 2:
-        vm_1.flags_hi &= ~0x800;
+    case ASCII_FONT_SMALL:
+        glyph_vm.flags_hi &= ~ANM_VM_FILTER_POINT;
         line_height = 10.0f;
         advance = str->scale.x * 7.0f;
         break;
-    case 3:
-        vm_1.flags_hi |= 0x800;
+    case ASCII_FONT_SMALL_POINT:
+        glyph_vm.flags_hi |= ANM_VM_FILTER_POINT;
         line_height = 10.0f;
         advance = str->scale.x * 7.0f;
         break;
-    case 4:
-        vm_1.flags_hi &= ~0x800;
+    case ASCII_FONT_LARGE:
+        glyph_vm.flags_hi &= ~ANM_VM_FILTER_POINT;
         line_height = 16.0f;
         advance = str->scale.x * 12.0f;
         break;
-    case 5:
-        vm_1.flags_hi |= 0x800;
+    case ASCII_FONT_LARGE_POINT:
+        glyph_vm.flags_hi |= ANM_VM_FILTER_POINT;
         line_height = 16.0f;
         advance = str->scale.x * 12.0f;
         break;
     default:
         if (str->scale.x != 1.0f)
         {
-            vm_1.flags_hi |= 0x800;
+            glyph_vm.flags_hi |= ANM_VM_FILTER_POINT;
         }
         else
         {
-            vm_1.flags_hi &= ~0x800;
+            glyph_vm.flags_hi &= ~ANM_VM_FILTER_POINT;
         }
         line_height = 14.0f;
         advance = character_spacing_for_font_0 * str->scale.x;
@@ -333,18 +335,18 @@ void AsciiInf::draw_string(AsciiStr *str)
     const char *p;
     switch (str->align_h)
     {
-    case 0:
+    case ASCII_ALIGN_CENTER:
         switch (str->font_id)
         {
-        case 2:
-        case 3:
+        case ASCII_FONT_SMALL:
+        case ASCII_FONT_SMALL_POINT:
             for (p = str->text; *p != '\0'; p++)
             {
                 vm->pos.x += (*p == '.' ? str->scale.x * -4.0f * 0.5f : advance * -0.5f) * g_screen_coord_scale;
             }
             break;
-        case 4:
-        case 5:
+        case ASCII_FONT_LARGE:
+        case ASCII_FONT_LARGE_POINT:
             for (p = str->text; *p != '\0'; p++)
             {
                 vm->pos.x += (*p == ',' ? str->scale.x * -4.0f * 0.5f : advance * -0.5f) * g_screen_coord_scale;
@@ -355,18 +357,18 @@ void AsciiInf::draw_string(AsciiStr *str)
             break;
         }
         break;
-    case 2:
+    case ASCII_ALIGN_END:
         switch (str->font_id)
         {
-        case 2:
-        case 3:
+        case ASCII_FONT_SMALL:
+        case ASCII_FONT_SMALL_POINT:
             for (p = str->text; *p != '\0'; p++)
             {
                 vm->pos.x += *p == '.' ? str->scale.x * -4.0f * g_screen_coord_scale : -(g_screen_coord_scale * advance);
             }
             break;
-        case 4:
-        case 5:
+        case ASCII_FONT_LARGE:
+        case ASCII_FONT_LARGE_POINT:
             for (p = str->text; *p != '\0'; p++)
             {
                 vm->pos.x += *p == ',' ? str->scale.x * -4.0f * g_screen_coord_scale : -(g_screen_coord_scale * advance);
@@ -380,10 +382,10 @@ void AsciiInf::draw_string(AsciiStr *str)
     }
     switch (str->align_v)
     {
-    case 0:
+    case ASCII_ALIGN_CENTER:
         vm->pos.y += line_height * -0.5f * g_screen_coord_scale;
         break;
-    case 2:
+    case ASCII_ALIGN_END:
         vm->pos.y += -(g_screen_coord_scale * line_height);
         break;
     }
@@ -393,7 +395,7 @@ void AsciiInf::draw_string(AsciiStr *str)
         if (c == '\n')
         {
             vm->pos.y += str->scale.y * line_height * g_screen_coord_scale;
-            vm_1.pos.x = str->pos.x;
+            glyph_vm.pos.x = str->pos.x;
             continue;
         }
         if (c != ' ')
@@ -401,14 +403,14 @@ void AsciiInf::draw_string(AsciiStr *str)
             AnmManager *anm = g_AnmManager;
             switch (str->font_id)
             {
-            case 0:
+            case ASCII_FONT_DEFAULT:
                 vm->set_sprite_uvs_inline(anm, (u8)c - 0x20);
                 break;
-            case 1:
+            case ASCII_FONT_DEBUG:
                 vm->set_sprite_uvs_inline(anm, (u8)c + 0x42);
                 break;
-            case 2:
-            case 3:
+            case ASCII_FONT_SMALL:
+            case ASCII_FONT_SMALL_POINT:
                 advance = str->scale.x * 7.0f;
                 if (c >= 'a' && c <= 'z')
                 {
@@ -456,10 +458,10 @@ void AsciiInf::draw_string(AsciiStr *str)
                     vm->set_sprite_uvs((u8)c + 0x94);
                 }
                 break;
-            case 4:
-            case 5:
+            case ASCII_FONT_LARGE:
+            case ASCII_FONT_LARGE_POINT:
                 advance = str->scale.x * 12.0f;
-                vm_1.pos.y = str->pos.y;
+                glyph_vm.pos.y = str->pos.y;
                 if (c == '/')
                 {
                     vm->set_sprite_uvs(0xf9);
@@ -480,7 +482,7 @@ void AsciiInf::draw_string(AsciiStr *str)
                 {
                     vm->set_sprite_uvs(0xfd);
                     advance = str->scale.x * 4.0f;
-                    vm_1.pos.y = g_screen_coord_scale * 3.0f + str->pos.y;
+                    glyph_vm.pos.y = g_screen_coord_scale * 3.0f + str->pos.y;
                 }
                 else
                 {
@@ -495,25 +497,25 @@ void AsciiInf::draw_string(AsciiStr *str)
             vm->sprite_size.y = sprite_height;
             if (str->draw_shadows)
             {
-                vm_1.color_1.d3d = str->color & 0xff000000;
-                vm_1.color_1.a = str->color >> 25;
+                glyph_vm.color_1.d3d = str->color & 0xff000000;
+                glyph_vm.color_1.a = str->color >> 25;
                 vm->pos.x += g_screen_coord_scale * 2.0f;
                 vm->pos.y += g_screen_coord_scale * 2.0f;
                 AnmVm::write_sprite_corners__without_rot(vm, (Float3 *)&g_sprite_temp_buffer[0],
                                                          (Float3 *)&g_sprite_temp_buffer[1],
                                                          (Float3 *)&g_sprite_temp_buffer[2],
                                                          (Float3 *)&g_sprite_temp_buffer[3]);
-                anm->render_sprite_2d(vm, 1);
+                anm->render_sprite_2d(vm, ANM_SPRITE_SNAP_TO_PIXELS);
                 anm = g_AnmManager;
                 vm->pos.x += g_screen_coord_scale * -2.0f;
                 vm->pos.y += g_screen_coord_scale * -2.0f;
             }
-            vm_1.color_1.d3d = str->color;
+            glyph_vm.color_1.d3d = str->color;
             AnmVm::write_sprite_corners__without_rot(vm, (Float3 *)&g_sprite_temp_buffer[0],
                                                      (Float3 *)&g_sprite_temp_buffer[1],
                                                      (Float3 *)&g_sprite_temp_buffer[2],
                                                      (Float3 *)&g_sprite_temp_buffer[3]);
-            anm->render_sprite_2d(vm, 1);
+            anm->render_sprite_2d(vm, ANM_SPRITE_SNAP_TO_PIXELS);
         }
         vm->pos.x += g_screen_coord_scale * advance;
     }
@@ -540,15 +542,15 @@ i32 AsciiInf::draw_group(i32 group)
     g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &g_Supervisor.cameras[2].projection_matrix);
     if (g_AnmManager != NULL)
     {
-        g_AnmManager->camera_unk_fc.x = g_Supervisor.cameras[2].unk_fc.x;
-        g_AnmManager->camera_unk_fc.y = g_Supervisor.cameras[2].unk_fc.y;
+        g_AnmManager->camera_2d_offset.x = g_Supervisor.cameras[2].shake_offset.x;
+        g_AnmManager->camera_2d_offset.y = g_Supervisor.cameras[2].shake_offset.y;
     }
     g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
     g_Supervisor.current_camera_index = 2;
     return 1;
 }
 
-// Group 1 is drawn with layer kind 2 coordinates on the first camera.
+// Group 1 is drawn with camera 0, placed from the arcade HUD origin.
 // FUNCTION: TH16 0x408ef0
 i32 AsciiInf::draw_group_1()
 {
@@ -557,9 +559,9 @@ i32 AsciiInf::draw_group_1()
     g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
     g_Supervisor.current_camera_index = 0;
     g_AnmManager->flush_sprites();
-    vm_1.flags_hi = vm_1.flags_hi & ~ANM_VM_LAYER_KIND_MASK | ANM_VM_LAYER_UI;
+    glyph_vm.flags_hi = glyph_vm.flags_hi & ~ANM_VM_ORIGIN_MODE_MASK | ANM_VM_ORIGIN_HUD;
     draw_group(1);
-    vm_1.flags_hi &= ~ANM_VM_LAYER_KIND_MASK;
+    glyph_vm.flags_hi &= ~ANM_VM_ORIGIN_MODE_MASK;
     g_AnmManager->flush_sprites();
     g_Supervisor.current_camera = &g_Supervisor.cameras[2];
     g_Supervisor.swap_transform_matrices(&g_Supervisor.cameras[2]);

@@ -3,6 +3,19 @@
 #include "decomp.h"
 #include "types.h"
 
+// The name entry grid of the replay and high score name entries: the 88
+// characters of g_name_entry_chars, then space, backspace and end, 13 to a
+// row. Names are 8 characters.
+enum NameEntryGrid
+{
+    NAME_ENTRY_CHAR_COUNT = 88,
+    NAME_ENTRY_SPACE = 88,
+    NAME_ENTRY_BACKSPACE = 89,
+    NAME_ENTRY_END = 90,
+    NAME_ENTRY_CHOICES = 91,
+    NAME_ENTRY_COLUMNS = 13,
+};
+
 // Cursor state for a list menu, with a stack for submenus. Layout from
 // ExpHP's th-re-data (zMenuHelper).
 struct MenuHelper

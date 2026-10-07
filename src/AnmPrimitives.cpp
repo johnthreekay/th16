@@ -2,24 +2,13 @@
 // render modes 16 and up).
 #include "AnmManager.h"
 #include "Supervisor.h"
+#include "ZunAsm.h"
 
-// This file's copy of ZunMath.h's sincosmul.
+// This file's copy of sincosmul (ZunAsm.h).
 // FUNCTION: TH16 0x469e00
 static void __fastcall primitive_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-#ifdef TH16_PORT
-    port_sincosmul(&dst->x, angle, radius);
-#else
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
-#endif
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // A width x height rectangle at (x, y) rotated by angle, anchored by
@@ -39,44 +28,35 @@ HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f3
     f32 c;
     f32 s;
     f32 a = angle;
-#ifdef TH16_PORT
-    port_sincos(a, &s, &c);
-#else
-    __asm {
-        fld a
-        fsincos
-        fstp c
-        fstp s
-    }
-#endif
+    ZUN_ASM_SINCOS(a, s, c);
     f32 x0, x1, x2, x3;
     f32 y0, y1, y2, y3;
     switch (anchor_x)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         x1 = x3 = width * 0.5f;
         x0 = x2 = width * -0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         x1 = x3 = width;
         x0 = x2 = 0.0f;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         x1 = x3 = 0.0f;
         x0 = x2 = -width;
         break;
     }
     switch (anchor_y)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         y2 = y3 = height * 0.5f;
         y0 = y1 = height * -0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         y2 = y3 = height;
         y0 = y1 = 0.0f;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         y2 = y3 = 0.0f;
         y0 = y1 = -height;
         break;
@@ -99,22 +79,22 @@ HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f3
         g_Supervisor.zwrite_enabled = 0;
         g_Supervisor.d3d_device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
     }
-    if (g_AnmManager->last_color_op != 0)
+    if (g_AnmManager->last_color_op != ANM_COLOR_OP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
-        g_AnmManager->last_color_op = 0;
+        g_AnmManager->last_color_op = ANM_COLOR_OP_DIFFUSE;
     }
-    if (render_cache_184fbb6 != 1)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-        render_cache_184fbb6 = 1;
+        last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
     g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
     g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, primitive_write_cursor, sizeof(RenderVertex044));
     primitive_write_cursor += 4;
-    unk_cc++;
+    stat_draw_calls++;
     return 0;
 }
 
@@ -133,44 +113,35 @@ HARNESS_CALLED i32 AnmManager::draw_rect_outline(f32 x, f32 y, f32 width, f32 he
     f32 c;
     f32 s;
     f32 a = angle;
-#ifdef TH16_PORT
-    port_sincos(a, &s, &c);
-#else
-    __asm {
-        fld a
-        fsincos
-        fstp c
-        fstp s
-    }
-#endif
+    ZUN_ASM_SINCOS(a, s, c);
     f32 x0, x1, x2, x3;
     f32 y0, y1, y2, y3;
     switch (anchor_x)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         x1 = x3 = width * 0.5f;
         x0 = x2 = width * -0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         x1 = x3 = width;
         x0 = x2 = 0.0f;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         x1 = x3 = 0.0f;
         x0 = x2 = -width;
         break;
     }
     switch (anchor_y)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         y2 = y3 = height * 0.5f;
         y0 = y1 = height * -0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         y2 = y3 = height;
         y0 = y1 = 0.0f;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         y2 = y3 = 0.0f;
         y0 = y1 = -height;
         break;
@@ -194,22 +165,22 @@ HARNESS_CALLED i32 AnmManager::draw_rect_outline(f32 x, f32 y, f32 width, f32 he
         g_Supervisor.zwrite_enabled = 0;
         g_Supervisor.d3d_device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
     }
-    if (g_AnmManager->last_color_op != 0)
+    if (g_AnmManager->last_color_op != ANM_COLOR_OP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
-        g_AnmManager->last_color_op = 0;
+        g_AnmManager->last_color_op = ANM_COLOR_OP_DIFFUSE;
     }
-    if (render_cache_184fbb6 != 1)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-        render_cache_184fbb6 = 1;
+        last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
     g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
     g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_LINESTRIP, 4, primitive_write_cursor, sizeof(RenderVertex044));
     primitive_write_cursor += 5;
-    unk_cc++;
+    stat_draw_calls++;
     return 0;
 }
 
@@ -240,30 +211,21 @@ HARNESS_CALLED i32 AnmManager::draw_line(f32 x, f32 y, f32 length, f32 angle, D3
     f32 c;
     f32 s;
     f32 a = angle;
-#ifdef TH16_PORT
-    port_sincos(a, &s, &c);
-#else
-    __asm {
-        fld a
-        fsincos
-        fstp c
-        fstp s
-    }
-#endif
+    ZUN_ASM_SINCOS(a, s, c);
     f32 start;
     f32 end;
     f32 offset = 0.0f;
     switch (anchor)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         start = length * -0.5f;
         end = length * 0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         start = 0.0f;
         end = length;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         start = -length;
         end = 0.0f;
         break;
@@ -282,22 +244,22 @@ HARNESS_CALLED i32 AnmManager::draw_line(f32 x, f32 y, f32 length, f32 angle, D3
         g_Supervisor.zwrite_enabled = 0;
         g_Supervisor.d3d_device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
     }
-    if (g_AnmManager->last_color_op != 0)
+    if (g_AnmManager->last_color_op != ANM_COLOR_OP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
-        g_AnmManager->last_color_op = 0;
+        g_AnmManager->last_color_op = ANM_COLOR_OP_DIFFUSE;
     }
-    if (render_cache_184fbb6 != 1)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-        render_cache_184fbb6 = 1;
+        last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
     g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
     g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_LINESTRIP, 1, primitive_write_cursor, sizeof(RenderVertex044));
     primitive_write_cursor += 2;
-    unk_cc++;
+    stat_draw_calls++;
     return 0;
 }
 
@@ -341,23 +303,23 @@ HARNESS_CALLED i32 AnmManager::draw_circle(f32 x, f32 y, f32 radius, f32 angle, 
     }
     g_AnmManager->flush_sprites();
     g_Supervisor.d3d_device->SetRenderState(D3DRS_ZFUNC, D3DCMP_ALWAYS);
-    if (g_AnmManager->last_color_op != 0)
+    if (g_AnmManager->last_color_op != ANM_COLOR_OP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
-        g_AnmManager->last_color_op = 0;
+        g_AnmManager->last_color_op = ANM_COLOR_OP_DIFFUSE;
     }
-    if (render_cache_184fbb6 != 1)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-        render_cache_184fbb6 = 1;
+        last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
     g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
     g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, count, primitive_write_cursor,
                                              sizeof(RenderVertex044));
     primitive_write_cursor += count + 2;
-    unk_cc++;
+    stat_draw_calls++;
     return 0;
 }
 
@@ -385,23 +347,23 @@ HARNESS_CALLED i32 AnmManager::draw_circle_outline(f32 x, f32 y, f32 radius, f32
         vertices++;
         angle = wrap_angle(angle + step);
     }
-    if (g_AnmManager->last_color_op != 0)
+    if (g_AnmManager->last_color_op != ANM_COLOR_OP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
-        g_AnmManager->last_color_op = 0;
+        g_AnmManager->last_color_op = ANM_COLOR_OP_DIFFUSE;
     }
-    if (render_cache_184fbb6 != 1)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-        render_cache_184fbb6 = 1;
+        last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
     g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
     g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_LINESTRIP, count, primitive_write_cursor,
                                              sizeof(RenderVertex044));
     primitive_write_cursor += count + 1;
-    unk_cc++;
+    stat_draw_calls++;
     return 0;
 }
 
@@ -438,22 +400,22 @@ HARNESS_CALLED i32 AnmManager::draw_ring(f32 x, f32 y, f32 radius, f32 width, f3
         vertices += 2;
         angle = wrap_angle(angle + step);
     }
-    if (g_AnmManager->last_color_op != 0)
+    if (g_AnmManager->last_color_op != ANM_COLOR_OP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
-        g_AnmManager->last_color_op = 0;
+        g_AnmManager->last_color_op = ANM_COLOR_OP_DIFFUSE;
     }
-    if (render_cache_184fbb6 != 1)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-        render_cache_184fbb6 = 1;
+        last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
     g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
     g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, count * 2, primitive_write_cursor,
                                              sizeof(RenderVertex044));
     primitive_write_cursor += count * 2 + 2;
-    unk_cc++;
+    stat_draw_calls++;
     return 0;
 }

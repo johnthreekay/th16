@@ -15,6 +15,19 @@ struct AnmLoaded;
 // Base of every laser kind. The name is ZUN's, from RTTI. The base methods
 // are almost all empty; the slot names follow ExpHP's zVTableLaser.
 // VTABLE: TH16 0x492490
+// LaserDataInf::state.
+enum LaserState
+{
+    // Cancelled: skipped by on_draw and removed on the next tick.
+    LASER_STATE_CANCELLED = 1,
+    LASER_STATE_ACTIVE = 2,
+    // Infinite lasers: the thin warning line, then widening, then (after
+    // ACTIVE) shrinking away.
+    LASER_STATE_WARNING = 3,
+    LASER_STATE_EXPANDING = 4,
+    LASER_STATE_SHRINKING = 5,
+};
+
 class LaserDataInf
 {
   public:
@@ -25,30 +38,40 @@ class LaserDataInf
     // Nonzero once the laser is to be removed: LaserManager counts it up
     // and deletes the laser when it reaches 2.
     u32 pending_delete : 2;
-    // While set, LaserManager only runs check_graze_or_kill on the laser.
-    u32 flag_3 : 1;
+    // While set, LaserManager only runs check_graze_or_kill on the laser
+    // (like BULLET_FLAG_FROZEN).
+    u32 frozen : 1;
     u32 flags_rest : 28;
-    // 1: skipped by on_draw and removed on the next tick.
+    // A LaserState.
     i32 state;
     i32 kind;
     ZunTimer timer;
-    ZunTimer timer_2c;
-    ZunTimer timer_40;
+    // Grazes count every third frame of it.
+    ZunTimer graze_timer;
+    // Curvy lasers: time since the head left, in segments.
+    ZunTimer segment_timer;
     Float3 position;
-    Float3 unk_60;
+    // From position to the tip: (cos angle, sin angle) * length.
+    Float3 tip_offset;
     f32 angle;
-    f32 unk_70;
+    // Length of the hitbox along the laser; infinite lasers grow it to
+    // laser_new_arg_2.
+    f32 hit_length;
     f32 width;
     f32 length;
     f32 unk_7c;
     i32 id;
     BulletExState ex_state[0x12];
+    // As Bullet::ex_index and active_ex_flags.
     i32 ex_index;
     u32 ex_flags;
     i32 unk_59c;
-    ZunTimer timer_5a0;
+    // 30 on creation; while it runs (or with BULLET_EX_OFFSCREEN) the laser
+    // may be off screen.
+    ZunTimer offscreen_grace;
     ZunTimer timer_5b4;
-    i32 countdown_5c8;
+    // Immune to cancels while nonzero (BULLET_EX_INVULN).
+    i32 ex_invuln_remaining_frames;
     // Index into g_bullet_types, and the color within it.
     i32 bullet_type;
     i32 bullet_color;
@@ -67,24 +90,34 @@ class LaserDataInf
     virtual i32 on_draw();
     // Called right before LaserManager deletes the laser.
     virtual i32 on_destroy();
-    virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
-    virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
-    virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
-    virtual i32 cancel(i32 mode, i32 b);
+    // ExpHP: method_1c. Adds a damage value to g_LaserManager's
+    // rect_damage_sum for each point of the laser inside a rotated
+    // rectangle (only the infinite laser's version is called).
+    virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
+    // The cancels: inside a rotated rectangle, inside a circle, or the
+    // whole laser. mode is a BulletCancelMode for the items; with
+    // skip_invuln set, a laser under BULLET_EX_INVULN is spared.
+    virtual i32 cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln);
+    virtual i32 cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln);
+    virtual i32 cancel(i32 mode, i32 skip_invuln);
     virtual i32 method_2c(i32 a, i32 b, i32 c, i32 d);
-    virtual i32 method_30(Float3 *pos, f32 radius);
-    virtual i32 check_graze_or_kill(i32 a);
-    virtual i32 method_38();
-    virtual i32 method_3c();
-    virtual i32 method_40();
-    virtual i32 method_44();
-    virtual i32 method_48();
-    virtual i32 method_4c();
-    virtual i32 method_50();
-    virtual i32 method_54();
+    // ExpHP: method_30. 2 if a circle at pos touches the laser, else 0.
+    virtual i32 touches_circle(Float3 *pos, f32 radius);
+    virtual i32 check_graze_or_kill(i32 graze_only);
+    // The et_ex steps (ExpHP: method_38 to method_60), as Bullet::step_ex_NN
+    // for the BulletExType of the same name; BULLET_EX_ANGLE picks one of
+    // three by its mode (ex_state[3].ints[3]: 0, 1 or 4).
+    virtual i32 step_ex_speedup();
+    virtual i32 step_ex_accel();
+    virtual i32 step_ex_angle_accel();
+    virtual i32 step_ex_angle();
+    virtual i32 step_ex_angle_mode_4();
+    virtual i32 step_ex_angle_mode_1();
+    virtual i32 step_ex_bounce();
+    virtual i32 step_ex_wrap();
     virtual i32 method_58();
     virtual i32 method_5c();
-    virtual i32 method_60();
+    virtual i32 step_ex_offscreen();
     // Only LaserLineInf implements it, returning a heap copy of itself.
     virtual LaserDataInf *clone();
 
@@ -103,8 +136,9 @@ struct LaserDataFlagBits
 {
     u32 ticked : 1;
     u32 pending_delete : 2;
-    u32 flag_3 : 1;
-    // Curvy lasers: the segments stay where they are (et_ex 0x10000000).
+    u32 frozen : 1;
+    // Curvy lasers: the segments stay where they are
+    // (BULLET_EX_FREEZE_SEGMENTS).
     u32 segments_frozen : 1;
     u32 rest : 27;
 };
@@ -125,7 +159,8 @@ struct LaserLineInner
     i32 bullet_type;
     i32 bullet_color;
     f32 distance;
-    i32 unk_30;
+    // Index of the first et_ex transform.
+    i32 start_transform;
     u32 flags;
     BulletEx ex[0x12];
     i32 shot_sfx;
@@ -139,6 +174,8 @@ struct LaserLineInner
 static_assert(offsetof(LaserLineInner, ex) == 0x38, "LaserLineInner::ex");
 static_assert(offsetof(LaserLineInner, shot_sfx) == 0x350, "LaserLineInner::shot_sfx");
 
+// A straight laser that flies like a bullet (ECL laserOn, et_ex LASER).
+// The name is ZUN's, from RTTI.
 // VTABLE: TH16 0x492424
 class LaserLineInf : public LaserDataInf
 {
@@ -164,15 +201,15 @@ class LaserLineInf : public LaserDataInf
     virtual i32 on_tick();
     virtual i32 on_draw();
     virtual i32 on_destroy();
-    virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
-    virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
-    virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
-    virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(Float3 *pos, f32 radius);
-    virtual i32 check_graze_or_kill(i32 a);
-    virtual i32 method_3c();
-    virtual i32 method_44();
-    virtual i32 method_50();
+    virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
+    virtual i32 cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln);
+    virtual i32 cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln);
+    virtual i32 cancel(i32 mode, i32 skip_invuln);
+    virtual i32 touches_circle(Float3 *pos, f32 radius);
+    virtual i32 check_graze_or_kill(i32 graze_only);
+    virtual i32 step_ex_accel();
+    virtual i32 step_ex_angle();
+    virtual i32 step_ex_bounce();
     virtual LaserDataInf *clone();
 
     // Sprite mapping callback 2 of the line laser VMs: the sprite of the
@@ -196,10 +233,12 @@ struct LaserInfiniteInner
     f32 laser_new_arg_4;
     // ExpHP: spd1.
     f32 speed;
-    i32 unk_30;
-    i32 unk_34;
-    i32 unk_38;
-    i32 unk_3c;
+    // laserTiming: frames of the thin warning line, of widening, at full
+    // width and of shrinking (LaserState).
+    i32 start_time;
+    i32 expand_time;
+    i32 duration;
+    i32 shrink_time;
     i32 shot_sfx;
     i32 shot_transform_sfx;
     i32 laser_st_on_arg_1;
@@ -215,6 +254,8 @@ struct LaserInfiniteInner
     LaserInfiniteInner();
 };
 
+// A laser fixed at its origin that warns, widens, stays and shrinks
+// (ECL laserStOn). The name is ZUN's, from RTTI.
 // VTABLE: TH16 0x4923b8
 class LaserInfiniteInf : public LaserDataInf
 {
@@ -232,20 +273,23 @@ class LaserInfiniteInf : public LaserDataInf
     virtual i32 on_tick();
     virtual i32 on_draw();
     virtual i32 on_destroy();
-    virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
-    virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
-    virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
-    virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(Float3 *pos, f32 radius);
-    virtual i32 check_graze_or_kill(i32 a);
+    virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
+    virtual i32 cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln);
+    virtual i32 cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln);
+    virtual i32 cancel(i32 mode, i32 skip_invuln);
+    virtual i32 touches_circle(Float3 *pos, f32 radius);
+    virtual i32 check_graze_or_kill(i32 graze_only);
 };
 
+// One stretch of a curvy laser's path: its head follows the nodes in
+// turn, and the segments retrace them.
 struct LaserCurveNode
 {
     LaserCurveNode *next;
     LaserCurveNode *prev;
-    f32 unk_8;
-    f32 unk_c;
+    // The node's stretch of the curve in time (end 999999 for the last).
+    f32 start_time;
+    f32 end_time;
     // 0: straight at angle/speed, 1: velocity (or turning, see 0x438370),
     // 2: speed and angle change by speed_delta/angle_delta.
     i32 mode;
@@ -266,8 +310,8 @@ struct LaserCurveNode
     {
         next = other.next;
         prev = other.prev;
-        unk_8 = other.unk_8;
-        unk_c = other.unk_c;
+        start_time = other.start_time;
+        end_time = other.end_time;
         mode = other.mode;
         velocity = other.velocity;
         start_pos = other.start_pos;
@@ -281,8 +325,8 @@ struct LaserCurveNode
     // 0x438370. Steps a point of the curve back by one frame of this node's
     // motion (t is the node time, its fraction the part of the frame).
     void step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle, f32 t);
-    // 0x437ee0. Where the node's motion is at the given time (unk_8 is
-    // its start time), with its speed and angle there.
+    // 0x437ee0. Where the node's motion is at the given time (from
+    // start_time on), with its speed and angle there.
     void get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, f32 time);
 };
 
@@ -316,7 +360,7 @@ struct LaserCurveInner
     }
 };
 
-// One point of a curvy laser's body (LaserCurveInf::unk_1524 holds
+// One point of a curvy laser's body (LaserCurveInf::segments holds
 // segment_count of them).
 struct LaserCurveSegment
 {
@@ -327,6 +371,8 @@ struct LaserCurveSegment
     f32 length;
 };
 
+// A curvy laser: segment_count points that follow the head's path (ECL
+// laserCuOn). The name is ZUN's, from RTTI.
 // VTABLE: TH16 0x4922e0
 class LaserCurveInf : public LaserDataInf
 {
@@ -334,8 +380,10 @@ class LaserCurveInf : public LaserDataInf
     LaserCurveInner inner;
     AnmVm vm_92c;
     AnmVm vm_f28;
-    void *unk_1524;
-    void *unk_1528;
+    // segment_count LaserCurveSegments.
+    void *segments;
+    // Two RenderVertex144 per segment, rebuilt for drawing.
+    void *vertices;
     // Head of a list of heap nodes; never a real node itself.
     LaserCurveNode nodes;
 
@@ -347,16 +395,16 @@ class LaserCurveInf : public LaserDataInf
     virtual i32 on_tick();
     virtual i32 on_draw();
     virtual i32 on_destroy();
-    virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
-    virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
-    virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
-    virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(Float3 *pos, f32 radius);
-    virtual i32 check_graze_or_kill(i32 a);
-    virtual i32 method_3c();
-    virtual i32 method_40();
-    virtual i32 method_44();
-    DECOMP_NOINLINE virtual i32 method_60();
+    virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
+    virtual i32 cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln);
+    virtual i32 cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln);
+    virtual i32 cancel(i32 mode, i32 skip_invuln);
+    virtual i32 touches_circle(Float3 *pos, f32 radius);
+    virtual i32 check_graze_or_kill(i32 graze_only);
+    virtual i32 step_ex_accel();
+    virtual i32 step_ex_angle_accel();
+    virtual i32 step_ex_angle();
+    DECOMP_NOINLINE virtual i32 step_ex_offscreen();
 
     HARNESS_CALLED LaserCurveNode *append_node(f32 value);
 
@@ -365,6 +413,7 @@ class LaserCurveInf : public LaserDataInf
     static i32 __fastcall on_sprite_set(AnmVm *vm, i32 sprite);
 };
 
+// Parameters of a beam laser (ECL 713).
 struct LaserBeamInner
 {
     D3DXVECTOR3 start_pos;
@@ -390,6 +439,7 @@ struct LaserBeamInner
     }
 };
 
+// A beam laser (ECL 713). The name is ZUN's, from RTTI.
 // VTABLE: TH16 0x49234c
 class LaserBeamInf : public LaserDataInf
 {
@@ -410,15 +460,10 @@ class LaserBeamInf : public LaserDataInf
     virtual i32 on_tick();
     virtual i32 on_draw();
     virtual i32 on_destroy();
-    virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
-    virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(Float3 *pos, f32 radius);
+    virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
+    virtual i32 cancel(i32 mode, i32 skip_invuln);
+    virtual i32 touches_circle(Float3 *pos, f32 radius);
 };
-
-// Placeholder virtual methods (not decompiled yet) live in the laser .cpp
-// files rather than in src/stub/: with only the trivial LaserDataInf bodies
-// visible, LTCG would speculatively devirtualize calls through the vtable.
-i32 unit5_placeholder(void *object);
 
 enum LaserKind
 {
@@ -443,9 +488,9 @@ struct LaserManager
     Float3 cancel_pos;
     Float3 cancel_pos_2;
     AnmLoaded *bullet_anm;
-    // Summed by the method_1c variants: 18 to 22 for each point of a laser
-    // inside their rectangle, by laser width. Nothing reads it.
-    i32 unk_608;
+    // Summed by the sum_rect_damage variants: 18 to 22 for each point of a
+    // laser inside their rectangle, by laser width. Nothing reads it.
+    i32 rect_damage_sum;
     u8 unk_60c[4];
 
     LaserManager();
@@ -459,10 +504,10 @@ struct LaserManager
 
     // These reach the manager through g_LaserManager; LTCG drops this.
     i32 allocate_new_laser(i32 kind, void *params);
-    HARNESS_CALLED i32 cancel_in_rectangle(Float3 *a, Float3 *b, f32 angle, i32 mode, i32 e);
+    HARNESS_CALLED i32 cancel_in_rectangle(Float3 *center, Float3 *size, f32 angle, i32 mode, i32 skip_invuln);
     i32 cancel_all();
-    HARNESS_CALLED i32 cancel_in_radius(Float3 *pos, f32 radius, i32 c, i32 d);
-    HARNESS_CALLED i32 clear_all(i32 mode, i32 b);
+    HARNESS_CALLED i32 cancel_in_radius(Float3 *pos, f32 radius, i32 mode, i32 skip_invuln);
+    HARNESS_CALLED i32 clear_all(i32 mode, i32 skip_invuln);
     // 0x41aa40. The laser with the given id, NULL if there is none. The
     // second argument is the same at every call site; LTCG folded it.
     HARNESS_CALLED LaserDataInf *find_by_id(i32 id, i32 unused);
@@ -477,7 +522,7 @@ struct LaserManager
         while (laser != NULL)
         {
             LaserDataInf *next = laser->next;
-            if (laser->state != 1 && laser->ticked)
+            if (laser->state != LASER_STATE_CANCELLED && laser->ticked)
             {
                 laser->cancel_as_bomb_rectangle(a, b, angle, mode, e);
             }
@@ -494,7 +539,7 @@ struct LaserManager
         while (laser != NULL)
         {
             LaserDataInf *next = laser->next;
-            if (laser->state != 1)
+            if (laser->state != LASER_STATE_CANCELLED)
             {
                 laser->cancel_as_bomb_circle(pos, radius, c, d);
             }

@@ -11,6 +11,7 @@
 #include "Rng.h"
 #include "ScreenEffect.h"
 #include "Spellcard.h"
+#include "StageData.h"
 #include "Supervisor.h"
 #include "ZunAngle.h"
 
@@ -20,6 +21,15 @@ Stage *g_Stage;
 // GLOBAL: TH16 0x4a6d9c
 Stage *g_Stage2;
 
+// The stage table (file names, music and bosses per stage number; defined
+// here without the original's contents) and the current stage's entry.
+// GLOBAL: TH16 0x4a22d0
+StageData g_stage_table[8];
+
+// GLOBAL: TH16 0x4a6f18
+StageData *g_stage_data;
+
+// STD_FOG_TIME.
 // FUNCTION: TH16 0x409490
 void StageInner::set_sky_interp(i32 end_time, i32 method, CameraSky *goal)
 {
@@ -33,21 +43,22 @@ void StageInner::set_sky_interp(i32 end_time, i32 method, CameraSky *goal)
 // SYNTHETIC: TH16 0x409d90
 // Fog::`scalar deleting destructor'
 
+// Deletes the VMs and frees the buffers.
 // FUNCTION: TH16 0x409550
 Fog::~Fog()
 {
     delete_vm_and_clear(main_vm);
-    if (buffer_14 != NULL)
+    if (vertices != NULL)
     {
-        free(buffer_14);
-        buffer_14 = NULL;
+        free(vertices);
+        vertices = NULL;
     }
-    if (buffer_18 != NULL)
+    if (points != NULL)
     {
-        free(buffer_18);
-        buffer_18 = NULL;
+        free(points);
+        points = NULL;
     }
-    for (i32 i = 0; i < vm_count - 1; i++)
+    for (i32 i = 0; i < strip_count - 1; i++)
     {
         delete_vm_inline_and_clear(vm_ids[i]);
     }
@@ -75,9 +86,17 @@ StageInner::~StageInner()
 {
 }
 
-// TODO: ours saves esi/edi after the load_std check (shrink-wrapped); the
-// original saves them in the prologue. Matches once GameThread::thread_start
-// realigns like the original (tested with a stand-in double there).
+// Takes on_tick_callback's address for load_data. In the original the
+// callback jumps to on_tick, which realigns itself: it is not entered with
+// the known alignment load_data has from GameThread::thread_start. Taking the
+// address in an inline helper node keeps LTCG from handing it down.
+static inline UpdateFuncCallback stage_on_tick_callback()
+{
+    return Stage::on_tick_callback;
+}
+
+// Loads the STD file, sets the camera up from the Supervisor's camera 3 and
+// registers the update functions (inactive until start_std_vms).
 // FUNCTION: TH16 0x4097c0
 HARNESS_CALLED i32 Stage::load_data(const char *path, i32 unused)
 {
@@ -98,9 +117,9 @@ HARNESS_CALLED i32 Stage::load_data(const char *path, i32 unused)
     inner.camera.up = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     inner.camera.rocking_vector_1 = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     inner.camera.rocking_vector_2 = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-    inner.unk_3310 = 9610000.0f;
+    inner.draw_distance_sq = 9610000.0f;
 
-    UpdateFunc *f = g_UpdateFuncRegistry->create_func(on_tick_callback);
+    UpdateFunc *f = g_UpdateFuncRegistry->create_func(stage_on_tick_callback());
     f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
     g_UpdateFuncRegistry->register_on_tick(f, 17);
@@ -120,12 +139,13 @@ HARNESS_CALLED i32 Stage::load_data(const char *path, i32 unused)
 
     frame_count = 0;
     inner.time_in_stage = 0;
-    stage_flags |= STAGE_FLAG_1;
+    stage_flags |= STAGE_VISIBLE;
     inner.camera_facing_i.end_time = 0;
     inner.camera_pos_i.end_time = 0;
     return 0;
 }
 
+// Keeps the stage's anm file loaded across a stage restart.
 // FUNCTION: TH16 0x4099a0
 Stage::~Stage()
 {
@@ -189,9 +209,9 @@ Stage::~Stage()
         delete lolk_snapshot_inner.fog;
         lolk_snapshot_inner.fog = NULL;
     }
-    if (!(g_Globals.flags_lo_45c & 1))
+    if (!(g_Globals.flags_lo_45c & GLOBALS_SAME_STAGE_AGAIN))
     {
-        g_AnmManager->unload_anm(3 + (stage_num & 1));
+        g_AnmManager->unload_anm(ANM_SLOT_STAGE + (stage_num & 1));
     }
     if (g_Stage == this)
     {
@@ -203,9 +223,6 @@ Stage::~Stage()
     }
 }
 
-// TODO: the original reserves one more 4-byte stack slot (sub esp, 8): a
-// padded frame from GameThread::thread_start's realignment, which ours lacks;
-// matches once thread_start realigns (tested with a stand-in double there).
 // FUNCTION: TH16 0x409db0
 HARNESS_CALLED Stage *Stage::create(const char *path)
 {
@@ -218,6 +235,9 @@ HARNESS_CALLED Stage *Stage::create(const char *path)
     return stage;
 }
 
+// Runs the objects' VMs and the script (not while entering, for its first
+// 30 frames), copies the camera to the Supervisor's camera 3 and moves the
+// distortion mesh.
 // TODO: the original aligns its frame to 8 bytes (LTCG, for a callee), and
 // saves esi/edi in the prologue.
 // FUNCTION: TH16 0x409e50
@@ -225,19 +245,19 @@ i32 Stage::on_tick()
 {
     if (stage_flags & STAGE_DISABLED)
     {
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
-    if ((stage_flags & STAGE_FADING_OUT) && fade_timer.current >= 60)
+    if ((stage_flags & STAGE_ENTERING) && fade_timer.current >= 60)
     {
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
-    inner.camera.unk_fc.x = 0.0f;
-    inner.camera.unk_fc.y = 0.0f;
-    inner.camera.unk_104 = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    inner.camera.shake_offset.x = 0.0f;
+    inner.camera.shake_offset.y = 0.0f;
+    inner.camera.position_delta = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     D3DXVECTOR3 facing = inner.camera.facing + inner.camera.rocking_vector_2;
     D3DXVec3Normalize(&inner.camera.facing_normalized, &facing);
-    inner.color_3344 = 0x808080;
-    if (!(stage_flags & STAGE_FADING_OUT) || fade_timer.current < 30)
+    inner.anm_color = 0x808080;
+    if (!(stage_flags & STAGE_ENTERING) || fade_timer.current < 30)
     {
         update_std_vms();
         inner.run_std();
@@ -249,7 +269,7 @@ i32 Stage::on_tick()
     }
     inner.step_fog();
     frame_count++;
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // FUNCTION: TH16 0x40a7a0
@@ -262,7 +282,7 @@ int __fastcall Stage::on_tick_callback(void *arg)
 static __forceinline void stage_apply_camera_3()
 {
     g_Supervisor.current_camera = &g_Supervisor.cameras[3];
-    camera_apply_43c940(&g_Supervisor.cameras[3]);
+    camera_apply_3d(&g_Supervisor.cameras[3]);
     g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
     g_Supervisor.current_camera_index = 3;
 }
@@ -270,8 +290,8 @@ static __forceinline void stage_apply_camera_3()
 __forceinline void Stage::use_camera()
 {
     g_AnmManager->flush_sprites();
-    inner.camera.unk_fc.x = g_Supervisor.cameras[3].unk_fc.x;
-    inner.camera.unk_fc.y = g_Supervisor.cameras[3].unk_fc.y;
+    inner.camera.shake_offset.x = g_Supervisor.cameras[3].shake_offset.x;
+    inner.camera.shake_offset.y = g_Supervisor.cameras[3].shake_offset.y;
     g_Supervisor.cameras[3] = inner.camera;
     stage_apply_camera_3();
 }
@@ -279,8 +299,8 @@ __forceinline void Stage::use_camera()
 // Passes a color change on to the ANM manager.
 static __forceinline void stage_set_anm_color(u32 color)
 {
-    g_AnmManager->unk_1c7fd8c = 1;
-    g_AnmManager->unk_1c7fd88.d3d = color;
+    g_AnmManager->global_tint_enabled = 1;
+    g_AnmManager->global_tint.d3d = color;
 }
 
 static __forceinline void stage_set_render_state(D3DRENDERSTATETYPE state, DWORD value)
@@ -301,16 +321,18 @@ static __forceinline void stage_clear_viewport(D3DCOLOR color)
     g_Supervisor.d3d_device->Clear(1, &rect, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, color, 1.0f, 0);
 }
 
-// Sets up the camera and fog, clears the background and draws layers 0-7.
+// Sets up the camera and fog, clears the background (black during the
+// first frames of entering) and draws layers 0-7. Entering, the objects
+// appear with a fade-in 30 frames before the end.
 // TODO: around the inlined ScreenEffect allocation the original pops operator new's argument together with memset's and spills the effect later.
 // FUNCTION: TH16 0x409f90
 i32 Stage::on_draw_03()
 {
     if (stage_flags & STAGE_DISABLED)
     {
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
-    if (!(stage_flags & STAGE_FADING_OUT) || fade_timer.current < 60)
+    if (!(stage_flags & STAGE_ENTERING) || fade_timer.current < 60)
     {
         use_camera();
         g_Supervisor.enable_zwrite_inline();
@@ -318,7 +340,7 @@ i32 Stage::on_draw_03()
         stage_set_render_state(D3DRS_FOGCOLOR, *(D3DCOLOR *)inner.camera.sky.color);
         stage_set_render_state(D3DRS_FOGSTART, *(DWORD *)&inner.camera.sky.begin_distance);
         stage_set_render_state(D3DRS_FOGEND, *(DWORD *)&inner.camera.sky.end_distance);
-        if ((stage_flags & STAGE_FADING_OUT) && frame_count < 34)
+        if ((stage_flags & STAGE_ENTERING) && frame_count < 34)
         {
             stage_clear_viewport(0);
         }
@@ -327,29 +349,29 @@ i32 Stage::on_draw_03()
             stage_clear_viewport(*(D3DCOLOR *)inner.camera.sky.color);
         }
     }
-    if (stage_flags & STAGE_FADING_OUT)
+    if (stage_flags & STAGE_ENTERING)
     {
         if (fade_timer.current < 30)
         {
-            ScreenEffect::create_inline(3, 30, 0, 0, 0, 10);
-            stage_flags |= STAGE_FLAG_1;
+            ScreenEffect::create_inline(SCREEN_EFFECT_FADE_IN, 30, 0, 0, 0, 10);
+            stage_flags |= STAGE_VISIBLE;
             fade_timer.set_value(1);
         }
         else
         {
-            stage_flags &= ~STAGE_FLAG_1;
+            stage_flags &= ~STAGE_VISIBLE;
             inner.color_changed = 0;
         }
     }
     if (inner.color_changed)
     {
-        stage_set_anm_color(inner.color_3344);
+        stage_set_anm_color(inner.anm_color);
         inner.color_changed = 0;
     }
     instances_drawn = 0;
     instances_culled = 0;
     quads_drawn = 0;
-    if (stage_flags & STAGE_FLAG_1)
+    if (stage_flags & STAGE_VISIBLE)
     {
         g_Supervisor.enable_d3d_fog_inline();
         draw_layer(0);
@@ -362,24 +384,23 @@ i32 Stage::on_draw_03()
         draw_layer(7);
         g_AnmManager->flush_sprites();
     }
-    g_AnmManager->unk_1c7fd8c = 0;
-    g_AnmManager->unk_1c7fd88.d3d = 0x80808080;
+    g_AnmManager->global_tint_enabled = 0;
+    g_AnmManager->global_tint.d3d = 0x80808080;
     g_Supervisor.disable_zwrite_inline();
     stage_set_render_state(D3DRS_ZFUNC, D3DCMP_ALWAYS);
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // Draws layers 32 and 33 of the ANM manager and layers 8-11 of the stage,
 // and runs the fade timer.
-// TODO: the original realigns its frame through ebx and stores 0xff into the color byte after loading the flags. Matches once GameThread::thread_start realigns like the original (tested).
 // FUNCTION: TH16 0x40a410
 i32 Stage::on_draw_06()
 {
     if (stage_flags & STAGE_DISABLED)
     {
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
-    if (!(stage_flags & STAGE_FADING_OUT) || fade_timer.current < 60)
+    if (!(stage_flags & STAGE_ENTERING) || fade_timer.current < 60)
     {
         use_camera();
         g_Supervisor.disable_d3d_fog_inline();
@@ -393,11 +414,11 @@ i32 Stage::on_draw_06()
         stage_set_render_state(D3DRS_FOGSTART, *(DWORD *)&inner.camera.sky.begin_distance);
         stage_set_render_state(D3DRS_FOGEND, *(DWORD *)&inner.camera.sky.end_distance);
     }
-    if ((stage_flags & STAGE_FADING_OUT) && fade_timer.current >= 30)
+    if ((stage_flags & STAGE_ENTERING) && fade_timer.current >= 30)
     {
         inner.color_changed = 0;
     }
-    if (stage_flags & STAGE_FLAG_1)
+    if (stage_flags & STAGE_VISIBLE)
     {
         g_Supervisor.disable_zwrite_inline();
         g_Supervisor.enable_d3d_fog_inline();
@@ -407,26 +428,26 @@ i32 Stage::on_draw_06()
         draw_layer(11);
         g_AnmManager->flush_sprites();
     }
-    g_AnmManager->unk_1c7fd8c = 0;
-    g_AnmManager->unk_1c7fd88.d3d = 0x80808080;
+    g_AnmManager->global_tint_enabled = 0;
+    g_AnmManager->global_tint.d3d = 0x80808080;
     if (fade_timer.current > 0)
     {
         fade_timer--;
         if (fade_timer.current <= 0)
         {
             inner.color_changed = 0xff;
-            if (stage_flags & STAGE_FADING_IN)
+            if (stage_flags & STAGE_EXITING)
             {
                 stage_flags |= STAGE_DISABLED;
             }
-            stage_flags &= ~(STAGE_FADING_IN | STAGE_FADING_OUT);
-            inner.color_3344 = 0xffffff;
+            stage_flags &= ~(STAGE_EXITING | STAGE_ENTERING);
+            inner.anm_color = 0xffffff;
         }
     }
     g_Supervisor.disable_zwrite_inline();
     stage_set_render_state(D3DRS_ZFUNC, D3DCMP_ALWAYS);
     g_Supervisor.disable_d3d_fog_inline();
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // TODO: the float math and the corner stores are scheduled differently (the original reloads center.x and groups the stores by value).
@@ -529,7 +550,8 @@ HARNESS_CALLED i32 StdObject::is_culled(D3DXVECTOR3 *pos, f32 max_distance_sq, C
     return 1;
 }
 
-// Draws the instances of objects on a layer, culling those out of view.
+// Draws the instances of objects on a layer, culling those out of view;
+// quads with a 3D render mode are moved to the instance and scaled.
 // FUNCTION: TH16 0x40af70
 i32 Stage::draw_layer(i32 layer)
 {
@@ -547,10 +569,10 @@ i32 Stage::draw_layer(i32 layer)
             continue;
         }
         D3DXVECTOR3 pos(instance->pos.x, instance->pos.y, instance->pos.z);
-        if (object->is_culled(&pos, inner.unk_3310, &g_Supervisor.cameras[3]))
+        if (object->is_culled(&pos, inner.draw_distance_sq, &g_Supervisor.cameras[3]))
         {
             instances_culled++;
-            instance->unk_2 &= 0xfffe;
+            instance->flags &= 0xfffe;
             continue;
         }
         object->flags |= 2;
@@ -599,7 +621,7 @@ i32 Stage::draw_layer(i32 layer)
             g_AnmManager->draw_vm(vm);
             quads_drawn++;
         }
-        instance->unk_2 |= 1;
+        instance->flags |= 1;
         instances_drawn++;
     }
     g_Supervisor.disable_zwrite_inline();
@@ -612,7 +634,7 @@ void StageInner::draw_vms(i32 layer)
     for (i32 i = 0; i < 8; i++)
     {
         AnmVm *vm = &anm_vms[i];
-        if (&g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id] == NULL || unk_32f0[i] != layer)
+        if (&g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id] == NULL || anm_vm_layers[i] != layer)
         {
             continue;
         }
@@ -625,8 +647,8 @@ void StageInner::draw_vms(i32 layer)
         g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &g_Supervisor.cameras[3].projection_matrix);
         if (g_AnmManager != NULL)
         {
-            g_AnmManager->camera_unk_fc.x = g_Supervisor.cameras[3].unk_fc.x;
-            g_AnmManager->camera_unk_fc.y = g_Supervisor.cameras[3].unk_fc.y;
+            g_AnmManager->camera_2d_offset.x = g_Supervisor.cameras[3].shake_offset.x;
+            g_AnmManager->camera_2d_offset.y = g_Supervisor.cameras[3].shake_offset.y;
         }
         g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
         g_Supervisor.current_camera_index = 3;
@@ -643,9 +665,9 @@ void StageInner::draw_vms(i32 layer)
 }
 
 // TODO: register and stack slot allocation differ (the original keeps 255.0f in memory and adds d.x to pos.x the other way round).
-// Moves the fog mesh: kind 1 waves the bottom of the screen while no spell
-// card is active, kind 2 bulges a disc around the center of the game area
-// whose radius shrinks towards unk_3318.
+// Moves the distortion mesh: kind 1 waves the bottom of the screen while no
+// spell card is active, kind 2 bulges a disc around the center of the game
+// area whose radius shrinks towards distortion_min_radius.
 // FUNCTION: TH16 0x40c4a0
 void StageInner::step_fog()
 {
@@ -654,13 +676,13 @@ void StageInner::step_fog()
         return;
     }
     // The angles are ZunAngles in ZUN's struct: copied as such.
-    ZunAngle angle_a = *(ZunAngle *)&unk_3338;
-    ZunAngle angle_b = *(ZunAngle *)&unk_333c;
-    D3DXVECTOR3 *point = (D3DXVECTOR3 *)fog->buffer_18;
+    ZunAngle angle_a = *(ZunAngle *)&wave_angle_a;
+    ZunAngle angle_b = *(ZunAngle *)&wave_angle_b;
+    D3DXVECTOR3 *point = (D3DXVECTOR3 *)fog->points;
     D3DXVECTOR3 d;
     if (fog_kind == 1)
     {
-        if (g_Spellcard != NULL && (g_Spellcard->flags & 1))
+        if (g_Spellcard != NULL && (g_Spellcard->flags & SPELLCARD_ACTIVE))
         {
             goto tick;
         }
@@ -674,16 +696,16 @@ void StageInner::step_fog()
         {
             amplitude = 6.0f;
         }
-        FogVertex *vertex = (FogVertex *)fog->buffer_14;
-        for (i32 i = 0; i < fog->vm_count; i++)
+        FogVertex *vertex = (FogVertex *)fog->vertices;
+        for (i32 i = 0; i < fog->strip_count; i++)
         {
-            for (i32 j = 0; j < fog->unk_4; j++)
+            for (i32 j = 0; j < fog->strip_points; j++)
             {
                 ((u8 *)&vertex->diffuse)[3] = 0x80;
-                f32 t = j * amplitude / (fog->unk_4 - 1);
+                f32 t = j * amplitude / (fog->strip_points - 1);
                 d.x = sinf(angle_a.value) * t;
                 d.y = sinf(angle_b.value) * t;
-                if (i != 0 && j != 0 && i != fog->vm_count - 1 && j != fog->unk_4 - 1)
+                if (i != 0 && j != 0 && i != fog->strip_count - 1 && j != fog->strip_points - 1)
                 {
                     vertex->pos.x = vertex->pos.x + d.x;
                     vertex->pos.y = vertex->pos.y + d.y;
@@ -696,21 +718,21 @@ void StageInner::step_fog()
             }
             angle_b.value = wrap_angle(angle_b.value - ZUN_PI * 10.0f / 21.0f);
         }
-        unk_3338 = wrap_angle(unk_3338 + ZUN_PI / 64);
-        unk_333c = wrap_angle(unk_333c + ZUN_PI / 80);
+        wave_angle_a = wrap_angle(wave_angle_a + ZUN_PI / 64);
+        wave_angle_b = wrap_angle(wave_angle_b + ZUN_PI / 80);
     }
     else if (fog_kind == 2)
     {
-        f32 radius = unk_331c;
-        if (radius > unk_3318)
+        f32 radius = distortion_radius;
+        if (radius > distortion_min_radius)
         {
-            unk_331c = radius - 2.0f;
+            distortion_radius = radius - 2.0f;
         }
         fog->set_rect(-radius, 224.0f - radius, radius + radius, radius + radius);
-        FogVertex *vertex = (FogVertex *)fog->buffer_14;
-        for (i32 i = 0; i < fog->vm_count; i++)
+        FogVertex *vertex = (FogVertex *)fog->vertices;
+        for (i32 i = 0; i < fog->strip_count; i++)
         {
-            for (i32 j = 0; j < fog->unk_4; j++)
+            for (i32 j = 0; j < fog->strip_points; j++)
             {
                 d = D3DXVECTOR3(point->x - 224.0f, point->y - 240.0f, point->z - radius * radius);
                 f32 t = radius * radius - (d.x * d.x + d.y * d.y);
@@ -742,8 +764,8 @@ void StageInner::step_fog()
                 point++;
             }
         }
-        unk_3338 = wrap_angle(unk_3338 + ZUN_PI / 64);
-        unk_333c = wrap_angle(g_replay_unsafe_rng.randf_0_to_1() * ZUN_PI / 40.0f + ZUN_PI / 80 + unk_333c);
+        wave_angle_a = wrap_angle(wave_angle_a + ZUN_PI / 64);
+        wave_angle_b = wrap_angle(g_replay_unsafe_rng.randf_0_to_1() * ZUN_PI / 40.0f + ZUN_PI / 80 + wave_angle_b);
     }
 tick:
     fog_timer.tick_in_place();
@@ -761,9 +783,9 @@ int __fastcall Stage::on_draw_06_callback(void *arg)
     return ((Stage *)arg)->on_draw_06();
 }
 
-// TODO: ours saves esi/edi late (shrink-wrapped) and merges the stack
-// cleanups of malloc/memcpy/memset. Matches once GameThread::thread_start
-// realigns like the original (tested with a stand-in double there).
+// Copies the STD file (reading it unless an earlier stage kept it), loads
+// its anm file into slot 3 or 4, turns the offsets into pointers and
+// allocates the quads' VMs.
 // FUNCTION: TH16 0x40ac30
 i32 Stage::load_std(const char *path)
 {
@@ -779,7 +801,7 @@ i32 Stage::load_std(const char *path)
     }
     std = (StdHeader *)malloc(std_file_size);
     memcpy(std, std_file, std_file_size);
-    stage_anm = AnmManager::preload_anm(3 + (stage_num & 1), std->anm_path);
+    stage_anm = AnmManager::preload_anm(ANM_SLOT_STAGE + (stage_num & 1), std->anm_path);
     if (stage_anm == NULL)
     {
         // ステージデータが見つかりません。データが壊れています
@@ -807,7 +829,7 @@ i32 Stage::load_std(const char *path)
     script = (StdInstr *)((u8 *)std + std->script_offset);
     for (i32 i = 0; i < std->num_objects; i++)
     {
-        objects[i] = (StdObject *)((u8 *)objects[i] + (uptr)std);
+        objects[i] = (StdObject *)((u8 *)objects[i] + (u32)std);
     }
 #endif
     vms = (AnmVm *)malloc(std->num_quads * sizeof(AnmVm));
@@ -817,7 +839,8 @@ i32 Stage::load_std(const char *path)
     return 0;
 }
 
-// Starts a VM for every quad of every object.
+// Starts a VM for every quad of every object, the update functions and
+// the script.
 // FUNCTION: TH16 0x40add0
 HARNESS_CALLED void Stage::start_std_vms()
 {
@@ -839,8 +862,10 @@ HARNESS_CALLED void Stage::start_std_vms()
 
 // Runs the VMs of objects still marked as running; unmarks objects whose
 // VMs have all finished.
-// TODO: ours saves ebx/edi after the loop guard (shrink-wrapped). Matches
-// once GameThread::thread_start realigns like the original (tested).
+// TODO: ours saves ebx/edi after the loop guard (shrink-wrapped): the
+// original's frame is padded for alignment from Stage::on_tick, which
+// realigns itself there and not in ours (it matched while on_tick_callback
+// was entered aligned, which costs that thunk its jump).
 // FUNCTION: TH16 0x40aed0
 i32 Stage::update_std_vms()
 {
@@ -871,13 +896,13 @@ i32 Stage::update_std_vms()
     return 0;
 }
 
-// Jumps the script to the label instruction (opcode 16) with this number.
+// Jumps the script to the STD_INTERRUPT_LABEL instruction with this number.
 // FUNCTION: TH16 0x40c040
 HARNESS_CALLED void Stage::jump_to_label(i32 label)
 {
     for (StdInstr *instr = script; instr->time >= 0; instr = (StdInstr *)((u8 *)instr + instr->size))
     {
-        if (instr->opcode == 16 && instr->args[0] == label)
+        if (instr->opcode == STD_INTERRUPT_LABEL && instr->args[0] == label)
         {
             inner.cur_instr_offset = (u8 *)instr - (u8 *)script;
             inner.time_in_stage = ((StdInstr *)((u8 *)script + inner.cur_instr_offset))->time;
@@ -886,20 +911,22 @@ HARNESS_CALLED void Stage::jump_to_label(i32 label)
     }
 }
 
-// Fades the screen in over 30 frames while the stage starts.
+// The previous stage, when the next one starts: the screen fades out over
+// 30 frames, then the stage is disabled (and GameThread deletes it).
 // FUNCTION: TH16 0x40c0d0
-HARNESS_CALLED void Stage::start_fade_in()
+HARNESS_CALLED void Stage::start_exit()
 {
     ScreenEffect::create_inline(SCREEN_EFFECT_FADE_OUT, 30, 0, 0, 0, 10);
     fade_timer = 30;
-    stage_flags |= STAGE_FADING_IN;
+    stage_flags |= STAGE_EXITING;
 }
 
+// The next stage: hidden while the previous one fades out, then fading in.
 // FUNCTION: TH16 0x40c210
-HARNESS_CALLED void Stage::start_fade_out()
+HARNESS_CALLED void Stage::start_enter()
 {
     fade_timer = 60;
-    stage_flags |= STAGE_FADING_OUT;
+    stage_flags |= STAGE_ENTERING;
 }
 
 // TODO: ours gets a /GS cookie (the CameraSky temporaries), which shifts every stack slot; the original also shares one return path per result.
@@ -958,6 +985,7 @@ CameraSky InterpCameraSky::step()
     return current;
 }
 
+// The sum of each distance and color component; color follows the sums.
 // FUNCTION: TH16 0x40d370
 HARNESS_CALLED CameraSky CameraSky::operator+(const CameraSky &other) const
 {
@@ -1016,8 +1044,8 @@ void Stage::interrupt_vms(i32 n)
 // calls the out-of-line sinf and cosf (0x405510, 0x4054f0), which LTCG
 // keeps out of line here (this function has an EH frame).
 // TODO: the original realigns its frame (and esp, -8 with an ebx frame),
-// which moves every stack slot; its callees that realign (AnmVm::run) are
-// stubs here.
+// which moves every stack slot; ours does not, also now that its callees
+// that realign (AnmVm::run) are decompiled.
 // FUNCTION: TH16 0x40b3b0
 i32 StageInner::run_std()
 {
@@ -1026,25 +1054,23 @@ i32 StageInner::run_std()
     {
         switch (ins->opcode)
         {
-        // stop: the script waits here for good.
-        case 0:
+        case STD_STOP:
             goto stopped;
-        // jmp: offset, new time
-        case 1:
+        case STD_JMP:
             time_in_stage.set_inline(ins->args[1]);
             cur_instr_offset = ins->args[0];
             ins = (StdInstr *)((u8 *)stage->script + cur_instr_offset);
             continue;
-        // pos: also keeps how far the camera moved.
-        case 2:
-            camera.unk_104 = camera.position;
+        // Also keeps how far the camera moved.
+        case STD_POS:
+            camera.position_delta = camera.position;
             camera.position.x = *(f32 *)&ins->args[0];
             camera.position.y = *(f32 *)&ins->args[1];
             camera.position.z = *(f32 *)&ins->args[2];
-            camera.unk_104 = camera.position - camera.unk_104;
+            camera.position_delta = camera.position - camera.position_delta;
             break;
-        // posTime
-        case 3:
+        // Time, method, goal.
+        case STD_POS_TIME:
         {
             Float3 goal(*(f32 *)&ins->args[2], *(f32 *)&ins->args[3], *(f32 *)&ins->args[4]);
             camera_pos_i.end_time = ins->args[0];
@@ -1054,14 +1080,12 @@ i32 StageInner::run_std()
             camera_pos_i.reset_timer();
             break;
         }
-        // facing
-        case 4:
+        case STD_FACING:
             camera.facing.x = *(f32 *)&ins->args[0];
             camera.facing.y = *(f32 *)&ins->args[1];
             camera.facing.z = *(f32 *)&ins->args[2];
             break;
-        // facingTime
-        case 5:
+        case STD_FACING_TIME:
         {
             Float3 goal(*(f32 *)&ins->args[2], *(f32 *)&ins->args[3], *(f32 *)&ins->args[4]);
             camera_facing_i.end_time = ins->args[0];
@@ -1071,14 +1095,12 @@ i32 StageInner::run_std()
             camera_facing_i.reset_timer();
             break;
         }
-        // up
-        case 6:
+        case STD_UP:
             camera.up.x = *(f32 *)&ins->args[0];
             camera.up.y = *(f32 *)&ins->args[1];
             camera.up.z = *(f32 *)&ins->args[2];
             break;
-        // upTime
-        case 18:
+        case STD_UP_TIME:
         {
             Float3 goal(*(f32 *)&ins->args[2], *(f32 *)&ins->args[3], *(f32 *)&ins->args[4]);
             camera_up_i.end_time = ins->args[0];
@@ -1088,12 +1110,10 @@ i32 StageInner::run_std()
             camera_up_i.reset_timer();
             break;
         }
-        // fov
-        case 7:
+        case STD_FOV:
             camera.field_of_view = *(f32 *)&ins->args[0];
             break;
-        // fog: color, begin and end distance
-        case 8:
+        case STD_FOG:
             *(i32 *)camera.sky.color = ins->args[0];
             camera.sky.color_components[0] = camera.sky.color[0];
             camera.sky.color_components[1] = camera.sky.color[1];
@@ -1102,8 +1122,8 @@ i32 StageInner::run_std()
             camera.sky.begin_distance = *(f32 *)&ins->args[1];
             camera.sky.end_distance = *(f32 *)&ins->args[2];
             break;
-        // fogTime
-        case 9:
+        // Time, method, color, begin and end distance.
+        case STD_FOG_TIME:
         {
             CameraSky goal;
             goal.begin_distance = *(f32 *)&ins->args[3];
@@ -1119,8 +1139,8 @@ i32 StageInner::run_std()
             set_sky_interp(ins->args[0], ins->args[1], &goal);
             break;
         }
-        // posBezier, facingBezier: initial, bezier_1, goal, bezier_2.
-        case 10:
+        // Time, then bezier_1, goal and bezier_2 (from the current value).
+        case STD_POS_BEZIER:
         {
             Float3 bezier_1(*(f32 *)&ins->args[2], *(f32 *)&ins->args[3], *(f32 *)&ins->args[4]);
             Float3 goal(*(f32 *)&ins->args[5], *(f32 *)&ins->args[6], *(f32 *)&ins->args[7]);
@@ -1134,7 +1154,7 @@ i32 StageInner::run_std()
             camera_pos_i.reset_timer();
             break;
         }
-        case 11:
+        case STD_FACING_BEZIER:
         {
             Float3 bezier_1(*(f32 *)&ins->args[2], *(f32 *)&ins->args[3], *(f32 *)&ins->args[4]);
             Float3 goal(*(f32 *)&ins->args[5], *(f32 *)&ins->args[6], *(f32 *)&ins->args[7]);
@@ -1148,8 +1168,7 @@ i32 StageInner::run_std()
             camera_facing_i.reset_timer();
             break;
         }
-        // rockMode
-        case 12:
+        case STD_ROCKING_MODE:
             rocking_mode() = *(u8 *)&ins->args[0];
             if (rocking_mode() == 0)
             {
@@ -1157,27 +1176,26 @@ i32 StageInner::run_std()
                 camera.rocking_vector_1.y = 0.0f;
                 camera.rocking_vector_1.z = 0.0f;
             }
-            timer_1c.reset_inline();
+            rocking_timer.reset_inline();
             if (rocking_mode() == 2)
             {
-                timer_1c.set_value(0x200);
+                rocking_timer.set_value(0x200);
             }
             break;
-        // bgColor
-        case 13:
+        case STD_BG_COLOR:
             g_Supervisor.background_color = ins->args[0];
             break;
-        // sprite: replaces one of the eight extra VMs (-1 stops it, -2
-        // hides it).
-        case 14:
+        // Slot, script, layer: script -2 hides the slot's VM, -1 also stops
+        // its script.
+        case STD_SPRITE:
         {
             i32 script = ins->args[1];
             if (script >= 0)
             {
                 AnmVm *vm = &anm_vms[ins->args[0]];
                 stage->stage_anm->copy_vm(vm, script);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
             else if (script == -2)
@@ -1189,24 +1207,23 @@ i32 StageInner::run_std()
                 anm_vms[ins->args[0]].instr_offset = script;
                 anm_vms[ins->args[0]].flags_lo &= ~1;
             }
-            unk_32f0[ins->args[0]] = ins->args[2];
+            anm_vm_layers[ins->args[0]] = ins->args[2];
             break;
         }
-        // Replaces the fog effect.
-        case 17:
+        case STD_DISTORTION:
             if (fog != NULL)
             {
                 delete fog;
             }
             fog = NULL;
-            unk_3318 = 112.0f;
-            unk_331c = 192.0f;
+            distortion_min_radius = 112.0f;
+            distortion_radius = 192.0f;
             unk_3320 = -1;
-            unk_3338 = 0;
-            unk_333c = 0;
+            wave_angle_a = 0;
+            wave_angle_b = 0;
             fog_timer.reset_inline();
             fog_kind = ins->args[0];
-            if (unk_3318 > 0.0f)
+            if (distortion_min_radius > 0.0f)
             {
                 if (fog_kind == 1)
                 {
@@ -1218,11 +1235,10 @@ i32 StageInner::run_std()
                 }
             }
             break;
-        case 20:
-            unk_3310 = *(f32 *)&ins->args[0] * *(f32 *)&ins->args[0];
+        case STD_DRAW_DISTANCE:
+            draw_distance_sq = *(f32 *)&ins->args[0] * *(f32 *)&ins->args[0];
             break;
-        // interrupt
-        case 19:
+        case STD_INTERRUPT:
             stage->interrupt_vms(ins->args[0] + 7);
             break;
         }
@@ -1247,13 +1263,15 @@ stopped:
     {
         camera.up = camera_up_i.step();
     }
+    // The rocking patterns sway the camera (rocking vectors) and tilt it
+    // (up) over a cycle of rocking_timer.
     if (rocking_mode() != 0)
     {
         switch (rocking_mode())
         {
         case 1:
         {
-            f32 angle = normalize_angle(timer_1c.current_f * ZUN_PI * 2.0f / 512.0f);
+            f32 angle = normalize_angle(rocking_timer.current_f * ZUN_PI * 2.0f / 512.0f);
             f32 s = sinf(angle);
             f32 x = s * -20.0f;
             camera.rocking_vector_1.x = x;
@@ -1262,28 +1280,28 @@ stopped:
             camera.up.x = s * -0.01f;
             camera.rocking_vector_2.x = x * -0.5f;
             camera.rocking_vector_2.z = z * -0.5f;
-            timer_1c++;
-            if (timer_1c.current >= 0x200)
+            rocking_timer++;
+            if (rocking_timer.current >= 0x200)
             {
-                timer_1c.set_value(0);
+                rocking_timer.set_value(0);
             }
             break;
         }
         case 2:
         {
-            f32 angle = normalize_angle(timer_1c.current_f * ZUN_PI * 2.0f / 3072.0f);
+            f32 angle = normalize_angle(rocking_timer.current_f * ZUN_PI * 2.0f / 3072.0f);
             camera.up.x = -sinf(angle);
             camera.up.z = cosf(angle);
-            timer_1c++;
-            if (timer_1c.current >= 0xc00)
+            rocking_timer++;
+            if (rocking_timer.current >= 0xc00)
             {
-                timer_1c.set_value(0);
+                rocking_timer.set_value(0);
             }
             break;
         }
         case 3:
         {
-            f32 angle = normalize_angle(timer_1c.current_f * ZUN_PI * 2.0f / 2048.0f);
+            f32 angle = normalize_angle(rocking_timer.current_f * ZUN_PI * 2.0f / 2048.0f);
             f32 s = sinf(angle);
             f32 v = s * 50.0f;
             camera.rocking_vector_1.x = v;
@@ -1292,60 +1310,60 @@ stopped:
             camera.rocking_vector_2.x = -v;
             camera.rocking_vector_2.y = -v;
             camera.up.x = s * -0.05f;
-            timer_1c++;
-            if (timer_1c.current >= 0x800)
+            rocking_timer++;
+            if (rocking_timer.current >= 0x800)
             {
-                timer_1c.set_value(0);
+                rocking_timer.set_value(0);
             }
             break;
         }
         case 4:
         {
-            f32 angle = normalize_angle(timer_1c.current_f * ZUN_PI * 2.0f / 3072.0f);
+            f32 angle = normalize_angle(rocking_timer.current_f * ZUN_PI * 2.0f / 3072.0f);
             camera.up.x = -sinf(angle);
             camera.up.z = -cosf(angle);
-            timer_1c++;
-            if (timer_1c.current >= 0xc00)
+            rocking_timer++;
+            if (rocking_timer.current >= 0xc00)
             {
-                timer_1c.set_value(0);
+                rocking_timer.set_value(0);
             }
             break;
         }
         case 7:
         {
-            f32 angle = timer_1c.current_f * ZUN_PI * 2.0f / 2048.0f - ZUN_PI;
+            f32 angle = rocking_timer.current_f * ZUN_PI * 2.0f / 2048.0f - ZUN_PI;
             f32 s = sinf(angle);
             camera.rocking_vector_1.x = s * 70.0f;
             camera.rocking_vector_1.z = sinf(normalize_angle(angle + angle)) * 200.0f;
             camera.up.x = s * -0.1f;
-            timer_1c++;
-            if (timer_1c.current >= 0x800)
+            rocking_timer++;
+            if (rocking_timer.current >= 0x800)
             {
-                timer_1c.set_value(0);
+                rocking_timer.set_value(0);
             }
             break;
         }
         case 8:
         {
-            f32 s = sinf(timer_1c.current_f * ZUN_PI * 2.0f / 1024.0f - ZUN_PI);
+            f32 s = sinf(rocking_timer.current_f * ZUN_PI * 2.0f / 1024.0f - ZUN_PI);
             camera.rocking_vector_1.x = s * -50.0f;
             camera.up.x = s * -0.1f;
-            timer_1c++;
-            if (timer_1c.current >= 0x400)
+            rocking_timer++;
+            if (rocking_timer.current >= 0x400)
             {
-                timer_1c.set_value(0);
+                rocking_timer.set_value(0);
             }
             break;
         }
         case 9:
         {
-            f32 s = sinf(timer_1c.current_f * ZUN_PI * 2.0f / 512.0f - ZUN_PI);
+            f32 s = sinf(rocking_timer.current_f * ZUN_PI * 2.0f / 512.0f - ZUN_PI);
             camera.up.x = s * -0.01f;
             camera.rocking_vector_1.x = s * -15.0f;
-            timer_1c++;
-            if (timer_1c.current >= 0x200)
+            rocking_timer++;
+            if (rocking_timer.current >= 0x200)
             {
-                timer_1c.set_value(0);
+                rocking_timer.set_value(0);
             }
             break;
         }

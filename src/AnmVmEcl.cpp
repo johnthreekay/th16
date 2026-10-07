@@ -12,7 +12,7 @@ void AnmVm::fade_alpha2(i32 end_time, i32 method, u8 goal)
     alpha2_i.initial = color_2.a;
     alpha2_i.goal = goal;
     alpha2_i.time = 0;
-    flags_lo = flags_lo & ~0x40000 | 0x20000;
+    flags_lo = flags_lo & ~ANM_VM_COLOR_MODE_2 | ANM_VM_COLOR_MODE_1;
 }
 
 // FUNCTION: TH16 0x425e70
@@ -61,7 +61,9 @@ HARNESS_CALLED void PosVel::set_ellipse_angle(f32 angle)
     ellipse_angle.value = wrap_angle(wrap_angle(angle));
 }
 
-// TODO: identical code; the original frame has 4 more (unused) bytes, like create_vm's.
+// TODO: identical code; the original frame has 4 more (unused) bytes, like create_vm's: a
+// frame padded for known 8-byte alignment (0x10 locals + 3 saves); not every caller of ours
+// calls it aligned (ecl_run_over_300's helpers, repopulate_options).
 // FUNCTION: TH16 0x426160
 HARNESS_CALLED AnmId AnmLoaded::create_vm_front(i32 script, i32 layer, i32 unused)
 {
@@ -73,16 +75,16 @@ HARNESS_CALLED AnmId AnmLoaded::create_vm_front(i32 script, i32 layer, i32 unuse
     if (layer >= 0)
     {
         vm->layer = layer;
-        if (layer <= 23)
+        if (layer <= ANM_LAYER_HUD_LAST)
         {
-            vm->flags_hi &= ~ANM_VM_LAYER_UI;
-            vm->flags_hi |= ANM_VM_LAYER_SET;
+            vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
+            vm->flags_hi |= ANM_VM_ORIGIN_GAME;
         }
     }
     vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     vm->rotation.z = 0.0f;
     vm->run();
-    vm->mode_of_create_child = 2;
+    vm->mode_of_create_child = ANM_CREATE_FRONT;
     AnmId id;
     id = g_AnmManager->insert_in_world_list_front(vm);
     LEAVE_CS(CS_ANM_MANAGER);

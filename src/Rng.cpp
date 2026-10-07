@@ -1,7 +1,10 @@
 #include "CriticalSections.h"
 #include "Rng.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
+// One step of the generator: xor, subtract, rotate left by 2 (in 16
+// bits). Returns the new seed.
 // FUNCTION: TH16 0x402b70
 u16 Rng::rand_u16()
 {
@@ -13,6 +16,7 @@ u16 Rng::rand_u16()
     return seed;
 }
 
+// Two steps.
 // FUNCTION: TH16 0x402be0
 u32 Rng::rand_u32()
 {
@@ -29,36 +33,27 @@ u32 Rng::rand_u32()
     return a << 16 | b;
 }
 
+// [0, 1]. The finit resets the x87 state first (ZunAsm.h).
 // FUNCTION: TH16 0x402c70
 f32 Rng::randf_0_to_1()
 {
-#ifdef TH16_PORT
-    port_finit();
-#else
-    __asm finit;
-#endif
+    ZUN_ASM_FINIT();
     return (f32)rand_u32() / (f32)0xffffffff;
 }
 
+// [-1, 1].
 // FUNCTION: TH16 0x402cb0
 f32 Rng::randf_neg_1_to_1()
 {
-#ifdef TH16_PORT
-    port_finit();
-#else
-    __asm finit;
-#endif
+    ZUN_ASM_FINIT();
     return (f32)rand_u32() / (f32)0x7fffffff - 1.0f;
 }
 
+// [-pi, pi].
 // FUNCTION: TH16 0x402cf0
 f32 Rng::randf_neg_pi_to_pi()
 {
-#ifdef TH16_PORT
-    port_finit();
-#else
-    __asm finit;
-#endif
+    ZUN_ASM_FINIT();
     return (f32)rand_u32() / ((f32)0xffffffff / ZUN_2PI) - ZUN_PI;
 }
 

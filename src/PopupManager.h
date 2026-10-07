@@ -13,7 +13,8 @@ struct PopupString
     char digits[8];
     u8 unk_8[4];
     Float3 pos;
-    f32 unk_18;
+    // Upward speed: starts at 1 and slows by 5% a frame.
+    f32 rise_speed;
     D3DCOLOR color;
     ZunTimer time;
     u8 unk_34[0x3c - 0x34];

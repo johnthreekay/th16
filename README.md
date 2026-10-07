@@ -106,34 +106,30 @@ program is linked. That has consequences for how we work:
 
 ### Placeholders and stand-in callers
 
-Three directories hold code that is not ZUN's, to give partially
-decompiled code the surroundings it had in the original:
+While the decompilation was partial, three directories held code that is
+not ZUN's, to give decompiled functions the surroundings they had in the
+original: `src/stub/` (placeholder bodies compiled **without** `/GL`, so
+calls to them stayed opaque), `src/placeholder/` (`/GL` stand-ins for
+callees whose shape LTCG had to see) and `src/harness/` (stand-in callers).
+With every function decompiled, what is left is:
 
-- `src/stub/` is compiled **without** `/GL`. It holds placeholder bodies for
-  functions we call but have not decompiled (and the temporary `WinMain`).
-  Link-time code generation cannot see inside them, so calls to them stay
-  opaque the way calls to real, non-trivial code are: they may throw, they
-  keep the standard calling convention, and nothing gets inlined.
-- `src/placeholder/` is compiled **with** `/GL` and not forced alive. It holds
-  stand-ins for callees whose shape LTCG must see: a custom calling
-  convention, a constructor LTCG has to know cannot throw, a parameter it
-  should fold, overrides that stop speculative devirtualization. Their
-  bodies call an opaque stub so the calls survive, and they should clobber
-  registers roughly like the real code, because LTCG's register allocation
-  across calls looks inside them.
-- `src/harness/` is compiled **with** `/GL`. It recreates call sites from code
-  that is not decompiled yet, when a function's shape depends on how it is
-  called (for example `delete g_UpdateFuncRegistry`, which is what makes the
-  compiler generate and specialize the scalar deleting destructor).
+- `src/stub/Opaque.cpp`, compiled **without** `/GL`: one global LTCG must
+  not see (`g_zero_vec2`, which it would fold into constant zeros) and two
+  sinks the harness uses to make an address escape or a frame 8-byte
+  aligned.
+- `src/harness/`, compiled **with** `/GL`: stand-in callers for functions
+  whose shape still depends on calls our build does not reproduce (constant
+  arguments LTCG must not fold, globals whose address the original takes
+  elsewhere, frames the original keeps aligned). Each one says which
+  original call site it stands for.
 - `DECOMP_NOINLINE` (`src/decomp.h`) marks functions the original keeps out of
-  line but our smaller program would inline. Remove it once enough callers
-  exist.
-- `HARNESS_CALLED` marks functions kept alive by harness callers instead of
-  `/INCLUDE`. That lets LTCG see every caller and pick the same custom
-  calling convention it did in the original, including conventions no
-  keyword can request (`this` in `ecx` with a float in `xmm1`). Prefer it
-  over spelling out `LTCG_FASTCALL`/`LTCG_VECTORCALL`, which only cover the
-  simpler cases.
+  line where ours would inline them.
+- `HARNESS_CALLED` marks functions kept alive by their callers (real or
+  harness) instead of `/INCLUDE`. That lets LTCG see every caller and pick
+  the same custom calling convention it did in the original, including
+  conventions no keyword can request (`this` in `ecx` with a float in
+  `xmm1`). Prefer it over spelling out `LTCG_FASTCALL`/`LTCG_VECTORCALL`,
+  which only cover the simpler cases.
 
 ### Things learned so far
 
@@ -181,8 +177,8 @@ decompiled code the surroundings it had in the original:
   vectorize where ours would.
 - Constructors and `new` expressions in the original sometimes keep a dead
   `push ecx; mov [ebp-4], this`: leftover EH cleanup state. It appears when
-  the callee is visible to LTCG and not known nothrow; `LTCG_NOTHROW`
-  (decomp.h) declares a stubbed constructor nothrow when it must not appear.
+  the callee is visible to LTCG and not known nothrow (while callees were
+  still stubs, an `LTCG_NOTHROW` macro declared them nothrow).
 - ExpHP's Supervisor layout is 4 bytes off at the start: `d3d` is at +4,
   `d3d_device` at +8 (0x4c10d8, hundreds of uses), `dinput` at +0xc.
 - Whether a function realigns its frame (`and esp, -8`) for a spilled
@@ -362,8 +358,8 @@ decompiled code the surroundings it had in the original:
   `pos.y += 15` on the struct (separate x/y locals become immediates), and
   mind the field store order.
 - MSVC does not connect a store through a struct pointer with a later int
-  load of the same address: store `*(EnemyRef *)&b->unk_90`, then test
-  `b->unk_90`, to get the original's reload.
+  load of the same address: store `*(EnemyRef *)&b->target_enemy_id`, then test
+  `b->target_enemy_id`, to get the original's reload.
 - `memcpy(buf, ...)` lets the compiler drop a later `buf != NULL` test;
   `memcpy(buf + size, ...)` with `size = 0` keeps it.
 - An 8-byte field (`__time64_t date`) stored as one 8-byte zero changes the
@@ -708,7 +704,8 @@ decompiled code the surroundings it had in the original:
     update_options_cursor went to 99.9%). `w + 16.0f` written at each store
     keeps the add after the first lookup; adding into the parameter first
     hoists it.
-  - GameThread::thread_start does not realign its frame like the original.
+  - (Solved in sweep round 2, see below.) GameThread::thread_start does
+    not realign its frame like the original.
     Forcing it (a volatile double in it, harness_w3d_player's removed)
     matched 12 more functions it reaches (Stage::create, load_data,
     load_std, update_std_vms, on_draw_06, Gui::initialize,
@@ -804,6 +801,121 @@ decompiled code the surroundings it had in the original:
     `return 1` merges with the on_wait `return 1`; the fallthrough form keeps
     case 1 right and case 2 wrong.
 
+- Source shapes found in the player/bomb TODO sweep:
+  - A local pointer to a member changes which register addresses it:
+    `AnmVm *vm = &this->vm;` before copy_vm and the field stores gives the
+    original's stores through the VM pointer (Player::initialize).
+  - `AnmLoaded *anm = g_Player->anm_file;` before a struct-returning
+    create_vm/create_effect call loads the object first, which decides the
+    registers around the call (BombReimuAOrb::start). With one such local
+    per branch the script argument is no longer hoisted above the branch
+    (PlayerBullet::create).
+  - `vm->rotation.z = x;` before `vm->flags_lo |= ...` gives the original's
+    load of x ahead of the `or` (PlayerBullet::create, Marisa's bomb).
+  - `v += *p` with `Float3 *p = &member` and `v += member` give different
+    addss operand orders (BombCirnoAInf::on_tick).
+  - The same loop through an inline helper and written in place compile
+    differently: Globals::season_level's loop tests its counter in
+    BombInf::activate, the loop written out there tests the pointer like
+    the original.
+  - Player::do_graze: `Player *player = g_Player;` first decides esi/edi;
+    reading graze_in_chapter into a temp before graze gives the
+    interleaved cmov clamps; `(player->inner.pos + *pos) * 0.5f` gives the
+    midpoint's scheduling; atan2 spelled out (as in angle_to_player) keeps
+    it inline, which realigns the frame and makes the spawn_item call fold
+    unk_3 and unk_6 like the original.
+  - A union in BombReimuAOrb puts a PosVel member over pos (pos is its
+    first field), so update addresses it through `this` instead of a
+    second pointer register.
+- /GS: direct calls to AnmManager::interrupt_tree are a cookie trigger as
+  well (sht_on_tick_sideways and BombMarisaAInf::on_tick lose their cookie
+  when the calls are removed). An inline wrapper node around it does not
+  help, and neither does defining g_anm_on_switch_funcs (the table its
+  inlined AnmVm::interrupt calls through) with its real entries in /GL
+  code. get_vm instead of a direct get_vm_with_id call removed the cookie
+  from BombAyaAInf::begin and BombReimuAOrb::update.
+- do_shooting's ebx-form realignment does not come from
+  AnmLoaded::create_effect: making that realign (a volatile double)
+  changes nothing in do_shooting or tick_shooting_state.
+- Sweep round 2, list B:
+  - Padded frames (`push ecx`, or a `sub esp` 4 bytes bigger than the
+    locals need) in a function whose callers are aligned come from a callee
+    that wants 8-byte alignment. A dead double in that callee (marked
+    HARNESS_CALLED, all callers real) reproduces it: InterpAngle::step
+    matched with one in ZunAngle::operator*, its only callee nobody else
+    calls. The callee must not itself show signs of known alignment in the
+    original: a dead double in GuiMsgVm::show matched leave_state_1 but
+    cost show its edi shrink-wrapping.
+  - AnmVm::run is that callee for interrupt_child_and_run, set_vm_script
+    and the LaserLineInf/LaserInfiniteInf initializes (which realign in the
+    original): its double math sits in the `__forceinline` run_script, a
+    helper node of its own, so ours never counts as wanting alignment. A
+    dead double in a HARNESS_CALLED run matches both initializes but loses
+    nine others (start_std_vms, the Gui interrupt_spell_vms_2/3, Spellcard::end,
+    Item::init_anm, the TitleInf cursor updates, ...), whose callers would
+    need known alignment as well. Making run, set_vm_script, get_runtime or
+    leave_state_1 HARNESS_CALLED alone changes nothing.
+  - AnmVm::step_interpolators matched once HARNESS_CALLED (with the
+    InterpAngle, InterpInt3 and InterpFloat2 steps): /INCLUDE'd, it
+    realigned for InterpFloat2::step's D3DXVECTOR2.
+  - quickdiff MATCHes that reccmp reports below 100% can be real
+    differences hidden by "call targets count as equal": the player data
+    screen called `__alldiv` where the original calls `__aulldiv` (the play
+    time is an `unsigned __int64`). sigscan.py adds a CRT helper to lib.csv
+    only once our build calls it.
+  - Library data (dinput8.lib's c_dfDIKeyboard and c_dfDIJoystick2) can
+    carry a `// GLOBAL:` annotation on an `extern "C"` redeclaration;
+    reccmp then names both sides the same.
+  - Data from one object file is not laid out in definition order (both
+    orders put the anchor tables before g_sound_effect_table), so the
+    original's adjacency of g_anchor_corners_x after the sound table could
+    not be reproduced for SoundManager::initialize's end pointer.
+  - A struct local copy-initialized inside a block (`ZunAngle tmp =
+    initial;` in a branch) gets a stack slot that function-scope locals do
+    not; the original's InterpAngle::step code needs the block form.
+- Sweep round 2, list A:
+  - GameThread::thread_start realigns like the original with a double
+    local (`double zero = 0.0;` for the FpsCounter stores); a dead double
+    in a HARNESS_CALLED callee (Stage::create) did the same. That gave 11
+    matches below it (Stage::create, load_data, load_std, on_draw_06,
+    Gui::initialize, load_stage_files, LaserManager::initialize,
+    render_layer, the padded Gui::on_tick_callback and
+    BulletManager::on_draw_callback thunks).
+  - The original does not hand that alignment to every callback the
+    aligned code registers: GameThread's, Stage's and BulletManager's
+    on_tick_callback jump to bodies that realign themselves, and
+    Gui::on_draw_2_callback's body realigns, so AsciiInf::create_number and
+    Stage::start_std_vms stay unpadded. Taking those addresses in an inline
+    helper node (`static inline UpdateFuncCallback f() { return cb; }`)
+    keeps LTCG from passing the alignment on; taking the address directly
+    still passes it (Gui::on_tick_callback, on_draw_06_callback).
+  - A dead double in a HARNESS_CALLED set_vm_script made it realign itself,
+    not its callers (the original pads set_vm_script and realigns all of
+    its laser callers); the set_substate trick does not always push up.
+  - seek_bgm_to_stage_time as a plain inline helper (not DECOMP_NOINLINE)
+    gives GameThread::on_tick_body the original's late `and esp, -8`
+    without padding sub_42dc50's callees; written out, it realigns early.
+  - `test byte ptr [flags], 0x40` followed by a fresh dword load for the
+    game_mode bitfield: a `*(u8 *)` cast and the bitfield view both share
+    one load (`test al`); reading game_mode through
+    `((volatile Globals *)&g_Globals)` keeps them apart.
+  - A store through D3DXVECTOR2's operator FLOAT* (`uv[1] = ...`) may alias
+    uv.x, so the following `uv.x < 0` test stays after it
+    (EnemyData::update_fog).
+  - InterpFloat::step matches with the plain ZunTimer::tick (current stored
+    before current_f) and method 17 copying initial to current as an
+    integer (`*(i32 *)&current = *(i32 *)&initial`) after the bezier_2
+    update: the original copies it with mov eax/mov and reloads current
+    for the return, where a float assignment forwards xmm0.
+  - A class without its `// VTABLE:` annotation shows the vftable store in
+    its constructor and destructor as a raw address in reccmp (AsciiInf).
+  - The frames of create_vm and create_vm_front (4 unused bytes) are padded
+    for known alignment: every original caller calls them aligned.
+  - Open, scheduling only: AnmVm::wipe's flags_hi and/or and pops, and
+    EnemyInf's memset pushes, come a few stores later in the original; the
+    bitfield view, a local, one expression and other statement positions
+    do not move them.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
@@ -843,6 +955,8 @@ Name-based annotations: the marker, then a comment line naming the function.
   fail on a stale object or quietly use one.
 - Comments must go above `// FUNCTION:`, not between it and the signature:
   reccmp then loses the function and build.py may misread the declaration.
+  The same holds for `// GLOBAL:`: with a comment line in between, reccmp
+  names the variable after the comment and every use shows as a difference.
 - quickdiff misreports jump thunks and tail jumps; check those with
   compare.py.
 - Overloads are told apart by the object file that defines them and then

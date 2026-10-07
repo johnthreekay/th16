@@ -7,10 +7,12 @@
 
 #include "Ecl.h"
 #include "Rng.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
 static_assert(sizeof(EclRunContext) == 0x11e8, "EclRunContext size");
 
+// The current instruction's integer argument index, resolving variables.
 // TODO: the original checks the stack range with two compares and loads the entry value before its type.
 // FUNCTION: TH16 0x473c90
 i32 EclRunContext::get_int_arg(int index)
@@ -43,6 +45,7 @@ i32 EclRunContext::get_int_arg(int index)
     return ins->args[index].i;
 }
 
+// The current instruction's float argument index, resolving variables.
 // FUNCTION: TH16 0x473d40
 HARNESS_CALLED f32 EclRunContext::get_float_arg(int index)
 {
@@ -127,6 +130,7 @@ HARNESS_CALLED f32 EclRunContext::get_float_arg_given_value(int index, f32 value
     return value;
 }
 
+// get_int_arg, popping a stack reference.
 // TODO: register allocation and the stack range check differ (two compares in the original).
 // FUNCTION: TH16 0x473fe0
 HARNESS_CALLED i32 EclRunContext::pop_int_arg(int index)
@@ -160,6 +164,7 @@ HARNESS_CALLED i32 EclRunContext::pop_int_arg(int index)
     return ins->args[index].i;
 }
 
+// get_float_arg, popping a stack reference.
 // TODO: register allocation differs around the popped entry.
 // FUNCTION: TH16 0x474090
 HARNESS_CALLED f32 EclRunContext::pop_float_arg(int index)
@@ -356,6 +361,7 @@ int SptResourceInf::load_ecl_data(void *data)
     return index;
 }
 
+// Index of the named subroutine (binary search), -1 if there is none.
 // FUNCTION: TH16 0x474740
 int SptResourceInf::find_sub_by_name(const char *name) throw()
 {
@@ -480,23 +486,11 @@ HARNESS_CALLED void ecl_log(const char *fmt, ...)
 {
 }
 
-// This file's copy of ZunMath.h's sincosmul.
+// This file's copy of sincosmul (ZunAsm.h).
 // FUNCTION: TH16 0x474510
 static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-#ifdef TH16_PORT
-    port_sincosmul(&dst->x, angle, radius);
-#else
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
-#endif
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // FUNCTION: TH16 0x471db0
@@ -660,10 +654,11 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
         {
             switch ((i16)ins->opcode)
             {
-            case 0:
+            case ECL_OP_NOP:
                 break;
-            // return
-            case 10:
+            // Back to the caller saved by call_sub; returning from the
+            // outermost frame falls through to delete.
+            case ECL_OP_RETURN:
                 stack.ecl_return();
                 if (stack.stack_offset != 0)
                 {
@@ -677,17 +672,14 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                         break;
                     }
                 }
-            // delete
-            case 1:
+            case ECL_OP_DELETE:
                 cur_location.offset_from_first_instruction = -1;
                 cur_location.subroutine_index = -1;
                 return -1;
-            // callAsync
-            case 15:
+            case ECL_OP_CALL_ASYNC:
                 vm->create_async(-1, 0);
                 goto next_instr;
-            // killAllAsync
-            case 21:
+            case ECL_OP_KILL_ALL_ASYNC:
             {
                 EclRunContextList *node = vm->async_list_head.next;
                 while (node != NULL)
@@ -699,14 +691,13 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 }
                 goto next_instr;
             }
-            // callAsyncId: the id follows the subroutine name.
-            case 16:
+            // The id follows the subroutine name.
+            case ECL_OP_CALL_ASYNC_ID:
                 vm->create_async(
                     pop_int_arg_given_value(1, ins->args[(ins->args[0].i + sizeof(i32)) / sizeof(EclStackItem)].i),
                     1);
                 goto next_instr;
-            // killAsync
-            case 17:
+            case ECL_OP_KILL_ASYNC:
             {
                 EclRunContextList *node = vm->lookup_async(get_int_arg(0));
                 if (node != NULL)
@@ -715,7 +706,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 }
                 break;
             }
-            case 18:
+            case ECL_OP_ASYNC_FLAG_SET:
             {
                 EclRunContextList *node = vm->lookup_async(get_int_arg(0));
                 if (node != NULL)
@@ -724,7 +715,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 }
                 break;
             }
-            case 19:
+            case ECL_OP_ASYNC_FLAG_CLEAR:
             {
                 EclRunContextList *node = vm->lookup_async(get_int_arg(0));
                 if (node != NULL)
@@ -733,7 +724,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 }
                 break;
             }
-            case 20:
+            case ECL_OP_ASYNC_SET_101C:
             {
                 EclRunContextList *node = vm->lookup_async(get_int_arg(0));
                 if (node != NULL)
@@ -744,7 +735,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 break;
             }
             // call: the callee pops the stack arguments itself.
-            case 11:
+            case ECL_OP_CALL:
                 ins->num_stack_refs = 0;
                 if (call_sub(this, 0, 0) != 0)
                 {
@@ -754,49 +745,46 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 }
                 ins = get_subroutine_ptr();
                 continue;
-            // jmpNeq (jump if nonzero)
-            case 14:
+            // Pop; jump if nonzero.
+            case ECL_OP_JMP_NEQ:
                 if (stack.pop_int() != 0)
                 {
                     goto jump;
                 }
                 break;
-            // jmpEq (jump if zero)
-            case 13:
+            // Pop; jump if zero.
+            case ECL_OP_JMP_EQ:
                 if (stack.pop_int() != 0)
                 {
                     break;
                 }
-            // jmp: offset, new time
-            case 12:
+            // args: offset, new time.
+            case ECL_OP_JMP:
             jump:
                 time = ins->args[1].i;
                 cur_location.offset_from_first_instruction += ins->args[0].i;
                 ins = (EclRawInstr *)((u8 *)ins + ins->args[0].i);
                 continue;
-            // wait
-            case 23:
+            case ECL_OP_WAIT:
                 time -= get_int_arg(0);
                 break;
-            case 24:
+            case ECL_OP_WAITF:
                 time -= get_float_arg(0);
                 break;
-            // stackAlloc
-            case 40:
+            case ECL_OP_STACK_ALLOC:
                 stack.enter(get_int_arg(0));
                 break;
-            case 41:
+            case ECL_OP_STACK_DEALLOC:
                 stack.ecl_return();
                 break;
-            // push
-            case 42:
+            case ECL_OP_PUSH:
                 stack.push_int(pop_int_arg(0));
                 goto next_instr;
-            case 44:
+            case ECL_OP_PUSHF:
                 stack.push_float(pop_float_arg(0));
                 goto next_instr;
             // set: stores the popped value, then converts it in place.
-            case 43:
+            case ECL_OP_SET:
             {
                 i32 *dst = get_int_arg_ptr(0);
                 *dst = stack.pop_raw();
@@ -807,7 +795,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 }
                 goto next_instr;
             }
-            case 45:
+            case ECL_OP_SETF:
             {
                 f32 *dst = get_float_arg_ptr(0);
                 *(i32 *)dst = stack.pop_raw();
@@ -820,7 +808,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 goto next_instr;
             }
             // Integer arithmetic.
-            case 50:
+            case ECL_OP_ADD:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
@@ -829,7 +817,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 ins->num_stack_refs = 0;
                 goto next_instr;
             }
-            case 52:
+            case ECL_OP_SUB:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
@@ -837,7 +825,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 ins->num_stack_refs = 0;
                 goto next_instr;
             }
-            case 54:
+            case ECL_OP_MUL:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
@@ -845,7 +833,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 ins->num_stack_refs = 0;
                 goto next_instr;
             }
-            case 56:
+            case ECL_OP_DIV:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
@@ -853,7 +841,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 ins->num_stack_refs = 0;
                 goto next_instr;
             }
-            case 58:
+            case ECL_OP_MOD:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
@@ -862,7 +850,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 goto next_instr;
             }
             // Float arithmetic.
-            case 51:
+            case ECL_OP_ADDF:
             {
                 f32 b = stack.pop_float();
                 f32 a = stack.pop_float();
@@ -870,7 +858,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 ins->num_stack_refs = 0;
                 goto next_instr;
             }
-            case 53:
+            case ECL_OP_SUBF:
             {
                 f32 b = stack.pop_float();
                 f32 a = stack.pop_float();
@@ -878,7 +866,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 ins->num_stack_refs = 0;
                 goto next_instr;
             }
-            case 55:
+            case ECL_OP_MULF:
             {
                 f32 b = stack.pop_float();
                 f32 a = stack.pop_float();
@@ -886,7 +874,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 ins->num_stack_refs = 0;
                 goto next_instr;
             }
-            case 57:
+            case ECL_OP_DIVF:
             {
                 f32 b = stack.pop_float();
                 f32 a = stack.pop_float();
@@ -895,127 +883,127 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 goto next_instr;
             }
             // Integer comparisons.
-            case 59:
+            case ECL_OP_EQ:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
                 stack.push_int(a == b);
                 goto next_instr;
             }
-            case 61:
+            case ECL_OP_NEQ:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
                 stack.push_int(a != b);
                 goto next_instr;
             }
-            case 63:
+            case ECL_OP_LESS:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
                 stack.push_int(a < b);
                 goto next_instr;
             }
-            case 65:
+            case ECL_OP_LEQ:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
                 stack.push_int(a <= b);
                 goto next_instr;
             }
-            case 67:
+            case ECL_OP_GREATER:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
                 stack.push_int(a > b);
                 goto next_instr;
             }
-            case 69:
+            case ECL_OP_GEQ:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
                 stack.push_int(a >= b);
                 goto next_instr;
             }
-            case 71:
+            case ECL_OP_NOT:
                 stack.push_int(!stack.pop_int());
                 goto next_instr;
             // Float comparisons.
-            case 60:
+            case ECL_OP_EQF:
             {
                 f32 b = stack.pop_float();
                 f32 a = stack.pop_float();
                 stack.push_int(a == b);
                 goto next_instr;
             }
-            case 62:
+            case ECL_OP_NEQF:
             {
                 f32 b = stack.pop_float();
                 f32 a = stack.pop_float();
                 stack.push_int(a != b);
                 goto next_instr;
             }
-            case 64:
+            case ECL_OP_LESSF:
             {
                 f32 b = stack.pop_float();
                 f32 a = stack.pop_float();
                 stack.push_int(a < b);
                 goto next_instr;
             }
-            case 66:
+            case ECL_OP_LEQF:
             {
                 f32 b = stack.pop_float();
                 f32 a = stack.pop_float();
                 stack.push_int(a <= b);
                 goto next_instr;
             }
-            case 68:
+            case ECL_OP_GREATERF:
             {
                 f32 b = stack.pop_float();
                 f32 a = stack.pop_float();
                 stack.push_int(a > b);
                 goto next_instr;
             }
-            case 70:
+            case ECL_OP_GEQF:
             {
                 f32 b = stack.pop_float();
                 f32 a = stack.pop_float();
                 stack.push_int(a >= b);
                 goto next_instr;
             }
-            case 72:
+            case ECL_OP_NOTF:
                 stack.push_int(stack.pop_float() == 0.0f);
                 goto next_instr;
             // Logic and bit operations.
-            case 73:
+            case ECL_OP_OR:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
                 stack.push_int(a || b);
                 goto next_instr;
             }
-            case 74:
+            case ECL_OP_AND:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
                 stack.push_int(a && b);
                 goto next_instr;
             }
-            case 75:
+            case ECL_OP_XOR:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
                 stack.push_int(a ^ b);
                 goto next_instr;
             }
-            case 76:
+            case ECL_OP_BIT_OR:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
                 stack.push_int(a | b);
                 goto next_instr;
             }
-            case 77:
+            case ECL_OP_BIT_AND:
             {
                 i32 b = stack.pop_int();
                 i32 a = stack.pop_int();
@@ -1023,31 +1011,31 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 goto next_instr;
             }
             // Negation.
-            case 83:
+            case ECL_OP_NEG:
                 stack.push_int(-stack.pop_int());
                 goto next_instr;
-            case 84:
+            case ECL_OP_NEGF:
                 stack.push_float(-stack.pop_float());
                 goto next_instr;
             // Decrement a variable, pushing its old value.
-            case 78:
+            case ECL_OP_DEC:
             {
                 i32 value = get_int_arg(0);
                 *get_int_arg_ptr(0) = value - 1;
                 stack.push_int(value);
                 goto next_instr;
             }
-            case 79:
+            case ECL_OP_STACK_SIN:
                 stack.push_float((f32)sin(stack.pop_float()));
                 goto next_instr;
-            case 88:
+            case ECL_OP_STACK_SQRT:
                 stack.push_float(sqrtf(stack.pop_float()));
                 goto next_instr;
-            case 80:
+            case ECL_OP_STACK_COS:
                 stack.push_float((f32)cos(stack.pop_float()));
                 goto next_instr;
             // x, y = radius at angle
-            case 81:
+            case ECL_OP_MATH_CIRCLE_POS:
             {
                 f32 angle = normalize_angle(get_float_arg(2));
                 Float3 pos;
@@ -1057,28 +1045,28 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 break;
             }
             // Squared length, length.
-            case 85:
+            case ECL_OP_NORM_SQ:
             {
                 f32 x = get_float_arg(1);
                 f32 y = get_float_arg(2);
                 *get_float_arg_ptr(0) = x * x + y * y;
                 break;
             }
-            case 86:
+            case ECL_OP_NORM:
             {
                 f32 x = get_float_arg(1);
                 f32 y = get_float_arg(2);
                 *get_float_arg_ptr(0) = sqrtf(x * x + y * y);
                 break;
             }
-            case 82:
+            case ECL_OP_VALID_RAD:
             {
                 f32 angle = normalize_angle(get_float_arg(0));
                 *get_float_arg_ptr(0) = angle;
                 break;
             }
             // Angle from (x1, y1) to (x2, y2).
-            case 87:
+            case ECL_OP_MATH_ANGLE:
             {
                 f32 x1 = get_float_arg(1);
                 f32 y1 = get_float_arg(2);
@@ -1089,7 +1077,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 break;
             }
             // Signed difference of two angles, wrapped once.
-            case 89:
+            case ECL_OP_ANGLE_DIFF:
             {
                 f32 a = get_float_arg(1);
                 f32 b = get_float_arg(2);
@@ -1110,7 +1098,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 break;
             }
             // Rotate (x, y) by an angle.
-            case 90:
+            case ECL_OP_POINT_ROTATE:
             {
                 f32 x = get_float_arg(2);
                 f32 y = get_float_arg(3);
@@ -1123,8 +1111,9 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 *get_float_arg_ptr(1) = ry;
                 break;
             }
-            // floatTime: interpolate a variable from initial to goal.
-            case 91:
+            // floatTime(slot, var, time, mode, initial, goal): interpolates a
+            // float variable from initial to goal.
+            case ECL_OP_FLOAT_TIME:
             {
                 i32 i = get_int_arg(0);
                 float_i_locs[i] = cur_location;
@@ -1142,7 +1131,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 break;
             }
             // The same with bezier control values.
-            case 92:
+            case ECL_OP_FLOAT_TIME_BEZIER:
             {
                 i32 i = get_int_arg(0);
                 float_i_locs[i] = cur_location;
@@ -1162,7 +1151,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 break;
             }
             // Random point in a ring.
-            case 93:
+            case ECL_OP_RAND_RING_POS:
             {
                 f32 r1 = get_float_arg(2);
                 f32 r2 = get_float_arg(3);
@@ -1175,9 +1164,9 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 break;
             }
             // Debug instructions, empty in release builds.
-            case 22:
-            case 30:
-            case 31:
+            case ECL_OP_DEBUG_22:
+            case ECL_OP_DEBUG_30:
+            case ECL_OP_DEBUG_31:
                 break;
             default:
             {

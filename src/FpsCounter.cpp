@@ -20,6 +20,11 @@ FpsCounter::~FpsCounter()
     g_FpsCounter = NULL;
 }
 
+// Once a second: measures the frame rate (counting skipped frames), counts
+// measurements above 65 fps, and while a game runs (not loading or in a
+// menu) adds the second to the actual and expected frame totals that the
+// slowdown rate of replays and scores comes from (above 57 fps counts as
+// a full 60).
 // FUNCTION: TH16 0x4262f0
 HARNESS_CALLED int FpsCounter::update()
 {
@@ -43,7 +48,7 @@ HARNESS_CALLED int FpsCounter::update()
         }
         if (g_GameThread != NULL)
         {
-            if (!g_GameThread->flags.paused && !g_GameThread->flags.flag_4)
+            if (!g_GameThread->flags.loading && !g_GameThread->flags.in_menu)
             {
                 total_expected += 60.0;
                 if (fps > 57.0f)
@@ -55,7 +60,7 @@ HARNESS_CALLED int FpsCounter::update()
                     total_actual += fps;
                 }
             }
-            g_GameThread->flags.flag_7 = 0;
+            g_GameThread->flags.ticked_while_loading = 0;
         }
         frame_count = 0;
     }
@@ -63,10 +68,12 @@ HARNESS_CALLED int FpsCounter::update()
     return UPDATE_FUNC_CONTINUE;
 }
 
+// Draws the frame rate in the bottom right corner (red below 30, pink
+// below 40); not in GAMEMODE_ENDING or GAMEMODE_TITLE.
 // FUNCTION: TH16 0x4263e0
 int FpsCounter::draw()
 {
-    if (g_Supervisor.gamemode_to_switch_to == 15 || g_Supervisor.gamemode_to_switch_to == 4)
+    if (g_Supervisor.gamemode_to_switch_to == GAMEMODE_ENDING || g_Supervisor.gamemode_to_switch_to == GAMEMODE_TITLE)
     {
         return UPDATE_FUNC_CONTINUE;
     }

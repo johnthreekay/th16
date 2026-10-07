@@ -14,13 +14,17 @@ UpdateFunc::~UpdateFunc()
     on_cleanup = NULL;
 }
 
+// Both chains start empty (the heads' constructors clear them).
 // FUNCTION: TH16 0x401280
 UpdateFuncRegistry::UpdateFuncRegistry()
 {
     is_cleaning_up = 0;
 }
 
-// Only ever inlined into the scalar deleting destructor below.
+// Stops the supervisor's thread, gives every active on_tick function its
+// on_cleanup (is_cleaning_up makes run_all_on_tick do that instead of
+// running them) and unregisters everything. Only ever inlined into the
+// scalar deleting destructor below.
 UpdateFuncRegistry::~UpdateFuncRegistry()
 {
     g_Supervisor.thread.join_if_running();
@@ -33,6 +37,9 @@ UpdateFuncRegistry::~UpdateFuncRegistry()
 // SYNTHETIC: TH16 0x45a3a0
 // UpdateFuncRegistry::`scalar deleting destructor'
 
+// Calls f's on_registration once, then inserts f into the on_tick chain
+// after every function with a lower or equal priority (lower priorities run
+// first). Returns what on_registration returned, or 0.
 // FUNCTION: TH16 0x401300
 HARNESS_CALLED int UpdateFuncRegistry::register_on_tick(UpdateFunc *f, int priority)
 {
@@ -71,6 +78,7 @@ HARNESS_CALLED int UpdateFuncRegistry::register_on_tick(UpdateFunc *f, int prior
     return result;
 }
 
+// register_on_tick for the on_draw chain.
 // FUNCTION: TH16 0x4013b0
 HARNESS_CALLED int UpdateFuncRegistry::register_on_draw(UpdateFunc *f, int priority)
 {
@@ -109,6 +117,11 @@ HARNESS_CALLED int UpdateFuncRegistry::register_on_draw(UpdateFunc *f, int prior
     return result;
 }
 
+// Runs every active on_tick function in priority order and acts on each
+// result (UpdateFuncResult). Returns how many registered functions it
+// visited, or 0, 1 or -1 when one ends the frame (EXIT_SUCCESS, BREAK, EXIT_ERROR). The lock is released
+// around each call, and iter_next keeps the loop valid when a function
+// unregisters others.
 // FUNCTION: TH16 0x401460
 int UpdateFuncRegistry::run_all_on_tick()
 {
@@ -173,6 +186,8 @@ done:
     return count;
 }
 
+// run_all_on_tick for the on_draw chain, without the cleanup and restart
+// results.
 // FUNCTION: TH16 0x4015a0
 HARNESS_CALLED int UpdateFuncRegistry::run_all_on_draw()
 {
@@ -223,6 +238,8 @@ done:
     return count;
 }
 
+// A new heap-allocated UpdateFunc running function; owners set its arg and
+// flags and then register it.
 // FUNCTION: TH16 0x401730
 HARNESS_CALLED UpdateFunc *UpdateFuncRegistry::create_func(UpdateFuncCallback function)
 {
@@ -236,6 +253,7 @@ HARNESS_CALLED UpdateFunc *UpdateFuncRegistry::create_func(UpdateFuncCallback fu
     return f;
 }
 
+// Unregisters every function in the chain that starts at head.
 // FUNCTION: TH16 0x4016b0
 void UpdateFuncRegistry::unregister_all_in_list(UpdateFunc *head)
 {
@@ -254,6 +272,8 @@ void UpdateFuncRegistry::unregister_all_in_list(UpdateFunc *head)
     }
 }
 
+// Unlinks f from whichever chain holds it and clears its function; deletes
+// it if create_func made it. The caller holds the lock.
 // FUNCTION: TH16 0x4017a0
 void UpdateFuncRegistry::unregister(UpdateFunc *f)
 {

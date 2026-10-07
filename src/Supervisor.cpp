@@ -33,18 +33,18 @@
 #include "UpdateFunc.h"
 
 static_assert(offsetof(Supervisor, d3d_device) == 0x8, "Supervisor::d3d_device");
-static_assert(offsetof(Supervisor, viewport_dc) == 0xdc, "Supervisor::viewport_dc");
+static_assert(offsetof(Supervisor, full_window_viewport) == 0xdc, "Supervisor::full_window_viewport");
 static_assert(offsetof(Supervisor, present_params) == 0xf4, "Supervisor::present_params");
 static_assert(offsetof(Supervisor, arcade_surface_0) == 0x1ac, "Supervisor::arcade_surface_0");
-static_assert(offsetof(Supervisor, unk_700) == 0x700, "Supervisor::unk_700");
-static_assert(offsetof(Supervisor, unk_71c) == 0x71c, "Supervisor::unk_71c");
+static_assert(offsetof(Supervisor, new_game_started) == 0x700, "Supervisor::new_game_started");
+static_assert(offsetof(Supervisor, no_vsync) == 0x71c, "Supervisor::no_vsync");
 static_assert(offsetof(Supervisor, text_anm) == 0x728, "Supervisor::text_anm");
 static_assert(offsetof(Supervisor, flags) == 0x730, "Supervisor::flags");
 static_assert(offsetof(Supervisor, start_time) == 0x734, "Supervisor::start_time");
 static_assert(offsetof(Supervisor, screenshot) == 0x870, "Supervisor::screenshot");
 static_assert(offsetof(Supervisor, thread) == 0x998, "Supervisor::thread");
 static_assert(offsetof(Supervisor, loading_thread) == 0xa24, "Supervisor::loading_thread");
-static_assert(offsetof(Supervisor, unk_58) == 0x58, "Supervisor::unk_58");
+static_assert(offsetof(Supervisor, main_window) == 0x58, "Supervisor::main_window");
 static_assert(offsetof(Supervisor, display_mode) == 0x19c, "Supervisor::display_mode");
 static_assert(offsetof(Supervisor, unk_714) == 0x714, "Supervisor::unk_714");
 static_assert(offsetof(Supervisor, exe_size) == 0xa18, "Supervisor::exe_size");
@@ -52,30 +52,30 @@ static_assert(offsetof(Supervisor, ver_file_size) == 0xa1c, "Supervisor::ver_fil
 static_assert(offsetof(Supervisor, frame_time) == 0xa34, "Supervisor::frame_time");
 static_assert(offsetof(Supervisor, background_color) == 0xa3c, "Supervisor::background_color");
 static_assert(offsetof(Config, color_mode) == 0x20, "Config::color_mode");
-static_assert(offsetof(Config, unk_29) == 0x29, "Config::unk_29");
-static_assert(offsetof(Config, flags_2c) == 0x2c, "Config::flags_2c");
+static_assert(offsetof(Config, frame_pacing) == 0x29, "Config::frame_pacing");
+static_assert(offsetof(Config, flags) == 0x2c, "Config::flags");
 static_assert(offsetof(GameWindow, save_dir) == 0x2d, "GameWindow::save_dir");
 static_assert(offsetof(SoundManager, bgm_dat_name) == 0x5560, "SoundManager::bgm_dat_name");
 
 Config::Config()
 {
     memset(this, 0, sizeof(Config));
-    flags_2c |= 0x100;
+    flags |= CONFIG_SHOW_STARTUP_DIALOG;
     color_mode = 0;
     bgm_mode = 1;
-    unk_4 = 0x160002;
+    version = CONFIG_VERSION;
     deadzone_x = deadzone_y = 600;
-    unk_22 = 1;
-    window_size = 5;
+    se_enabled = 1;
+    window_size = WINDOW_SIZE_WINDOWED_1280;
     frame_skip = 0;
-    memcpy(pad_mapping_copy, g_pad_mapping, sizeof(pad_mapping_copy));
+    memcpy(pad_mapping, g_pad_mapping, sizeof(pad_mapping));
     unk_25 = 2;
     bgm_volume = 100;
     unk_28 = 0;
-    unk_29 = 2;
+    frame_pacing = 2;
     se_volume = 80;
-    unk_30 = 0x80000000;
-    unk_34 = 0x80000000;
+    window_x = CW_USEDEFAULT;
+    window_y = CW_USEDEFAULT;
 }
 
 // FUNCTION: TH16 0x40d510
@@ -86,6 +86,7 @@ Camera::Camera()
 Supervisor::Supervisor()
 {
     memset(this, 0, sizeof(Supervisor));
+    // SUPERVISOR_NO_STARTUP_TITLE and the unread 0x200 and 0x4000.
     flags |= 0x4240;
 }
 
@@ -114,34 +115,34 @@ HARNESS_CALLED u32 Supervisor::read_joypad(u32 input)
         {
             return input;
         }
-        if (g_pad_mapping[0] >= 0)
+        if (g_pad_mapping[PAD_SHOT] >= 0)
         {
-            input |= (info.dwButtons & (1 << g_pad_mapping[0])) ? 1 : 0;
+            input |= (info.dwButtons & (1 << g_pad_mapping[PAD_SHOT])) ? INPUT_SHOT : 0;
         }
-        if (g_pad_mapping[1] >= 0)
+        if (g_pad_mapping[PAD_BOMB] >= 0)
         {
-            input |= (info.dwButtons & (1 << g_pad_mapping[1])) ? 2 : 0;
+            input |= (info.dwButtons & (1 << g_pad_mapping[PAD_BOMB])) ? INPUT_BOMB : 0;
         }
-        if (g_pad_mapping[3] >= 0)
+        if (g_pad_mapping[PAD_PAUSE] >= 0)
         {
-            input |= (info.dwButtons & (1 << g_pad_mapping[3])) ? 0x100 : 0;
+            input |= (info.dwButtons & (1 << g_pad_mapping[PAD_PAUSE])) ? INPUT_MENU : 0;
         }
-        if (g_pad_mapping[2] >= 0)
+        if (g_pad_mapping[PAD_FOCUS] >= 0)
         {
-            input |= (info.dwButtons & (1 << g_pad_mapping[2])) ? 8 : 0;
+            input |= (info.dwButtons & (1 << g_pad_mapping[PAD_FOCUS])) ? INPUT_FOCUS : 0;
         }
-        if (g_pad_mapping[9] >= 0)
+        if (g_pad_mapping[PAD_RELEASE] >= 0)
         {
-            input |= (info.dwButtons & (1 << g_pad_mapping[9])) ? 0x800 : 0;
+            input |= (info.dwButtons & (1 << g_pad_mapping[PAD_RELEASE])) ? INPUT_RELEASE : 0;
         }
         u32 center_x = (g_joypad_caps.wXmin + g_joypad_caps.wXmax) / 2;
         u32 margin_x = (g_joypad_caps.wXmax - g_joypad_caps.wXmin) / 4;
         u32 center_y = (g_joypad_caps.wYmin + g_joypad_caps.wYmax) / 2;
         u32 margin_y = (g_joypad_caps.wYmax - g_joypad_caps.wYmin) / 4;
-        input |= (info.dwXpos > center_x + margin_x) ? 0x80 : 0;
-        input |= (info.dwXpos < center_x - margin_x) ? 0x40 : 0;
-        input |= (info.dwYpos > center_y + margin_y) ? 0x20 : 0;
-        input |= (info.dwYpos < center_y - margin_y) ? 0x10 : 0;
+        input |= (info.dwXpos > center_x + margin_x) ? INPUT_RIGHT : 0;
+        input |= (info.dwXpos < center_x - margin_x) ? INPUT_LEFT : 0;
+        input |= (info.dwYpos > center_y + margin_y) ? INPUT_DOWN : 0;
+        input |= (info.dwYpos < center_y - margin_y) ? INPUT_UP : 0;
         return input;
     }
 
@@ -161,30 +162,30 @@ HARNESS_CALLED u32 Supervisor::read_joypad(u32 input)
     {
         return input;
     }
-    if (g_pad_mapping[0] >= 0)
+    if (g_pad_mapping[PAD_SHOT] >= 0)
     {
-        input |= (js.rgbButtons[g_pad_mapping[0]] & 0x80) ? 1 : 0;
+        input |= (js.rgbButtons[g_pad_mapping[PAD_SHOT]] & 0x80) ? INPUT_SHOT : 0;
     }
-    if (g_pad_mapping[1] >= 0)
+    if (g_pad_mapping[PAD_BOMB] >= 0)
     {
-        input |= (js.rgbButtons[g_pad_mapping[1]] & 0x80) ? 2 : 0;
+        input |= (js.rgbButtons[g_pad_mapping[PAD_BOMB]] & 0x80) ? INPUT_BOMB : 0;
     }
-    if (g_pad_mapping[3] >= 0)
+    if (g_pad_mapping[PAD_PAUSE] >= 0)
     {
-        input |= (js.rgbButtons[g_pad_mapping[3]] & 0x80) ? 0x100 : 0;
+        input |= (js.rgbButtons[g_pad_mapping[PAD_PAUSE]] & 0x80) ? INPUT_MENU : 0;
     }
-    if (g_pad_mapping[2] >= 0)
+    if (g_pad_mapping[PAD_FOCUS] >= 0)
     {
-        input |= (js.rgbButtons[g_pad_mapping[2]] & 0x80) ? 8 : 0;
+        input |= (js.rgbButtons[g_pad_mapping[PAD_FOCUS]] & 0x80) ? INPUT_FOCUS : 0;
     }
-    if (g_pad_mapping[9] >= 0)
+    if (g_pad_mapping[PAD_RELEASE] >= 0)
     {
-        input |= (js.rgbButtons[g_pad_mapping[9]] & 0x80) ? 0x800 : 0;
+        input |= (js.rgbButtons[g_pad_mapping[PAD_RELEASE]] & 0x80) ? INPUT_RELEASE : 0;
     }
-    return input | ((js.lX < -g_Supervisor.config.deadzone_x) ? 0x40 : 0) |
-           ((js.lY < -g_Supervisor.config.deadzone_y) ? 0x10 : 0) |
-           ((js.lX > g_Supervisor.config.deadzone_x) ? 0x80 : 0) |
-           ((js.lY > g_Supervisor.config.deadzone_y) ? 0x20 : 0);
+    return input | ((js.lX < -g_Supervisor.config.deadzone_x) ? INPUT_LEFT : 0) |
+           ((js.lY < -g_Supervisor.config.deadzone_y) ? INPUT_UP : 0) |
+           ((js.lX > g_Supervisor.config.deadzone_x) ? INPUT_RIGHT : 0) |
+           ((js.lY > g_Supervisor.config.deadzone_y) ? INPUT_DOWN : 0);
 }
 
 // GLOBAL: TH16 0x4d9d2c
@@ -202,7 +203,7 @@ i32 g_arcade_height;
 // GLOBAL: TH16 0x4d9d44
 i32 g_arcade_width;
 // GLOBAL: TH16 0x4d9d1c
-u32 g_unk_4d9d1c;
+u32 g_window_flags;
 // GLOBAL: TH16 0x4d9d48
 i32 g_arcade_hud_origin_x;
 // GLOBAL: TH16 0x4d9d4c
@@ -212,14 +213,16 @@ i32 g_game_2d_origin_x;
 // GLOBAL: TH16 0x4d9d54
 i32 g_game_2d_origin_y;
 // GLOBAL: TH16 0x4c0f4c
-AnmId g_anm_ids_4c0f4c[3];
+AnmId g_stage_load_anm_ids[3];
 // GLOBAL: TH16 0x4a6ef0
 i32 g_unk_4a6ef0;
 // GLOBAL: TH16 0x4a6ee8
-void (*g_draw_hook_4a6ee8)();
+void (*g_draw_hook_1a)();
 // GLOBAL: TH16 0x4a6eec
-void (*g_draw_hook_4a6eec)();
+void (*g_draw_hook_0f)();
 
+// The fog and z-write switches: each flushes the sprite batch and changes
+// the render state only if it differs from the cached one.
 // FUNCTION: TH16 0x43c4b0
 HRESULT Supervisor::enable_d3d_fog()
 {
@@ -269,33 +272,33 @@ HRESULT Supervisor::disable_zwrite()
 }
 
 // FUNCTION: TH16 0x43c630
-void Supervisor::sub_43c630()
+void Supervisor::end_stage_load_anms()
 {
-    if (unk_9b8 == 1)
+    if (stage_load_anm_state == 1)
     {
-        AnmManager::interrupt_tree(g_anm_ids_4c0f4c[0], 1);
-        AnmManager::interrupt_tree(g_anm_ids_4c0f4c[1], 1);
-        AnmManager::interrupt_tree(g_anm_ids_4c0f4c[2], 1);
-        g_anm_ids_4c0f4c[0].id = 0;
-        g_anm_ids_4c0f4c[1].id = 0;
-        g_anm_ids_4c0f4c[2].id = 0;
-        unk_9b8 = 0;
+        AnmManager::interrupt_tree(g_stage_load_anm_ids[0], 1);
+        AnmManager::interrupt_tree(g_stage_load_anm_ids[1], 1);
+        AnmManager::interrupt_tree(g_stage_load_anm_ids[2], 1);
+        g_stage_load_anm_ids[0].id = 0;
+        g_stage_load_anm_ids[1].id = 0;
+        g_stage_load_anm_ids[2].id = 0;
+        stage_load_anm_state = 0;
     }
     g_unk_4a6ef0 = 0;
 }
 
 // FUNCTION: TH16 0x43c6a0
-void Supervisor::sub_43c6a0()
+void Supervisor::abort_stage_load_anms()
 {
-    if (unk_9b8 == 1)
+    if (stage_load_anm_state == 1)
     {
-        AnmManager::interrupt_tree(g_anm_ids_4c0f4c[0], 2);
-        AnmManager::interrupt_tree(g_anm_ids_4c0f4c[1], 2);
-        AnmManager::interrupt_tree(g_anm_ids_4c0f4c[2], 2);
-        g_anm_ids_4c0f4c[0].id = 0;
-        g_anm_ids_4c0f4c[1].id = 0;
-        g_anm_ids_4c0f4c[2].id = 0;
-        unk_9b8 = 2;
+        AnmManager::interrupt_tree(g_stage_load_anm_ids[0], 2);
+        AnmManager::interrupt_tree(g_stage_load_anm_ids[1], 2);
+        AnmManager::interrupt_tree(g_stage_load_anm_ids[2], 2);
+        g_stage_load_anm_ids[0].id = 0;
+        g_stage_load_anm_ids[1].id = 0;
+        g_stage_load_anm_ids[2].id = 0;
+        stage_load_anm_state = 2;
     }
     g_unk_4a6ef0 = 0;
 }
@@ -311,7 +314,7 @@ HARNESS_CALLED void Supervisor::swap_transform_matrices(Camera *camera)
     g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &camera->projection_matrix);
     if (g_AnmManager != NULL)
     {
-        g_AnmManager->camera_unk_fc = camera->unk_fc;
+        g_AnmManager->camera_2d_offset = camera->shake_offset;
     }
 }
 
@@ -321,7 +324,7 @@ DECOMP_NOINLINE float __CRTDECL tanf(float);
 
 // TODO: the original builds the three vectors after the tanf call (eye and at from one packed x, y); ours stores the constants up front.
 // FUNCTION: TH16 0x43c780
-void __stdcall camera_update_43c780(Camera *camera)
+void __stdcall camera_update_2d(Camera *camera)
 {
     f32 x = camera->viewport.X + camera->viewport.Width * 0.5f;
     f32 y = camera->viewport.Height * 0.5f + camera->viewport.Y;
@@ -337,7 +340,7 @@ void __stdcall camera_update_43c780(Camera *camera)
 
 // TODO: matches until write_screenshot exists (in any file, any body): then LTCG stops keeping &camera->up in ebx. Whole-program effect.
 // FUNCTION: TH16 0x43c940
-void __stdcall camera_apply_43c940(Camera *camera)
+void __stdcall camera_apply_3d(Camera *camera)
 {
     if (g_AnmManager != NULL)
     {
@@ -351,11 +354,11 @@ void __stdcall camera_apply_43c940(Camera *camera)
                                (f32)camera->viewport.Width / (f32)camera->viewport.Height, 30.0f, 8000.0f);
     g_Supervisor.d3d_device->SetTransform(D3DTS_VIEW, &camera->view_matrix);
     g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &camera->projection_matrix);
-    D3DXVec3Cross(&camera->unk_30, &facing, &camera->up);
-    D3DXVec3Normalize(&camera->unk_30, &camera->unk_30);
+    D3DXVec3Cross(&camera->right, &facing, &camera->up);
+    D3DXVec3Normalize(&camera->right, &camera->right);
     if (g_AnmManager != NULL)
     {
-        g_AnmManager->camera_unk_fc = camera->unk_fc;
+        g_AnmManager->camera_2d_offset = camera->shake_offset;
     }
 }
 
@@ -370,7 +373,7 @@ void Supervisor::setup_cameras()
     cameras[2].viewport.Y = 0;
     cameras[2].viewport.Width = g_resolution_x;
     cameras[2].viewport.Height = g_resolution_y;
-    if ((g_unk_4d9d1c & 0x3c) == 8)
+    if ((g_window_flags & WINDOW_SIZE_MASK) == WINDOW_SIZE_FULLSCREEN_1280 << WINDOW_SIZE_SHIFT)
     {
         cameras[2].viewport.Height = 960;
     }
@@ -381,7 +384,7 @@ void Supervisor::setup_cameras()
     cameras[2].camera_index = 2;
     cameras[2].window_resolution[0] = g_resolution_x;
     cameras[2].window_resolution[1] = g_resolution_y;
-    camera_update_43c780(&cameras[2]);
+    camera_update_2d(&cameras[2]);
 
     cameras[0] = cameras[2];
     cameras[0].camera_index = 0;
@@ -389,7 +392,7 @@ void Supervisor::setup_cameras()
     cameras[0].viewport.Y = (i32)(g_screen_coord_scale * 16.0f);
     cameras[0].viewport.Width = (i32)(g_screen_coord_scale * 384.0f);
     cameras[0].viewport.Height = (i32)(g_screen_coord_scale * 448.0f);
-    camera_update_43c780(&cameras[0]);
+    camera_update_2d(&cameras[0]);
 
     cameras[1] = cameras[0];
     cameras[1].camera_index = 1;
@@ -397,7 +400,7 @@ void Supervisor::setup_cameras()
     cameras[1].viewport.Y = (i32)(g_screen_coord_scale * 16.0f);
     cameras[1].viewport.Width = (i32)(g_screen_coord_scale * 384.0f);
     cameras[1].viewport.Height = (i32)(g_screen_coord_scale * 448.0f);
-    camera_update_43c780(&cameras[1]);
+    camera_update_2d(&cameras[1]);
 
     cameras[3] = cameras[0];
     cameras[3].camera_index = 3;
@@ -405,153 +408,155 @@ void Supervisor::setup_cameras()
     cameras[3].viewport.Y = (i32)((g_resolution_y - 472.0f) * 0.5f);
     cameras[3].viewport.Width = 408;
     cameras[3].viewport.Height = 472;
-    camera_update_43c780(&cameras[3]);
+    camera_update_2d(&cameras[3]);
 
     g_arcade_hud_origin_x = g_resolution_x / 2;
     g_arcade_hud_origin_y = (i32)(g_screen_coord_scale * 16.0f);
 }
 
 // GLOBAL: TH16 0x4a6f1c
-i32 g_unk_4a6f1c;
+i32 g_title_return_point;
 
-// Returns 1 normally, 4 or 5 when the game is to quit.
 // FUNCTION: TH16 0x43ce10
 int Supervisor::switch_gamemodes()
 {
     if (gamemode_current == gamemode_to_switch_to)
     {
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
     ENTER_CS(CS_SUPERVISOR_GAMEMODE);
     gamemode_prev = gamemode_current;
     background_color = 0xff000000;
     switch (gamemode_to_switch_to)
     {
-    case 0:
-        gamemode_to_switch_to = 1;
+    case GAMEMODE_STARTUP:
+        gamemode_to_switch_to = GAMEMODE_LOADING;
         loading_thread = LoadingThread::create();
         if (loading_thread != NULL)
         {
             break;
         }
-        gamemode_to_switch_to = 3;
-    case 3:
+        gamemode_to_switch_to = GAMEMODE_QUIT;
+        // Falls through.
+    case GAMEMODE_QUIT:
         destroy_game_objects();
         g_CriticalSections.leave(CS_SUPERVISOR_GAMEMODE);
-        return 4;
-    case 4:
+        return UPDATE_FUNC_EXIT_SUCCESS;
+    case GAMEMODE_TITLE:
         switch (gamemode_current)
         {
-        case 1:
-        case 2:
+        case GAMEMODE_LOADING:
+        case GAMEMODE_IDLE:
             TitleInf::create();
             break;
-        case 7:
+        case GAMEMODE_GAME:
             GameThread::destroy();
             TitleInf::create();
             break;
-        case 15:
+        case GAMEMODE_ENDING:
             Ending::destroy();
             TitleInf::create();
             break;
         }
         break;
-    case 16:
+    case GAMEMODE_TITLE_SCORE_ENTRY:
+        // Only from a game, the ending or GAMEMODE_IDLE; from anything else
+        // the mode just becomes GAMEMODE_TITLE_SCORE_ENTRY.
         switch (gamemode_current)
         {
-        case 2:
+        case GAMEMODE_IDLE:
             break;
-        case 7:
+        case GAMEMODE_GAME:
             GameThread::destroy();
             break;
-        case 15:
+        case GAMEMODE_ENDING:
             Ending::destroy();
             break;
         default:
             goto done;
         }
-        gamemode_to_switch_to = 4;
-        g_unk_4a6f1c = 3;
+        gamemode_to_switch_to = GAMEMODE_TITLE;
+        g_title_return_point = TITLE_RETURN_SCORE_ENTRY;
         TitleInf::create();
         break;
-    case 7:
-        if (gamemode_current == 4)
+    case GAMEMODE_GAME:
+        if (gamemode_current == GAMEMODE_TITLE)
         {
             TitleInf::destroy();
         }
-        unk_700 = 1;
-        GameThread::create(0);
+        new_game_started = 1;
+        GameThread::create(0); // playing
         break;
-    case 13:
-        if (gamemode_current == 4)
+    case GAMEMODE_START_REPLAY:
+        if (gamemode_current == GAMEMODE_TITLE)
         {
             TitleInf::destroy();
         }
-        gamemode_to_switch_to = 7;
-        unk_700 = 1;
-        GameThread::create(1);
+        gamemode_to_switch_to = GAMEMODE_GAME;
+        new_game_started = 1;
+        GameThread::create(1); // a replay
         break;
-    case 12:
+    case GAMEMODE_NEXT_STAGE:
     {
         i32 replay_mode = g_GameThread->replay_mode;
-        unk_700 = 0;
-        if (gamemode_current == 7)
+        new_game_started = 0;
+        if (gamemode_current == GAMEMODE_GAME)
         {
             GameThread::destroy();
         }
-        gamemode_to_switch_to = 7;
+        gamemode_to_switch_to = GAMEMODE_GAME;
         GameThread::create(replay_mode);
         break;
     }
-    case 10:
+    case GAMEMODE_RESTART:
         GameThread::destroy();
-        unk_700 = 1;
+        new_game_started = 1;
         unk_704 = 0;
-        gamemode_to_switch_to = 7;
+        gamemode_to_switch_to = GAMEMODE_GAME;
         g_Globals.stage_num = g_Globals.weird_stage_num;
         g_stage_data = &g_stage_table[g_Globals.stage_num];
-        GameThread::create(0);
+        GameThread::create(0); // playing
         break;
-    case 11:
+    case GAMEMODE_RESTART_REPLAY:
         GameThread::destroy();
-        unk_700 = 1;
+        new_game_started = 1;
         unk_704 = 0;
-        gamemode_to_switch_to = 7;
+        gamemode_to_switch_to = GAMEMODE_GAME;
         g_Globals.stage_num = g_Globals.weird_stage_num;
         g_stage_data = &g_stage_table[g_Globals.stage_num];
-        GameThread::create(1);
+        GameThread::create(1); // a replay
         break;
-    case 19:
+    case GAMEMODE_RESTART_19:
         GameThread::destroy();
-        unk_700 = 1;
+        new_game_started = 1;
         unk_704 = 1;
-        gamemode_to_switch_to = 7;
+        gamemode_to_switch_to = GAMEMODE_GAME;
         g_Globals.stage_num = g_Globals.weird_stage_num;
         g_stage_data = &g_stage_table[g_Globals.stage_num];
-        GameThread::create(0);
+        GameThread::create(0); // playing
         break;
-    case 14:
+    case GAMEMODE_RETRY_STAGE:
         GameThread::destroy();
-        unk_700 = 1;
-        gamemode_to_switch_to = 7;
-        GameThread::create(0);
+        new_game_started = 1;
+        gamemode_to_switch_to = GAMEMODE_GAME;
+        GameThread::create(0); // playing
         break;
-    case 15:
-        if (gamemode_current == 7)
+    case GAMEMODE_ENDING:
+        if (gamemode_current == GAMEMODE_GAME)
         {
             GameThread::destroy();
         }
         Ending::create();
         break;
-    case 17:
+    case GAMEMODE_QUIT_ERROR:
         destroy_game_objects();
         g_CriticalSections.leave(CS_SUPERVISOR_GAMEMODE);
-        return 5;
+        return UPDATE_FUNC_EXIT_ERROR;
     }
 done:
     gamemode_current = gamemode_to_switch_to;
     LEAVE_CS(CS_SUPERVISOR_GAMEMODE);
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // Clears the frame and resets the render state the sprite code caches.
@@ -582,19 +587,19 @@ int __fastcall Supervisor::on_draw_01(void *arg)
                                        1.0f, 0);
     }
     AnmManager *anm = g_AnmManager;
-    anm->render_cache_184fbc0 = 0;
-    anm->render_cache_184fbb0 = -1;
-    anm->last_blend_mode = 10;
+    anm->last_texture_matrix_sprite = 0;
+    anm->last_texture_id = -1;
+    anm->last_blend_mode = ANM_BLEND_FORCE_RESET;
     anm->render_cache_184fbb5 = 0xff;
     anm->render_cache_184fbb7 = 0xff;
     anm->render_cache_184fbb8 = 0xff;
-    anm->unk_1c7fd8c = 0;
-    anm->unk_1c7fd88.d3d = 0x80808080;
+    anm->global_tint_enabled = 0;
+    anm->global_tint.d3d = 0x80808080;
     anm->last_filter_point = 0xff;
-    anm->last_color_op = 0xff;
-    anm->camera_unk_fc.y = 0.0f;
-    anm->camera_unk_fc.x = 0.0f;
-    anm->render_cache_184fbb6 = 0xff;
+    anm->last_color_op = ANM_COLOR_OP_NONE;
+    anm->camera_2d_offset.y = 0.0f;
+    anm->camera_2d_offset.x = 0.0f;
+    anm->last_vertex_setup = ANM_VERTEX_SETUP_NONE;
     s->current_camera = &s->cameras[2];
     s->swap_transform_matrices(&s->cameras[2]);
     s->d3d_device->SetViewport(&s->current_camera->viewport);
@@ -602,13 +607,13 @@ int __fastcall Supervisor::on_draw_01(void *arg)
     return 1;
 }
 
-// Draws the arcade region (vm_1bc and layer 0x22) onto the screen.
+// Draws the arcade region (arcade_blit_vm_0f and layer 0x22) onto the screen.
 // FUNCTION: TH16 0x43d2f0
 int __fastcall Supervisor::on_draw_0f(void *arg)
 {
     if (g_Supervisor.arcade_surface_0 != NULL)
     {
-        if (g_draw_hook_4a6eec == NULL)
+        if (g_draw_hook_0f == NULL)
         {
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
@@ -617,14 +622,14 @@ int __fastcall Supervisor::on_draw_0f(void *arg)
             g_Supervisor.swap_transform_matrices(&g_Supervisor.cameras[3]);
             g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
             g_Supervisor.current_camera_index = 3;
-            g_AnmManager->draw_vm(g_Supervisor.vm_1bc);
-            g_Supervisor.vm_1bc->color_1.d3d = 0xffffffff;
+            g_AnmManager->draw_vm(g_Supervisor.arcade_blit_vm_0f);
+            g_Supervisor.arcade_blit_vm_0f->color_1.d3d = 0xffffffff;
             g_AnmManager->render_layer(0x22);
             g_AnmManager->flush_sprites();
             g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
             return 1;
         }
-        g_draw_hook_4a6eec();
+        g_draw_hook_0f();
     }
     return 1;
 }
@@ -652,7 +657,7 @@ int __fastcall Supervisor::on_draw_1a(void *arg)
 {
     if (g_Supervisor.arcade_surface_0 != NULL)
     {
-        if (g_draw_hook_4a6ee8 == NULL)
+        if (g_draw_hook_1a == NULL)
         {
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
@@ -661,14 +666,14 @@ int __fastcall Supervisor::on_draw_1a(void *arg)
             g_Supervisor.swap_transform_matrices(&g_Supervisor.cameras[3]);
             g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
             g_Supervisor.current_camera_index = 3;
-            g_AnmManager->draw_vm(g_Supervisor.vm_1c0);
-            g_Supervisor.vm_1c0->color_1.d3d = 0xffffffff;
+            g_AnmManager->draw_vm(g_Supervisor.arcade_blit_vm_1a);
+            g_Supervisor.arcade_blit_vm_1a->color_1.d3d = 0xffffffff;
             g_AnmManager->flush_sprites();
             g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
         }
         else
         {
-            g_draw_hook_4a6ee8();
+            g_draw_hook_1a();
         }
     }
     return 1;
@@ -700,9 +705,9 @@ int __fastcall Supervisor::on_draw_2c(void *arg)
         g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
         g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
         g_Supervisor.disable_zwrite();
-        g_AnmManager->draw_vm(g_Supervisor.vm_1c4);
+        g_AnmManager->draw_vm(g_Supervisor.arcade_blit_vm_2c);
         g_AnmManager->flush_sprites();
-        g_Supervisor.vm_1c4->color_1.d3d = 0xffffffff;
+        g_Supervisor.arcade_blit_vm_2c->color_1.d3d = 0xffffffff;
         g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
     }
     return 1;
@@ -734,8 +739,8 @@ int __fastcall Supervisor::on_draw_39(void *arg)
     if (g_Supervisor.arcade_surface_0 != NULL)
     {
         g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
-        g_AnmManager->draw_vm(g_Supervisor.vm_1c8);
-        g_Supervisor.vm_1c8->color_1.d3d = 0xffffffff;
+        g_AnmManager->draw_vm(g_Supervisor.arcade_blit_vm_39);
+        g_Supervisor.arcade_blit_vm_39->color_1.d3d = 0xffffffff;
         g_AnmManager->flush_sprites();
         g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
     }
@@ -755,10 +760,10 @@ int __fastcall Supervisor::on_draw_38(void *arg)
 int __fastcall Supervisor::on_draw_55(void *arg)
 {
     g_AnmManager->flush_sprites();
-    g_Supervisor.cameras[3].unk_fc.x = 0.0f;
-    g_Supervisor.cameras[3].unk_fc.y = 0.0f;
-    g_Supervisor.cameras[1].unk_fc.x = 0.0f;
-    g_Supervisor.cameras[1].unk_fc.y = 0.0f;
+    g_Supervisor.cameras[3].shake_offset.x = 0.0f;
+    g_Supervisor.cameras[3].shake_offset.y = 0.0f;
+    g_Supervisor.cameras[1].shake_offset.x = 0.0f;
+    g_Supervisor.cameras[1].shake_offset.y = 0.0f;
     return 1;
 }
 
@@ -771,7 +776,7 @@ HARNESS_CALLED AnmId Supervisor::create_fog_vm(i32 count, i32 script)
     vm->alloc_extra_data(count * 2 * sizeof(RenderVertex144));
     if (count > 2)
     {
-        RenderVertex144 *vertices = (RenderVertex144 *)vm->ins_508_extra_data;
+        RenderVertex144 *vertices = (RenderVertex144 *)vm->extra_data;
         vm->flags_lo = (vm->flags_lo & ~(0x1f << ANM_VM_RENDER_MODE_SHIFT)) | (12 << ANM_VM_RENDER_MODE_SHIFT);
         vm->int_vars[0] = count;
         for (i32 i = 0; i < count * 2; i++)
@@ -803,79 +808,79 @@ void Supervisor::setup_special_anms()
         }
         text_anm->d3d[2].texture->GetSurfaceLevel(0, &arcade_surface_0);
         text_anm->d3d[3].texture->GetSurfaceLevel(0, &arcade_surface_1);
-        AnmVm *vm = vm_1bc;
+        AnmVm *vm = arcade_blit_vm_0f;
         if (!(vm->flags_lo & ANM_VM_VISIBLE))
         {
             if (g_resolution_x == 640)
             {
-                text_anm->copy_vm(vm, 0x3b);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_0F);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
-                vm = vm_1c0;
-                text_anm->copy_vm(vm, 0x41);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm = arcade_blit_vm_1a;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_1A);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
-                vm = vm_1c4;
-                text_anm->copy_vm(vm, 0x3e);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm = arcade_blit_vm_2c;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_2C);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
-                vm = vm_1c8;
-                text_anm->copy_vm(vm, 0x44);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm = arcade_blit_vm_39;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_39);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
             else if (g_resolution_x == 960)
             {
-                text_anm->copy_vm(vm, 0x3c);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_0F + 1);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
-                vm = vm_1c0;
-                text_anm->copy_vm(vm, 0x42);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm = arcade_blit_vm_1a;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_1A + 1);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
-                vm = vm_1c4;
-                text_anm->copy_vm(vm, 0x3f);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm = arcade_blit_vm_2c;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_2C + 1);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
-                vm = vm_1c8;
-                text_anm->copy_vm(vm, 0x45);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm = arcade_blit_vm_39;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_39 + 1);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
             else if (g_resolution_x == 1280)
             {
-                text_anm->copy_vm(vm, 0x3d);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_0F + 2);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
-                vm = vm_1c0;
-                text_anm->copy_vm(vm, 0x43);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm = arcade_blit_vm_1a;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_1A + 2);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
-                vm = vm_1c4;
-                text_anm->copy_vm(vm, 0x40);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm = arcade_blit_vm_2c;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_2C + 2);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
-                vm = vm_1c8;
-                text_anm->copy_vm(vm, 0x46);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm = arcade_blit_vm_39;
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_39 + 2);
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
         }
         if (g_screen_coord_scale == 1.5f)
         {
-            vm_1c4->flags_hi &= ~0x800;
+            arcade_blit_vm_2c->flags_hi &= ~ANM_VM_FILTER_POINT;
         }
     }
     else
@@ -916,7 +921,7 @@ void Supervisor::release_dinput()
 }
 
 // GLOBAL: TH16 0x4d9d20
-i32 g_unk_4d9d20;
+i32 g_device_reset_frames;
 // GLOBAL: TH16 0x4d9d90
 DECOMP_ALIGN16 FramePacingTable g_frame_pacing;
 // GLOBAL: TH16 0x4a5788
@@ -927,27 +932,28 @@ int __fastcall Supervisor::on_tick(void *arg)
 {
     Supervisor *s = (Supervisor *)arg;
 
-    if ((s->flags & 0x180) == 0x80 && !s->thread.should_run)
+    if ((s->flags & (SUPERVISOR_QUIT_REQUESTED | SUPERVISOR_FLAG_100)) == SUPERVISOR_QUIT_REQUESTED &&
+        !s->thread.should_run)
     {
-        g_Supervisor.gamemode_to_switch_to = 3;
+        g_Supervisor.gamemode_to_switch_to = GAMEMODE_QUIT;
     }
     SoundManager::update_sound_thread();
     SoundManager::tick_bgm_fade();
     read_keyboard_input();
-    if (g_AnmManager->sub_46d690())
+    if (g_AnmManager->service_pending_loads())
     {
         return UPDATE_FUNC_EXIT_SUCCESS;
     }
-    if (g_unk_4d9d20 != 0)
+    if (g_device_reset_frames != 0)
     {
-        g_unk_4d9d20--;
+        g_device_reset_frames--;
     }
     if (s->unk_9b4 != 0)
     {
         return s->unk_9b4 == 2 ? UPDATE_FUNC_EXIT_SUCCESS : UPDATE_FUNC_CONTINUE;
     }
     int result = s->switch_gamemodes();
-    if (result == 1)
+    if (result == UPDATE_FUNC_CONTINUE)
     {
         g_game_2d_origin_x = g_resolution_x / 2;
         g_game_2d_origin_y = (g_resolution_y - 448) / 2;
@@ -1002,12 +1008,12 @@ int __fastcall Supervisor::on_registration(void *arg)
     fps->on_draw = f;
     AnmManager::setup_vertex_buffer();
     create_fonts();
-    g_Supervisor.vm_1bc = new AnmVm;
-    g_Supervisor.vm_1c0 = new AnmVm;
-    g_Supervisor.vm_1c4 = new AnmVm;
-    g_Supervisor.vm_1c8 = new AnmVm;
-    g_draw_hook_4a6eec = NULL;
-    g_draw_hook_4a6ee8 = NULL;
+    g_Supervisor.arcade_blit_vm_0f = new AnmVm;
+    g_Supervisor.arcade_blit_vm_1a = new AnmVm;
+    g_Supervisor.arcade_blit_vm_2c = new AnmVm;
+    g_Supervisor.arcade_blit_vm_39 = new AnmVm;
+    g_draw_hook_0f = NULL;
+    g_draw_hook_1a = NULL;
     return 0;
 }
 
@@ -1035,17 +1041,17 @@ int Supervisor::teardown_everything()
         anm->vertex_buffer->Release();
         anm->vertex_buffer = NULL;
     }
-    g_SoundManager.modify_bgm(4, 0, "dummy");
+    g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
     g_TextHelper.release_buffer();
-    DeleteObject(g_font_904);
-    DeleteObject(g_font_90c);
-    DeleteObject(g_font_914);
-    DeleteObject(g_font_91c);
-    DeleteObject(g_font_924);
-    DeleteObject(g_font_910);
-    DeleteObject(g_font_918);
-    DeleteObject(g_font_920);
-    DeleteObject(g_font_928);
+    DeleteObject(g_text_font_default);
+    DeleteObject(g_text_font_0);
+    DeleteObject(g_text_font_2);
+    DeleteObject(g_text_font_4);
+    DeleteObject(g_text_font_6);
+    DeleteObject(g_text_font_1);
+    DeleteObject(g_text_font_3);
+    DeleteObject(g_text_font_5);
+    DeleteObject(g_text_font_7);
     if (keyboard != NULL)
     {
         keyboard->Unacquire();
@@ -1070,14 +1076,14 @@ int Supervisor::teardown_everything()
         dinput = NULL;
     }
     g_Arcfile.close();
-    delete g_Supervisor.vm_1bc;
-    g_Supervisor.vm_1bc = NULL;
-    delete g_Supervisor.vm_1c0;
-    g_Supervisor.vm_1c0 = NULL;
-    delete g_Supervisor.vm_1c4;
-    g_Supervisor.vm_1c4 = NULL;
-    delete g_Supervisor.vm_1c8;
-    g_Supervisor.vm_1c8 = NULL;
+    delete g_Supervisor.arcade_blit_vm_0f;
+    g_Supervisor.arcade_blit_vm_0f = NULL;
+    delete g_Supervisor.arcade_blit_vm_1a;
+    g_Supervisor.arcade_blit_vm_1a = NULL;
+    delete g_Supervisor.arcade_blit_vm_2c;
+    g_Supervisor.arcade_blit_vm_2c = NULL;
+    delete g_Supervisor.arcade_blit_vm_39;
+    g_Supervisor.arcade_blit_vm_39 = NULL;
     return 0;
 }
 
@@ -1096,7 +1102,7 @@ void Supervisor::destroy_game_objects()
 
 extern HANDLE g_file;
 
-void debug_log_43dce0(const char *fmt, ...);
+void supervisor_debug_log(const char *fmt, ...);
 
 // FUNCTION: TH16 0x43bbd0
 HARNESS_CALLED int Supervisor::take_screenshot(const char *path)
@@ -1107,7 +1113,7 @@ HARNESS_CALLED int Supervisor::take_screenshot(const char *path)
         Sleep(10);
     }
     IDirect3DSurface9 *surface = NULL;
-    debug_log_43dce0("SnapShot! %s\n", path);
+    supervisor_debug_log("SnapShot! %s\n", path);
     g_Supervisor.d3d_device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &surface);
     memset(&shot->file_header, 0, sizeof(BITMAPFILEHEADER));
     shot->file_header.bfType = 0x4d42;
@@ -1226,8 +1232,8 @@ int Supervisor::initialize()
     UpdateFunc *f;
     int result;
 
-    g_Supervisor.gamemode_current = -2;
-    g_Supervisor.gamemode_to_switch_to = 0;
+    g_Supervisor.gamemode_current = GAMEMODE_NONE;
+    g_Supervisor.gamemode_to_switch_to = GAMEMODE_STARTUP;
     g_Supervisor.unk_6fc = 0;
 
     f = g_UpdateFuncRegistry->create_func(on_tick);
@@ -1297,7 +1303,7 @@ int Supervisor::initialize()
 // FUNCTION: TH16 0x43c050
 HARNESS_CALLED int Supervisor::load_game_config(const char *path)
 {
-    ConfigData *data = (ConfigData *)&g_Supervisor.config.unk_4;
+    ConfigData *data = (ConfigData *)&g_Supervisor.config.version;
     data->set_defaults_inline();
     _chdir(g_GameWindow.save_dir);
     i32 size;
@@ -1313,8 +1319,9 @@ HARNESS_CALLED int Supervisor::load_game_config(const char *path)
     {
         *data = *file;
         free(file);
-        if (data->unk_1c >= 2 || data->unk_1d >= 3 || data->unk_1e >= 2 || data->unk_1f >= 6 || data->unk_20 >= 3 ||
-            data->unk_21 >= 3 || data->version != 0x160002 || size != sizeof(ConfigData))
+        if (data->color_mode >= 2 || data->bgm_mode >= 3 || data->se_enabled >= 2 || data->window_size >= 6 ||
+            data->frame_skip >= 3 || data->unk_21 >= 3 || data->version != CONFIG_VERSION ||
+            size != sizeof(ConfigData))
         {
             // "Config data was broken, so it was reinitialized"
             g_GameErrorContext.log("\x83R\x83\x93\x83t\x83" "B\x83O\x83" "f\x81[\x83^\x82\xaa\x88\xd9\x8f\xed\x82\xc5\x82\xb5\x82\xbd\x82\xcc\x82\xc5\x8d\xc4\x8f\x89\x8a\xfa\x89\xbb\x82\xb5\x82\xdc\x82\xb5\x82\xbd\r\n");
@@ -1326,8 +1333,8 @@ HARNESS_CALLED int Supervisor::load_game_config(const char *path)
             memcpy(g_pad_mapping, data->pad_mapping, sizeof(g_pad_mapping));
         }
     }
-    unk_71c = 0;
-    if (config.flags_2c & 4)
+    no_vsync = 0;
+    if (config.flags & CONFIG_NO_FOG)
     {
         // "Fog is suppressed"
         g_GameErrorContext.log("\x83t\x83H\x83O\x82\xcc\x8eg\x97p\x82\xf0\x97}\x90\xa7\x82\xb5\x82\xdc\x82\xb7\r\n");
@@ -1337,28 +1344,28 @@ HARNESS_CALLED int Supervisor::load_game_config(const char *path)
         // "Starting in window mode"
         g_GameErrorContext.log("\x83" "E\x83" "B\x83\x93\x83h\x83" "E\x83\x82\x81[\x83h\x82\xc5\x8bN\x93\xae\x82\xb5\x82\xdc\x82\xb7\r\n");
     }
-    if (config.flags_2c & 2)
+    if (config.flags & CONFIG_REFERENCE_RASTERIZER)
     {
         // "Forcing the reference rasterizer"
         g_GameErrorContext.log("\x83\x8a\x83t\x83@\x83\x8c\x83\x93\x83X\x83\x89\x83X\x83^\x83\x89\x83" "C\x83U\x82\xf0\x8b\xad\x90\xa7\x82\xb5\x82\xdc\x82\xb7\r\n");
     }
-    if (config.flags_2c & 8)
+    if (config.flags & CONFIG_NO_DIRECTINPUT)
     {
         // "Not using DirectInput for pad and keyboard input"
         g_GameErrorContext.log("\x83p\x83" "b\x83h\x81" "A\x83L\x81[\x83{\x81[\x83h\x82\xcc\x93\xfc\x97\xcd\x82\xc9 DirectInput \x82\xf0\x8eg\x97p\x82\xb5\x82\xdc\x82\xb9\x82\xf1\r\n");
     }
-    if (config.flags_2c & 0x10)
+    if (config.flags & CONFIG_BGM_IN_MEMORY)
     {
         // "Loading the BGM into memory"
         g_GameErrorContext.log("\x82" "a\x82" "f\x82l\x82\xf0\x83\x81\x83\x82\x83\x8a\x82\xc9\x93\xc7\x82\xdd\x8d\x9e\x82\xdd\x82\xdc\x82\xb7\r\n");
     }
-    if (config.flags_2c & 0x20)
+    if (config.flags & CONFIG_NO_VSYNC)
     {
         // "Not waiting for vsync"
         g_GameErrorContext.log("\x90\x82\x92\xbc\x93\xaf\x8a\xfa\x82\xf0\x8e\xe6\x82\xe8\x82\xdc\x82\xb9\x82\xf1\r\n");
-        g_Supervisor.unk_71c = 1;
+        g_Supervisor.no_vsync = 1;
     }
-    if (config.flags_2c & 0x40)
+    if (config.flags & CONFIG_NO_TEXT_ENV_DETECTION)
     {
         // "Not detecting the text rendering environment"
         g_GameErrorContext.log("\x95\xb6\x8e\x9a\x95`\x89\xe6\x82\xcc\x8a\xc2\x8b\xab\x82\xf0\x8e\xa9\x93\xae\x8c\x9f\x8fo\x82\xb5\x82\xdc\x82\xb9\x82\xf1\r\n");
@@ -1378,24 +1385,24 @@ HARNESS_CALLED int Supervisor::load_game_config(const char *path)
 }
 
 // FUNCTION: TH16 0x43c370
-HARNESS_CALLED i32 Supervisor::play_bgm_wav(i32 arg, const char *name)
+HARNESS_CALLED i32 Supervisor::play_bgm_wav(i32 slot, const char *name)
 {
     char path[256];
 
     strcpy(path, name);
     append_wav_extension(path);
-    g_SoundManager.modify_bgm(BGM_PLAY_WAV, arg, path);
+    g_SoundManager.modify_bgm(BGM_LOAD, slot, path);
     return 1;
 }
 
 // FUNCTION: TH16 0x43c3f0
-HARNESS_CALLED i32 Supervisor::play_bgm(i32 arg, i32 track)
+HARNESS_CALLED i32 Supervisor::play_bgm(i32 slot, i32 track)
 {
-    if (g_Supervisor.config.flags_2c & 0x10)
+    if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
     {
-        g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+        g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
     }
-    g_SoundManager.modify_bgm(BGM_PLAY, arg, "dummy");
+    g_SoundManager.modify_bgm(BGM_PLAY, slot, "dummy");
     g_Scorefile->bgm_unlocked[track] = 1;
     return 0;
 }
@@ -1403,9 +1410,9 @@ HARNESS_CALLED i32 Supervisor::play_bgm(i32 arg, i32 track)
 // FUNCTION: TH16 0x43c440
 HARNESS_CALLED i32 Supervisor::stop_bgm()
 {
-    if (g_Supervisor.config.flags_2c & 0x10)
+    if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
     {
-        g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+        g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
     }
     else
     {
@@ -1434,7 +1441,8 @@ HARNESS_CALLED i32 Supervisor::start_thread(ThreadStart start, void *arg)
     return 0;
 }
 
+// Debug output, empty in the release build.
 // FUNCTION: TH16 0x43dce0
-void debug_log_43dce0(const char *fmt, ...)
+void supervisor_debug_log(const char *fmt, ...)
 {
 }

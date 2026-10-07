@@ -13,7 +13,7 @@ static_assert(offsetof(AnmManager, loaded_anms) == 0x184f4f0, "AnmManager loaded
 static_assert(offsetof(AnmManager, layer_list_dummy_heads) == 0x1c6fc30, "AnmManager layer_list_dummy_heads");
 static_assert(offsetof(AnmManager, last_discriminator) == 0x1c7fd84, "AnmManager last_discriminator");
 static_assert(offsetof(AnmManager, vertex_buffer) == 0x184fbc4, "AnmManager vertex_buffer");
-static_assert(offsetof(AnmManager, unk_1c7fd88) == 0x1c7fd88, "AnmManager unk_1c7fd88");
+static_assert(offsetof(AnmManager, global_tint) == 0x1c7fd88, "AnmManager global_tint");
 static_assert(sizeof(AnmManager) == 0x1c7fd90, "AnmManager size");
 
 // GLOBAL: TH16 0x4c0f48
@@ -225,7 +225,7 @@ HARNESS_CALLED void AnmManager::delete_vm(AnmId id)
 // FUNCTION: TH16 0x46f220
 HARNESS_CALLED void AnmManager::mark_tree_for_delete(AnmVm *vm)
 {
-    if (vm == NULL || (vm->flags_hi & ANM_VM_FLAG_HI_4000000))
+    if (vm == NULL || (vm->flags_hi & ANM_VM_IS_SNAPSHOT))
     {
         return;
     }
@@ -282,42 +282,42 @@ DECOMP_NOINLINE AnmVm *AnmId::find_or_clear()
 }
 
 // FUNCTION: TH16 0x46f300
-void AnmId::set_flag_lo_2_tree()
+void AnmId::show_tree()
 {
     AnmVm *vm = g_AnmManager->get_vm_with_id(*this);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
 }
 
 // FUNCTION: TH16 0x46f340
-void AnmId::clear_flag_lo_2_tree()
+void AnmId::hide_tree()
 {
     AnmVm *vm = g_AnmManager->get_vm_with_id(*this);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
 }
 
 // FUNCTION: TH16 0x46f380
-HARNESS_CALLED void AnmVm::set_flag_lo_2_tree()
+HARNESS_CALLED void AnmVm::show_tree()
 {
-    flags_lo |= ANM_VM_FLAG_LO_2;
+    flags_lo |= ANM_VM_SHOWN;
     for (ZunList<AnmVm> *node = list_of_children.next; node != NULL; node = node->next)
     {
-        node->entry->set_flag_lo_2_tree();
+        node->entry->show_tree();
     }
 }
 
 // FUNCTION: TH16 0x46f3b0
-HARNESS_CALLED void AnmVm::clear_flag_lo_2_tree()
+HARNESS_CALLED void AnmVm::hide_tree()
 {
-    flags_lo &= ~ANM_VM_FLAG_LO_2;
+    flags_lo &= ~ANM_VM_SHOWN;
     for (ZunList<AnmVm> *node = list_of_children.next; node != NULL; node = node->next)
     {
-        node->entry->clear_flag_lo_2_tree();
+        node->entry->hide_tree();
     }
 }
 
@@ -374,7 +374,7 @@ void AnmLoadedD3D::clear_texture()
 }
 
 // FUNCTION: TH16 0x46f510
-HARNESS_CALLED AnmVm *AnmVm::search_children(i32 unk_49c, i32 n)
+HARNESS_CALLED AnmVm *AnmVm::search_children(i32 script, i32 n)
 {
     for (ZunList<AnmVm> *node = &list_of_children; node != NULL; node = node->next)
     {
@@ -383,7 +383,7 @@ HARNESS_CALLED AnmVm *AnmVm::search_children(i32 unk_49c, i32 n)
         {
             continue;
         }
-        if (child->unk_49c == unk_49c || unk_49c == -1)
+        if (child->script_id_short == script || script == -1)
         {
             if (n == 0)
             {
@@ -393,13 +393,13 @@ HARNESS_CALLED AnmVm *AnmVm::search_children(i32 unk_49c, i32 n)
         }
         if (child->list_of_children.next != NULL)
         {
-            AnmVm *found = child->search_children(unk_49c, n);
+            AnmVm *found = child->search_children(script, n);
             if (found != NULL)
             {
                 return found;
             }
         }
-        if (this->unk_49c == -2 && node->next == NULL)
+        if (this->script_id_short == -2 && node->next == NULL)
         {
             return node->entry;
         }
@@ -408,7 +408,7 @@ HARNESS_CALLED AnmVm *AnmVm::search_children(i32 unk_49c, i32 n)
 }
 
 // FUNCTION: TH16 0x46f5a0
-HARNESS_CALLED AnmId AnmId::search_children(i32 unk_49c, i32 n)
+HARNESS_CALLED AnmId AnmId::search_children(i32 script, i32 n)
 {
     AnmVm *vm = g_AnmManager->get_vm_with_id(*this);
     if (vm == NULL)
@@ -416,7 +416,7 @@ HARNESS_CALLED AnmId AnmId::search_children(i32 unk_49c, i32 n)
         id = 0;
         return AnmId();
     }
-    AnmVm *found = vm->search_children(unk_49c, n);
+    AnmVm *found = vm->search_children(script, n);
     AnmId result;
     result.id = found != NULL ? found->id.id : 0;
     return result;
@@ -431,8 +431,8 @@ HARNESS_CALLED AnmVm *AnmManager::allocate_vm()
         fast->freelist_node.unlink_inline();
         fast->vm.fast_id = fast->fast_id;
         fast->is_alive = true;
-        fast->vm.parent = NULL;
-        fast->vm.unk_5b0 = NULL;
+        fast->vm.root_vm = NULL;
+        fast->vm.parent_vm = NULL;
         // ZUN's code stores the manager here; whoever links the node in
         // overwrites it.
         fast->vm.node_in_global_list.entry = (AnmVm *)this;
@@ -464,8 +464,8 @@ i32 __fastcall AnmManager::tick_world(AnmManager *mgr)
     delete_list.next = NULL;
     delete_list.prev = NULL;
     delete_list.unk_c = NULL;
-    AnmVm *layer_tails[43];
-    for (i32 i = 0; i < 36; i++)
+    AnmVm *layer_tails[ANM_LAYER_COUNT];
+    for (i32 i = 0; i < ANM_LAYER_UI_LIST_FIRST; i++)
     {
         AnmVm *head = &mgr->layer_list_dummy_heads[i];
         layer_tails[i] = head;
@@ -476,7 +476,7 @@ i32 __fastcall AnmManager::tick_world(AnmManager *mgr)
     {
         ZunList<AnmVm> *next = node->next;
         AnmVm *vm = node->entry;
-        u32 deletion = vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_FLAG_HI_40);
+        u32 deletion = vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_IN_DELETE_LIST);
         if (deletion == ANM_VM_DELETE_PENDING)
         {
             mgr->remove_tree(vm, &delete_list);
@@ -490,9 +490,9 @@ i32 __fastcall AnmManager::tick_world(AnmManager *mgr)
             else
             {
                 // World VMs on the UI copies of layers 24-30 move back.
-                if (vm->layer >= 36 && vm->layer <= 42)
+                if (vm->layer >= ANM_LAYER_UI_LIST_FIRST && vm->layer <= ANM_LAYER_UI_LIST_LAST)
                 {
-                    vm->layer -= 12;
+                    vm->layer -= ANM_LAYER_UI_LIST_OFFSET;
                 }
                 layer_tails[vm->layer]->next_in_layer = vm;
                 layer_tails[vm->layer] = vm;
@@ -518,11 +518,11 @@ i32 __fastcall AnmManager::tick_ui(AnmManager *mgr)
 {
     ENTER_CS(CS_ANM_MANAGER);
     // The UI list only uses layers 36-42.
-    AnmVm *layer_tails[7];
-    for (i32 i = 0; i < 7; i++)
+    AnmVm *layer_tails[ANM_LAYER_UI_LIST_COUNT];
+    for (i32 i = 0; i < ANM_LAYER_UI_LIST_COUNT; i++)
     {
-        layer_tails[i] = &mgr->layer_list_dummy_heads[36 + i];
-        mgr->layer_list_dummy_heads[36 + i].next_in_layer = NULL;
+        layer_tails[i] = &mgr->layer_list_dummy_heads[ANM_LAYER_UI_LIST_FIRST + i];
+        mgr->layer_list_dummy_heads[ANM_LAYER_UI_LIST_FIRST + i].next_in_layer = NULL;
     }
     mgr->useless_count = 0;
     ZunList<AnmVm> delete_list;
@@ -535,7 +535,7 @@ i32 __fastcall AnmManager::tick_ui(AnmManager *mgr)
     {
         ZunList<AnmVm> *next = node->next;
         AnmVm *vm = node->entry;
-        u32 deletion = vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_FLAG_HI_40);
+        u32 deletion = vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_IN_DELETE_LIST);
         if (deletion == ANM_VM_DELETE_PENDING)
         {
             mgr->remove_tree(vm, &delete_list);
@@ -549,16 +549,16 @@ i32 __fastcall AnmManager::tick_ui(AnmManager *mgr)
             else
             {
                 // UI VMs on layers 24-31 move to their UI copies.
-                if (vm->layer >= 24 && vm->layer <= 31)
+                if (vm->layer >= ANM_LAYER_UI_FIRST && vm->layer <= ANM_LAYER_UI_LAST)
                 {
-                    vm->layer += 12;
+                    vm->layer += ANM_LAYER_UI_LIST_OFFSET;
                 }
-                else if (vm->layer < 36 || vm->layer > 42)
+                else if (vm->layer < ANM_LAYER_UI_LIST_FIRST || vm->layer > ANM_LAYER_UI_LIST_LAST)
                 {
-                    vm->layer = 38;
+                    vm->layer = ANM_LAYER_UI_LIST_DEFAULT;
                 }
-                layer_tails[vm->layer - 36]->next_in_layer = vm;
-                layer_tails[vm->layer - 36] = vm;
+                layer_tails[vm->layer - ANM_LAYER_UI_LIST_FIRST]->next_in_layer = vm;
+                layer_tails[vm->layer - ANM_LAYER_UI_LIST_FIRST] = vm;
                 vm->next_in_layer = NULL;
                 mgr->useless_count++;
             }
@@ -586,21 +586,21 @@ void AnmManager::remove_tree(AnmVm *vm, ZunList<AnmVm> *delete_list)
         remove_tree(node->entry, delete_list);
         node = next;
     }
-    if ((vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_FLAG_HI_40)) != ANM_VM_FLAG_HI_40)
+    if ((vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_IN_DELETE_LIST)) != ANM_VM_IN_DELETE_LIST)
     {
-        vm->unk_list_598.init(vm);
-        delete_list->insert_after(&vm->unk_list_598);
+        vm->node_in_delete_list.init(vm);
+        delete_list->insert_after(&vm->node_in_delete_list);
     }
     vm->flags_hi &= ~ANM_VM_DELETE_PENDING;
-    vm->flags_hi |= ANM_VM_FLAG_HI_40;
-    vm->parent = NULL;
-    vm->unk_5b0 = NULL;
+    vm->flags_hi |= ANM_VM_IN_DELETE_LIST;
+    vm->root_vm = NULL;
+    vm->parent_vm = NULL;
 }
 
 // FUNCTION: TH16 0x46e710
-i32 __fastcall AnmManager::on_tick_21(AnmManager *mgr)
+i32 __fastcall AnmManager::on_tick_21_world(AnmManager *mgr)
 {
-    if (g_GameThread != NULL && (g_GameThread->flags.flag_0 | g_GameThread->flags.paused) &&
+    if (g_GameThread != NULL && (g_GameThread->flags.flag_0 | g_GameThread->flags.loading) &&
         g_GameThread->flags.flag_1)
     {
         return 1;
@@ -609,7 +609,7 @@ i32 __fastcall AnmManager::on_tick_21(AnmManager *mgr)
 }
 
 // FUNCTION: TH16 0x46e740
-i32 __fastcall AnmManager::on_tick_09(AnmManager *mgr)
+i32 __fastcall AnmManager::on_tick_09_ui(AnmManager *mgr)
 {
     return tick_ui(mgr);
 }
@@ -638,20 +638,20 @@ i32 AnmManager::destroy_possibly_managed_vm(AnmVm *vm)
         g_anm_on_destroy_funcs[vm->index_of_on_destroy](vm);
     }
     vm->node_in_global_list.unlink_inline();
-    vm->unk_list_598.unlink_inline();
+    vm->node_in_delete_list.unlink_inline();
     vm->node_as_child.unlink_inline();
-    vm->parent = NULL;
-    vm->unk_5b0 = NULL;
+    vm->root_vm = NULL;
+    vm->parent_vm = NULL;
     if (vm >= &fast_array[0].vm && vm < &fast_array[0x1fff].vm)
     {
         fast_array[vm->fast_id].is_alive = false;
         freelist_head.insert_after(&fast_array[vm->fast_id].freelist_node);
-        if (vm->ins_508_extra_data != NULL)
+        if (vm->extra_data != NULL)
         {
-            free(vm->ins_508_extra_data);
+            free(vm->extra_data);
         }
-        vm->ins_508_extra_data = NULL;
-        vm->ins_508_extra_data_size = 0;
+        vm->extra_data = NULL;
+        vm->extra_data_size = 0;
         vm->instr_offset = -1;
         vm->id.id = 0;
         return 0;
@@ -688,21 +688,21 @@ AnmId AnmLoaded::create_managed_child(i32 script, AnmVm *parent, i32 mode)
     vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
     vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     copy_vm(vm, script);
-    vm->flags_hi = (vm->flags_hi & ~ANM_VM_FLAG_HI_2000000) | (parent->flags_hi & ANM_VM_FLAG_HI_2000000);
-    vm->unk_5b0 = parent;
-    vm->parent = parent->parent != NULL ? parent->parent : parent;
+    vm->flags_hi = (vm->flags_hi & ~ANM_VM_COLORIZE_CHILDREN) | (parent->flags_hi & ANM_VM_COLORIZE_CHILDREN);
+    vm->parent_vm = parent;
+    vm->root_vm = parent->root_vm != NULL ? parent->root_vm : parent;
     vm->run();
     vm->mode_of_create_child = mode;
     AnmId id;
-    if ((mode & 6) == 6)
+    if ((mode & ANM_CREATE_UI_FRONT) == ANM_CREATE_UI_FRONT)
     {
         id = g_AnmManager->insert_in_ui_list_front(vm);
     }
-    else if (mode & 4)
+    else if (mode & ANM_CREATE_UI)
     {
         id = g_AnmManager->insert_in_ui_list_back(vm);
     }
-    else if (mode & 2)
+    else if (mode & ANM_CREATE_FRONT)
     {
         id = g_AnmManager->insert_in_world_list_front(vm);
     }
@@ -724,14 +724,14 @@ HARNESS_CALLED AnmId AnmLoaded::create_managed_root(i32 script, AnmVm *like, i32
     copy_vm(vm, script);
     vm->layer = like->layer;
     vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
-    vm->flags_hi = (vm->flags_hi & ~ANM_VM_FLAG_HI_2000000) | (like->flags_hi & ANM_VM_FLAG_HI_2000000);
+    vm->flags_hi = (vm->flags_hi & ~ANM_VM_COLORIZE_CHILDREN) | (like->flags_hi & ANM_VM_COLORIZE_CHILDREN);
     vm->entity_pos = like->entity_pos;
     vm->rotation.x = like->rotation.x;
     vm->rotation.y = like->rotation.y;
     vm->rotation.z = like->rotation.z;
     vm->pos_2 = like->pos;
     vm->run();
-    vm->mode_of_create_child = 0;
+    vm->mode_of_create_child = ANM_CREATE_WORLD_BACK;
     AnmId id;
     id = g_AnmManager->insert_in_world_list_back(vm);
     LEAVE_CS(CS_ANM_MANAGER);
@@ -744,8 +744,8 @@ void AnmVm::copy_from(const AnmVm &other, i32 arg)
     memcpy(this, &other, offsetof(AnmVm, id));
     ZunTimer timer = other.script_time;
     script_time = timer.current;
-    timer = other.timer_1c;
-    timer_1c = timer.current;
+    timer = other.time_in_script;
+    time_in_script = timer.current;
     node_in_global_list.entry = this;
     node_in_global_list.next = NULL;
     node_in_global_list.prev = NULL;
@@ -759,8 +759,8 @@ void AnmVm::copy_from(const AnmVm &other, i32 arg)
     list_of_children.prev = NULL;
     list_of_children.unk_c = NULL;
     next_in_layer = NULL;
-    parent = NULL;
-    unk_5b0 = NULL;
+    root_vm = NULL;
+    parent_vm = NULL;
     slowdown = other.slowdown;
     entity_pos = other.entity_pos;
     associated_game_entity = other.associated_game_entity;
@@ -770,16 +770,16 @@ void AnmVm::copy_from(const AnmVm &other, i32 arg)
     index_of_on_draw = other.index_of_on_draw;
     index_of_on_destroy = other.index_of_on_destroy;
     index_of_on_interrupt = other.index_of_on_interrupt;
-    index_of_on_copy_1 = other.index_of_on_copy_1;
-    index_of_on_copy_2 = other.index_of_on_copy_2;
-    if (other.ins_508_extra_data != NULL)
+    index_of_on_copy = other.index_of_on_copy;
+    index_of_on_serialize = other.index_of_on_serialize;
+    if (other.extra_data != NULL)
     {
-        ins_508_extra_data_size = other.ins_508_extra_data_size;
-        ins_508_extra_data = malloc(ins_508_extra_data_size);
-        memcpy(ins_508_extra_data, other.ins_508_extra_data, ins_508_extra_data_size);
-        if (other.index_of_on_copy_1 != 0)
+        extra_data_size = other.extra_data_size;
+        extra_data = malloc(extra_data_size);
+        memcpy(extra_data, other.extra_data, extra_data_size);
+        if (other.index_of_on_copy != 0)
         {
-            g_anm_on_copy_funcs[other.index_of_on_copy_1](this, &other, arg);
+            g_anm_on_copy_funcs[other.index_of_on_copy](this, &other, arg);
         }
     }
 }
@@ -802,21 +802,21 @@ HARNESS_CALLED void AnmManager::save_vm_tree(AnmVm *dst, AnmVm *src, i32 *size)
     dst->list_of_children.next = NULL;
     dst->list_of_children.prev = NULL;
     dst->list_of_children.unk_c = NULL;
-    if (src->ins_508_extra_data_size != 0)
+    if (src->extra_data_size != 0)
     {
-        memcpy(cursor, src->ins_508_extra_data, src->ins_508_extra_data_size);
-        dst->ins_508_extra_data = cursor;
-        if (src->index_of_on_copy_2 != 0)
+        memcpy(cursor, src->extra_data, src->extra_data_size);
+        dst->extra_data = cursor;
+        if (src->index_of_on_serialize != 0)
         {
             i32 written = 0;
-            g_anm_serialize_funcs[src->index_of_on_copy_2](src, cursor, &written, 0);
+            g_anm_serialize_funcs[src->index_of_on_serialize](src, cursor, &written, 0);
             cursor += written;
             *size += written;
         }
         else
         {
-            cursor += src->ins_508_extra_data_size;
-            *size += src->ins_508_extra_data_size;
+            cursor += src->extra_data_size;
+            *size += src->extra_data_size;
         }
     }
     for (ZunList<AnmVm> *node = src->list_of_children.next; node != NULL; node = node->next)
@@ -842,15 +842,15 @@ HARNESS_CALLED AnmId AnmManager::load_vm_tree(AnmVm *src, AnmVm *parent, i32 *si
     }
     i32 id;
     AnmVm *vm = allocate_snapshot_vm(&id);
-    if (src->ins_508_extra_data_size != 0)
+    if (src->extra_data_size != 0)
     {
-        src->ins_508_extra_data = src + 1;
+        src->extra_data = src + 1;
     }
     i32 read = 0;
     vm->load_from(src, &read);
     *size += read;
     src = (AnmVm *)((u8 *)src + read);
-    vm->flags_hi |= ANM_VM_FLAG_HI_4000000;
+    vm->flags_hi |= ANM_VM_IS_SNAPSHOT;
     vm->id.id = id;
     snapshot_list_head.insert_after(&vm->node_in_global_list);
     if (parent != NULL)
@@ -874,15 +874,15 @@ HARNESS_CALLED AnmId AnmManager::load_vm_tree(AnmVm *src, AnmVm *parent, i32 *si
     return result;
 }
 
-// TODO: the original keeps src and src + 1 in stack slots (and a pointer to index_of_on_copy_2); ours keeps src + 1 in edi.
+// TODO: the original keeps src and src + 1 in stack slots (and a pointer to index_of_on_serialize); ours keeps src + 1 in edi.
 // FUNCTION: TH16 0x46ffb0
 HARNESS_CALLED void AnmVm::load_from(const AnmVm *src, i32 *size)
 {
     memcpy(this, src, offsetof(AnmVm, id));
     ZunTimer timer = src->script_time;
     script_time = timer.current;
-    timer = src->timer_1c;
-    timer_1c = timer.current;
+    timer = src->time_in_script;
+    time_in_script = timer.current;
     *size += sizeof(AnmVm);
     node_in_global_list.entry = this;
     node_in_global_list.next = NULL;
@@ -897,7 +897,7 @@ HARNESS_CALLED void AnmVm::load_from(const AnmVm *src, i32 *size)
     list_of_children.prev = NULL;
     list_of_children.unk_c = NULL;
     next_in_layer = NULL;
-    parent = NULL;
+    root_vm = NULL;
     slowdown = src->slowdown;
     entity_pos = src->entity_pos;
     associated_game_entity = src->associated_game_entity;
@@ -907,23 +907,23 @@ HARNESS_CALLED void AnmVm::load_from(const AnmVm *src, i32 *size)
     index_of_on_draw = src->index_of_on_draw;
     index_of_on_destroy = src->index_of_on_destroy;
     index_of_on_interrupt = src->index_of_on_interrupt;
-    index_of_on_copy_1 = src->index_of_on_copy_1;
-    index_of_on_copy_2 = src->index_of_on_copy_2;
+    index_of_on_copy = src->index_of_on_copy;
+    index_of_on_serialize = src->index_of_on_serialize;
     const u8 *extra = (const u8 *)(src + 1);
-    if (src->ins_508_extra_data != NULL)
+    if (src->extra_data != NULL)
     {
-        ins_508_extra_data_size = src->ins_508_extra_data_size;
-        ins_508_extra_data = malloc(ins_508_extra_data_size);
-        memcpy(ins_508_extra_data, extra, ins_508_extra_data_size);
-        if (src->index_of_on_copy_2 != 0)
+        extra_data_size = src->extra_data_size;
+        extra_data = malloc(extra_data_size);
+        memcpy(extra_data, extra, extra_data_size);
+        if (src->index_of_on_serialize != 0)
         {
             i32 read = 0;
-            g_anm_serialize_funcs[src->index_of_on_copy_2](this, (void *)extra, &read, 1);
+            g_anm_serialize_funcs[src->index_of_on_serialize](this, (void *)extra, &read, 1);
             *size += read;
         }
         else
         {
-            *size += ins_508_extra_data_size;
+            *size += extra_data_size;
         }
     }
 }
@@ -973,17 +973,17 @@ HARNESS_CALLED AnmId AnmManager::store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, 
     i32 id;
     AnmVm *copy = allocate_snapshot_vm(&id);
     copy->copy_from(*vm, 0);
-    copy->flags_hi |= ANM_VM_FLAG_HI_4000000;
+    copy->flags_hi |= ANM_VM_IS_SNAPSHOT;
     copy->id.id = id;
     snapshot_list_head.insert_after(&copy->node_in_global_list);
     if (parent != NULL)
     {
         ((ZunList<void> *)&parent->list_of_children)->append((ZunList<void> *)&copy->node_as_child);
-        if (parent->parent != NULL)
+        if (parent->root_vm != NULL)
         {
-            copy->parent = parent->parent;
+            copy->root_vm = parent->root_vm;
         }
-        copy->unk_5b0 = parent;
+        copy->parent_vm = parent;
     }
     for (ZunList<AnmVm> *node = vm->list_of_children.next; node != NULL; node = node->next)
     {
@@ -1020,20 +1020,20 @@ AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
     ENTER_CS(CS_ANM_MANAGER);
     AnmVm *vm = g_AnmManager->allocate_vm();
     vm->copy_from(*snapshot, 1);
-    vm->flags_hi &= ~ANM_VM_FLAG_HI_4000000;
+    vm->flags_hi &= ~ANM_VM_IS_SNAPSHOT;
     i32 mode = vm->mode_of_create_child;
     AnmId id;
-    if ((mode & 6) == 6)
+    if ((mode & ANM_CREATE_UI_FRONT) == ANM_CREATE_UI_FRONT)
     {
         id = g_AnmManager->insert_in_ui_list_front(vm);
-        vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
+        vm->flags_hi &= ~(ANM_VM_FREEZES_WITH_WORLD | ANM_VM_FREEZES_AFTER_FIRST_RUN);
     }
-    else if (mode & 4)
+    else if (mode & ANM_CREATE_UI)
     {
         id = g_AnmManager->insert_in_ui_list_back(vm);
-        vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
+        vm->flags_hi &= ~(ANM_VM_FREEZES_WITH_WORLD | ANM_VM_FREEZES_AFTER_FIRST_RUN);
     }
-    else if (mode & 2)
+    else if (mode & ANM_CREATE_FRONT)
     {
         id = g_AnmManager->insert_in_world_list_front(vm);
     }
@@ -1043,9 +1043,9 @@ AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
     }
     if (parent != NULL)
     {
-        AnmVm *root = parent->parent != NULL ? parent->parent : parent;
-        vm->unk_5b0 = parent;
-        vm->parent = root;
+        AnmVm *root = parent->root_vm != NULL ? parent->root_vm : parent;
+        vm->parent_vm = parent;
+        vm->root_vm = root;
         parent->list_of_children.insert_after(&vm->node_as_child);
     }
     LEAVE_CS(CS_ANM_MANAGER);

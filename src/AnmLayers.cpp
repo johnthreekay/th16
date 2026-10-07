@@ -1,12 +1,24 @@
 // AnmManager's per-layer draw callbacks. Each draws one layer's VMs at its
 // own UpdateFunc priority (the hex number in the name); some first switch
-// the camera or render state for the layers that follow.
+// the camera or render state for the layers that follow. In draw order:
+//
+//   priority  layer  before drawing
+//   05-09     0-2
+//   0a        3      stage camera (camera 3) updated and made current, no fog
+//   0b-2a     4-19   (12 comes before 13 at 1b)
+//   2d        20     game area 2D camera (camera 1), depth test off
+//   2e-36     21-23
+//   37        36     full screen camera (camera 2), depth test off
+//   3a        24     camera 2 again, camera_2d_offset cleared
+//   3b-3f     25, 37, 26, 27, 38
+//   40, 41    28, 39 drawn with camera 0, then back to camera 2
+//   4d-53     29, 40, 30, 41, 31, 42
+//
+// Layers 36-42 are the UI list's copies of 24-30 (AnmLayer), each right
+// after its twin.
 #include "AnmManager.h"
 #include "CriticalSections.h"
 #include "Supervisor.h"
-
-// 0x43c780. Recomputes a camera's matrices and viewport.
-void __stdcall camera_update_43c780(Camera *camera);
 
 // Makes one of the Supervisor's cameras the current one.
 inline void use_camera(i32 index)
@@ -25,13 +37,14 @@ inline void disable_depth_test()
     g_Supervisor.d3d_device->SetRenderState(D3DRS_ZFUNC, D3DCMP_ALWAYS);
 }
 
+// Draws the layer's VMs in tick order, skipping those being deleted.
 // FUNCTION: TH16 0x46e750
 i32 AnmManager::render_layer(i32 layer)
 {
     ENTER_CS(CS_ANM_MANAGER);
     for (AnmVm *vm = layer_list_dummy_heads[layer].next_in_layer; vm != NULL; vm = vm->next_in_layer)
     {
-        if (!(vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_FLAG_HI_40)))
+        if (!(vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_IN_DELETE_LIST)))
         {
             draw_vm(vm);
         }
@@ -241,7 +254,7 @@ int __fastcall AnmManager::on_draw_53_layer_42(AnmManager *mgr)
 // FUNCTION: TH16 0x46ddd0
 int __fastcall AnmManager::on_draw_0a_layer_03(AnmManager *mgr)
 {
-    camera_update_43c780(&g_Supervisor.cameras[3]);
+    camera_update_2d(&g_Supervisor.cameras[3]);
     use_camera(3);
     g_Supervisor.disable_d3d_fog_inline();
     return mgr->render_layer(3);
@@ -260,8 +273,8 @@ int __fastcall AnmManager::on_draw_3a_layer_24(AnmManager *mgr)
 {
     use_camera(2);
     disable_depth_test();
-    g_AnmManager->camera_unk_fc.x = 0.0f;
-    g_AnmManager->camera_unk_fc.y = 0.0f;
+    g_AnmManager->camera_2d_offset.x = 0.0f;
+    g_AnmManager->camera_2d_offset.y = 0.0f;
     return mgr->render_layer(24);
 }
 

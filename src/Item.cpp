@@ -14,6 +14,7 @@
 #include "PopupManager.h"
 #include "Rng.h"
 #include "SoundManager.h"
+#include "ZunAsm.h"
 #include "ZunList.h"
 
 // GLOBAL: TH16 0x4a6ddc
@@ -26,27 +27,14 @@ const i32 g_item_anm_scripts[17][2] = {
     {123, -1}, {124, -1}, {125, -1}, {-1, -1}, {129, -1},
 };
 
-i32 unit5_placeholder(void *object);
 i32 get_piv_rounded();
 
-// This file's copy of ZunMath.h's sincosmul, which TH16 keeps once per
+// This file's copy of sincosmul (ZunAsm.h), which TH16 keeps once per
 // object file. A static of its own so that it can be annotated.
 // FUNCTION: TH16 0x430df0
 static void __fastcall item_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-#ifdef TH16_PORT
-    port_sincosmul(&dst->x, angle, radius);
-#else
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
-#endif
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // FUNCTION: TH16 0x42f0b0
@@ -67,6 +55,7 @@ Item::~Item()
 {
 }
 
+// Registers the tick and the two draw callbacks.
 // FUNCTION: TH16 0x42f260
 DECOMP_NOINLINE i32 ItemManager::initialize()
 {
@@ -156,15 +145,15 @@ i32 ItemManager::on_tick_body()
 {
     Player *player = g_Player;
     Item *item = inner.items;
-    unk_1c972e4 = 0;
+    num_cancel_items_this_frame = 0;
     num_items_onscreen = 0;
     for (i32 i = 0; i < 0x1258; i++, item++)
     {
-        if (item->state == 0)
+        if (item->state == ITEM_STATE_FREE)
         {
             continue;
         }
-        if (item->state == 6)
+        if (item->state == ITEM_STATE_DELAYED)
         {
             if (--item->intangibility_frames >= 0)
             {
@@ -174,35 +163,35 @@ i32 ItemManager::on_tick_body()
             player = g_Player;
             continue;
         }
-        if (item->state == 1)
+        if (item->state == ITEM_STATE_FALLING)
         {
             goto state_1;
         }
-        if (item->state == 2)
+        if (item->state == ITEM_STATE_RISING)
         {
             item->position += item->velocity * g_game_speed;
             item->velocity.y += g_game_speed * 0.03f;
             if (item->velocity.y >= 0.0f)
             {
                 item->speed_towards_player = player->sht_file->grazebox_radius;
-                if (item->item_type != 16)
+                if (item->item_type != ITEM_SEASON)
                 {
                     goto start_autocollect;
                 }
-                item->state = 1;
+                item->state = ITEM_STATE_FALLING;
                 goto state_1;
             }
             if (item_offscreen(item))
             {
                 // release(), inlined here.
                 ItemList *head = item->node.head;
-                item->state = 0;
+                item->state = ITEM_STATE_FREE;
                 item->release_to(head);
                 continue;
             }
             goto collect;
         }
-        if (item->state == 3)
+        if (item->state == ITEM_STATE_SEASON)
         {
             item->position += item->velocity * g_game_speed;
             item->velocity.y += g_game_speed * 0.03f;
@@ -222,7 +211,7 @@ i32 ItemManager::on_tick_body()
                 item->speed = 0.0f;
                 item->angle = ZUN_PI / 2;
                 item->speed_towards_player = player->sht_file->grazebox_radius;
-                item->state = item->force_autocollect != 0 ? 4 : 1;
+                item->state = item->force_autocollect != 0 ? ITEM_STATE_AUTOCOLLECT : ITEM_STATE_FALLING;
                 goto state_1;
             }
             if (!item_offscreen(item))
@@ -234,15 +223,16 @@ i32 ItemManager::on_tick_body()
             player = g_Player;
             continue;
         }
-        if (item->state == 4)
+        if (item->state == ITEM_STATE_AUTOCOLLECT)
         {
             goto state_4;
         }
-        if (item->state != 5)
+        if (item->state != ITEM_STATE_ATTRACTED)
         {
             goto collect;
         }
-        if ((player->inner.state != 2 && player->inner.state != 4 && (f32)item_collect_line() > player->inner.pos.y) ||
+        if ((player->inner.state != PLAYER_STATE_DEAD && player->inner.state != PLAYER_STATE_HIT &&
+             (f32)item_collect_line() > player->inner.pos.y) ||
             (g_MainBomb->in_use == 1 && g_MainBomb->timer.current < 60) || g_SubseasonBomb->is_active_before(10000) ||
             g_Gui->msg != NULL)
         {
@@ -255,9 +245,9 @@ i32 ItemManager::on_tick_body()
             item->speed_towards_player += 0.2f;
         }
         player = g_Player;
-        if (player->inner.state == 4)
+        if (player->inner.state == PLAYER_STATE_HIT)
         {
-            item->state = 1;
+            item->state = ITEM_STATE_FALLING;
             item->velocity.x = 0.0f;
             item->velocity.y = 0.0f;
         }
@@ -274,7 +264,8 @@ i32 ItemManager::on_tick_body()
             player = g_Player;
             continue;
         }
-        if ((player->inner.state != 2 && player->inner.state != 4 && (f32)item_collect_line() > player->inner.pos.y) ||
+        if ((player->inner.state != PLAYER_STATE_DEAD && player->inner.state != PLAYER_STATE_HIT &&
+             (f32)item_collect_line() > player->inner.pos.y) ||
             (g_MainBomb->in_use == 1 && g_MainBomb->timer.current < 60) ||
             (g_SubseasonBomb->in_use == 1 && g_SubseasonBomb->timer.current < 10000) || g_Gui->msg != NULL)
         {
@@ -317,10 +308,10 @@ i32 ItemManager::on_tick_body()
     autocollect:
         item->speed_towards_player = player->sht_file->grazebox_radius;
     start_autocollect:
-        item->state = 4;
+        item->state = ITEM_STATE_AUTOCOLLECT;
     state_4:
-        if (item->item_type != 9 && item->item_type != 10 && item->item_type != 11 && item->item_type != 12 &&
-            item->item_type != 13 && item->item_type != 14)
+        if (item->item_type != ITEM_PIV_5 && item->item_type != ITEM_PIV_10 && item->item_type != ITEM_PIV_20 && item->item_type != ITEM_PIV_30 &&
+            item->item_type != ITEM_PIV_40 && item->item_type != ITEM_PIV_50)
         {
             g_Globals.unk_dc = 8;
         }
@@ -331,15 +322,15 @@ i32 ItemManager::on_tick_body()
             item->speed_towards_player += 0.2f;
         }
         player = g_Player;
-        if (player->inner.state == 4)
+        if (player->inner.state == PLAYER_STATE_HIT)
         {
-            item->state = 1;
+            item->state = ITEM_STATE_FALLING;
             item->velocity.x = 0.0f;
             item->velocity.y = 0.0f;
         }
 
     collect:
-        if (player->inner.state != 2)
+        if (player->inner.state != PLAYER_STATE_DEAD)
         {
             Float3 half(0.0f, 0.0f, 0.0f);
             if (player->item_collect_box.min_pos.x <= item->position.x + half.x &&
@@ -349,39 +340,39 @@ i32 ItemManager::on_tick_body()
             {
                 switch (item->item_type)
                 {
-                case 8:
+                case ITEM_F:
                     item->collect_full_power();
                     break;
-                case 1:
+                case ITEM_POWER:
                     item->collect_power();
                     break;
-                case 3:
+                case ITEM_BIG_POWER:
                     item->collect_big_power();
                     break;
-                case 2:
+                case ITEM_POINT:
                     item->collect_point();
                     break;
-                case 5:
+                case ITEM_LIFE:
                     if (g_Globals.collect_extend(0))
                     {
-                        g_SoundManager.play_sound_centered(0x11, 0);
-                        g_Gui->sub_42bcf0(0, 4);
+                        g_SoundManager.play_sound_centered(SE_EXTEND, 0);
+                        g_Gui->show_notice(0, GUI_NOTICE_EXTEND);
                     }
                     break;
-                case 6:
+                case ITEM_BOMB_PIECE:
                     g_Globals.collect_bomb_fragment(0);
                     break;
-                case 7:
+                case ITEM_BOMB:
                     g_Globals.collect_bomb(0);
                     break;
-                case 9:
-                case 10:
-                case 11:
-                case 12:
-                case 13:
-                case 14:
+                case ITEM_PIV_5:
+                case ITEM_PIV_10:
+                case ITEM_PIV_20:
+                case ITEM_PIV_30:
+                case ITEM_PIV_40:
+                case ITEM_PIV_50:
                 {
-                    f32 value = g_cancel_item_piv[item->item_type - 9];
+                    f32 value = g_cancel_item_piv[item->item_type - ITEM_PIV_5];
                     item->collect_piv(value);
                     g_SubseasonBomb->release_bonus += value;
                     g_Globals.add_to_score(get_piv_rounded() / 100 * 10);
@@ -392,7 +383,7 @@ i32 ItemManager::on_tick_body()
                     {
                         g_Player->inner.repopulate_options();
                         g_PopupManager->generate_small_score_popup(&item->position, -1, 0xffffff40);
-                        g_SoundManager.play_sound_at_position(0x3f, item->position.x);
+                        g_SoundManager.play_sound_at_position(SE_LGODSGET, item->position.x);
                     }
                     g_Globals.add_to_score(10);
                     Gui::update_season_gauge();
@@ -402,11 +393,11 @@ i32 ItemManager::on_tick_body()
                 }
                 player = g_Player;
             collected:
-                g_SoundManager.play_sound_at_position(0x25, item->position.x);
+                g_SoundManager.play_sound_at_position(SE_ITEM00, item->position.x);
                 item->release();
                 continue;
             }
-            if (item->state != 5 && item->state != 4 && item->state != 3)
+            if (item->state != ITEM_STATE_ATTRACTED && item->state != ITEM_STATE_AUTOCOLLECT && item->state != ITEM_STATE_SEASON)
             {
                 u32 focused = g_InputState.input & INPUT_FOCUS;
                 if ((focused && player->item_attract_box_focused.min_pos.x <= item->position.x + half.x &&
@@ -418,10 +409,10 @@ i32 ItemManager::on_tick_body()
                      item->position.x <= player->item_attract_box_unfocused.max_pos.x &&
                      item->position.y <= player->item_attract_box_unfocused.max_pos.y))
                 {
-                    if (item->item_type != 9 && item->item_type != 10 && item->item_type != 11 &&
-                        item->item_type != 12 && item->item_type != 13 && item->item_type != 14)
+                    if (item->item_type != ITEM_PIV_5 && item->item_type != ITEM_PIV_10 && item->item_type != ITEM_PIV_20 &&
+                        item->item_type != ITEM_PIV_30 && item->item_type != ITEM_PIV_40 && item->item_type != ITEM_PIV_50)
                     {
-                        item->state = 5;
+                        item->state = ITEM_STATE_ATTRACTED;
                         item->speed_towards_player = player->sht_file->grazebox_radius / 3.0f;
                     }
                 }
@@ -452,7 +443,7 @@ i32 __fastcall ItemManager::on_tick_callback(ItemManager *mgr)
 {
     if (g_GameThread != NULL)
     {
-        if (g_GameThread->flags.flag_0 | g_GameThread->flags.paused)
+        if (g_GameThread->flags.flag_0 | g_GameThread->flags.loading)
         {
             return 1;
         }
@@ -467,7 +458,7 @@ i32 __fastcall ItemManager::on_tick_callback(ItemManager *mgr)
 // FUNCTION: TH16 0x430920
 i32 __fastcall ItemManager::on_draw_1_callback(ItemManager *mgr)
 {
-    if (g_GameThread != NULL && g_GameThread->flags.paused)
+    if (g_GameThread != NULL && g_GameThread->flags.loading)
     {
         return 1;
     }
@@ -482,18 +473,18 @@ i32 ItemManager::on_draw_body(i32 layer)
     Item *item = inner.items;
     for (i32 i = 0; i < 0x1258; i++, item++)
     {
-        if (item->state == 0 || !(item->vm.flags_lo & ANM_VM_VISIBLE) || item->intangibility_frames > 0)
+        if (item->state == ITEM_STATE_FREE || !(item->vm.flags_lo & ANM_VM_VISIBLE) || item->intangibility_frames > 0)
         {
             continue;
         }
         if (layer == 0)
         {
-            if (item->item_type != 16)
+            if (item->item_type != ITEM_SEASON)
             {
                 continue;
             }
         }
-        else if (layer == 1 && item->item_type == 16)
+        else if (layer == 1 && item->item_type == ITEM_SEASON)
         {
             continue;
         }
@@ -529,7 +520,7 @@ i32 ItemManager::on_draw_body(i32 layer)
 // FUNCTION: TH16 0x430940
 i32 __fastcall ItemManager::on_draw_2_callback(ItemManager *mgr)
 {
-    if (g_GameThread != NULL && g_GameThread->flags.paused)
+    if (g_GameThread != NULL && g_GameThread->flags.loading)
     {
         return 1;
     }
@@ -540,7 +531,7 @@ i32 __fastcall ItemManager::on_draw_2_callback(ItemManager *mgr)
 void Item::release()
 {
     ItemList *head = node.head;
-    state = 0;
+    state = ITEM_STATE_FREE;
     if (head->next != NULL)
     {
         node.next = head->next;
@@ -564,6 +555,7 @@ HARNESS_CALLED void Item::collect_piv(f32 value)
     }
 }
 
+// Clears every item and puts them back on the two free lists.
 // FUNCTION: TH16 0x4184a0
 void ItemManager::destroy_all()
 {
@@ -604,14 +596,14 @@ void ItemManager::destroy_all()
 // FUNCTION: TH16 0x430c90
 i32 Item::init_anm()
 {
-    if (item_type == 16)
+    if (item_type == ITEM_SEASON)
     {
-        state = 3;
+        state = ITEM_STATE_SEASON;
         g_BulletManager->bullet_anm->copy_vm_and_run(&vm, g_Globals.subseason + 0x81);
     }
     else
     {
-        state = 2;
+        state = ITEM_STATE_RISING;
         g_BulletManager->bullet_anm->copy_vm_and_run(&vm, g_item_anm_scripts[item_type][0]);
     }
     vm_2.flags_lo &= ~ANM_VM_VISIBLE;
@@ -622,23 +614,23 @@ i32 Item::init_anm()
 // FUNCTION: TH16 0x430d10
 i32 Item::spawn_effect()
 {
-    if (item_type == 4 || item_type == 6 || item_type == 15 || item_type == 5 || item_type == 7)
+    if (item_type == ITEM_LIFE_PIECE || item_type == ITEM_BOMB_PIECE || item_type == ITEM_DDC || item_type == ITEM_LIFE || item_type == ITEM_BOMB)
     {
         g_EffectManager->effect_anm->create_vm(0x65, &position, 0.0f, -1, 0);
-        if (item_type == 4 || item_type == 5)
+        if (item_type == ITEM_LIFE_PIECE || item_type == ITEM_LIFE)
         {
-            g_SoundManager.play_sound_centered(0x4a, 0);
+            g_SoundManager.play_sound_centered(SE_BONUS4, 0);
         }
         else
         {
-            g_SoundManager.play_sound_centered(0x30, 0);
+            g_SoundManager.play_sound_centered(SE_BONUS2, 0);
         }
     }
     return 0;
 }
 
-// TODO: the original reserves 8 bytes of unused locals and saves esi up
-// front; ours shrink-wraps the push of esi into the normal-item branch.
+// TODO: the original reserves 8 bytes of unused locals (alignment padding)
+// and loads g_BulletManager before the second copy_vm_and_run's arguments.
 // FUNCTION: TH16 0x430960
 HARNESS_CALLED Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f32 angle, f32 speed, i32 unk_6,
                               i32 force_autocollect)
@@ -646,21 +638,21 @@ HARNESS_CALLED Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f
     ItemManager *mgr = g_ItemManager;
     Item *item;
     mgr->total_items_created++;
-    if (type == 9 || type == 10 || type == 11 || type == 12 || type == 13 || type == 14 || type == 16)
+    if (type == ITEM_PIV_5 || type == ITEM_PIV_10 || type == ITEM_PIV_20 || type == ITEM_PIV_30 || type == ITEM_PIV_40 || type == ITEM_PIV_50 || type == ITEM_SEASON)
     {
         item = (Item *)mgr->inner.cancel_freelist.next;
         if (item != NULL)
         {
             item->unk_c64 = mgr->unk_1c972e8;
-            if (mgr->unk_1c972e4 >= 0x400)
+            if (mgr->num_cancel_items_this_frame >= 0x400)
             {
                 item->intangibility_frames = mgr->total_items_created % 32 + 16;
             }
-            else if (mgr->unk_1c972e4 >= 0x200)
+            else if (mgr->num_cancel_items_this_frame >= 0x200)
             {
                 item->intangibility_frames = mgr->total_items_created % 16 + 8;
             }
-            else if (mgr->unk_1c972e4 >= 0x100)
+            else if (mgr->num_cancel_items_this_frame >= 0x100)
             {
                 item->intangibility_frames = mgr->total_items_created % 8 + 4;
             }
@@ -668,7 +660,7 @@ HARNESS_CALLED Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f
             {
                 item->intangibility_frames = mgr->total_items_created % 4;
             }
-            item->state = 6;
+            item->state = ITEM_STATE_DELAYED;
             item->item_type = type;
             item->unk_c58 = type;
             item->position = *pos;
@@ -695,7 +687,7 @@ HARNESS_CALLED Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f
         item = (Item *)mgr->inner.normal_freelist.next;
         if (item != NULL)
         {
-            item->state = 1;
+            item->state = ITEM_STATE_FALLING;
             item->position = *pos;
             if (item->position.x <= -192.0f)
             {
@@ -705,11 +697,11 @@ HARNESS_CALLED Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f
             {
                 item->position.x = 192.0f;
             }
-            if (type == 15)
+            if (type == ITEM_DDC)
             {
                 g_Globals.item_spawn_count++;
             }
-            i32 anm_type = type != 15 ? type : 6;
+            i32 anm_type = type != ITEM_DDC ? type : 6;
             item_sincosmul(&item->velocity, angle, speed);
             item->velocity.z = 0.0f;
             item->time.set_value(0);
@@ -743,13 +735,13 @@ void Item::collect_full_power()
         }
         g_Globals.piv = piv;
         g_PopupManager->generate_small_score_popup(&position, 100, 0xff40ff40);
-        g_SoundManager.play_sound_at_position(0xd, position.x);
+        g_SoundManager.play_sound_at_position(SE_POWERUP, position.x);
     }
     if (g_Globals.add_power(g_Globals.max_power))
     {
         g_Player->inner.repopulate_options();
         g_PopupManager->generate_small_score_popup(&position, -1, 0xffffff40);
-        g_SoundManager.play_sound_at_position(0xd, position.x);
+        g_SoundManager.play_sound_at_position(SE_POWERUP, position.x);
     }
 }
 
@@ -763,7 +755,7 @@ void Item::collect_power()
     if (g_Globals.power >= g_Globals.max_power)
     {
         i32 line = item_collect_line();
-        if ((f32)line >= player_y || state == 4)
+        if ((f32)line >= player_y || state == ITEM_STATE_AUTOCOLLECT)
         {
             value = g_Globals.piv / 100;
             value -= value % 10;
@@ -773,8 +765,8 @@ void Item::collect_power()
                 value = 10;
             }
             g_PopupManager->generate_small_score_popup(&position, value, 0xffffff00);
-            g_Globals.unk_d8++;
-            g_Globals.unk_d0 += value;
+            g_Globals.full_value_item_count++;
+            g_Globals.full_value_item_score += value;
             g_Globals.last_collect_pos = g_Player->inner.pos;
             g_PopupManager->generate_small_score_popup(&position, value, -1);
         }
@@ -798,15 +790,15 @@ void Item::collect_power()
         {
             g_Player->inner.repopulate_options();
             g_PopupManager->generate_small_score_popup(&position, -1, 0xffffff40);
-            g_SoundManager.play_sound_at_position(0xd, position.x);
+            g_SoundManager.play_sound_at_position(SE_POWERUP, position.x);
         }
         value = 100;
     }
     g_Globals.add_to_score(value);
-    if ((f32)item_collect_line() >= player_y || state == 4)
+    if ((f32)item_collect_line() >= player_y || state == ITEM_STATE_AUTOCOLLECT)
     {
-        g_Globals.unk_d8++;
-        g_Globals.unk_d0 += value;
+        g_Globals.full_value_item_count++;
+        g_Globals.full_value_item_score += value;
         g_Globals.last_collect_pos = g_Player->inner.pos;
     }
 }
@@ -822,7 +814,7 @@ void Item::collect_big_power()
         value = 20000;
         g_Globals.add_to_score(20000);
         g_PopupManager->generate_small_score_popup(&position, 20000, 0xff808080);
-        g_SoundManager.play_sound_at_position(0xd, position.x);
+        g_SoundManager.play_sound_at_position(SE_POWERUP, position.x);
     }
     else
     {
@@ -830,15 +822,15 @@ void Item::collect_big_power()
         if (g_Globals.add_power(g_Globals.power_per_level))
         {
             g_Player->inner.repopulate_options();
-            g_SoundManager.play_sound_at_position(0xd, position.x);
+            g_SoundManager.play_sound_at_position(SE_POWERUP, position.x);
             g_PopupManager->generate_small_score_popup(&position, -1, 0xffffff40);
         }
     }
     g_Globals.add_to_score(value);
-    if ((f32)item_collect_line() >= player_y || state == 4)
+    if ((f32)item_collect_line() >= player_y || state == ITEM_STATE_AUTOCOLLECT)
     {
-        g_Globals.unk_d8++;
-        g_Globals.unk_d0 += value;
+        g_Globals.full_value_item_count++;
+        g_Globals.full_value_item_score += value;
         g_Globals.last_collect_pos = g_Player->inner.pos;
     }
 }
@@ -851,7 +843,7 @@ void Item::collect_point()
     i32 line = item_collect_line();
     Player *player = g_Player;
     i32 value;
-    if ((f32)line >= player->inner.pos.y || state == 4)
+    if ((f32)line >= player->inner.pos.y || state == ITEM_STATE_AUTOCOLLECT)
     {
         value = g_Globals.piv / 100;
         value -= value % 10;
@@ -861,8 +853,8 @@ void Item::collect_point()
             value = 10;
         }
         g_PopupManager->generate_small_score_popup(&position, value, 0xffffff00);
-        g_Globals.unk_d8++;
-        g_Globals.unk_d0 += value;
+        g_Globals.full_value_item_count++;
+        g_Globals.full_value_item_score += value;
         g_Globals.last_collect_pos = player->inner.pos;
     }
     else

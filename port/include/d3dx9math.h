@@ -124,6 +124,38 @@ struct D3DXVECTOR3 : public D3DVECTOR
 };
 typedef D3DXVECTOR3 *LPD3DXVECTOR3;
 
+// A D3DXVECTOR3 for members of anonymous structs (an MSVC extension that
+// GCC only allows for members without constructors, which D3DXVECTOR3 has;
+// used by Bomb.h's BombReimuAOrb). The same layout with no constructors:
+// it converts to and from D3DXVECTOR3, its address is a D3DXVECTOR3 *, and
+// it has D3DXVECTOR3's arithmetic.
+struct PortAnonVec3 : public D3DVECTOR
+{
+    PortAnonVec3 &operator=(const D3DVECTOR &v)
+    {
+        x = v.x;
+        y = v.y;
+        z = v.z;
+        return *this;
+    }
+    D3DXVECTOR3 *operator&() { return (D3DXVECTOR3 *)this; }
+    const D3DXVECTOR3 *operator&() const { return (const D3DXVECTOR3 *)this; }
+    operator D3DXVECTOR3 &() { return *(D3DXVECTOR3 *)this; }
+    operator const D3DXVECTOR3 &() const { return *(const D3DXVECTOR3 *)this; }
+    D3DXVECTOR3 &vec() { return *(D3DXVECTOR3 *)this; }
+    const D3DXVECTOR3 &vec() const { return *(const D3DXVECTOR3 *)this; }
+
+    D3DXVECTOR3 &operator+=(const D3DXVECTOR3 &v) { return vec() += v; }
+    D3DXVECTOR3 &operator-=(const D3DXVECTOR3 &v) { return vec() -= v; }
+    D3DXVECTOR3 &operator*=(FLOAT f) { return vec() *= f; }
+    D3DXVECTOR3 &operator/=(FLOAT f) { return vec() /= f; }
+    D3DXVECTOR3 operator-() const { return -vec(); }
+    D3DXVECTOR3 operator+(const D3DXVECTOR3 &v) const { return vec() + v; }
+    D3DXVECTOR3 operator-(const D3DXVECTOR3 &v) const { return vec() - v; }
+    D3DXVECTOR3 operator*(FLOAT f) const { return vec() * f; }
+    D3DXVECTOR3 operator/(FLOAT f) const { return vec() / f; }
+};
+
 struct D3DXVECTOR4
 {
     FLOAT x;

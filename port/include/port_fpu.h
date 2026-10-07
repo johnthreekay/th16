@@ -1,5 +1,5 @@
-// Portable stand-ins for the x87 inline assembly in the game (the TH16_PORT
-// branches next to each __asm block call these).
+// Portable stand-ins for the x87 inline assembly in the game: the TH16_PORT
+// branches of the src/ZunAsm.h macros call these.
 //
 // The original evaluates these on the x87 stack: the angle is loaded from a
 // float, fsincos produces 64-bit-mantissa results, and the products are
@@ -38,8 +38,8 @@ static inline void port_fsincos(float angle, port_x87_t *sine, port_x87_t *cosin
 #endif
 }
 
-// The sincosmul blocks: fld angle; fsincos; fmul rx; fstp [x]; fmul ry;
-// fstp [y].
+// ZUN_ASM_SINCOSMUL_XY, ZUN_ASM_SINCOSMUL and ZUN_ASM_SINCOSMUL_PTRS:
+// fld angle; fsincos; fmul rx; fstp [x]; fmul ry; fstp [y].
 static inline void port_sincosmul2(float *x, float *y, float angle, float rx, float ry)
 {
     port_x87_t s;
@@ -49,14 +49,7 @@ static inline void port_sincosmul2(float *x, float *y, float angle, float rx, fl
     *y = (float)(s * (port_x87_t)ry);
 }
 
-// dst[0] = radius * cos(angle), dst[1] = radius * sin(angle), for a Float3 or
-// D3DXVECTOR3 (anything with float x and y as its first members).
-static inline void port_sincosmul(float *dst, float angle, float radius)
-{
-    port_sincosmul2(&dst[0], &dst[1], angle, radius, radius);
-}
-
-// fld angle; fsincos; fstp cosine; fstp sine.
+// ZUN_ASM_SINCOS: fld angle; fsincos; fstp cosine; fstp sine.
 static inline void port_sincos(float angle, float *sine, float *cosine)
 {
     port_x87_t s;
@@ -66,6 +59,7 @@ static inline void port_sincos(float angle, float *sine, float *cosine)
     *sine = (float)s;
 }
 
+// ZUN_ASM_SNAP_QUAD_TO_PIXEL_CENTERS, per coordinate:
 // fld x; frndint; fsub half: round to nearest (even) in the default
 // rounding mode, then subtract. One rounding to float either way, so float
 // arithmetic gives the same result as the x87 sequence.
@@ -74,7 +68,7 @@ static inline float port_frndint_sub(float x, float sub)
     return (float)(nearbyintf(x) - sub);
 }
 
-// __asm finit. The x87 unit's default state (round to nearest, 64-bit
+// ZUN_ASM_FINIT (__asm finit). The x87 unit's default state (round to nearest, 64-bit
 // precision) is what Linux and macOS start threads with, and the port's
 // float math does not go through the x87 stack, so there is nothing to
 // reset.

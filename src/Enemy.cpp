@@ -20,6 +20,7 @@
 #include "SoundManager.h"
 #include "Supervisor.h"
 #include "UpdateFunc.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
 static_assert(sizeof(PosVel) == 0x44, "PosVel size");
@@ -32,7 +33,7 @@ static_assert(sizeof(EnemyManager) == 0x190, "EnemyManager size");
 i32 EnemyLife::receive_damage(i32 damage)
 {
     total_damage_including_ignored += damage;
-    if (is_spell & 1)
+    if (is_spell & ENEMY_LIFE_SPELL)
     {
         current_scaled_by_seven -= damage;
         return current = (current_scaled_by_seven - starting_value_for_next_attack * 7) / 7 +
@@ -99,7 +100,7 @@ EnemyInf::EnemyInf(const char *sub_name)
     context.current_context->cur_location.subroutine_index = file_manager->find_sub_by_name(sub_name);
     context.current_context->cur_location.offset_from_first_instruction = 0;
     context.current_context->time = 0.0f;
-    enemy.life.is_spell &= ~2;
+    enemy.life.is_spell &= ~ENEMY_LIFE_KILL;
     enemy.life.current = 0;
     enemy.life.maximum = 0;
     enemy.life.remaining_for_cur_attack = 0;
@@ -112,10 +113,10 @@ EnemyInf::EnemyInf(const char *sub_name)
     }
     for (int i = 0; i < 16; i++)
     {
-        enemy.unk_224[i] = -1;
+        enemy.anm_parent_slot[i] = -1;
     }
     enemy.bomb_damage_multiplier = 1.0f;
-    enemy.unk_452c = 0;
+    enemy.chapter_count = 0;
 }
 
 // FUNCTION: TH16 0x41a8c0
@@ -128,7 +129,7 @@ HARNESS_CALLED int EnemyManager::get_enemy_count()
     {
         next = node->next;
         EnemyInf *enemy = node->entry;
-        BOOL ignored = (enemy->enemy.flags_low & 0x31) || enemy->enemy.set_invuln.current > 0 ? TRUE : FALSE;
+        BOOL ignored = (enemy->enemy.flags_low & ENEMY_FLAGS_UNDAMAGEABLE) || enemy->enemy.set_invuln.current > 0 ? TRUE : FALSE;
         if (!ignored)
         {
             count++;
@@ -151,9 +152,9 @@ HARNESS_CALLED void EnemyManager::set_boss_id(int index, EnemyInf *enemy)
 }
 
 // FUNCTION: TH16 0x41a950
-HARNESS_CALLED void EnemyManager::set_boss_bit(int value)
+HARNESS_CALLED void EnemyManager::set_life_bar_hidden(int value)
 {
-    inner.boss_bit = value;
+    inner.life_bar_hidden = value;
 }
 
 // FUNCTION: TH16 0x41a980
@@ -173,6 +174,7 @@ HARNESS_CALLED BOOL EnemyManager::is_enemy_alive(int id)
     return FALSE;
 }
 
+// The live enemy with the given id, NULL if there is none.
 // FUNCTION: TH16 0x41a9c0
 EnemyInf *EnemyManager::find_enemy_by_id(int id)
 {
@@ -194,6 +196,8 @@ EnemyInf *EnemyManager::find_enemy_by_id(int id)
     return enemy;
 }
 
+// Loads the stage's ECL file, points the first two ANM slots at bullet.anm
+// and the effect ANM, and registers the tick and draw callbacks.
 // FUNCTION: TH16 0x41ae70
 int EnemyManager::initialize(const char *ecl_filename)
 {
@@ -224,6 +228,8 @@ int EnemyManager::initialize(const char *ecl_filename)
     return 0;
 }
 
+// Deletes every enemy, the ECL files and the stage's enemy ANM files
+// (slots 10 to 15).
 // FUNCTION: TH16 0x41b1a0
 EnemyManager::~EnemyManager()
 {
@@ -258,6 +264,7 @@ HARNESS_CALLED EnemyManager *EnemyManager::create(const char *ecl_filename)
     return mgr;
 }
 
+// Unlinks an enemy from the active list (its destructor calls this).
 // FUNCTION: TH16 0x41ade0
 HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
 {
@@ -284,7 +291,7 @@ HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
     }
     node->next = NULL;
     node->prev = NULL;
-    if (!(enemy->enemy.flags_high & 4))
+    if (!(enemy->enemy.flags_high & ENEMY_FLAG_HIGH_4))
     {
         enemy_count_real--;
     }
@@ -295,15 +302,15 @@ HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
 // FUNCTION: TH16 0x41b3d0
 int EnemyManager::update()
 {
-    inner.unk_a0[0] = 0;
-    inner.unk_a0[1] = 0;
+    inner.damage_this_frame[0] = 0;
+    inner.damage_this_frame[1] = 0;
     EnemyList *next;
     for (EnemyList *node = active_enemy_list_head; node != NULL; node = next)
     {
         next = node->next;
-        if (!(node->entry->enemy.flags_low & 0x2000000) && node->entry->on_tick() == 0)
+        if (!(node->entry->enemy.flags_low & ENEMY_FLAG_DELETE) && node->entry->on_tick() == 0)
         {
-            node->entry->enemy.flags_low &= ~0x40000;
+            node->entry->enemy.flags_low &= ~ENEMY_FLAG_TICKED;
         }
         else
         {
@@ -312,17 +319,19 @@ int EnemyManager::update()
     }
     if (g_Player->damage_multiplier > 1.01f)
     {
-        g_Player->inner.flags |= 0x20;
+        g_Player->inner.flags |= PLAYER_FLAG_DAMAGE_BOOSTED;
     }
     else
     {
-        g_Player->inner.flags &= ~0x20;
+        g_Player->inner.flags &= ~PLAYER_FLAG_DAMAGE_BOOSTED;
     }
     g_Player->damage_multiplier = 1.0f;
     inner.time_in_stage.tick();
     return UPDATE_FUNC_CONTINUE;
 }
 
+// Runs update unless the game is paused (or GameThread flag_1 or flag_10
+// is set).
 // FUNCTION: TH16 0x41b4f0
 int __fastcall EnemyManager::on_tick_callback(EnemyManager *mgr)
 {
@@ -330,7 +339,7 @@ int __fastcall EnemyManager::on_tick_callback(EnemyManager *mgr)
     {
         return UPDATE_FUNC_CONTINUE;
     }
-    if (g_GameThread->flags.flag_0 | g_GameThread->flags.paused)
+    if (g_GameThread->flags.flag_0 | g_GameThread->flags.loading)
     {
         return UPDATE_FUNC_CONTINUE;
     }
@@ -351,6 +360,8 @@ int __fastcall EnemyManager::on_draw_callback(EnemyManager *mgr)
     return UPDATE_FUNC_CONTINUE;
 }
 
+// The enemy with this id. When the id is gone it returns the last enemy
+// of the list (NULL only for an empty list or id 0).
 // FUNCTION: TH16 0x41b540
 EnemyInf *EnemyRef::get()
 {
@@ -429,6 +440,8 @@ DECOMP_NOINLINE f32 *EnemyData::get_float_arg_ptr(int index)
     return full->context.current_context->get_float_arg_ptr(index);
 }
 
+// The targetable enemy closest to pos within max_dist (homing shots);
+// id 0 if there is none.
 // FUNCTION: TH16 0x425240
 HARNESS_CALLED EnemyRef EnemyManager::find_closest(D3DXVECTOR3 *pos, f32 max_dist)
 {
@@ -439,7 +452,7 @@ HARNESS_CALLED EnemyRef EnemyManager::find_closest(D3DXVECTOR3 *pos, f32 max_dis
     {
         next = node->next;
         EnemyInf *enemy = node->entry;
-        if (enemy->enemy.flags_low & 0xc000021)
+        if (enemy->enemy.flags_low & ENEMY_FLAGS_UNTARGETABLE)
         {
             continue;
         }
@@ -467,14 +480,14 @@ int __fastcall ecl_funcset_cancel_near_player(EnemyData *enemy)
     Bullet *b = mgr->iter_first();
     while (b != NULL)
     {
-        if (b->unk_c4c == 1)
+        if (b->ex_tag == 1)
         {
             f32 dy = g_Player->inner.pos.y - b->pos.y;
             f32 dx = g_Player->inner.pos.x - b->pos.x;
             if (enemy->ecl_float_vars[0] * enemy->ecl_float_vars[0] > dx * dx + dy * dy)
             {
-                b->unk_c60 = 8;
-                b->unk_c4c = 2;
+                b->ex_index = 8;
+                b->ex_tag = 2;
                 b->active_ex_flags = 0;
             }
         }
@@ -549,15 +562,15 @@ int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage)
 static inline void enemy_play_hit_sound(EnemyData *enemy, i32 low_life_spell, i32 low_life)
 {
     u32 spell_flags = g_Spellcard->flags;
-    if ((enemy->flags_low & 0x40800000) && (spell_flags & 9) != 9 &&
-        (((spell_flags & 1) && enemy->full->enemy.life.remaining_for_cur_attack < low_life_spell) ||
-         (!(spell_flags & 1) && enemy->full->enemy.life.remaining_for_cur_attack < low_life)))
+    if ((enemy->flags_low & (ENEMY_FLAG_BIG_LIFE | ENEMY_FLAG_BOSS)) && (spell_flags & (SPELLCARD_ACTIVE | SPELLCARD_NO_BONUS_DECAY)) != (SPELLCARD_ACTIVE | SPELLCARD_NO_BONUS_DECAY) &&
+        (((spell_flags & SPELLCARD_ACTIVE) && enemy->full->enemy.life.remaining_for_cur_attack < low_life_spell) ||
+         (!(spell_flags & SPELLCARD_ACTIVE) && enemy->full->enemy.life.remaining_for_cur_attack < low_life)))
     {
-        g_SoundManager.play_sound_at_position(0x23, enemy->final_pos.pos.x);
+        g_SoundManager.play_sound_at_position(SE_DAMAGE01, enemy->final_pos.pos.x);
     }
     else
     {
-        g_SoundManager.play_sound_at_position(0x22, enemy->final_pos.pos.x);
+        g_SoundManager.play_sound_at_position(SE_DAMAGE00, enemy->final_pos.pos.x);
     }
 }
 
@@ -568,24 +581,24 @@ static inline void enemy_play_hit_sound(EnemyData *enemy, i32 low_life_spell, i3
 // FUNCTION: TH16 0x41c330
 int EnemyData::step_logic()
 {
-    if ((flags_low & 0x10000000) && (g_MainBomb->in_use == 1 || g_SubseasonBomb->in_use == 1) &&
-        !(flags_low & 0x20000000))
+    if ((flags_low & ENEMY_FLAG_BOMBSHIELD) && (g_MainBomb->in_use == 1 || g_SubseasonBomb->in_use == 1) &&
+        !(flags_low & ENEMY_FLAG_BOMBSHIELD_UP))
     {
         anm_set_main = bombshield_on_anm_main;
         anm_ids[0].replace_with_effect(bombshield_on_anm_main);
-        flags_low |= 0x20000001;
+        flags_low |= (ENEMY_FLAG_BOMBSHIELD_UP | ENEMY_FLAG_NO_HURTBOX);
     }
-    else if (g_MainBomb->in_use != 1 && g_SubseasonBomb->in_use != 1 && (flags_low & 0x20000000))
+    else if (g_MainBomb->in_use != 1 && g_SubseasonBomb->in_use != 1 && (flags_low & ENEMY_FLAG_BOMBSHIELD_UP))
     {
         anm_set_main = bombshield_off_anm_main;
         anm_ids[0].replace_with_effect(bombshield_off_anm_main);
-        flags_low &= ~0x20000001;
+        flags_low &= ~(ENEMY_FLAG_BOMBSHIELD_UP | ENEMY_FLAG_NO_HURTBOX);
     }
-    if (flags_low & 0x800)
+    if (flags_low & ENEMY_FLAG_DIE_ON_HIT)
     {
         i32 hit = 0;
         i32 result;
-        if (!(flags_low & 0x1000))
+        if (!(flags_low & ENEMY_FLAG_RECT_HITBOX))
         {
             result = g_Player->compute_damage_to_enemy(&final_pos.pos, NULL, 0.0f, hurtbox_size.x * 0.5f, &hit,
                                                        &last_damage_pos, 1, full->enemy_id);
@@ -615,14 +628,14 @@ int EnemyData::step_logic()
             return -1;
         }
     }
-    flags_low &= ~0x200000;
+    flags_low &= ~ENEMY_FLAG_DAMAGED;
     i32 hit = 0;
-    if (!(flags_low & 0x21))
+    if (!(flags_low & (ENEMY_FLAG_NO_HURTBOX | ENEMY_FLAG_INTANGIBLE)))
     {
         i32 damage = 0;
         if (hurtbox_size.x > 0.0f)
         {
-            if (!(flags_low & 0x1000))
+            if (!(flags_low & ENEMY_FLAG_RECT_HITBOX))
             {
                 damage = g_Player->compute_damage_to_enemy(&final_pos.pos, NULL, 0.0f, hurtbox_size.x * 0.5f, &hit,
                                                            &last_damage_pos, 0, full->enemy_id);
@@ -638,12 +651,12 @@ int EnemyData::step_logic()
         {
             damage += ((EnemyExtDamageFunc)func_from_ecl_flag_ext_dmg)(this, damage);
         }
-        if (unk_3fe0 > 0)
+        if (pending_damage > 0)
         {
-            damage += unk_3fe0;
-            unk_3fe0 = 0;
+            damage += pending_damage;
+            pending_damage = 0;
         }
-        if (g_Player->inner.state == 2 || g_Player->inner.state == 0)
+        if (g_Player->inner.state == PLAYER_STATE_DEAD || g_Player->inner.state == PLAYER_STATE_RESPAWNING)
         {
             damage /= 5;
         }
@@ -654,16 +667,16 @@ int EnemyData::step_logic()
             {
                 if (dealt >= life.current)
                 {
-                    g_EnemyManager->inner.unk_a0[0] += (dealt - life.current) / 4 + life.current;
+                    g_EnemyManager->inner.damage_this_frame[0] += (dealt - life.current) / 4 + life.current;
                 }
                 else
                 {
-                    g_EnemyManager->inner.unk_a0[0] += dealt;
+                    g_EnemyManager->inner.damage_this_frame[0] += dealt;
                 }
             }
             else
             {
-                g_EnemyManager->inner.unk_a0[1] += dealt;
+                g_EnemyManager->inner.damage_this_frame[1] += dealt;
             }
         }
         i32 life_damage = dealt;
@@ -671,17 +684,17 @@ int EnemyData::step_logic()
         {
             if (dealt != 0 && 0.0f >= bomb_damage_multiplier)
             {
-                g_SoundManager.play_sound_at_position(0x24, final_pos.pos.x);
+                g_SoundManager.play_sound_at_position(SE_NODAMAGE, final_pos.pos.x);
             }
             life_damage = dealt * bomb_damage_multiplier;
         }
         if (life_damage != 0)
         {
-            if ((g_Spellcard->flags & 0x21) == 0x21)
+            if ((g_Spellcard->flags & (SPELLCARD_ACTIVE | SPELLCARD_EARLY_BOMB)) == (SPELLCARD_ACTIVE | SPELLCARD_EARLY_BOMB))
             {
                 life_damage /= 30;
             }
-            if (!(flags_low & 0x10) && set_invuln.current <= 0)
+            if (!(flags_low & ENEMY_FLAG_INVINCIBLE) && set_invuln.current <= 0)
             {
                 life.receive_damage(life_damage);
             }
@@ -694,11 +707,11 @@ int EnemyData::step_logic()
                 while (drop_season.damage_accounted_for_season_drops < life.total_damage_including_ignored)
                 {
                     drop_season.damage_accounted_for_season_drops += drop_season.damage_per_season_drop;
-                    g_ItemManager->spawn_item(0x10, &final_pos.pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
+                    g_ItemManager->spawn_item(ITEM_SEASON, &final_pos.pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
                                               g_replay_safe_rng.randf_0_to_1() + 1.2f, 0, 0);
                 }
             }
-            unk_4024.set_value(30);
+            damaged_timer.set_value(30);
             sub = full->check_life_interrupts();
             if (sub != NULL)
             {
@@ -711,6 +724,7 @@ int EnemyData::step_logic()
                     return -1;
                 }
             }
+            // Bit 7 is ENEMY_FLAG_NO_DEATH.
             if ((life.current <= 0) & ~(flags_low >> 7))
             {
                 if (full->die() != 0)
@@ -718,17 +732,17 @@ int EnemyData::step_logic()
                     return 1;
                 }
             }
-            flags_low |= 0x200000;
+            flags_low |= ENEMY_FLAG_DAMAGED;
         }
     }
-    if (life.is_spell & 2)
+    if (life.is_spell & ENEMY_LIFE_KILL)
     {
         if (full->die() != 0)
         {
             return 1;
         }
     }
-    if (!(flags_low & 0x22) && no_hitbox_dur.current <= 0 && !(flags_low & 0x4000000))
+    if (!(flags_low & (ENEMY_FLAG_NO_HITBOX | ENEMY_FLAG_INTANGIBLE)) && no_hitbox_dur.current <= 0 && !(flags_low & ENEMY_FLAG_4000000))
     {
         if (func_from_ecl_unknown_634 != NULL)
         {
@@ -737,7 +751,7 @@ int EnemyData::step_logic()
         else
         {
             i32 result;
-            if (!(flags_low & 0x1000))
+            if (!(flags_low & ENEMY_FLAG_RECT_HITBOX))
             {
                 result = g_Player->check_hit_circle(&final_pos.pos, hitbox_size.x * 0.5f, 0);
             }
@@ -761,7 +775,7 @@ int EnemyData::step_logic()
                 pos.z = final_pos.pos.z + 0.0f;
                 result = g_Player->check_hit_rotated_rect(&pos, rotation, hitbox_size.x, hitbox_size.y, 0);
             }
-            if ((flags_low & 0x200) && result == 2 && time_in_ecl.current % 6 == 0)
+            if ((flags_low & ENEMY_FLAG_GRAZEABLE) && result == 2 && time_in_ecl.current % 6 == 0)
             {
                 g_Player->do_graze(&g_Player->inner.pos);
             }
@@ -772,25 +786,26 @@ int EnemyData::step_logic()
     {
         anm_ids[0].id = 0;
     }
-    else if (unk_3ff0 == 0)
+    else if (hit_flash_timer == 0)
     {
+        // Bit 31: EnemyFlagsLow::magenta_flash.
         if (flags_low >= 0x80000000)
         {
             if (time_in_ecl.current % 4 == 0)
             {
                 vm->color_2.d3d = 0xffff00ff;
-                vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
+                vm->flags_lo = (vm->flags_lo & ~ANM_VM_COLOR_MODE_2) | ANM_VM_COLOR_MODE_1;
             }
             else
             {
-                vm->flags_lo &= ~0x60000;
+                vm->flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
             }
         }
-        if ((flags_low & 0x200000) && !(flags_low & 0x2000))
+        if ((flags_low & ENEMY_FLAG_DAMAGED) && !(flags_low & ENEMY_FLAG_NO_HIT_EFFECT))
         {
             vm->color_2.d3d = 0xff0000ff;
-            vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
-            unk_3ff0 = 4;
+            vm->flags_lo = (vm->flags_lo & ~ANM_VM_COLOR_MODE_2) | ANM_VM_COLOR_MODE_1;
+            hit_flash_timer = 4;
             if (hit_sound < 0)
             {
                 enemy_play_hit_sound(this, 200, 900);
@@ -803,27 +818,27 @@ int EnemyData::step_logic()
         else if (time_in_ecl.current % 4 == 0)
         {
             u32 spell_flags = g_Spellcard->flags;
-            if ((flags_low & 0x40800000) && (spell_flags & 9) != 9 &&
-                (((spell_flags & 1) && full->enemy.life.remaining_for_cur_attack < 100) ||
-                 (!(spell_flags & 1) && full->enemy.life.remaining_for_cur_attack < 500)))
+            if ((flags_low & (ENEMY_FLAG_BIG_LIFE | ENEMY_FLAG_BOSS)) && (spell_flags & (SPELLCARD_ACTIVE | SPELLCARD_NO_BONUS_DECAY)) != (SPELLCARD_ACTIVE | SPELLCARD_NO_BONUS_DECAY) &&
+                (((spell_flags & SPELLCARD_ACTIVE) && full->enemy.life.remaining_for_cur_attack < 100) ||
+                 (!(spell_flags & SPELLCARD_ACTIVE) && full->enemy.life.remaining_for_cur_attack < 500)))
             {
                 vm->color_2.d3d = 0xff0000ff;
-                vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
+                vm->flags_lo = (vm->flags_lo & ~ANM_VM_COLOR_MODE_2) | ANM_VM_COLOR_MODE_1;
             }
         }
         else
         {
-            vm->flags_lo &= ~0x60000;
+            vm->flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
         }
     }
     else
     {
-        vm->flags_lo &= ~0x60000;
-        unk_3ff0--;
+        vm->flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
+        hit_flash_timer--;
     }
-    if (unk_4024.current > 0)
+    if (damaged_timer.current > 0)
     {
-        unk_4024--;
+        damaged_timer--;
     }
     return 0;
 }
@@ -831,13 +846,15 @@ int EnemyData::step_logic()
 // GLOBAL: TH16 0x4a6dc0
 EnemyManager *g_EnemyManager;
 
+// Frees the boss slot and the enemy's VMs (unless ENEMY_FLAG_HIGH_4)
+// and its fog.
 // FUNCTION: TH16 0x41ba10
 EnemyInf::~EnemyInf()
 {
     g_EnemyManager->remove_from_active_list(this);
-    if (!(enemy.flags_high & 4))
+    if (!(enemy.flags_high & ENEMY_FLAG_HIGH_4))
     {
-        if (enemy.flags_low & 0x800000)
+        if (enemy.flags_low & ENEMY_FLAG_BOSS)
         {
             g_EnemyManager->inner.boss_ids[enemy.own_boss_id] = 0;
         }
@@ -860,19 +877,7 @@ EnemyInf::~EnemyInf()
 // FUNCTION: TH16 0x426240
 static void __fastcall sincosmul_ellipse(Float3 *dst, f32 angle, f32 rx, f32 ry)
 {
-#ifdef TH16_PORT
-    port_sincosmul2(&dst->x, &dst->y, angle, rx, ry);
-#else
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul rx
-        fstp [eax]
-        fmul ry
-        fstp [eax+4]
-    }
-#endif
+    ZUN_ASM_SINCOSMUL_XY(dst, angle, rx, ry);
 }
 
 // FUNCTION: TH16 0x41a720
@@ -913,7 +918,7 @@ void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
         {
             for (i32 j = 0; j < extra_counts[15]; j++)
             {
-                g_ItemManager->spawn_item(0x10, pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
+                g_ItemManager->spawn_item(ITEM_SEASON, pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
                                           g_replay_safe_rng.randf_0_to_1() * 1.9f + 0.2f, 0, 0);
             }
         }
@@ -955,12 +960,14 @@ HARNESS_CALLED LaserDataInf *LaserManager::find_by_id(i32 id, i32 unused)
 // GLOBAL: TH16 0x4917b8
 extern EnemyFuncSetFunc const g_ecl_func_sets[3] = {NULL, ecl_funcset_cancel_near_player, ecl_funcset_zero_power};
 
+// Ticks the enemy at its slowdown: game speed is scaled for the tick and
+// the VMs get the same slowdown.
 // FUNCTION: TH16 0x41d1e0
 int EnemyInf::on_tick()
 {
     if (enemy.slowdown <= 0.0f)
     {
-        if (enemy.flags_high & 1)
+        if (enemy.flags_high & ENEMY_FLAG_HIGH_VMS_SLOWED)
         {
             for (i32 i = 0; i < 16; i++)
             {
@@ -987,22 +994,22 @@ int EnemyInf::on_tick()
     }
     int result = enemy.on_tick();
     g_game_speed = game_speed;
-    enemy.flags_high |= 1;
+    enemy.flags_high |= ENEMY_FLAG_HIGH_VMS_SLOWED;
     return result;
 }
 
 // TODO: ours realigns the frame (and esp, -8) because of the direct zun_atan2f call; the
-// original calls it without realigning (a harness for thread_start's aligned
-// EnemyManager::create and HARNESS_CALLED update/on_tick do not change it). Separate float
+// original calls it without realigning (GameThread::thread_start's aligned
+// EnemyManager::create call and HARNESS_CALLED update/on_tick do not change it). Separate float
 // locals for the summed position keep it in registers and avoid a /GS cookie.
 // FUNCTION: TH16 0x41d2e0
 int EnemyData::on_tick()
 {
-    if (flags_low & 0x40000)
+    if (flags_low & ENEMY_FLAG_TICKED)
     {
         return 0;
     }
-    flags_low |= 0x40000;
+    flags_low |= ENEMY_FLAG_TICKED;
     if (step_interpolators() != 0)
     {
         return -1;
@@ -1020,7 +1027,7 @@ int EnemyData::on_tick()
         return -1;
     }
     update_fog();
-    if (!(flags_low & 0x4000000))
+    if (!(flags_low & ENEMY_FLAG_4000000))
     {
         for (i32 i = 0; i < 14; i++)
         {
@@ -1032,9 +1039,9 @@ int EnemyData::on_tick()
             f32 x = anm_pos_array[i].x + final_pos.pos.x;
             f32 y = anm_pos_array[i].y + final_pos.pos.y;
             f32 z = anm_pos_array[i].z + final_pos.pos.z;
-            if (unk_224[i] >= 0)
+            if (anm_parent_slot[i] >= 0)
             {
-                AnmVm *base = anm_ids[unk_224[i]].find_or_clear();
+                AnmVm *base = anm_ids[anm_parent_slot[i]].find_or_clear();
                 if (base != NULL)
                 {
                     x += base->pos.x;
@@ -1086,7 +1093,7 @@ void EnemyData::update_final_pos()
 {
     final_pos.velocity = abs_pos.pos + rel_pos.pos - final_pos.pos;
     final_pos.step();
-    if (flags_low & 0x20000)
+    if (flags_low & ENEMY_FLAG_MOVE_LIMIT)
     {
         f32 half = move_limit_size.x * 0.5f;
         if (move_limit_center.x - half > final_pos.pos.x)
@@ -1143,10 +1150,10 @@ int EnemyInf::die()
             enemy.drop_season.min_count;
     }
     enemy.drops.eject_all_drops(&enemy.final_pos.pos);
-    if (enemy.unk_452c > 0 && enemy.own_chapter == g_Globals.chapter)
+    if (enemy.chapter_count > 0 && enemy.own_chapter == g_Globals.chapter)
     {
-        g_Globals.enemies_destroyed_in_chapter += enemy.unk_452c;
-        enemy.unk_452c = 0;
+        g_Globals.enemies_destroyed_in_chapter += enemy.chapter_count;
+        enemy.chapter_count = 0;
     }
     if (enemy.set_death[0] != '\0')
     {
@@ -1165,6 +1172,8 @@ int EnemyInf::die()
     return 1;
 }
 
+// Kills every enemy not protected by ENEMY_FLAGS_SURVIVE_KILL_ALL: death
+// effects, drops and set_death, then ENEMY_FLAG_DELETE.
 // TODO: the inlined tick (tick_mixed) adds speed and current_f the other way round (register choice).
 // FUNCTION: TH16 0x41d900
 void EnemyManager::kill_all()
@@ -1175,22 +1184,23 @@ void EnemyManager::kill_all()
     {
         next = node->next;
         EnemyInf *enemy = node->entry;
-        if (!(enemy->enemy.flags_low & 0xc004a0) || enemy->enemy.flags_low & 0x100)
+        if (!(enemy->enemy.flags_low & ENEMY_FLAGS_SURVIVE_KILL_ALL) || enemy->enemy.flags_low & ENEMY_FLAG_ALWAYS_KILLABLE)
         {
             enemy->enemy.drops.reset();
             enemy->enemy.last_damage_pos.x = 0.0f;
             enemy->enemy.last_damage_pos.y = 192.0f;
-            enemy->enemy.unk_452c = 0;
+            enemy->enemy.chapter_count = 0;
             enemy->die();
-            enemy->enemy.flags_low |= 0x2000000;
+            enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
         }
     }
     mgr->inner.time_in_stage.tick_mixed();
 }
 
+// kill_all for the enemies in the given kill_group (ECL 551).
 // TODO: register allocation: the original keeps value in ebx and spills next to the argument slot.
 // FUNCTION: TH16 0x41da30
-void __stdcall EnemyManager::kill_all_with_unk_278(i32 value)
+void __stdcall EnemyManager::kill_all_in_group(i32 value)
 {
     EnemyManager *mgr = g_EnemyManager;
     EnemyList *node = mgr->active_enemy_list_head;
@@ -1198,14 +1208,14 @@ void __stdcall EnemyManager::kill_all_with_unk_278(i32 value)
     {
         EnemyList *next = node->next;
         EnemyInf *enemy = node->entry;
-        if ((!(enemy->enemy.flags_low & 0xc004a0) || enemy->enemy.flags_low & 0x100) && enemy->enemy.unk_278 == value)
+        if ((!(enemy->enemy.flags_low & ENEMY_FLAGS_SURVIVE_KILL_ALL) || enemy->enemy.flags_low & ENEMY_FLAG_ALWAYS_KILLABLE) && enemy->enemy.kill_group == value)
         {
             enemy->enemy.drops.reset();
             enemy->enemy.last_damage_pos.x = 0.0f;
             enemy->enemy.last_damage_pos.y = 192.0f;
-            enemy->enemy.unk_452c = 0;
+            enemy->enemy.chapter_count = 0;
             enemy->die();
-            enemy->enemy.flags_low |= 0x2000000;
+            enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
         }
         node = next;
     }
@@ -1223,15 +1233,15 @@ void EnemyManager::kill_all_no_set_death()
     {
         next = node->next;
         EnemyInf *enemy = node->entry;
-        if (!(enemy->enemy.flags_low & 0xc004a0) || enemy->enemy.flags_low & 0x100)
+        if (!(enemy->enemy.flags_low & ENEMY_FLAGS_SURVIVE_KILL_ALL) || enemy->enemy.flags_low & ENEMY_FLAG_ALWAYS_KILLABLE)
         {
             enemy->enemy.drops.reset();
             enemy->enemy.last_damage_pos.x = 0.0f;
             enemy->enemy.last_damage_pos.y = 192.0f;
-            enemy->enemy.unk_452c = 0;
+            enemy->enemy.chapter_count = 0;
             enemy->enemy.set_death[0] = '\0';
             enemy->die();
-            enemy->enemy.flags_low |= 0x2000000;
+            enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
         }
     }
     mgr->inner.time_in_stage.tick();
@@ -1255,15 +1265,15 @@ const char *EnemyInf::check_life_interrupts()
         {
             return NULL;
         }
-        if (enemy.unk_452c != 0 && enemy.own_chapter == g_Globals.chapter)
+        if (enemy.chapter_count != 0 && enemy.own_chapter == g_Globals.chapter)
         {
-            g_Globals.enemies_destroyed_in_chapter += enemy.unk_452c;
-            enemy.unk_452c = 0;
+            g_Globals.enemies_destroyed_in_chapter += enemy.chapter_count;
+            enemy.chapter_count = 0;
         }
         enemy.life.current = enemy.interrupts[i].life;
         enemy.interrupts[i].life = -1;
         enemy.time_in_ecl.reset();
-        enemy.flags_low &= ~0x1000000;
+        enemy.flags_low &= ~ENEMY_FLAG_TIMEOUT;
         return enemy.interrupts[i].sub_for_set_next;
     }
     return NULL;
@@ -1280,7 +1290,7 @@ const char *EnemyInf::check_time_interrupts()
         {
             continue;
         }
-        if (enemy.flags_low & 0x800000)
+        if (enemy.flags_low & ENEMY_FLAG_BOSS)
         {
             i32 remaining = enemy.interrupts[i].time - enemy.time_in_ecl.current;
             i32 seconds = remaining / 60;
@@ -1290,8 +1300,8 @@ const char *EnemyInf::check_time_interrupts()
                 seconds = 99;
                 hundredths = 99;
             }
-            g_Gui->unk_1d0 = seconds;
-            g_Gui->unk_1d4 = hundredths;
+            g_Gui->boss_timer_seconds = seconds;
+            g_Gui->boss_timer_hundredths = hundredths;
         }
         if (enemy.time_in_ecl.current < enemy.interrupts[i].time)
         {
@@ -1300,12 +1310,12 @@ const char *EnemyInf::check_time_interrupts()
         enemy.life.current = enemy.interrupts[i].life;
         enemy.interrupts[i].life = -1;
         enemy.time_in_ecl.reset();
-        enemy.flags_low |= 0x1000000;
+        enemy.flags_low |= ENEMY_FLAG_TIMEOUT;
         Spellcard *spellcard = g_Spellcard;
-        if (!(spellcard->flags & 8))
+        if (!(spellcard->flags & SPELLCARD_NO_BONUS_DECAY))
         {
-            enemy.flags_low &= ~0x1000000;
-            spellcard->flags |= 0x80;
+            enemy.flags_low &= ~ENEMY_FLAG_TIMEOUT;
+            spellcard->flags |= SPELLCARD_TIMED_OUT;
             if (spellcard->flags & 1)
             {
                 if (spellcard->time.current >= 60)
@@ -1322,9 +1332,9 @@ const char *EnemyInf::check_time_interrupts()
         }
         else if ((spellcard->flags & 9) == 9)
         {
-            g_Globals.enemies_destroyed_in_chapter += enemy.unk_452c;
+            g_Globals.enemies_destroyed_in_chapter += enemy.chapter_count;
         }
-        enemy.unk_452c = 0;
+        enemy.chapter_count = 0;
         return enemy.interrupts[i].sub_for_set_timeout;
     }
     return NULL;
@@ -1354,12 +1364,12 @@ int EnemyData::ecl_anm_set_sprite()
         final_sprite_size.x = vm->scale.y * vm->sprite_size.y;
         final_sprite_size.y = vm->scale.x * vm->sprite_size.x;
     }
-    if (flags_low & 0x20)
+    if (flags_low & ENEMY_FLAG_INTANGIBLE)
     {
         vm = get_vm(anm_ids[slot]);
         if (vm != NULL)
         {
-            vm->clear_flag_lo_2_tree_inline();
+            vm->hide_tree_inline();
         }
     }
     return 0;
@@ -1384,11 +1394,11 @@ EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, EnemyCreatePara
     memcpy(enemy->enemy.ecl_int_vars, params->ecl_int_vars, sizeof(params->ecl_int_vars) + sizeof(params->ecl_float_vars));
     enemy->enemy.set_invuln = 2;
     ((EnemyFlagsLow *)&enemy->enemy.flags_low)->flag_4000000 = params->flag_4000000;
-    enemy->enemy.unk_278 = 0;
-    enemy->unk_5744 = params->parent_enemy_id;
+    enemy->enemy.kill_group = 0;
+    enemy->parent_enemy_id = params->parent_enemy_id;
     if (params->life >= 1000)
     {
-        ((EnemyFlagsLow *)&enemy->enemy.flags_low)->flag_40000000 = 1;
+        ((EnemyFlagsLow *)&enemy->enemy.flags_low)->big_life = 1;
     }
     enemy->enemy.own_chapter = g_Globals.chapter;
     enemy->on_tick();
@@ -1464,17 +1474,17 @@ int EnemyData::ecl_enm_create()
     memset(&params, 0, sizeof(params));
     params.pos.x = vm->context.current_context->get_float_arg_given_value(1, instr->args[n].f);
     params.pos.y = this->full->context.current_context->get_float_arg_given_value(2, instr->args[n + 1].f);
-    if (instr->opcode == 300 || instr->opcode == 309 || instr->opcode == 321 || instr->opcode == 311 ||
-        instr->opcode == 304)
+    if (instr->opcode == ECL_OP_ENM_CREATE || instr->opcode == ECL_OP_ENM_CREATE_F || instr->opcode == ECL_OP_ENM_CREATE_321 || instr->opcode == ECL_OP_ENM_CREATE_MF ||
+        instr->opcode == ECL_OP_ENM_CREATE_M)
     {
         params.pos.x += final_pos.pos.x;
         params.pos.y += final_pos.pos.y;
     }
-    if (instr->opcode == 311 || instr->opcode == 304 || instr->opcode == 312 || instr->opcode == 305)
+    if (instr->opcode == ECL_OP_ENM_CREATE_MF || instr->opcode == ECL_OP_ENM_CREATE_M || instr->opcode == ECL_OP_ENM_CREATE_AMF || instr->opcode == ECL_OP_ENM_CREATE_AM)
     {
         params.mirrored = 1;
     }
-    if (flags_low & 0x80000)
+    if (flags_low & ENEMY_FLAG_MIRRORED)
     {
         params.pos.x *= -1.0f;
         params.mirrored ^= 1;
@@ -1488,50 +1498,8 @@ int EnemyData::ecl_enm_create()
     return 0;
 }
 
-// ECL variable numbers (ExpHP's truth). Only the ones read here.
-enum EclVar
-{
-    ECL_VAR_I0 = -9985,
-    ECL_VAR_I1 = -9984,
-    ECL_VAR_I2 = -9983,
-    ECL_VAR_I3 = -9982,
-    ECL_VAR_MISS_COUNT = -9949,
-    ECL_VAR_BOMB_COUNT = -9948,
-    ECL_VAR_CAN_STILL_CAPTURE = -9947,
-    ECL_VAR_BOSS_I0 = -9943,
-    ECL_VAR_BOSS_I1 = -9942,
-    ECL_VAR_BOSS_I2 = -9941,
-    ECL_VAR_BOSS_I3 = -9940,
-    ECL_VAR_GI0 = -9926,
-    ECL_VAR_GI1 = -9925,
-    ECL_VAR_GI2 = -9924,
-    ECL_VAR_GI3 = -9923,
-    ECL_VAR_ABS_X = -9995,
-    ECL_VAR_ABS_Y = -9994,
-    ECL_VAR_REL_X = -9993,
-    ECL_VAR_REL_Y = -9992,
-    ECL_VAR_F0 = -9981,
-    ECL_VAR_F1 = -9980,
-    ECL_VAR_F2 = -9979,
-    ECL_VAR_F3 = -9978,
-    ECL_VAR_BOSS_F0 = -9939,
-    ECL_VAR_BOSS_F1 = -9938,
-    ECL_VAR_BOSS_F2 = -9937,
-    ECL_VAR_BOSS_F3 = -9936,
-    ECL_VAR_F4 = -9935,
-    ECL_VAR_F5 = -9934,
-    ECL_VAR_F6 = -9933,
-    ECL_VAR_F7 = -9932,
-    ECL_VAR_GF0 = -9922,
-    ECL_VAR_GF1 = -9921,
-    ECL_VAR_GF2 = -9920,
-    ECL_VAR_GF3 = -9919,
-    ECL_VAR_GF4 = -9918,
-    ECL_VAR_GF5 = -9917,
-    ECL_VAR_GF6 = -9916,
-    ECL_VAR_GF7 = -9915,
-};
-
+// Where an integer ECL variable lives, for assignment; NULL for
+// read-only variables.
 // FUNCTION: TH16 0x423f80
 int *EnemyInf::get_int_global_ptr(int var)
 {
@@ -1550,7 +1518,7 @@ int *EnemyInf::get_int_global_ptr(int var)
         return &g_EnemyManager->inner.miss_count;
     case ECL_VAR_BOMB_COUNT:
         return &g_EnemyManager->inner.bomb_count;
-    case ECL_VAR_CAN_STILL_CAPTURE:
+    case ECL_VAR_CAPTURE:
         return &g_EnemyManager->inner.can_still_capture_spell;
     case ECL_VAR_BOSS_I0:
         boss = g_EnemyManager->get_boss(0);
@@ -1592,6 +1560,8 @@ int *EnemyInf::get_int_global_ptr(int var)
     return NULL;
 }
 
+// Where a float ECL variable lives, for assignment; NULL for read-only
+// variables.
 // FUNCTION: TH16 0x424c10
 f32 *EnemyInf::get_float_global_ptr(int var)
 {
@@ -1670,6 +1640,7 @@ f32 *EnemyInf::get_float_global_ptr(int var)
     return NULL;
 }
 
+// The value of an ECL variable (EclVar) as an integer.
 // FUNCTION: TH16 0x423810
 int EnemyInf::get_int_global(int var)
 {
@@ -1678,238 +1649,239 @@ int EnemyInf::get_int_global(int var)
     f32 dy;
     switch (var)
     {
-    case -10000:
+    case ECL_VAR_RAND:
         return g_replay_safe_rng.rand_u32() & 0x7fffffff;
-    case -9999:
+    case ECL_VAR_RANDF:
         return (i32)g_replay_safe_rng.randf_0_to_1();
-    case -9987:
+    case ECL_VAR_RANDF2:
         return (i32)g_replay_safe_rng.randf_neg_1_to_1();
-    case -9997:
-    case -9977:
+    case ECL_VAR_FINAL_X:
+    case ECL_VAR_FINAL_X2:
         return (i32)enemy.final_pos.pos.x;
-    case -9996:
-    case -9976:
+    case ECL_VAR_FINAL_Y:
+    case ECL_VAR_FINAL_Y2:
         return (i32)enemy.final_pos.pos.y;
-    case -9995:
-    case -9975:
+    case ECL_VAR_ABS_X:
+    case ECL_VAR_ABS_X2:
         return (i32)enemy.abs_pos.pos.x;
-    case -9994:
-    case -9974:
+    case ECL_VAR_ABS_Y:
+    case ECL_VAR_ABS_Y2:
         return (i32)enemy.abs_pos.pos.y;
-    case -9993:
-    case -9973:
+    case ECL_VAR_REL_X:
+    case ECL_VAR_REL_X2:
         return (i32)enemy.rel_pos.pos.x;
-    case -9992:
-    case -9972:
+    case ECL_VAR_REL_Y:
+    case ECL_VAR_REL_Y2:
         return (i32)enemy.rel_pos.pos.y;
-    case -9991:
-    case -9965:
+    case ECL_VAR_PLAYER_X:
+    case ECL_VAR_PLAYER_X2:
         return (i32)g_Player->inner.pos.x;
-    case -9990:
-    case -9964:
+    case ECL_VAR_PLAYER_Y:
+    case ECL_VAR_PLAYER_Y2:
         return (i32)g_Player->inner.pos.y;
-    case -9988:
+    case ECL_VAR_TIME:
         return enemy.time_in_ecl.current;
-    case -9986:
-        return ((EnemyFlagsLow *)&enemy.flags_low)->flag_1000000;
-    case -9971:
+    case ECL_VAR_TIMEOUT:
+        return ((EnemyFlagsLow *)&enemy.flags_low)->timeout;
+    case ECL_VAR_ABS_ANGLE:
         return (i32)enemy.abs_pos.angle.value;
-    case -9970:
+    case ECL_VAR_REL_ANGLE:
         return (i32)enemy.rel_pos.angle.value;
-    case -9958:
+    case ECL_VAR_FINAL_ANGLE:
         return (i32)zun_atan2f(enemy.final_pos.velocity.y, enemy.final_pos.velocity.x);
-    case -9969:
+    case ECL_VAR_ABS_SPEED:
         return (i32)enemy.abs_pos.speed;
-    case -9968:
+    case ECL_VAR_REL_SPEED:
         return (i32)enemy.rel_pos.speed;
-    case -9967:
+    case ECL_VAR_ABS_RADIUS:
         return (i32)enemy.abs_pos.radial_dist;
-    case -9966:
+    case ECL_VAR_REL_RADIUS:
         return (i32)enemy.rel_pos.radial_dist;
-    case -9963:
+    case ECL_VAR_BOSS_X:
         return (i32)g_EnemyManager->get_boss(0)->enemy.final_pos.pos.x;
-    case -9962:
+    case ECL_VAR_BOSS_Y:
         return (i32)g_EnemyManager->get_boss(0)->enemy.final_pos.pos.y;
-    case -9961:
-        return enemy.anm_ids[0].find_or_clear()->unk_49c;
-    case -9960:
+    case ECL_VAR_MAIN_ANM_SCRIPT:
+        return enemy.anm_ids[0].find_or_clear()->script_id_short;
+    case ECL_VAR_RANK:
         return g_Globals.rank;
-    case -9959:
+    case ECL_VAR_DIFF:
         return g_Globals.difficulty;
-    case -9954:
+    case ECL_VAR_LIFE:
         return enemy.life.current;
-    case -9953:
+    case ECL_VAR_EASY:
         return g_Globals.difficulty == DIFFICULTY_EASY;
-    case -9952:
+    case ECL_VAR_NORMAL:
         return g_Globals.difficulty == DIFFICULTY_NORMAL;
-    case -9951:
+    case ECL_VAR_HARD:
         return g_Globals.difficulty == DIFFICULTY_HARD;
-    case -9950:
+    case ECL_VAR_LUNATIC:
         return g_Globals.difficulty == DIFFICULTY_LUNATIC;
-    case -9949:
+    case ECL_VAR_MISS_COUNT:
         return g_EnemyManager->inner.miss_count;
-    case -9948:
+    case ECL_VAR_BOMB_COUNT:
         return g_EnemyManager->inner.bomb_count;
-    case -9947:
+    case ECL_VAR_CAPTURE:
         return g_EnemyManager->inner.can_still_capture_spell;
-    case -9946:
+    case ECL_VAR_ENM_CNT_REAL:
         return g_EnemyManager->enemy_count_real;
-    case -9908:
+    case ECL_VAR_ENM_CNT:
         return g_EnemyManager->get_enemy_count();
-    case -9945:
+    case ECL_VAR_SHOTTYPE:
         return g_Globals.subshot + g_Globals.character;
-    case -9944:
+    case ECL_VAR_DIST_PLAYER:
         dy = enemy.final_pos.pos.y - g_Player->inner.pos.y;
         dx = enemy.final_pos.pos.x - g_Player->inner.pos.x;
         return (i32)sqrtf(dx * dx + dy * dy);
-    case -9931:
+    case ECL_VAR_LAST_ENM_ID:
         return g_EnemyManager->inner.last_enemy_id;
-    case -9930:
+    case ECL_VAR_POWER:
         return g_Globals.power;
-    case -9927:
-        if (g_GameThread->replay_mode == 0 && g_Supervisor.unk_700 != 0)
+    case ECL_VAR_DS3:
+        if (g_GameThread->replay_mode == 0 && g_Supervisor.new_game_started != 0)
         {
             return 1;
         }
         break;
-    case -9957:
+    case ECL_VAR_TRUE:
         return 1;
-    case -9943:
+    case ECL_VAR_BOSS_I0:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return boss->enemy.ecl_int_vars[0];
         }
         break;
-    case -9942:
+    case ECL_VAR_BOSS_I1:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return boss->enemy.ecl_int_vars[1];
         }
         break;
-    case -9941:
+    case ECL_VAR_BOSS_I2:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return boss->enemy.ecl_int_vars[2];
         }
         break;
-    case -9940:
+    case ECL_VAR_BOSS_I3:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return boss->enemy.ecl_int_vars[3];
         }
         break;
-    case -9939:
+    case ECL_VAR_BOSS_F0:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)boss->enemy.ecl_float_vars[0];
         }
         break;
-    case -9938:
+    case ECL_VAR_BOSS_F1:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)boss->enemy.ecl_float_vars[1];
         }
         break;
-    case -9937:
+    case ECL_VAR_BOSS_F2:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)boss->enemy.ecl_float_vars[2];
         }
         break;
-    case -9936:
+    case ECL_VAR_BOSS_F3:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)boss->enemy.ecl_float_vars[3];
         }
         break;
-    case -9911:
+    case ECL_VAR_BOSS_ANGLE:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)zun_atan2f(boss->enemy.final_pos.velocity.y, boss->enemy.final_pos.velocity.x);
         }
         break;
-    case -9910:
+    case ECL_VAR_BOSS_SPEED:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)boss->enemy.abs_pos.speed;
         }
         break;
-    case -9909:
-        return unk_5744;
-    case -9985:
+    case ECL_VAR_PARENT_ID:
+        return parent_enemy_id;
+    case ECL_VAR_I0:
         return enemy.ecl_int_vars[0];
-    case -9984:
+    case ECL_VAR_I1:
         return enemy.ecl_int_vars[1];
-    case -9983:
+    case ECL_VAR_I2:
         return enemy.ecl_int_vars[2];
-    case -9982:
+    case ECL_VAR_I3:
         return enemy.ecl_int_vars[3];
-    case -9981:
+    case ECL_VAR_F0:
         return (i32)enemy.ecl_float_vars[0];
-    case -9980:
+    case ECL_VAR_F1:
         return (i32)enemy.ecl_float_vars[1];
-    case -9979:
+    case ECL_VAR_F2:
         return (i32)enemy.ecl_float_vars[2];
-    case -9978:
+    case ECL_VAR_F3:
         return (i32)enemy.ecl_float_vars[3];
-    case -9935:
+    case ECL_VAR_F4:
         return (i32)enemy.ecl_float_vars[4];
-    case -9934:
+    case ECL_VAR_F5:
         return (i32)enemy.ecl_float_vars[5];
-    case -9933:
+    case ECL_VAR_F6:
         return (i32)enemy.ecl_float_vars[6];
-    case -9932:
+    case ECL_VAR_F7:
         return (i32)enemy.ecl_float_vars[7];
-    case -9926:
+    case ECL_VAR_GI0:
         return g_EnemyManager->inner.ecl_int_vars[0];
-    case -9925:
+    case ECL_VAR_GI1:
         return g_EnemyManager->inner.ecl_int_vars[1];
-    case -9924:
+    case ECL_VAR_GI2:
         return g_EnemyManager->inner.ecl_int_vars[2];
-    case -9923:
+    case ECL_VAR_GI3:
         return g_EnemyManager->inner.ecl_int_vars[3];
-    case -9922:
+    case ECL_VAR_GF0:
         return (i32)g_EnemyManager->inner.ecl_float_vars[0];
-    case -9921:
+    case ECL_VAR_GF1:
         return (i32)g_EnemyManager->inner.ecl_float_vars[1];
-    case -9920:
+    case ECL_VAR_GF2:
         return (i32)g_EnemyManager->inner.ecl_float_vars[2];
-    case -9919:
+    case ECL_VAR_GF3:
         return (i32)g_EnemyManager->inner.ecl_float_vars[3];
-    case -9918:
+    case ECL_VAR_GF4:
         return (i32)g_EnemyManager->inner.ecl_float_vars[4];
-    case -9917:
+    case ECL_VAR_GF5:
         return (i32)g_EnemyManager->inner.ecl_float_vars[5];
-    case -9916:
+    case ECL_VAR_GF6:
         return (i32)g_EnemyManager->inner.ecl_float_vars[6];
-    case -9915:
+    case ECL_VAR_GF7:
         return (i32)g_EnemyManager->inner.ecl_float_vars[7];
-    case -9914:
+    case ECL_VAR_ID:
         return enemy_id;
-    case -9907:
+    case ECL_VAR_SPELL_ID:
         return g_Globals.spell_id;
-    case -9906:
+    case ECL_VAR_MIRROR:
         return ((EnemyFlagsLow *)&enemy.flags_low)->mirrored;
-    case -9905:
+    case ECL_VAR_CHAPTER:
         return g_Globals.chapter;
-    case -9904:
+    case ECL_VAR_GAME_MISS_COUNT:
         return g_Globals.miss_count;
-    case -9903:
+    case ECL_VAR_SUBSEASON:
         return g_Globals.subseason;
     }
     return 0;
 }
 
+// The value of an ECL variable (EclVar) as a float.
 // FUNCTION: TH16 0x424110
 f32 EnemyInf::get_float_global(int var)
 {
@@ -1918,195 +1890,195 @@ f32 EnemyInf::get_float_global(int var)
     f32 dy;
     switch (var)
     {
-    case -10000:
+    case ECL_VAR_RAND:
         return g_replay_safe_rng.rand_u32() & 0x7fffffff;
-    case -9999:
+    case ECL_VAR_RANDF:
         return g_replay_safe_rng.randf_0_to_1();
-    case -9987:
+    case ECL_VAR_RANDF2:
         return g_replay_safe_rng.randf_neg_1_to_1();
-    case -9998:
+    case ECL_VAR_RANDRAD:
         return g_replay_safe_rng.randf_neg_1_to_1() * ZUN_PI;
-    case -9997:
-    case -9977:
+    case ECL_VAR_FINAL_X:
+    case ECL_VAR_FINAL_X2:
         return enemy.final_pos.pos.x;
-    case -9996:
-    case -9976:
+    case ECL_VAR_FINAL_Y:
+    case ECL_VAR_FINAL_Y2:
         return enemy.final_pos.pos.y;
-    case -9995:
-    case -9975:
+    case ECL_VAR_ABS_X:
+    case ECL_VAR_ABS_X2:
         return enemy.abs_pos.pos.x;
-    case -9994:
-    case -9974:
+    case ECL_VAR_ABS_Y:
+    case ECL_VAR_ABS_Y2:
         return enemy.abs_pos.pos.y;
-    case -9993:
-    case -9973:
+    case ECL_VAR_REL_X:
+    case ECL_VAR_REL_X2:
         return enemy.rel_pos.pos.x;
-    case -9992:
-    case -9972:
+    case ECL_VAR_REL_Y:
+    case ECL_VAR_REL_Y2:
         return enemy.rel_pos.pos.y;
-    case -9991:
-    case -9965:
+    case ECL_VAR_PLAYER_X:
+    case ECL_VAR_PLAYER_X2:
         return g_Player->inner.pos.x;
-    case -9990:
-    case -9964:
+    case ECL_VAR_PLAYER_Y:
+    case ECL_VAR_PLAYER_Y2:
         return g_Player->inner.pos.y;
-    case -9989:
+    case ECL_VAR_ANGLE_TO_PLAYER:
         return g_Player->angle_to_player(&enemy.final_pos.pos);
-    case -9988:
+    case ECL_VAR_TIME:
         return enemy.time_in_ecl.current_f;
-    case -9986:
-        return ((EnemyFlagsLow *)&enemy.flags_low)->flag_1000000;
-    case -9985:
+    case ECL_VAR_TIMEOUT:
+        return ((EnemyFlagsLow *)&enemy.flags_low)->timeout;
+    case ECL_VAR_I0:
         return enemy.ecl_int_vars[0];
-    case -9984:
+    case ECL_VAR_I1:
         return enemy.ecl_int_vars[1];
-    case -9983:
+    case ECL_VAR_I2:
         return enemy.ecl_int_vars[2];
-    case -9982:
+    case ECL_VAR_I3:
         return enemy.ecl_int_vars[3];
-    case -9981:
+    case ECL_VAR_F0:
         return enemy.ecl_float_vars[0];
-    case -9980:
+    case ECL_VAR_F1:
         return enemy.ecl_float_vars[1];
-    case -9979:
+    case ECL_VAR_F2:
         return enemy.ecl_float_vars[2];
-    case -9978:
+    case ECL_VAR_F3:
         return enemy.ecl_float_vars[3];
-    case -9935:
+    case ECL_VAR_F4:
         return enemy.ecl_float_vars[4];
-    case -9934:
+    case ECL_VAR_F5:
         return enemy.ecl_float_vars[5];
-    case -9933:
+    case ECL_VAR_F6:
         return enemy.ecl_float_vars[6];
-    case -9932:
+    case ECL_VAR_F7:
         return enemy.ecl_float_vars[7];
-    case -9943:
+    case ECL_VAR_BOSS_I0:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_int_vars[0] : 0.0f;
-    case -9942:
+    case ECL_VAR_BOSS_I1:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_int_vars[1] : 0.0f;
-    case -9941:
+    case ECL_VAR_BOSS_I2:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_int_vars[2] : 0.0f;
-    case -9940:
+    case ECL_VAR_BOSS_I3:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_int_vars[3] : 0.0f;
-    case -9939:
+    case ECL_VAR_BOSS_F0:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_float_vars[0] : 0.0f;
-    case -9938:
+    case ECL_VAR_BOSS_F1:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_float_vars[1] : 0.0f;
-    case -9937:
+    case ECL_VAR_BOSS_F2:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_float_vars[2] : 0.0f;
-    case -9936:
+    case ECL_VAR_BOSS_F3:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_float_vars[3] : 0.0f;
-    case -9911:
+    case ECL_VAR_BOSS_ANGLE:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? zun_atan2f(boss->enemy.final_pos.velocity.y, boss->enemy.final_pos.velocity.x) : 0.0f;
-    case -9910:
+    case ECL_VAR_BOSS_SPEED:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.abs_pos.speed : 0.0f;
-    case -9971:
+    case ECL_VAR_ABS_ANGLE:
         return enemy.abs_pos.angle.value;
-    case -9970:
+    case ECL_VAR_REL_ANGLE:
         return enemy.rel_pos.angle.value;
-    case -9958:
+    case ECL_VAR_FINAL_ANGLE:
         return zun_atan2f(enemy.final_pos.velocity.y, enemy.final_pos.velocity.x);
-    case -9969:
+    case ECL_VAR_ABS_SPEED:
         return enemy.abs_pos.speed;
-    case -9968:
+    case ECL_VAR_REL_SPEED:
         return enemy.rel_pos.speed;
-    case -9967:
+    case ECL_VAR_ABS_RADIUS:
         return enemy.abs_pos.radial_dist;
-    case -9966:
+    case ECL_VAR_REL_RADIUS:
         return enemy.rel_pos.radial_dist;
-    case -9963:
+    case ECL_VAR_BOSS_X:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.final_pos.pos.x : 0.0f;
-    case -9962:
+    case ECL_VAR_BOSS_Y:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.final_pos.pos.y : 128.0f;
-    case -9960:
+    case ECL_VAR_RANK:
         return g_Globals.rank;
-    case -9959:
+    case ECL_VAR_DIFF:
         return g_Globals.difficulty;
-    case -9957:
+    case ECL_VAR_TRUE:
         return 1.0f;
-    case -9956:
+    case ECL_VAR_ABS_ANGLE_TO_PLAYER:
         return g_Player->angle_to_player(&enemy.abs_pos.pos);
-    case -9955:
+    case ECL_VAR_REL_ANGLE_TO_PLAYER:
         return g_Player->angle_to_player(&enemy.rel_pos.pos);
-    case -9954:
+    case ECL_VAR_LIFE:
         return enemy.life.current;
-    case -9953:
+    case ECL_VAR_EASY:
         return g_Globals.difficulty == 0.0f;
-    case -9952:
+    case ECL_VAR_NORMAL:
         return g_Globals.difficulty == 1.0f;
-    case -9951:
+    case ECL_VAR_HARD:
         return g_Globals.difficulty == 2.0f;
-    case -9950:
+    case ECL_VAR_LUNATIC:
         return g_Globals.difficulty == 3.0f;
-    case -9949:
+    case ECL_VAR_MISS_COUNT:
         return g_EnemyManager->inner.miss_count;
-    case -9948:
+    case ECL_VAR_BOMB_COUNT:
         return g_EnemyManager->inner.bomb_count;
-    case -9947:
+    case ECL_VAR_CAPTURE:
         return g_EnemyManager->inner.can_still_capture_spell;
-    case -9946:
+    case ECL_VAR_ENM_CNT_REAL:
         return g_EnemyManager->enemy_count_real;
-    case -9908:
+    case ECL_VAR_ENM_CNT:
         return g_EnemyManager->get_enemy_count();
-    case -9945:
+    case ECL_VAR_SHOTTYPE:
         return g_Globals.subshot + g_Globals.character;
-    case -9944:
+    case ECL_VAR_DIST_PLAYER:
         dy = enemy.final_pos.pos.y - g_Player->inner.pos.y;
         dx = enemy.final_pos.pos.x - g_Player->inner.pos.x;
         return sqrtf(dx * dx + dy * dy);
-    case -9931:
+    case ECL_VAR_LAST_ENM_ID:
         return (u32)g_EnemyManager->inner.last_enemy_id;
-    case -9930:
+    case ECL_VAR_POWER:
         return g_Globals.power;
-    case -9927:
-        return (f32)(g_GameThread->replay_mode == 0) && g_Supervisor.unk_700 != 0;
-    case -9909:
-        return (u32)unk_5744;
-    case -9926:
+    case ECL_VAR_DS3:
+        return (f32)(g_GameThread->replay_mode == 0) && g_Supervisor.new_game_started != 0;
+    case ECL_VAR_PARENT_ID:
+        return (u32)parent_enemy_id;
+    case ECL_VAR_GI0:
         return g_EnemyManager->inner.ecl_int_vars[0];
-    case -9925:
+    case ECL_VAR_GI1:
         return g_EnemyManager->inner.ecl_int_vars[1];
-    case -9924:
+    case ECL_VAR_GI2:
         return g_EnemyManager->inner.ecl_int_vars[2];
-    case -9923:
+    case ECL_VAR_GI3:
         return g_EnemyManager->inner.ecl_int_vars[3];
-    case -9922:
+    case ECL_VAR_GF0:
         return g_EnemyManager->inner.ecl_float_vars[0];
-    case -9921:
+    case ECL_VAR_GF1:
         return g_EnemyManager->inner.ecl_float_vars[1];
-    case -9920:
+    case ECL_VAR_GF2:
         return g_EnemyManager->inner.ecl_float_vars[2];
-    case -9919:
+    case ECL_VAR_GF3:
         return g_EnemyManager->inner.ecl_float_vars[3];
-    case -9918:
+    case ECL_VAR_GF4:
         return g_EnemyManager->inner.ecl_float_vars[4];
-    case -9917:
+    case ECL_VAR_GF5:
         return g_EnemyManager->inner.ecl_float_vars[5];
-    case -9916:
+    case ECL_VAR_GF6:
         return g_EnemyManager->inner.ecl_float_vars[6];
-    case -9915:
+    case ECL_VAR_GF7:
         return g_EnemyManager->inner.ecl_float_vars[7];
-    case -9914:
+    case ECL_VAR_ID:
         return (u32)enemy_id;
-    case -9907:
+    case ECL_VAR_SPELL_ID:
         return g_Globals.spell_id;
-    case -9906:
+    case ECL_VAR_MIRROR:
         return (enemy.flags_low >> 19) & 1;
-    case -9905:
+    case ECL_VAR_CHAPTER:
         return g_Globals.chapter;
-    case -9903:
+    case ECL_VAR_SUBSEASON:
         return g_Globals.subseason;
     }
     return 0.0f;
@@ -2141,6 +2113,9 @@ static inline void anm_set_scale_2(AnmVm *vm, f32 x, f32 y)
 
 // TODO: register allocation: the original keeps full in ecx (reloading the context from it) and
 // spills vm, with this in edi and vm in ebx.
+// The ECL instructions that change one of the enemy's VMs (the slot is
+// always the first argument). The names are the usual thecl ones; ExpHP
+// groups them as 3xx__anmModify.
 // FUNCTION: TH16 0x4233a0
 void EnemyData::ecl_anm_vm_instr()
 {
@@ -2157,26 +2132,32 @@ void EnemyData::ecl_anm_vm_instr()
     }
     switch ((i16)instr->opcode)
     {
-    case 319:
+    // anmRotate(slot, angle)
+    case ECL_OP_ANM_ROTATE:
         vm->rotation.z = full->context.current_context->get_float_arg(1);
         vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         break;
-    case 329:
+    // anmScale(slot, x, y)
+    case ECL_OP_ANM_SCALE:
         anm_set_scale(vm, full->context.current_context->get_float_arg(1), full->context.current_context->get_float_arg(2));
         break;
-    case 335:
+    // anmScale2(slot, x, y)
+    case ECL_OP_ANM_SCALE2:
         anm_set_scale_2(vm, full->context.current_context->get_float_arg(1),
                         full->context.current_context->get_float_arg(2));
         break;
-    case 330:
+    // anmScaleTime(slot, time, mode, x, y)
+    case ECL_OP_ANM_SCALE_TIME:
         vm->scale_to(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
                      full->context.current_context->get_float_arg(3), full->context.current_context->get_float_arg(4));
         break;
-    case 325:
+    // anmColor(slot, r, g, b)
+    case ECL_OP_ANM_COLOR:
         anm_set_rgb1(vm, full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
                      full->context.current_context->get_int_arg(3));
         break;
-    case 326:
+    // anmColorTime(slot, time, mode, r, g, b)
+    case ECL_OP_ANM_COLOR_TIME:
     {
         ZunColor color;
         color.r = full->context.current_context->get_int_arg(3);
@@ -2186,21 +2167,26 @@ void EnemyData::ecl_anm_vm_instr()
                       &color);
         break;
     }
-    case 327:
+    // anmAlpha(slot, alpha)
+    case ECL_OP_ANM_ALPHA:
         vm->color_1.a = full->context.current_context->get_int_arg(1);
         break;
-    case 328:
+    // anmAlphaTime(slot, time, mode, alpha)
+    case ECL_OP_ANM_ALPHA_TIME:
         vm->fade_alpha1(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
                         full->context.current_context->get_int_arg(3));
         break;
-    case 331:
+    // anmAlpha2(slot, alpha)
+    case ECL_OP_ANM_ALPHA2:
         vm->color_2.a = full->context.current_context->get_int_arg(1);
         break;
-    case 332:
+    // anmAlpha2Time(slot, time, mode, alpha)
+    case ECL_OP_ANM_ALPHA2_TIME:
         vm->fade_alpha2(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
                         full->context.current_context->get_int_arg(3));
         break;
-    case 333:
+    // anmPosTime(slot, time, mode, x, y)
+    case ECL_OP_ANM_POS_TIME:
     {
         Float3 goal(full->context.current_context->get_float_arg(3), full->context.current_context->get_float_arg(4),
                     0.0f);
@@ -2208,10 +2194,12 @@ void EnemyData::ecl_anm_vm_instr()
                          &anm_ids[full->context.current_context->get_int_arg(0)].find_or_clear()->entity_pos, &goal);
         break;
     }
-    case 336:
+    // anmLayer(slot, layer)
+    case ECL_OP_ANM_LAYER:
         vm->set_layer(full->context.current_context->get_int_arg(1));
         break;
-    case 337:
+    // anmBlendMode(slot, mode)
+    case ECL_OP_ANM_BLEND_MODE:
         ((AnmVmFlagsLoBits *)&vm->flags_lo)->blend_mode = (u8)full->context.current_context->get_int_arg(1);
         break;
     }
@@ -2223,8 +2211,8 @@ void EnemyData::ecl_anm_vm_instr()
 int EnemyData::step_interpolators()
 {
     prev_final_pos = final_pos;
-    if (abs_angle_i.end_time != 0 && (abs_pos.flags & 0xf) != POSVEL_MODE_CIRCLE &&
-        (abs_pos.flags & 0xf) != POSVEL_MODE_ELLIPSE)
+    if (abs_angle_i.end_time != 0 && (abs_pos.flags & POSVEL_MODE_MASK) != POSVEL_MODE_CIRCLE &&
+        (abs_pos.flags & POSVEL_MODE_MASK) != POSVEL_MODE_ELLIPSE)
     {
         abs_pos.angle.value = wrap_angle(wrap_angle(abs_angle_i.step()));
     }
@@ -2232,8 +2220,8 @@ int EnemyData::step_interpolators()
     {
         abs_pos.speed = abs_speed_i.step();
     }
-    if (rel_angle_i.end_time != 0 && (rel_pos.flags & 0xf) != POSVEL_MODE_CIRCLE &&
-        (rel_pos.flags & 0xf) != POSVEL_MODE_ELLIPSE)
+    if (rel_angle_i.end_time != 0 && (rel_pos.flags & POSVEL_MODE_MASK) != POSVEL_MODE_CIRCLE &&
+        (rel_pos.flags & POSVEL_MODE_MASK) != POSVEL_MODE_ELLIPSE)
     {
         rel_pos.angle.value = wrap_angle(wrap_angle(rel_angle_i.step()));
     }
@@ -2270,21 +2258,21 @@ int EnemyData::step_interpolators()
         rel_pos.update_secondary_fields();
     }
     abs_pos.step();
-    if (flags_low & 0x4000000)
+    if (flags_low & ENEMY_FLAG_4000000)
     {
-        rel_pos.pos.x += g_Supervisor.cameras[0].unk_104.x;
-        rel_pos.pos.y += g_Supervisor.cameras[0].unk_104.y;
-        rel_pos.pos.z += g_Supervisor.cameras[0].unk_104.z;
+        rel_pos.pos.x += g_Supervisor.cameras[0].position_delta.x;
+        rel_pos.pos.y += g_Supervisor.cameras[0].position_delta.y;
+        rel_pos.pos.z += g_Supervisor.cameras[0].position_delta.z;
     }
     rel_pos.step();
     update_final_pos();
     if (((EnemyFlagsLow *)&flags_low)->directional_anm)
     {
         i32 dir = -0.03f > final_pos.velocity.x ? -1 : final_pos.velocity.x > 0.03f;
-        if (unk_274 != dir)
+        if (anm_direction != dir)
         {
             i32 script_offset = 0;
-            switch (unk_274)
+            switch (anm_direction)
             {
             case -1:
                 script_offset = dir != 0 ? 2 : 3;
@@ -2321,8 +2309,8 @@ int EnemyData::step_interpolators()
                 new_vm->layer = layer;
                 if (layer <= 23)
                 {
-                    new_vm->flags_hi &= ~ANM_VM_LAYER_UI;
-                    new_vm->flags_hi |= ANM_VM_LAYER_SET;
+                    new_vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
+                    new_vm->flags_hi |= ANM_VM_ORIGIN_GAME;
                 }
             }
             new_vm->entity_pos = pos;
@@ -2333,7 +2321,7 @@ int EnemyData::step_interpolators()
             id = g_AnmManager->insert_in_world_list_back(new_vm);
             LEAVE_CS(CS_ANM_MANAGER);
             anm_ids[0] = id;
-            unk_274 = dir;
+            anm_direction = dir;
         }
     }
     AnmVm *vm = get_vm_or_clear(anm_ids[0]);

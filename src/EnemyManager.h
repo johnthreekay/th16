@@ -25,12 +25,15 @@ struct EnemyManagerInner
     // Enemy ids of the bosses (0: none). ExpHP has 4 and unknown space up
     // to 0x7c, which destroy_all clears as 16 ids.
     i32 boss_ids[16];
-    u32 boss_bit : 1;
+    // The boss life bar is hidden (ECL lifeHide; setBoss clears it).
+    u32 life_bar_hidden : 1;
     i32 enemy_limit;
     i32 next_enemy_id;
     i32 last_enemy_id;
     ZunTimer time_in_stage;
-    i32 unk_a0[2];
+    // Damage the enemies took this frame: [0] from hits that count as
+    // direct (overkill counted a quarter), [1] the rest. Not read.
+    i32 damage_this_frame[2];
 };
 
 struct EnemyManager;
@@ -44,9 +47,9 @@ struct EnemyCreateParams
     i32 score_reward;
     i32 item_drop;
     i32 life;
-    // Mirrored: flips x movement (EnemyData::flags_low 0x80000).
+    // ENEMY_FLAG_MIRRORED.
     i32 mirrored;
-    // EnemyData::flags_low 0x4000000.
+    // ENEMY_FLAG_4000000; enmCreate leaves it 0.
     i32 flag_4000000;
     i32 ecl_int_vars[4];
     f32 ecl_float_vars[8];
@@ -89,7 +92,7 @@ struct EnemyManager
     // Uses g_EnemyManager; LTCG dropped this.
     HARNESS_CALLED int get_enemy_count();
     HARNESS_CALLED void set_boss_id(int index, EnemyInf *enemy);
-    HARNESS_CALLED void set_boss_bit(int value);
+    HARNESS_CALLED void set_life_bar_hidden(int value);
     HARNESS_CALLED void remove_from_active_list(EnemyInf *enemy);
     DECOMP_NOINLINE int update();
     static int __fastcall on_tick_callback(EnemyManager *mgr);
@@ -102,8 +105,8 @@ struct EnemyManager
     // 0x41d900. Kills every enemy; reaches the manager through
     // g_EnemyManager.
     static void kill_all();
-    // 0x41da30. kill_all for the enemies whose unk_278 is value.
-    static void __stdcall kill_all_with_unk_278(i32 value);
+    // 0x41da30. kill_all for the enemies whose kill_group is value.
+    static void __stdcall kill_all_in_group(i32 value);
     // 0x41db70. kill_all, skipping the set_death subroutines.
     static void kill_all_no_set_death();
     // Reaches the manager through g_EnemyManager; LTCG dropped this.

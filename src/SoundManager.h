@@ -7,14 +7,21 @@
 #include "decomp.h"
 #include "types.h"
 
-// Only the parts decompiled code needs so far.
+// The sound effects (DirectSound buffers, one per SoundEffect) and the BGM
+// (streamed from thbgm.dat, or read into memory first). Both are driven by
+// SoundManager::update_sound_thread, which the Supervisor calls every
+// frame.
 
-// One track of thbgm.fmt.
+// One track of thbgm.fmt, the index of thbgm.dat.
 struct ThBgmFormat
 {
+    // The track's .wav name (th16_01.wav, ...).
     char name[16];
+    // Where the track's samples start in thbgm.dat.
     i32 start_offset;
-    i32 unk_14;
+    // Bytes of the track in thbgm.dat; what CONFIG_BGM_IN_MEMORY reads.
+    i32 data_size;
+    // Bytes before the loop start, and the loop end.
     i32 intro_size;
     i32 total_size;
     WAVEFORMATEX format;
@@ -101,8 +108,8 @@ struct CWaveFile
     HARNESS_CALLED HRESULT Read(BYTE *pBuffer, DWORD dwSizeToRead, DWORD *pdwSizeRead);
 };
 
-// The BGM stream (an adapted DirectSound sample CStreamingSound). Fields
-// from 0x14 on are ZUN's fade state.
+// The BGM stream as SoundManager::bgm_stream sees it: the CStreamingSound
+// below, with the fields it uses. Fields from 0x14 on are ZUN's fade state.
 #ifdef TH16_PORT
 // Packed like CSound, so that with 8-byte pointers this view still lines up
 // with CStreamingSound (port/src/layout_checks.cpp checks it).
@@ -120,7 +127,9 @@ struct BgmStream
     // 1: fade out and stop, 2: fade in, 3/4: like 2/1 but quieter.
     i32 fade_mode;
     u8 unk_20[0x50 - 0x20];
-    i32 unk_50;
+    // CSound::m_playing: the streaming thread only refills a playing
+    // stream.
+    i32 playing;
 #if defined(TH16_PORT) && TH16_PORT_64BIT
     // CSound::m_desc, m_manager and CStreamingSound::m_hNotifyEvent (with its
     // alignment) are 0x10 bytes longer.
@@ -299,26 +308,146 @@ inline void BgmStream::destroy()
 // A row of the sound effect table.
 struct SoundEffectData
 {
+    // The SoundEffect this row describes.
     i32 id;
     // Index into g_sound_file_names.
     i32 file_index;
+    // In hundredths of dB, before the SE volume setting.
     i16 volume;
+    // 0 to 100; copied into SoundBufferEntry::unk_4 when the sound is
+    // queued, and never read.
     i16 unk_a;
     // Play flags (DSBPLAY_LOOPING).
     i32 play_flags;
+    // 0 for the shot and menu sounds, 1 for the rest; never read.
     i32 unk_10;
+};
+
+// The sound effects: rows of g_sound_effect_table, named after the .wav
+// file each one plays. Several ids play the same file at another volume.
+enum SoundEffect
+{
+    SE_PLST00 = 0,
+    SE_PLST00_2 = 1,
+    // Player death.
+    SE_PLDEAD00 = 2,
+    SE_ENEP00 = 3,
+    SE_ENEP00_2 = 4,
+    SE_ENEP01 = 5,
+    SE_ENEP02 = 6,
+    // Menus: choice made.
+    SE_OK00 = 7,
+    SE_OK00_2 = 8,
+    // Menus: back.
+    SE_CANCEL00 = 9,
+    // Menus: cursor moved.
+    SE_SELECT00 = 10,
+    // Spell card timer running out.
+    SE_TIMEOUT = 11,
+    SE_TIMEOUT2 = 12,
+    SE_POWERUP = 13,
+    // The pause menu opens.
+    SE_PAUSE = 14,
+    SE_CARDGET = 15,
+    // Menus: a choice that is not available.
+    SE_INVALID = 16,
+    // Extra life.
+    SE_EXTEND = 17,
+    SE_LAZER00 = 18,
+    SE_LAZER01 = 19,
+    // Loops.
+    SE_LAZER02 = 20,
+    SE_TAN00 = 21,
+    SE_TAN01 = 22,
+    SE_TAN02 = 23,
+    SE_TAN00_2 = 24,
+    SE_TAN01_2 = 25,
+    SE_TAN02_2 = 26,
+    SE_TAN00_3 = 27,
+    SE_POWER0 = 28,
+    SE_POWER1 = 29,
+    SE_CH00 = 30,
+    SE_CH01 = 31,
+    SE_GUN00 = 32,
+    SE_CAT00 = 33,
+    SE_DAMAGE00 = 34,
+    SE_DAMAGE01 = 35,
+    SE_NODAMAGE = 36,
+    SE_ITEM00 = 37,
+    SE_KIRA00 = 38,
+    SE_KIRA01 = 39,
+    SE_KIRA02 = 40,
+    SE_KIRA00_2 = 41,
+    SE_GRAZE = 42,
+    SE_GRAZE_2 = 43,
+    SE_SLASH = 44,
+    SE_SLASH_2 = 45,
+    SE_CARDGET_2 = 46,
+    SE_BONUS = 47,
+    SE_BONUS2 = 48,
+    SE_NEP00 = 49,
+    // Menus: starting a game.
+    SE_BOON00 = 50,
+    SE_DON00 = 51,
+    SE_BOON01 = 52,
+    SE_BOON01_2 = 53,
+    SE_CH02 = 54,
+    // Loops.
+    SE_CH03 = 55,
+    SE_EXTEND2 = 56,
+    SE_PIN00 = 57,
+    SE_PIN01 = 58,
+    SE_LGODS1 = 59,
+    SE_LGODS2 = 60,
+    SE_LGODS3 = 61,
+    SE_LGODS4 = 62,
+    SE_LGODSGET = 63,
+    SE_MSL = 64,
+    SE_MSL2 = 65,
+    SE_PLDEAD01 = 66,
+    SE_HEAL = 67,
+    SE_MSL3 = 68,
+    SE_FAULT = 69,
+    SE_NOISE = 70,
+    SE_ETBREAK = 71,
+    SE_TAN03 = 72,
+    SE_WOLF = 73,
+    SE_BONUS4 = 74,
+    SE_BIG = 75,
+    SE_ITEM01 = 76,
+    SE_RELEASE = 77,
 };
 
 #define SOUND_EFFECT_COUNT 78
 #define SOUND_QUEUE_SIZE 12
+// Slots for BGM tracks read into memory (CONFIG_BGM_IN_MEMORY).
+#define BGM_PRELOAD_SLOTS 0x10
+// Entries of the BGM command queue.
+#define BGM_QUEUE_SIZE 0x1f
 
+// SoundManager::modify_bgm's commands. The sound thread works through them
+// in order, a step per call for the longer ones (BgmCommandEntry::step).
 enum BgmCommand
 {
-    BGM_PLAY_WAV = 1,
+    // The end of the queue.
+    BGM_NONE = 0,
+    // With CONFIG_BGM_IN_MEMORY: stops the stream and reads the track into
+    // preload slot arg. Otherwise nothing.
+    BGM_LOAD = 1,
+    // Plays preload slot arg, or (without CONFIG_BGM_IN_MEMORY, or with
+    // arg < 0) switches the stream to the named track and plays it.
     BGM_PLAY = 2,
     BGM_STOP = 3,
-    BGM_STOP_4 = 4,
+    // Stops the stream, ends its thread and frees it.
+    BGM_RELEASE = 4,
+    // Fades out over arg seconds.
     BGM_FADE_OUT = 5,
+    BGM_PAUSE = 6,
+    BGM_UNPAUSE = 7,
+    // Back to full volume.
+    BGM_RESET_VOLUME = 8,
+    // Switches to the named track, keeping the play position.
+    BGM_SWITCH_TRACK = 9,
 };
 
 struct SoundEffectData;
@@ -350,9 +479,12 @@ void sound_debug_log(const char *fmt, ...);
 // A request to the sound thread (SoundManager::modify_bgm).
 struct BgmCommandEntry
 {
+    // A BgmCommand.
     i32 command;
     i32 arg;
-    i32 unk_8;
+    // How many steps of the command have run.
+    i32 step;
+    // A track's .wav name.
     char name[0x100];
 };
 
@@ -368,6 +500,9 @@ enum SoundThreadState
 
 extern SoundEffectData g_sound_effect_table[SOUND_EFFECT_COUNT];
 
+// The sound system (one global, g_SoundManager). DirectSound is set up on
+// a thread of its own at startup, and another thread loads the se_*.wav
+// files; the BGM is streamed by a third.
 struct SoundManager
 {
     struct IDirectSound8 *dsound;
@@ -384,24 +519,24 @@ struct SoundManager
     i32 queued_pans[SOUND_QUEUE_SIZE][0x80];
     // BGM tracks read ahead into memory (thbgm.fmt entry, file data, read
     // position and size), and the slot playing.
-    ThBgmFormat *preload_format[0x10];
-    u8 *preload_data[0x10];
-    u8 *preload_cursor[0x10];
-    i32 preload_size[0x10];
+    ThBgmFormat *preload_format[BGM_PRELOAD_SLOTS];
+    u8 *preload_data[BGM_PRELOAD_SLOTS];
+    u8 *preload_cursor[BGM_PRELOAD_SLOTS];
+    i32 preload_size[BGM_PRELOAD_SLOTS];
     i32 preload_current;
     // thbgm.fmt.
     ThBgmFormat *bgm_format;
     // File name of the BGM that select_bgm last switched to.
     char selected_bgm_name[0x100];
-    SoundBufferEntry sound_buffers[0x4e];
+    SoundBufferEntry sound_buffers[SOUND_EFFECT_COUNT];
     // The se_*.wav files, read by the loading thread.
     u8 *sound_file_data[SOUND_FILE_COUNT];
     // File name of the BGM playing.
     char bgm_name[0x100];
-    BgmCommandEntry bgm_commands[0x1f];
+    BgmCommandEntry bgm_commands[BGM_QUEUE_SIZE];
     u8 unk_4454[0x4560 - 0x4454];
     // File names of the preloaded tracks.
-    char preload_names[0x10][0x100];
+    char preload_names[BGM_PRELOAD_SLOTS][0x100];
     // The BGM archive's file name (thbgm.dat).
     char bgm_dat_name[0x100];
     BgmStream *bgm_stream;
@@ -448,8 +583,8 @@ struct SoundManager
     // 0x45db10. Opens the BGM archive and creates the BGM stream on it.
     // The path is "thbgm.dat" at the only call site; LTCG folded it.
     HARNESS_CALLED i32 open_bgm(const char *path);
-    // Reads a track into one of the preload slots (only with the preload
-    // option, flags_2c & 0x10), and starts streaming from such a slot.
+    // Reads a track into one of the preload slots (only with
+    // CONFIG_BGM_IN_MEMORY), and starts streaming from such a slot.
     // Reach the manager through g_SoundManager; LTCG dropped this.
     HARNESS_CALLED i32 preload_bgm(i32 slot, const char *name);
     HARNESS_CALLED i32 play_preloaded_bgm(i32 slot);
@@ -518,4 +653,3 @@ HARNESS_CALLED WAVEFORMATEX *__stdcall get_wav_chunk(u8 *data, const char *tag, 
 extern const char *const g_sound_file_names[SOUND_FILE_COUNT];
 extern SoundEffectData g_sound_effect_table[SOUND_EFFECT_COUNT];
 
-void play_sound_centered_stub(i32 id, i32 unused);

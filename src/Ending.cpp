@@ -20,15 +20,17 @@
 // GLOBAL: TH16 0x4a6dbc
 Ending *g_Ending;
 
-// Cleared when the ending goes away; also used by the screen effects.
-extern i32 g_unk_4c0f40;
+// Defined in GameThread.cpp.
+extern i32 g_cancel_screen_effects;
 
-// How many frames the bit at 0x114 / 4 of the raw button state has been
-// held.
+// The ending's anm files go in ANM manager slots 20-23 (ANM_SLOT_ENDING_FIRST on).
 
-#define BUTTON_SHOT (1 << 0)
-#define BUTTON_SKIP (1 << 9)
+// text.anm script of the first text line.
+#define ENDING_TEXT_ANM_LINE 0x2e
 
+// Holding skip, or shot for 20 frames, fast-forwards.
+#define ENDING_FAST_FORWARD_HELD()                                                                                     \
+    (g_hardware_input & INPUT_SKIP || (g_hardware_input & INPUT_SHOT && g_hardware_shot_hold_frames >= 20))
 
 i32 ending_load_anm();
 
@@ -39,17 +41,18 @@ Ending::Ending()
     flags_0 |= 2;
 }
 
+// Unloads the ending's anm files and script; clears g_cancel_screen_effects.
 // FUNCTION: TH16 0x419450
 Ending::~Ending()
 {
     g_UpdateFuncRegistry->unregister_locked(on_tick);
     g_UpdateFuncRegistry->unregister_locked(on_draw);
-    delete child;
-    child = NULL;
-    g_AnmManager->unload_anm(20);
-    g_AnmManager->unload_anm(21);
-    g_AnmManager->unload_anm(22);
-    g_AnmManager->unload_anm(23);
+    delete script_vm;
+    script_vm = NULL;
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST);
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST + 1);
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST + 2);
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST + 3);
     if (script_file != NULL)
     {
         free(script_file);
@@ -57,7 +60,7 @@ Ending::~Ending()
     }
     script_file = NULL;
     g_Ending = NULL;
-    g_unk_4c0f40 = 0;
+    g_cancel_screen_effects = 0;
 }
 
 // FUNCTION: TH16 0x419640
@@ -78,17 +81,20 @@ void Ending::destroy()
     delete g_Ending;
 }
 
+// Runs the script; fast-forwarding runs it again in the same frame (11 of
+// every 12 frames). At the end the game goes back to the title (or mode
+// 16).
 // FUNCTION: TH16 0x4196c0
 i32 Ending::on_tick_body()
 {
-    EndingChildF0 *c = child;
+    EndingScriptVm *c = script_vm;
     if (c->run() == 0)
     {
-        c->timer_4.tick();
+        c->time_alive.tick();
         ticks++;
-        if (!(child->flags & ENDING_CHILD_WAITING) && !(flags & ENDING_FLAG_2) && child->flags & ENDING_CHILD_SKIPPABLE)
+        if (!(script_vm->flags & ENDING_SCRIPT_WAITING) && !(flags & ENDING_FIRST_EVER) && script_vm->flags & ENDING_SCRIPT_SKIPPABLE)
         {
-            if (g_hardware_input & BUTTON_SKIP || (g_hardware_input & BUTTON_SHOT && g_hardware_input_held_4a51c4 >= 20))
+            if (ENDING_FAST_FORWARD_HELD())
             {
                 if (ticks % 12 != 0)
                 {
@@ -99,9 +105,10 @@ i32 Ending::on_tick_body()
     }
     else
     {
-        g_Supervisor.gamemode_to_switch_to = g_Supervisor.flags & SUPERVISOR_FLAG_2000 ? 2 : 16;
+        g_Supervisor.gamemode_to_switch_to =
+            g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT ? GAMEMODE_IDLE : GAMEMODE_TITLE_SCORE_ENTRY;
     }
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // FUNCTION: TH16 0x4197a0
@@ -113,14 +120,16 @@ i32 __fastcall Ending::on_tick_callback(Ending *self)
 // FUNCTION: TH16 0x4197b0
 i32 __fastcall Ending::on_draw_callback(Ending *self)
 {
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
+// Indexed by Ending::ending_index.
 // GLOBAL: TH16 0x491780
 const char *const g_ending_files[8] = {
     "e01.msg", "e02.msg", "e03.msg", "e04.msg", "e05.msg", "e06.msg", "e07.msg", "e08.msg",
 };
 
+// Per difficulty (Easy also stands for the rest).
 // GLOBAL: TH16 0x4917a0
 const char *const g_staff_files[4] = {
     "staff1.msg",
@@ -129,15 +138,16 @@ const char *const g_staff_files[4] = {
     "staff4.msg",
 };
 
+// Waits for the loading thread and deletes the text lines.
 // FUNCTION: TH16 0x4190b0
-EndingChildF0::~EndingChildF0()
+EndingScriptVm::~EndingScriptVm()
 {
     thread.join_if_running();
     AnmManager *anm = g_AnmManager;
     for (i32 i = 0; i < 5; i++)
     {
-        anm->delete_vm_inline(anm_ids[i]);
-        anm_ids[i].id = 0;
+        anm->delete_vm_inline(line_ids[i]);
+        line_ids[i].id = 0;
     }
 }
 
@@ -180,15 +190,17 @@ i32 Ending::initialize()
 
     g_AsciiManager->show_now_loading_inline(480.0f, 392.0f);
 
+    // The score file keeps a bit per difficulty for each ending (Easy is
+    // bit 0 alone), and entry 8 for having seen any.
     ending_index = g_Globals.subshot + g_Globals.character;
     ending_index = g_Globals.continues_used != 0 ? ending_index * 2 + 1 : ending_index * 2;
     if (g_Scorefile->endings_seen[ending_index] == 0)
     {
-        flags |= ENDING_FLAG_1;
+        flags |= ENDING_NEW;
     }
     if (g_Scorefile->endings_seen[8] == 0)
     {
-        flags |= ENDING_FLAG_2;
+        flags |= ENDING_FIRST_EVER;
     }
     g_Scorefile->endings_seen[ending_index] |= 1;
     if (g_Globals.difficulty == DIFFICULTY_NORMAL)
@@ -217,40 +229,42 @@ i32 Ending::initialize()
         g_GameErrorContext.log("\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
-    child = new EndingChildF0((u8 *)script_file + ((i32 *)script_file)[1]);
+    script_vm = new EndingScriptVm((u8 *)script_file + ((i32 *)script_file)[1]);
     if (ending_index >= 8)
     {
-        child->flags |= ENDING_CHILD_SKIPPABLE;
+        script_vm->flags |= ENDING_SCRIPT_SKIPPABLE;
     }
     return 0;
 }
 
+// Creates the five text lines (16-pixel glyphs) and starts the script.
 // FUNCTION: TH16 0x4197c0
-EndingChildF0::EndingChildF0(void *script)
+EndingScriptVm::EndingScriptVm(void *script)
 {
-    memset(this, 0, sizeof(EndingChildF0));
+    memset(this, 0, sizeof(EndingScriptVm));
     for (u32 i = 0; i < 5; i++)
     {
-        anm_ids[i] = g_Supervisor.text_anm->create_effect(i + 0x2e, -1, NULL);
-        get_vm_or_clear(anm_ids[i])->font_dims[0] = 16;
-        get_vm_or_clear(anm_ids[i])->font_dims[1] = 16;
-        get_vm_or_clear(anm_ids[i])->flags_hi &= ~0x1000;
+        line_ids[i] = g_Supervisor.text_anm->create_effect(i + ENDING_TEXT_ANM_LINE, -1, NULL);
+        get_vm_or_clear(line_ids[i])->font_dims[0] = 16;
+        get_vm_or_clear(line_ids[i])->font_dims[1] = 16;
+        get_vm_or_clear(line_ids[i])->flags_hi &= ~ANM_VM_TEXT_NO_OUTLINE;
     }
     instr = (EndingInstr *)script;
-    timer_4.reset();
-    timer_18.reset();
-    timer_2c.reset();
-    flags |= 1;
+    time_alive.reset();
+    script_time.reset();
+    wait_timer.reset();
+    flags |= ENDING_SCRIPT_MUSIC;
     text_color = 0xffffff;
 }
 
-// Loading thread of instruction 7.
+// The loading thread of ENDING_LOAD_ANM.
 // FUNCTION: TH16 0x41a310
 i32 ending_load_anm()
 {
-    EndingChildF0 *child = g_Ending->child;
-    child->anms[child->anm_index] = AnmManager::preload_anm(child->anm_index + 20, child->anm_filename);
-    child->flags &= ~ENDING_CHILD_WAITING;
+    EndingScriptVm *script_vm = g_Ending->script_vm;
+    script_vm->anms[script_vm->anm_index] =
+        AnmManager::preload_anm(script_vm->anm_index + ANM_SLOT_ENDING_FIRST, script_vm->anm_filename);
+    script_vm->flags &= ~ENDING_SCRIPT_WAITING;
     g_AsciiManager->hide_now_loading_inline();
     return 0;
 }
@@ -270,42 +284,44 @@ HARNESS_CALLED void AsciiInf::show_now_loading(f32 x, f32 y)
 
 #define ENDING_NEXT_INSTR(instr) ((EndingInstr *)((u8 *)(instr) + (instr)->size + 4))
 
+// Waits (ENDING_WAIT, ENDING_PAGE_WAIT) end on shot or enter; fast-forward
+// (not for a new ending) ends them every 6 frames.
 // FUNCTION: TH16 0x4199f0
-i32 EndingChildF0::run()
+i32 EndingScriptVm::run()
 {
-    if (flags & ENDING_CHILD_WAITING)
+    if (flags & ENDING_SCRIPT_WAITING)
     {
         return 0;
     }
-    while (timer_18.current >= instr->time)
+    while (script_time.current >= instr->time)
     {
         switch (instr->opcode)
         {
-        case 0:
+        case ENDING_END:
             return -1;
-        case 3:
+        case ENDING_TEXT:
             if (line_index == 0)
             {
                 for (i32 i = 0; i < 5; i++)
                 {
-                    g_AnmManager->draw_text(get_vm_or_clear(anm_ids[i]), 0xffffff, 0, 0, 0, 0, " ");
-                    AnmManager::interrupt_tree(anm_ids[i], 3);
+                    g_AnmManager->draw_text(get_vm_or_clear(line_ids[i]), 0xffffff, 0, 0, 0, 0, " ");
+                    AnmManager::interrupt_tree(line_ids[i], 3);
                 }
                 AnmManager *anm = g_AnmManager;
-                AnmVm *vm = anm->get_vm_with_id(anm_ids[0]);
+                AnmVm *vm = anm->get_vm_with_id(line_ids[0]);
                 if (vm == NULL)
                 {
-                    anm_ids[0].id = 0;
+                    line_ids[0].id = 0;
                 }
                 anm->draw_text(vm, text_color, 0, 0, 0, 0, decode_msg_string((const char *)instr->args));
-                AnmManager::interrupt_tree(anm_ids[0], 2);
+                AnmManager::interrupt_tree(line_ids[0], 2);
                 line_index++;
             }
             else
             {
-                g_AnmManager->draw_text(get_vm_or_clear(anm_ids[line_index]), text_color, 0, 0, 0, 0,
+                g_AnmManager->draw_text(get_vm_or_clear(line_ids[line_index]), text_color, 0, 0, 0, 0,
                                         decode_msg_string((const char *)instr->args));
-                AnmManager::interrupt_tree(anm_ids[line_index], 2);
+                AnmManager::interrupt_tree(line_ids[line_index], 2);
                 line_index++;
                 if (line_index >= 5)
                 {
@@ -313,116 +329,115 @@ i32 EndingChildF0::run()
                 }
             }
             break;
-        case 4:
+        case ENDING_TEXT_HIDE:
             for (i32 i = 0; i < 5; i++)
             {
-                AnmManager::interrupt_tree(anm_ids[i], 3);
+                AnmManager::interrupt_tree(line_ids[i], 3);
             }
             break;
-        case 5:
-            if (timer_2c.current <= 0)
+        case ENDING_WAIT:
+            if (wait_timer.current <= 0)
             {
-                timer_2c.set_value(instr->args[0]);
+                wait_timer.set_value(instr->args[0]);
             }
-            timer_2c--;
+            wait_timer--;
             if (instr->args[0] < 0)
             {
-                timer_2c.set_value(999);
+                wait_timer.set_value(999);
             }
-            if (g_hardware_input_pressed & 0x80001 || timer_2c.current <= 0)
+            if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT) || wait_timer.current <= 0)
             {
-                g_SoundManager.play_sound_centered(0, 0);
-                timer_2c.set_value(0);
+                g_SoundManager.play_sound_centered(SE_PLST00, 0);
+                wait_timer.set_value(0);
                 break;
             }
-            if (g_Ending->flags & ENDING_FLAG_1)
+            if (g_Ending->flags & ENDING_NEW)
             {
                 return 0;
             }
-            if (!(g_hardware_input & BUTTON_SKIP || (g_hardware_input & BUTTON_SHOT && g_hardware_input_held_4a51c4 >= 20)))
+            if (!ENDING_FAST_FORWARD_HELD())
             {
                 return 0;
             }
-            if (timer_2c.current % 6 != 0)
+            if (wait_timer.current % 6 != 0)
             {
                 return 0;
             }
-            timer_2c.set_value(0);
+            wait_timer.set_value(0);
             break;
-        case 6:
-            if (timer_2c.current <= 0)
+        case ENDING_PAGE_WAIT:
+            if (wait_timer.current <= 0)
             {
-                timer_2c.set_value(instr->args[0]);
+                wait_timer.set_value(instr->args[0]);
             }
-            timer_2c--;
-            if (!(g_hardware_input_pressed & 0x80001) && timer_2c.current > 0)
+            wait_timer--;
+            if (!(g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT)) && wait_timer.current > 0)
             {
-                if (g_Ending->flags & ENDING_FLAG_1)
+                if (g_Ending->flags & ENDING_NEW)
                 {
                     return 0;
                 }
-                if (!(g_hardware_input & BUTTON_SKIP ||
-                      (g_hardware_input & BUTTON_SHOT && g_hardware_input_held_4a51c4 >= 20)))
+                if (!ENDING_FAST_FORWARD_HELD())
                 {
                     return 0;
                 }
-                if (timer_2c.current % 6 != 0)
+                if (wait_timer.current % 6 != 0)
                 {
                     return 0;
                 }
             }
             else
             {
-                g_SoundManager.play_sound_centered(0, 0);
+                g_SoundManager.play_sound_centered(SE_PLST00, 0);
             }
-            timer_2c.set_value(0);
+            wait_timer.set_value(0);
             line_index = 0;
-            g_unk_4c0f40 = 0;
+            g_cancel_screen_effects = 0;
             break;
-        case 7:
+        case ENDING_LOAD_ANM:
         {
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
-            i32 slot = instr->args[0] + 20;
+            i32 slot = instr->args[0] + ANM_SLOT_ENDING_FIRST;
             if (slot >= 0)
             {
                 g_AnmManager->unload_anm_out_of_line(slot);
             }
-            flags |= ENDING_CHILD_WAITING;
+            flags |= ENDING_SCRIPT_WAITING;
             anm_filename = (const char *)&instr->args[1];
             anm_index = instr->args[0];
             thread.restart((ThreadStart)ending_load_anm, this);
             instr = ENDING_NEXT_INSTR(instr);
             return 0;
         }
-        case 8:
-            delete_vm_and_clear(vm_ids[instr->args[0]]);
-            vm_ids[instr->args[0]] = anms[instr->args[1]]->create_effect(instr->args[2], -1, NULL);
+        case ENDING_PICTURE:
+            delete_vm_and_clear(picture_ids[instr->args[0]]);
+            picture_ids[instr->args[0]] = anms[instr->args[1]]->create_effect(instr->args[2], -1, NULL);
             break;
-        case 15:
+        case ENDING_PICTURE_NORMAL:
             if (g_Globals.difficulty == DIFFICULTY_NORMAL)
             {
-                delete_vm_and_clear(vm_ids[instr->args[0]]);
-                vm_ids[instr->args[0]] = anms[instr->args[1]]->create_effect(instr->args[2], -1, NULL);
+                delete_vm_and_clear(picture_ids[instr->args[0]]);
+                picture_ids[instr->args[0]] = anms[instr->args[1]]->create_effect(instr->args[2], -1, NULL);
             }
             break;
-        case 16:
+        case ENDING_PICTURE_HARD:
             if (g_Globals.difficulty == DIFFICULTY_HARD)
             {
-                delete_vm_and_clear(vm_ids[instr->args[0]]);
-                vm_ids[instr->args[0]] = anms[instr->args[1]]->create_effect(instr->args[2], -1, NULL);
+                delete_vm_and_clear(picture_ids[instr->args[0]]);
+                picture_ids[instr->args[0]] = anms[instr->args[1]]->create_effect(instr->args[2], -1, NULL);
             }
             break;
-        case 17:
+        case ENDING_PICTURE_LUNATIC:
             if (g_Globals.difficulty == DIFFICULTY_LUNATIC)
             {
-                delete_vm_and_clear(vm_ids[instr->args[0]]);
-                vm_ids[instr->args[0]] = anms[instr->args[1]]->create_effect(instr->args[2], -1, NULL);
+                delete_vm_and_clear(picture_ids[instr->args[0]]);
+                picture_ids[instr->args[0]] = anms[instr->args[1]]->create_effect(instr->args[2], -1, NULL);
             }
             break;
-        case 9:
+        case ENDING_TEXT_COLOR:
             text_color = instr->args[0];
             break;
-        case 10:
+        case ENDING_MUSIC:
             g_Supervisor.play_bgm_wav(0, (const char *)instr->args);
             if (strcmp((const char *)instr->args, "bgm/th16_14") == 0)
             {
@@ -433,20 +448,20 @@ i32 EndingChildF0::run()
                 g_Supervisor.play_bgm(0, 16);
             }
             break;
-        case 11:
+        case ENDING_MUSIC_FADE:
         {
             // Supervisor::fade_out_bgm(3.0f), inlined.
             g_SoundManager.modify_bgm(BGM_FADE_OUT,
                                       g_game_speed != 0.0f && !(g_game_speed > 1.0f) ? 3.0f / g_game_speed : 3.0f,
                                       "");
-            flags &= ~1;
+            flags &= ~ENDING_SCRIPT_MUSIC;
             break;
         }
-        case 12:
+        case ENDING_STAFF_ROLL:
         {
             for (i32 i = 0; i < 5; i++)
             {
-                delete_vm_and_clear(anm_ids[i]);
+                delete_vm_and_clear(line_ids[i]);
             }
             void *data;
             switch (g_Globals.difficulty)
@@ -468,24 +483,24 @@ i32 EndingChildF0::run()
             {
                 return -1;
             }
-            memset(this, 0, sizeof(EndingChildF0));
+            memset(this, 0, sizeof(EndingScriptVm));
             instr = (EndingInstr *)((u8 *)data + ((i32 *)data)[1]);
-            timer_4.reset_inline();
-            timer_18.reset_inline();
-            timer_2c.reset_inline();
-            flags |= ENDING_CHILD_SKIPPABLE;
+            time_alive.reset_inline();
+            script_time.reset_inline();
+            wait_timer.reset_inline();
+            flags |= ENDING_SCRIPT_SKIPPABLE;
             text_color = 0xffffff;
             continue;
         }
-        case 13:
-            ScreenEffect::create_inline(0, instr->args[0], 0, 0, 0, 0x54);
+        case ENDING_FADE_IN:
+            ScreenEffect::create_inline(SCREEN_EFFECT_FADE_IN_VIEWPORT, instr->args[0], 0, 0, 0, 0x54);
             break;
-        case 14:
-            ScreenEffect::create_inline(5, instr->args[0], 0, 0, 0, 0x54);
+        case ENDING_FADE_OUT:
+            ScreenEffect::create_inline(SCREEN_EFFECT_FADE_OUT_VIEWPORT, instr->args[0], 0, 0, 0, 0x54);
             break;
         }
         instr = ENDING_NEXT_INSTR(instr);
     }
-    timer_18.tick_split();
+    script_time.tick_split();
     return 0;
 }

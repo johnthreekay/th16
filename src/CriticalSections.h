@@ -4,24 +4,38 @@
 
 #include "decomp.h"
 
-enum
+// The game's critical sections (g_CriticalSections.cs). The ones not
+// listed (1, 4, 7, 8 and 13) are never entered in TH16.
+enum CriticalSectionId
 {
+    // Guards g_UpdateFuncRegistry's chains.
     CS_UPDATE_FUNC_REGISTRY = 0,
+    // Guards file access: file_read_all, file_exists and file_write, and
+    // file_open/file_create until file_close (FileSystem.h).
     CS_FILE = 2,
+    // Guards g_GameErrorContext's log buffer.
     CS_GAME_ERROR_CONTEXT = 3,
     // Held while Supervisor::switch_gamemodes switches.
     // GameWindow::get_runtime also takes it around its timer state.
     CS_SUPERVISOR_GAMEMODE = 5,
     // Guards restarting g_Supervisor.thread.
     CS_SUPERVISOR_THREAD = 6,
+    // Guards AnmManager's loaded files and VM lists.
     CS_ANM_MANAGER = 9,
+    // Guards Rng::rand_u16 and rand_u32.
     CS_RNG = 10,
     // Guards SoundManager's BGM command queue.
     CS_SOUND = 11,
+    // Guards the streaming BGM buffer (DSUtil.cpp), shared with the sound
+    // thread.
+    CS_BGM_STREAM = 12,
     CS_COUNT = 14,
 };
 
-// Optional locking; only active when the game runs its threaded mode.
+// The game's locks, entered with ENTER_CS and left with LEAVE_CS. Locking
+// is optional: WinMain initializes the sections and sets enabled, and the
+// macros do nothing while it is clear. depth counts how often each section
+// is held.
 struct CriticalSections
 {
     CRITICAL_SECTION cs[CS_COUNT];

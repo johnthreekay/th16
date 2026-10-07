@@ -16,10 +16,46 @@ struct FramePacing
     i32 late_frames;
 };
 
+// GameWindow::flags (g_window_flags).
+enum WindowFlags
+{
+    // Set once Supervisor::initialize has succeeded; the window procedure
+    // only switches modes on maximize after that.
+    WINDOW_RUNNING = 1 << 0,
+    // A switch between full screen and windowed is pending (Alt+Enter,
+    // maximize): the frame loop resets the device in the new mode.
+    WINDOW_CHANGE_MODE = 1 << 1,
+    // The current WindowSize, in bits 2 to 5.
+    WINDOW_SIZE_SHIFT = 2,
+    WINDOW_SIZE_MASK = 0xf << WINDOW_SIZE_SHIFT,
+    // Pace frames by sleeping (frame_pacing 2 without frame skip, at 60 Hz).
+    WINDOW_SLEEP_PACING = 1 << 6,
+    // The resolution dialog was closed without OK: the game quits.
+    WINDOW_DIALOG_CANCELLED = 1 << 7,
+    // The resolution dialog is open.
+    WINDOW_DIALOG_OPEN = 1 << 8,
+};
+
+// The resolution dialog shown at startup (dialog resource IDD_RESOLUTION)
+// and its controls.
+enum ResolutionDialogIds
+{
+    IDD_RESOLUTION = 0xcb,
+    // Check box: show this dialog every time (CONFIG_SHOW_STARTUP_DIALOG).
+    IDC_SHOW_AT_STARTUP = 0xca,
+    // Check box: full screen rather than a window.
+    IDC_FULL_SCREEN = 0xcb,
+    // Radio buttons for the three sizes.
+    IDC_SIZE_640 = 0xcd,
+    IDC_SIZE_960 = 0xce,
+    IDC_SIZE_1280 = 0xcf,
+    IDC_OK = 0xd0,
+};
+
 // The main window (TH06's GameWindow) and the frame loop state. Window
 // methods reach the fields through this; other code addresses them as
 // globals. Several of those globals are defined on their own
-// (g_unk_4d9d1c for flags, g_unk_4d9d20, g_resolution_x and the rest from
+// (g_window_flags for flags, g_device_reset_frames, g_resolution_x and the rest from
 // 0x4d9d2c, g_frame_pacing for pacing_mode and pacing): they are fields of
 // this struct, and code that addresses them as globals uses those
 // definitions.
@@ -29,18 +65,25 @@ struct GameWindow
     HWND window;
     // The resolution dialog while it is open.
     HWND dialog;
-    i32 unk_8;
+    // The frame loop runs while this is 0. Cleared by init_d3d and never
+    // set.
+    i32 exit_requested;
     HINSTANCE instance;
     // Nonzero while the window has focus; input reads nothing otherwise.
     i32 is_app_active;
-    i32 unk_14;
+    // Show the mouse cursor over the full screen window (set while the game
+    // is in the background).
+    i32 show_cursor;
     // Counts drawn frames up to the frame skip setting.
     i8 frame_skip_counter;
     u8 unk_19[3];
     // Zero if there is no performance counter (timeGetTime is used then).
     LARGE_INTEGER performance_frequency;
     LARGE_INTEGER initial_performance_counter;
-    u8 unk_2c;
+    // Set when the game was started through a shortcut (or by a program)
+    // whose target is not this executable; turns vsync waiting off
+    // (Supervisor::no_vsync).
+    u8 started_by_launcher;
     // %APPDATA%\ShanghaiAlice\th16 and the directory of the executable:
     // where th16.cfg, replays and screenshots go, and where the game runs
     // from (Supervisor::load_game_config switches between them).
@@ -51,9 +94,11 @@ struct GameWindow
     i32 screen_save_active;
     i32 low_power_active;
     i32 power_off_active;
-    // 0x2: device lost; 0x3c: window size; 0x40: frame pacing by sleeping.
+    // WindowFlags.
     u32 flags;
-    i32 unk_2040;
+    // Set to 10 when the device is reset; counted down by
+    // Supervisor::on_tick; never read.
+    i32 device_reset_frames;
     u8 unk_2044[0x204c - 0x2044];
     i32 resolution_x;
     i32 resolution_y;
@@ -81,8 +126,8 @@ struct GameWindow
     FramePacing pacing[4];
 
     // The frame loop variants; 0 to keep running, 1 or 2 to quit. With
-    // flags & 0x40 the loop paces itself by sleeping; otherwise vsync does,
-    // with or without frame skipping.
+    // WINDOW_SLEEP_PACING the loop paces itself by sleeping; otherwise vsync
+    // does, with or without frame skipping.
     HARNESS_CALLED i32 do_frame_sleeping();
     HARNESS_CALLED i32 do_frame();
     HARNESS_CALLED i32 do_frame_frameskip();

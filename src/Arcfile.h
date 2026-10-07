@@ -67,6 +67,7 @@ struct ArcfileEntry
     u32 offset;
     // Size after decompression; equal to the packed size if stored as is.
     u32 size;
+    // Read from the directory but never used.
     u32 unk_c;
 
     ArcfileEntry();

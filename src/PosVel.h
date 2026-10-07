@@ -4,6 +4,7 @@
 #include "ZunMath.h"
 #include "types.h"
 
+// How PosVel::step moves pos.
 enum PosVelMode
 {
     // pos += velocity.
@@ -18,6 +19,9 @@ enum PosVelMode
     // side to side as wave_angle advances.
     POSVEL_MODE_WAVE = 4,
 };
+
+// The PosVelMode bits of PosVel::flags.
+const u32 POSVEL_MODE_MASK = 0xf;
 
 // Position and motion of an enemy or bullet-like object. Layout from
 // ExpHP's th-re-data (zPosVel).
@@ -36,8 +40,14 @@ struct PosVel
     // Low 4 bits: PosVelMode.
     u32 flags;
 
+    // The per-frame update before step(): sets velocity from angle and
+    // speed (VELOCITY), advances the orbit's radius and angle (CIRCLE,
+    // ELLIPSE), or advances the wave's phase and sets its drift velocity
+    // (WAVE), all scaled by the game speed.
     void update_secondary_fields();
+    // Moves pos one frame by the mode, then snaps it to 1/100 pixel.
     void step();
+    // step(), restarting a wave from the current position first.
     void step_from_center();
     // 0x4260d0. LTCG passes the angle in xmm1.
     HARNESS_CALLED void set_ellipse_angle(f32 angle);

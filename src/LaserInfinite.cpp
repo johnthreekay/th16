@@ -29,13 +29,13 @@ void LaserInfiniteInf::run_ex()
         }
         switch (ex->type)
         {
-        case 0x80:
-            countdown_5c8 = ex->a;
+        case BULLET_EX_INVULN:
+            ex_invuln_remaining_frames = ex->a;
             break;
-        case 0x400:
-            state = 3;
+        case BULLET_EX_DELETE:
+            state = LASER_STATE_WARNING;
             break;
-        case 0x100000:
+        case BULLET_EX_BLEND:
             if (ex->a != 0)
             {
                 vm_950.flags_lo = vm_950.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
@@ -54,7 +54,7 @@ void LaserInfiniteInf::run_ex()
 // 2 if a circle at pos touches the laser's rectangle, else 0.
 // TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
 // FUNCTION: TH16 0x436ef0
-i32 LaserInfiniteInf::method_30(Float3 *pos, f32 radius)
+i32 LaserInfiniteInf::touches_circle(Float3 *pos, f32 radius)
 {
     f32 dx = pos->x - position.x;
     f32 dy = pos->y - position.y;
@@ -65,7 +65,7 @@ i32 LaserInfiniteInf::method_30(Float3 *pos, f32 radius)
     f32 y = dx * s + dy * c;
     D3DXVECTOR2 lo(x - radius, y - radius);
     D3DXVECTOR2 hi(x + radius, y + radius);
-    if (lo.x > unk_70 || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
+    if (lo.x > hit_length || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
     {
         return 0;
     }
@@ -87,24 +87,24 @@ i32 LaserInfiniteInf::on_tick()
         {
             if (ex_state[5].timer.current <= 0)
             {
-                ex_flags ^= 0x80000000;
+                ex_flags ^= BULLET_EX_WAIT;
             }
             else
             {
                 ex_state[5].timer--;
             }
         }
-        if (countdown_5c8 != 0)
+        if (ex_invuln_remaining_frames != 0)
         {
-            countdown_5c8--;
+            ex_invuln_remaining_frames--;
         }
     }
-    if (unk_70 < inner.laser_new_arg_2)
+    if (hit_length < inner.laser_new_arg_2)
     {
-        unk_70 = length * g_game_speed + unk_70;
-        if (unk_70 > inner.laser_new_arg_2)
+        hit_length = length * g_game_speed + hit_length;
+        if (hit_length > inner.laser_new_arg_2)
         {
-            unk_70 = inner.laser_new_arg_2;
+            hit_length = inner.laser_new_arg_2;
         }
     }
     i32 i = 0;
@@ -139,35 +139,35 @@ i32 LaserInfiniteInf::on_tick()
     position.z = position.z + inner.velocity.z * g_game_speed;
     switch (state)
     {
-    case 3:
-        if (timer.current >= inner.unk_30)
+    case LASER_STATE_WARNING:
+        if (timer.current >= inner.start_time)
         {
             timer.set_value(0);
-            state = 4;
+            state = LASER_STATE_EXPANDING;
         }
         break;
-    case 4:
-        if (timer.current < inner.unk_34)
+    case LASER_STATE_EXPANDING:
+        if (timer.current < inner.expand_time)
         {
-            width = inner.laser_new_arg_4 * timer.current_f / inner.unk_34;
+            width = inner.laser_new_arg_4 * timer.current_f / inner.expand_time;
             break;
         }
         timer.set_value(0);
-        state = 2;
+        state = LASER_STATE_ACTIVE;
         width = inner.laser_new_arg_4;
-    case 2:
-        if (timer.current < inner.unk_38)
+    case LASER_STATE_ACTIVE:
+        if (timer.current < inner.duration)
         {
             break;
         }
         timer.set_value(0);
-        state = 5;
-    case 5:
-        if (timer.current >= inner.unk_3c)
+        state = LASER_STATE_SHRINKING;
+    case LASER_STATE_SHRINKING:
+        if (timer.current >= inner.shrink_time)
         {
             return 1;
         }
-        width = inner.laser_new_arg_4 - timer.current_f * inner.laser_new_arg_4 / inner.unk_3c;
+        width = inner.laser_new_arg_4 - timer.current_f * inner.laser_new_arg_4 / inner.shrink_time;
         break;
     }
     check_graze_or_kill(0);
@@ -175,7 +175,7 @@ i32 LaserInfiniteInf::on_tick()
     vm->flags_lo |= ANM_VM_SCALE_CHANGED;
     vm->scale.x = width / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_width;
     vm->flags_lo |= ANM_VM_SCALE_CHANGED;
-    vm->scale.y = unk_70 / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_height;
+    vm->scale.y = hit_length / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_height;
     vm->run();
     if (unk_7c == 0.0f)
     {

@@ -1,7 +1,10 @@
+// The four characters' bombs: begin starts the ANM scripts (from the
+// character's pl0X.anm), the sound and the screen shake, on_tick runs every
+// frame until it returns nonzero, cancel_bullets cancels bullets (as
+// bomb cancels, which drop season items). The player stays invincible
+// while a bomb runs (and for 120 frames from the start of all but
+// Reimu's), and a bomb after a spell card's first second costs its bonus.
 #include <math.h>
-// The four characters' bombs: begin sets up the ANM scripts and screen
-// shake, on_tick runs every frame until it returns nonzero, method_10
-// cancels bullets.
 #include <stdlib.h>
 #include <string.h>
 
@@ -16,49 +19,42 @@
 #include "ScreenEffect.h"
 #include "SoundManager.h"
 #include "Spellcard.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
 // Reimu's bomb allocates its orbs by size (0x6c0 bytes in the original).
 static_assert(sizeof(BombReimuAOrbs) == 0x6c0, "BombReimuAOrbs size");
 
-// The copy of ZunMath.h's sincosmul in Cirno's bomb's object file (TH16
+// Scripts of the character's pl0X.anm that the bombs start: the main VM
+// (anm_id) and the secondary one, Reimu's orbs, and the beam pieces under
+// Marisa's main VM.
+enum
+{
+    REIMU_BOMB_ORB_SCRIPT = 15,
+    REIMU_BOMB_SECONDARY_SCRIPT = 23,
+    CIRNO_BOMB_SCRIPT = 10,
+    CIRNO_BOMB_SECONDARY_SCRIPT = 13,
+    AYA_BOMB_SCRIPT = 14,
+    AYA_BOMB_SECONDARY_SCRIPT = 19,
+    MARISA_BOMB_SCRIPT = 17,
+    MARISA_BOMB_SECONDARY_SCRIPT = 25,
+    MARISA_BOMB_BEAM_SCRIPT = 24,
+};
+
+// The copy of sincosmul (ZunAsm.h) in Cirno's bomb's object file (TH16
 // keeps one per object file). A static of its own so that it can be
 // annotated.
 // FUNCTION: TH16 0x40f570
 static void __fastcall cirno_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-#ifdef TH16_PORT
-    port_sincosmul(&dst->x, angle, radius);
-#else
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
-#endif
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // The same for Marisa's bomb.
 // FUNCTION: TH16 0x410130
 static void __fastcall marisa_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-#ifdef TH16_PORT
-    port_sincosmul(&dst->x, angle, radius);
-#else
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
-#endif
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // A bomb ends a spell card's bonus once the card has run a second.
@@ -70,17 +66,20 @@ static inline void spellcard_on_bomb()
         if (spellcard->time.current >= 60)
         {
             spellcard->bonus = 0;
-            spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_FLAG_20);
+            spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_EARLY_BOMB);
         }
         else if (g_MainBomb->in_use == 1)
         {
-            spellcard->flags |= SPELLCARD_FLAG_20;
+            spellcard->flags |= SPELLCARD_EARLY_BOMB;
         }
     }
 }
 
+// A vertical band of wind through the player's column, tilted and sent
+// sideways by the player's horizontal movement.
 // TODO: player and &pos trade registers (esi/edi) with the original, which
-// also pushes the sound argument later.
+// also pushes the sound argument later (get_vm instead of a direct
+// get_vm_with_id call removed the /GS cookie).
 // FUNCTION: TH16 0x40e780
 i32 BombAyaAInf::begin()
 {
@@ -89,19 +88,19 @@ i32 BombAyaAInf::begin()
     D3DXVECTOR3 pos_2;
     pos_2 = player->inner.pos;
     pos.y = 224.0f;
-    angle = player->inner.unk_16050 * (1.0f / 128.0f) * 0.017453292f * 0.5f - ZUN_PI / 2;
-    speed = player->inner.unk_16050 * (1.0f / 128.0f) * 0.05f;
-    g_SoundManager.play_sound_centered(30, 0);
+    angle = player->inner.attempted_delta_pos_subpixel.x * (1.0f / 128.0f) * 0.017453292f * 0.5f - ZUN_PI / 2;
+    speed = player->inner.attempted_delta_pos_subpixel.x * (1.0f / 128.0f) * 0.05f;
+    g_SoundManager.play_sound_centered(SE_CH00, 0);
 
-    anm_id = player->anm_file->create_vm(14, &pos, 0.0f, -1, 0);
-    AnmVm *vm = g_AnmManager->get_vm_with_id(anm_id);
+    anm_id = player->anm_file->create_vm(AYA_BOMB_SCRIPT, &pos, 0.0f, -1, 0);
+    AnmVm *vm = get_vm(anm_id);
     if (vm != NULL)
     {
         vm->rotation.z = angle;
         vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
     }
     AnmLoaded *anm = g_Player->anm_file;
-    anm_id_64 = anm->create_vm(19, &pos_2, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(AYA_BOMB_SECONDARY_SCRIPT, &pos_2, 0.0f, -1, 0);
     spellcard_on_bomb();
     g_Player->inner.iframes = 120;
     g_EnemyManager->inner.bomb_count++;
@@ -118,7 +117,7 @@ i32 BombAyaAInf::on_tick()
     g_Player->inner.iframes = 40;
     if (vm == NULL)
     {
-        AnmManager::interrupt_tree(anm_id_64, 1);
+        AnmManager::interrupt_tree(anm_id_secondary, 1);
         anm_id.id = 0;
         return -1;
     }
@@ -135,10 +134,12 @@ i32 BombAyaAInf::on_tick()
     effect_pos.y = g_replay_safe_rng.randf_0_to_1() * 448.0f;
     effect_pos.z = 0.0f;
     EffectManager *effects = g_EffectManager;
-    AnmVm *effect = g_EffectManager->get_tracked_vm(effects->create_tracked_inline(3, &effect_pos));
+    AnmVm *effect =
+        g_EffectManager->get_tracked_vm(effects->create_tracked_inline(EFFECT_JAGGED_LINE_GRAY, &effect_pos));
+    // Blend mode 1.
     effect->flags_lo &= ~0x1c0;
     effect->flags_lo |= 0x20;
-    method_10();
+    cancel_bullets();
     return 0;
 }
 
@@ -148,11 +149,11 @@ i32 BombCirnoAInf::begin()
     Player *player = g_Player;
     pos = player->inner.pos;
     angle = -ZUN_PI / 2;
-    g_SoundManager.play_sound_centered(30, 0);
+    g_SoundManager.play_sound_centered(SE_CH00, 0);
 
-    anm_id = player->anm_file->create_vm(10, &pos, 0.0f, -1, 0);
+    anm_id = player->anm_file->create_vm(CIRNO_BOMB_SCRIPT, &pos, 0.0f, -1, 0);
     AnmLoaded *anm = g_Player->anm_file;
-    anm_id_64 = anm->create_vm(13, &pos, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(CIRNO_BOMB_SECONDARY_SCRIPT, &pos, 0.0f, -1, 0);
     spellcard_on_bomb();
     g_Player->inner.iframes = 120;
     g_EnemyManager->inner.bomb_count++;
@@ -160,10 +161,9 @@ i32 BombCirnoAInf::begin()
     return 0;
 }
 
-// Sparkles inside the growing circle for most of the bomb, then all over
-// the screen.
-// TODO: the first sparkle's x adds pos.x to the offset where the original
-// adds the offset to pos.x (operand order of one addss).
+// Two damage sources grow with the circle (radius 16 to 176 in the first
+// second, then to 208), with sparkles inside it for most of the bomb, then
+// all over the screen.
 // FUNCTION: TH16 0x40f240
 i32 BombCirnoAInf::on_tick()
 {
@@ -171,7 +171,7 @@ i32 BombCirnoAInf::on_tick()
     g_Player->inner.iframes = 40;
     if (vm == NULL)
     {
-        AnmManager::interrupt_tree(anm_id_64, 1);
+        AnmManager::interrupt_tree(anm_id_secondary, 1);
         anm_id.id = 0;
         return -1;
     }
@@ -190,8 +190,11 @@ i32 BombCirnoAInf::on_tick()
         D3DXVECTOR3 effect_pos;
         cirno_sincosmul(&effect_pos, angle, g_replay_safe_rng.randf_0_to_1() * scale);
         effect_pos.z = 0.0f;
-        effect_pos += pos;
-        AnmVm *effect = g_EffectManager->get_tracked_vm(g_EffectManager->create_tracked(3, &effect_pos, 0));
+        Float3 *center = &pos;
+        effect_pos += *center;
+        AnmVm *effect = g_EffectManager->get_tracked_vm(
+            g_EffectManager->create_tracked(EFFECT_JAGGED_LINE_GRAY, &effect_pos, 0));
+        // Blend mode 1.
         effect->flags_lo &= ~0x1c0;
         effect->flags_lo |= 0x20;
     }
@@ -201,11 +204,12 @@ i32 BombCirnoAInf::on_tick()
         effect_pos.x = g_replay_safe_rng.randf_neg_1_to_1() * 192.0f;
         effect_pos.y = g_replay_safe_rng.randf_0_to_1() * 448.0f;
         effect_pos.z = 0.0f;
-        AnmVm *effect = g_EffectManager->get_tracked_vm(g_EffectManager->create_tracked(3, &effect_pos, 0));
+        AnmVm *effect = g_EffectManager->get_tracked_vm(
+            g_EffectManager->create_tracked(EFFECT_JAGGED_LINE_GRAY, &effect_pos, 0));
         effect->flags_lo &= ~0x1c0;
         effect->flags_lo |= 0x20;
     }
-    method_10();
+    cancel_bullets();
     return 0;
 }
 
@@ -215,36 +219,34 @@ i32 BombMarisaAInf::begin()
     Player *player = g_Player;
     pos = player->inner.pos;
     angle = -ZUN_PI / 2;
-    g_SoundManager.play_sound_centered(49, 0);
+    g_SoundManager.play_sound_centered(SE_NEP00, 0);
 
-    anm_id = player->anm_file->create_vm(17, &pos, 0.0f, -1, 0);
+    anm_id = player->anm_file->create_vm(MARISA_BOMB_SCRIPT, &pos, 0.0f, -1, 0);
     spellcard_on_bomb();
     g_Player->inner.iframes = 120;
     g_EnemyManager->inner.bomb_count++;
     ScreenEffect::create_inline(SCREEN_EFFECT_SHAKE_WITH_RAMP, 3, 60, 240, 30, 0);
     AnmLoaded *anm = g_Player->anm_file;
-    anm_id_64 = anm->create_vm(25, &pos, 0.0f, -1, 0);
-    g_Player->inner.flags |= 4;
+    anm_id_secondary = anm->create_vm(MARISA_BOMB_SECONDARY_SCRIPT, &pos, 0.0f, -1, 0);
+    g_Player->inner.flags |= PLAYER_FLAG_NO_SHOOTING;
     return 0;
 }
 
-// Marisa's master spark: turns with the player's movement and keeps three
-// stretches of damage along the beam.
-// TODO: ours gets a /GS cookie for beam_pos and swaps edi/ebx (the ANM
-// manager and the VM).
+// Marisa's master spark: follows the player (slowed to a fifth) and turns
+// with their horizontal movement; every third frame three rectangles of
+// damage along the beam. After 300 frames the beam fades and the player
+// can move and shoot again.
+// TODO: ours gets a /GS cookie for beam_pos (it goes away without the
+// interrupt_tree calls, also when those go through an inline helper), and
+// sums beam_pos and pos in a different operand order.
 // FUNCTION: TH16 0x40fb00
 i32 BombMarisaAInf::on_tick()
 {
-    AnmManager *anm = g_AnmManager;
-    AnmVm *vm = anm->get_vm_with_id(anm_id);
-    if (vm == NULL)
-    {
-        anm_id.id = 0;
-    }
+    AnmVm *vm = get_vm_or_clear(anm_id);
     g_Player->inner.iframes = 40;
     if (vm == NULL)
     {
-        AnmManager::interrupt_tree(anm_id_64, 1);
+        AnmManager::interrupt_tree(anm_id_secondary, 1);
         return -1;
     }
     if (timer.current > 300)
@@ -254,18 +256,18 @@ i32 BombMarisaAInf::on_tick()
     if (timer.current == 300)
     {
         AnmManager::interrupt_tree(anm_id, 1);
-        AnmManager::interrupt_tree(anm_id_64, 1);
-        g_Player->inner.flags &= ~4;
+        AnmManager::interrupt_tree(anm_id_secondary, 1);
+        g_Player->inner.flags &= ~PLAYER_FLAG_NO_SHOOTING;
         g_Player->inner.speed_multiplier = 1.0f;
     }
-    vm->flags_lo |= 4;
     vm->rotation.z = angle;
+    vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
     Player *player = g_Player;
-    if (0.0f > player->inner.unk_16050)
+    if (0.0f > player->inner.attempted_delta_pos_subpixel.x)
     {
         angle -= 0.0026179939f;
     }
-    else if (player->inner.unk_16050 > 0.0f)
+    else if (player->inner.attempted_delta_pos_subpixel.x > 0.0f)
     {
         angle += 0.0026179939f;
     }
@@ -276,57 +278,56 @@ i32 BombMarisaAInf::on_tick()
         D3DXVECTOR3 beam_pos;
         beam_pos.z = 0.0f;
         marisa_sincosmul(&beam_pos, angle, 208.0f);
-        beam_pos.x = pos.x + beam_pos.x;
-        beam_pos.y = pos.y + beam_pos.y;
-        beam_pos.z = pos.z + beam_pos.z;
-        g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 32.0f, angle, 0, 60))->flags |= 4;
+        beam_pos += pos;
+        g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 32.0f, angle, 0, 60))
+            ->flags |= DAMAGE_SOURCE_BOMB;
         marisa_sincosmul(&beam_pos, angle, 240.0f);
-        beam_pos.x = pos.x + beam_pos.x;
-        beam_pos.y = pos.y + beam_pos.y;
-        beam_pos.z = pos.z + beam_pos.z;
-        g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 128.0f, angle, 0, 20))->flags |= 4;
+        beam_pos += pos;
+        g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 128.0f, angle, 0, 20))
+            ->flags |= DAMAGE_SOURCE_BOMB;
         marisa_sincosmul(&beam_pos, angle, 304.0f);
-        beam_pos.x = pos.x + beam_pos.x;
-        beam_pos.y = pos.y + beam_pos.y;
-        beam_pos.z = pos.z + beam_pos.z;
-        g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 256.0f, angle, 0, 20))->flags |= 4;
+        beam_pos += pos;
+        g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 256.0f, angle, 0, 20))
+            ->flags |= DAMAGE_SOURCE_BOMB;
     }
-    vm = anm->get_vm_with_id(anm_id);
+    vm = get_vm(anm_id);
     if (vm != NULL)
     {
         vm->entity_pos = pos;
     }
-    vm = anm->get_vm_with_id(anm_id_64);
+    vm = get_vm(anm_id_secondary);
     if (vm != NULL)
     {
         vm->entity_pos = pos;
     }
-    method_10();
+    cancel_bullets();
     return 0;
 }
 
+// The orbs start on the bomb's first frame (on_tick).
 // FUNCTION: TH16 0x410d10
 i32 BombReimuAInf::begin()
 {
     Player *player = g_Player;
     pos = player->inner.pos;
-    g_SoundManager.play_sound_centered(49, 0);
+    g_SoundManager.play_sound_centered(SE_NEP00, 0);
     spellcard_on_bomb();
     g_EnemyManager->inner.bomb_count++;
-    if (unk_70 != NULL)
+    if (reimu_orbs != NULL)
     {
-        free(unk_70);
-        unk_70 = NULL;
+        free(reimu_orbs);
+        reimu_orbs = NULL;
     }
-    unk_70 = malloc(sizeof(BombReimuAOrbs));
-    memset(unk_70, 0, sizeof(BombReimuAOrbs));
+    reimu_orbs = (BombReimuAOrbs *)malloc(sizeof(BombReimuAOrbs));
+    memset(reimu_orbs, 0, sizeof(BombReimuAOrbs));
     AnmLoaded *anm = g_Player->anm_file;
-    anm_id_64 = anm->create_vm(23, &pos, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(REIMU_BOMB_SECONDARY_SCRIPT, &pos, 0.0f, -1, 0);
     return 0;
 }
 
+// The wind's rectangle.
 // FUNCTION: TH16 0x40ec10
-i32 BombAyaAInf::method_10()
+i32 BombAyaAInf::cancel_bullets()
 {
     D3DXVECTOR3 size;
     size.x = 640.0f;
@@ -336,26 +337,20 @@ i32 BombAyaAInf::method_10()
     return 0;
 }
 
-// Every beam VM (script 24) under the bomb's VM cancels bullets and lasers
-// in its rectangle.
-// TODO: the original realigns its frame (and esp, -8), reads the parent's world_pos from its stack slot and keeps the loop unrotated.
+// Every beam VM (MARISA_BOMB_BEAM_SCRIPT) under the bomb's VM cancels
+// bullets and lasers in its rectangle.
+// TODO: the original realigns its frame (and esp, -8), reads the parent's
+// world_pos from its stack slot and keeps the loop unrotated.
 // FUNCTION: TH16 0x40fe80
-i32 BombMarisaAInf::method_10()
+i32 BombMarisaAInf::cancel_bullets()
 {
     for (i32 i = 0;; i++)
     {
-        AnmManager *anm = g_AnmManager;
-        if (anm->get_vm_with_id(anm_id) == NULL)
+        if (get_vm_or_clear(anm_id) == NULL)
         {
-            anm_id.id = 0;
             return 0;
         }
-        AnmVm *parent = anm->get_vm_with_id(anm_id);
-        if (parent == NULL)
-        {
-            anm_id.id = 0;
-        }
-        AnmVm *vm = parent->search_children(0x18, i);
+        AnmVm *vm = get_vm_or_clear(anm_id)->search_children(MARISA_BOMB_BEAM_SCRIPT, i);
         if (vm == NULL)
         {
             return 0;
@@ -371,7 +366,7 @@ i32 BombMarisaAInf::method_10()
 
 // The radius grows from 16 to 176 over the first second, then to 208.
 // FUNCTION: TH16 0x40f4c0
-i32 BombCirnoAInf::method_10()
+i32 BombCirnoAInf::cancel_bullets()
 {
     f32 radius;
     if (timer.current <= 60)
@@ -390,33 +385,34 @@ i32 BombCirnoAInf::method_10()
 // The orb's motion: its pos is the first field of a PosVel.
 static inline PosVel *orb_motion(BombReimuAOrb *orb)
 {
-    return (PosVel *)&orb->pos;
+    return &orb->motion;
 }
 
-// TODO: the original addresses the PosVel through this (a member at +4), ours through a second pointer register; the ifs after the timer check also differ in block order.
+// TODO: this is in esi where the original has edi (both save esi and edi and
+// leave the other unused), and the radial_dist update is scheduled into the
+// start_pos copy.
 // FUNCTION: TH16 0x410550
 void BombReimuAOrb::update()
 {
-    PosVel *motion = orb_motion(this);
     if (timer.current != timer.previous)
     {
         i32 time = timer.current;
         if (time < 90)
         {
             start_pos = g_Player->inner.pos;
-            motion->radial_dist += 1.5f;
-            motion->angle.value = wrap_angle(motion->angle.value + ZUN_PI / 30);
+            motion.radial_dist += 1.5f;
+            motion.angle.value = wrap_angle(motion.angle.value + ZUN_PI / 30);
         }
         else if (time < (index + 9) * 10)
         {
             start_pos = g_Player->inner.pos;
-            motion->angle.value = wrap_angle(motion->angle.value + ZUN_PI / 30);
+            motion.angle.value = wrap_angle(motion.angle.value + ZUN_PI / 30);
         }
         else if (time == (index + 9) * 10)
         {
-            motion->flags &= ~0xf;
-            motion->set_angle(atan2(move.y, move.x));
-            motion->speed = sqrtf(move.x * move.x + move.y * move.y);
+            motion.flags &= ~0xf;
+            motion.set_angle(atan2(move.y, move.x));
+            motion.speed = sqrtf(move.x * move.x + move.y * move.y);
         }
         else
         {
@@ -427,11 +423,11 @@ void BombReimuAOrb::update()
             if (target.id != 0)
             {
                 target_enemy = target.get();
-                if (!(target_enemy->enemy.flags_low & 0xc000021))
+                if (!(target_enemy->enemy.flags_low & ENEMY_FLAGS_UNTARGETABLE))
                 {
                     f32 goal = atan2(target_enemy->enemy.final_pos.pos.y - pos.y,
                                      target_enemy->enemy.final_pos.pos.x - pos.x);
-                    f32 angle = motion->angle.value;
+                    f32 angle = motion.angle.value;
                     f32 delta;
                     if (goal - angle > ZUN_PI)
                     {
@@ -445,7 +441,7 @@ void BombReimuAOrb::update()
                     {
                         delta = goal - angle;
                     }
-                    f32 speed = motion->speed;
+                    f32 speed = motion.speed;
                     f32 abs_delta = fabs(delta);
                     if (abs_delta >= ZUN_PI / 4)
                     {
@@ -455,20 +451,20 @@ void BombReimuAOrb::update()
                     {
                         speed = speed + 0.2f > 8.0f ? 8.0f : speed + 0.2f;
                     }
-                    motion->set_angle((motion->angle + delta * 0.1f).value);
-                    motion->speed = speed;
+                    motion.set_angle((motion.angle + delta * 0.1f).value);
+                    motion.speed = speed;
                 }
             }
             else if (pos.x < -160.0f || pos.x > 160.0f || pos.y < 32.0f || pos.y > 416.0f)
             {
-                motion->speed *= 0.9f;
+                motion.speed *= 0.9f;
             }
         }
     }
     D3DXVECTOR3 old_pos = pos;
-    motion->update_secondary_fields();
-    motion->step();
-    AnmVm *vm = g_AnmManager->get_vm_with_id(anm_id);
+    motion.update_secondary_fields();
+    motion.step();
+    AnmVm *vm = get_vm(anm_id);
     if (vm != NULL)
     {
         vm->entity_pos = pos;
@@ -486,16 +482,19 @@ static DECOMP_NOINLINE void orb_update(BombReimuAOrb *orb)
 }
 
 // Starts the orbs at frame 0, steps them, and bursts those whose damage
-// source has dealt 300 damage.
-// TODO: same shape, different register allocation and block order (orb loop, the damage source lookups); calls update through the orb_update stand-in (see there).
+// source has dealt 300 damage. All burst at frame 200; the bomb ends once
+// their VMs are gone.
+// TODO: same shape, different register allocation and block order (orb
+// loop, the damage source lookups); calls update through the orb_update
+// stand-in (see there).
 // FUNCTION: TH16 0x410de0
 i32 BombReimuAInf::on_tick()
 {
     Player *player = g_Player;
     f32 angle = 0.0f;
     player->inner.iframes = 40;
-    BombReimuAOrbs *orbs = (BombReimuAOrbs *)unk_70;
-    AnmVm *vm = g_AnmManager->get_vm_with_id(anm_id_64);
+    BombReimuAOrbs *orbs = reimu_orbs;
+    AnmVm *vm = g_AnmManager->get_vm_with_id(anm_id_secondary);
     if (vm != NULL)
     {
         vm->entity_pos = player->inner.pos;
@@ -513,11 +512,11 @@ i32 BombReimuAInf::on_tick()
         }
         if (i == 8)
         {
-            AnmManager::interrupt_tree(anm_id_64, 1);
-            if (unk_70 != NULL)
+            AnmManager::interrupt_tree(anm_id_secondary, 1);
+            if (reimu_orbs != NULL)
             {
-                free(unk_70);
-                unk_70 = NULL;
+                free(reimu_orbs);
+                reimu_orbs = NULL;
             }
             return -1;
         }
@@ -525,7 +524,7 @@ i32 BombReimuAInf::on_tick()
     if (timer.current == 200)
     {
         orbs->finish_all();
-        AnmManager::interrupt_tree(anm_id_64, 1);
+        AnmManager::interrupt_tree(anm_id_secondary, 1);
         ScreenEffect::create_inline(SCREEN_EFFECT_SHAKE, 8, 6, 6, 0, 0);
         return 0;
     }
@@ -540,7 +539,7 @@ i32 BombReimuAInf::on_tick()
             motion->radial_dist = 0.0f;
             motion->angle.value = wrap_angle(angle);
             motion->radial_speed = ZUN_PI / 64;
-            g_Player->get_damage_source(orb->damage_source)->unk_7c = 300;
+            g_Player->get_damage_source(orb->damage_source)->damage_limit = 300;
             angle = wrap_angle(angle + ZUN_PI / 4);
         }
     }
@@ -555,7 +554,7 @@ i32 BombReimuAInf::on_tick()
         if (g_Player->get_damage_source(orb->damage_source)->total_damage_dealt >= 300)
         {
             orb->finish();
-            g_SoundManager.play_sound_at_position(0x1b, orb->pos.x);
+            g_SoundManager.play_sound_at_position(SE_TAN00_3, orb->pos.x);
             ScreenEffect::create_inline(SCREEN_EFFECT_SHAKE, 8, 6, 6, 0, 0);
         }
         else
@@ -563,16 +562,16 @@ i32 BombReimuAInf::on_tick()
             g_Player->get_damage_source(orb->damage_source)->pos.pos = orb->pos;
         }
     }
-    method_10();
+    cancel_bullets();
     return 0;
 }
 
 // Each active orb cancels bullets around it every eighth frame, the orbs
 // taking turns.
 // FUNCTION: TH16 0x411280
-i32 BombReimuAInf::method_10()
+i32 BombReimuAInf::cancel_bullets()
 {
-    BombReimuAOrb *orb = ((BombReimuAOrbs *)unk_70)->orbs;
+    BombReimuAOrb *orb = reimu_orbs->orbs;
     for (i32 i = 0; i < 8; i++, orb++)
     {
         if (orb->active && timer.current % 8 == i)
@@ -584,20 +583,19 @@ i32 BombReimuAInf::method_10()
     return 0;
 }
 
-// TODO: register choice around the create_vm call (the original keeps the
-// return slot in ecx and g_Player in eax).
 // FUNCTION: TH16 0x4109d0
 void BombReimuAOrb::start(i32 index, D3DXVECTOR3 *pos)
 {
     start_pos = *pos;
-    anm_id = g_Player->anm_file->create_vm(0xf, &this->pos, 0.0f, -1, 0);
+    AnmLoaded *anm = g_Player->anm_file;
+    anm_id = anm->create_vm(REIMU_BOMB_ORB_SCRIPT, &this->pos, 0.0f, -1, 0);
     active = 1;
     timer.reset();
     this->index = index;
     damage_source = g_Player->create_damage_source(&this->pos, 56.0f, 0.0f, 9999, 0xf);
     PlayerDamageSource *source = g_Player->get_damage_source(damage_source);
-    source->flags |= 4;
-    source->unk_80 = 3;
+    source->flags |= DAMAGE_SOURCE_BOMB;
+    source->hit_interval = 3;
 }
 
 // The orb bursts: cancels bullets and lasers around it and hurts enemies
@@ -609,16 +607,17 @@ void BombReimuAOrb::finish()
     {
         if (active)
         {
-            g_SoundManager.play_sound_at_position(0x1b, pos.x);
+            g_SoundManager.play_sound_at_position(SE_TAN00_3, pos.x);
             g_BulletManager->cancel_radius_as_bomb(&pos, 128.0f, 1);
             g_LaserManager->cancel_in_radius(&pos, 128.0f, 1, 1);
-            g_Player->get_damage_source(g_Player->create_damage_source(&pos, 64.0f, 8.0f, 0xb, 100))->flags |= 4;
+            g_Player->get_damage_source(g_Player->create_damage_source(&pos, 64.0f, 8.0f, 0xb, 100))->flags |=
+                DAMAGE_SOURCE_BOMB;
         }
         AnmManager::interrupt_tree(anm_id, 1);
         active = 0;
         if (damage_source != 0)
         {
-            g_Player->inner.damage_sources[damage_source - 1].flags &= ~1;
+            g_Player->inner.damage_sources[damage_source - 1].flags &= ~DAMAGE_SOURCE_ACTIVE;
         }
         damage_source = 0;
         return;
@@ -627,8 +626,6 @@ void BombReimuAOrb::finish()
 }
 
 // finish for every orb, with the laser cancel and the VM deletion inlined.
-// TODO: the original loads the VM's child list after storing flags_hi (as
-// in ~EnemyInf).
 // FUNCTION: TH16 0x410bb0
 void BombReimuAOrbs::finish_all()
 {
@@ -640,16 +637,17 @@ void BombReimuAOrbs::finish_all()
             if (orb->active)
             {
                 D3DXVECTOR3 *pos = &orb->pos;
-                g_SoundManager.play_sound_at_position(0x1b, pos->x);
+                g_SoundManager.play_sound_at_position(SE_TAN00_3, pos->x);
                 g_BulletManager->cancel_radius_as_bomb(pos, 128.0f, 1);
                 g_LaserManager->cancel_in_radius_inline(pos, 128.0f, 1, 1);
-                g_Player->get_damage_source(g_Player->create_damage_source(pos, 64.0f, 8.0f, 0xb, 100))->flags |= 4;
+                g_Player->get_damage_source(g_Player->create_damage_source(pos, 64.0f, 8.0f, 0xb, 100))->flags |=
+                    DAMAGE_SOURCE_BOMB;
             }
             AnmManager::interrupt_tree(orb->anm_id, 1);
             orb->active = 0;
             if (orb->damage_source != 0)
             {
-                g_Player->inner.damage_sources[orb->damage_source - 1].flags &= ~1;
+                g_Player->inner.damage_sources[orb->damage_source - 1].flags &= ~DAMAGE_SOURCE_ACTIVE;
             }
             orb->damage_source = 0;
             continue;
@@ -658,15 +656,16 @@ void BombReimuAOrbs::finish_all()
     }
 }
 
+// Bursts the orbs and ends the bomb at once.
 // FUNCTION: TH16 0x411320
-void BombReimuAInf::method_14()
+void BombReimuAInf::end_at_stage_clear()
 {
-    ((BombReimuAOrbs *)unk_70)->finish_all();
-    AnmManager::interrupt_tree(anm_id_64, 1);
-    if (unk_70 != NULL)
+    reimu_orbs->finish_all();
+    AnmManager::interrupt_tree(anm_id_secondary, 1);
+    if (reimu_orbs != NULL)
     {
-        free(unk_70);
-        unk_70 = NULL;
+        free(reimu_orbs);
+        reimu_orbs = NULL;
     }
     ScreenEffect::create_inline(SCREEN_EFFECT_SHAKE, 8, 6, 6, 0, 0);
     in_use = 0;

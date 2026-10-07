@@ -7,6 +7,7 @@
 #include "EffectManager.h"
 #include "Laser.h"
 
+// Frees the segment and vertex buffers and the node list.
 // FUNCTION: TH16 0x437760
 i32 LaserCurveInf::on_destroy()
 {
@@ -17,15 +18,15 @@ i32 LaserCurveInf::on_destroy()
         delete node;
         node = next;
     }
-    if (unk_1528 != NULL)
+    if (vertices != NULL)
     {
-        free(unk_1528);
-        unk_1528 = NULL;
+        free(vertices);
+        vertices = NULL;
     }
-    if (unk_1524 != NULL)
+    if (segments != NULL)
     {
-        free(unk_1524);
-        unk_1524 = NULL;
+        free(segments);
+        segments = NULL;
     }
     return 0;
 }
@@ -55,16 +56,16 @@ static __forceinline void allocate_curve_laser_inline(void *params)
 // becomes a new curvy laser continuing this one's nodes.
 // TODO: the original keeps center, size and the loop state in different registers and stack slots; the run loops are laid out differently.
 // FUNCTION: TH16 0x4397d0
-i32 LaserCurveInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 e)
+i32 LaserCurveInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln)
 {
-    if (e != 0 && countdown_5c8 != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }
     i32 count = 0;
     u8 *hit = (u8 *)malloc(inner.segment_count);
     memset(hit, 0, inner.segment_count);
-    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    LaserCurveSegment *segment = (LaserCurveSegment *)segments;
     i32 i;
     for (i = 0; i < inner.segment_count; i++, segment++)
     {
@@ -120,7 +121,7 @@ i32 LaserCurveInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 re
             {
                 hit[k] = hit[k + j];
             }
-            timer_40 += (f32)-j;
+            segment_timer += (f32)-j;
             inner.segment_count -= j;
             if (inner.segment_count < 4)
             {
@@ -165,7 +166,7 @@ i32 LaserCurveInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 re
                 params.segment_count = run;
                 params.shot_sfx = -1;
                 params.source_nodes = &nodes;
-                params.source_time = timer_40.current_f - (f32)start;
+                params.source_time = segment_timer.current_f - (f32)start;
                 allocate_curve_laser_inline(&params);
             }
         }
@@ -191,9 +192,9 @@ done:
 // dropped, and otherwise everything before the end of the first hit run.
 // Returns the number of segments hit.
 // FUNCTION: TH16 0x43a2f0
-i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 mode, i32 d)
+i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 mode, i32 skip_invuln)
 {
-    if (d != 0 && countdown_5c8 != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }
@@ -201,7 +202,7 @@ i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 mode, i32 
     u8 hit[0x100];
     memset(hit, 0, sizeof(hit));
     radius = radius * radius;
-    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    LaserCurveSegment *segment = (LaserCurveSegment *)segments;
     i32 i;
     for (i = 0; i < inner.segment_count; i++, segment++)
     {
@@ -237,9 +238,9 @@ i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 mode, i32 
         {
             for (i32 k = 0; k < inner.segment_count - j; k++)
             {
-                ((LaserCurveSegment *)unk_1524)[k] = ((LaserCurveSegment *)unk_1524)[k + j];
+                ((LaserCurveSegment *)segments)[k] = ((LaserCurveSegment *)segments)[k + j];
             }
-            timer_40 += (f32)-j;
+            segment_timer += (f32)-j;
             inner.segment_count -= j;
             return count;
         }
@@ -268,7 +269,7 @@ i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 mode, i32 
             {
                 for (i32 k = 0; k < inner.segment_count - j; k++)
                 {
-                    ((LaserCurveSegment *)unk_1524)[k] = ((LaserCurveSegment *)unk_1524)[k + j];
+                    ((LaserCurveSegment *)segments)[k] = ((LaserCurveSegment *)segments)[k + j];
                 }
                 inner.segment_count -= j;
             }
@@ -290,8 +291,8 @@ static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECT
         vm->layer = layer;
         if (layer <= 23)
         {
-            vm->flags_hi &= ~ANM_VM_LAYER_UI;
-            vm->flags_hi |= ANM_VM_LAYER_SET;
+            vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
+            vm->flags_hi |= ANM_VM_ORIGIN_GAME;
         }
     }
     if (pos == NULL)
@@ -304,7 +305,7 @@ static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECT
     }
     vm->rotation.z = rotation;
     vm->run();
-    vm->mode_of_create_child = 0;
+    vm->mode_of_create_child = ANM_CREATE_WORLD_BACK;
     AnmId id;
     id = g_AnmManager->insert_in_world_list_back(vm);
     LEAVE_CS(CS_ANM_MANAGER);
@@ -313,13 +314,13 @@ static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECT
 
 // Cancels the laser, leaving a cancel effect on every third segment.
 // FUNCTION: TH16 0x43a620
-i32 LaserCurveInf::cancel(i32 mode, i32 b)
+i32 LaserCurveInf::cancel(i32 mode, i32 skip_invuln)
 {
-    if (b != 0 && countdown_5c8 != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }
-    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    LaserCurveSegment *segment = (LaserCurveSegment *)segments;
     for (i32 i = 0; i < inner.segment_count; i++, segment++)
     {
         D3DXVECTOR3 pos = segment->pos;
@@ -329,14 +330,14 @@ i32 LaserCurveInf::cancel(i32 mode, i32 b)
             create_vm_inline(anm, inner.color * 2 + 0xd1, &pos, 0.0f, -1);
         }
     }
-    state = 1;
+    state = LASER_STATE_CANCELLED;
     return 0;
 }
 
 // 2 if a circle at pos touches the laser's rectangle, else 0.
 // TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
 // FUNCTION: TH16 0x43a760
-i32 LaserCurveInf::method_30(Float3 *pos, f32 radius)
+i32 LaserCurveInf::touches_circle(Float3 *pos, f32 radius)
 {
     f32 dx = pos->x - position.x;
     f32 dy = pos->y - position.y;
@@ -347,7 +348,7 @@ i32 LaserCurveInf::method_30(Float3 *pos, f32 radius)
     f32 y = dx * s + dy * c;
     D3DXVECTOR2 lo(x - radius, y - radius);
     D3DXVECTOR2 hi(x + radius, y + radius);
-    if (lo.x > unk_70 || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
+    if (lo.x > hit_length || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
     {
         return 0;
     }
@@ -360,12 +361,12 @@ i32 LaserCurveInf::method_30(Float3 *pos, f32 radius)
 // 0x100 and returns 1.
 // TODO: the original keeps the multiply of the speed by 1.0f (see ZunTimer::operator--).
 // FUNCTION: TH16 0x439730
-i32 LaserCurveInf::method_60()
+i32 LaserCurveInf::step_ex_offscreen()
 {
     ex_state[11].timer.decrement(1.0f);
     if (ex_state[11].timer.current <= 0)
     {
-        ex_flags ^= 0x100;
+        ex_flags ^= BULLET_EX_OFFSCREEN;
         return 1;
     }
     return 0;
@@ -380,8 +381,8 @@ HARNESS_CALLED LaserCurveNode *LaserCurveInf::append_node(f32 value)
         node = node->next;
     }
     node->next = new LaserCurveNode;
-    node->unk_c = value;
-    node->next->unk_8 = value;
+    node->end_time = value;
+    node->next->start_time = value;
     node->next->next = NULL;
     node->next->prev = node;
     return node->next;

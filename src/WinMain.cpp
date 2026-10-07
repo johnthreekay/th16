@@ -70,21 +70,21 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
     window_class.hInstance = instance;
     window_class.lpfnWndProc = window_proc;
     g_GameWindow.is_app_active = 1;
-    g_GameWindow.unk_14 = 0;
+    g_GameWindow.show_cursor = 0;
     window_class.lpszClassName = "BASE";
     RegisterClassA(&window_class);
-    u32 flags = g_unk_4d9d1c;
-    flags ^= (g_Supervisor.config.window_size << 2 ^ flags) & 0x3c;
-    g_Supervisor.present_params.Windowed = (flags & 0x3c) >= 0xc;
-    if (g_Supervisor.config.frame_skip == 0 && g_Supervisor.config.unk_29 == 2)
+    u32 flags = g_window_flags;
+    flags ^= (g_Supervisor.config.window_size << WINDOW_SIZE_SHIFT ^ flags) & WINDOW_SIZE_MASK;
+    g_Supervisor.present_params.Windowed = (flags & WINDOW_SIZE_MASK) >= WINDOW_SIZE_WINDOWED_640 << WINDOW_SIZE_SHIFT;
+    if (g_Supervisor.config.frame_skip == 0 && g_Supervisor.config.frame_pacing == 2)
     {
-        flags |= 0x40;
+        flags |= WINDOW_SLEEP_PACING;
     }
     else
     {
-        flags &= ~0x40;
+        flags &= ~WINDOW_SLEEP_PACING;
     }
-    g_unk_4d9d1c = flags;
+    g_window_flags = flags;
     g_frame_pacing.pacing[0].max_sleep_ms = 15;
     g_frame_pacing.pacing[0].sleep_ms = 15;
     g_frame_pacing.pacing[0].late_frames = 0;
@@ -97,7 +97,7 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
     g_frame_pacing.pacing[3].max_sleep_ms = 8;
     g_frame_pacing.pacing[3].sleep_ms = 8;
     g_frame_pacing.pacing[3].late_frames = 0;
-    g_frame_pacing.mode = 0;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
     g_GameWindow.set_resolution_from_config();
     if (!g_Supervisor.present_params.Windowed)
     {
@@ -111,11 +111,12 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
         i32 height = GetSystemMetrics(SM_CYDLGFRAME) * 2 + GetSystemMetrics(SM_CYCAPTION) + g_resolution_y;
         g_GameWindow.window =
             CreateWindowExA(0, "BASE", "\x93\x8c\x95\xfb\x93V\x8b\xf3\xe0\xf6\x81@\x81` Hidden Star in Four Seasons. ver 1.00a",
-                            0x100b0000, g_Supervisor.config.unk_30, g_Supervisor.config.unk_34,
+                            WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX, g_Supervisor.config.window_x,
+                            g_Supervisor.config.window_y,
                             width, height, NULL, NULL, instance, NULL);
     }
     GetWindowRect(g_GameWindow.window, &g_Supervisor.window_rect);
-    g_Supervisor.unk_58 = g_GameWindow.window;
+    g_Supervisor.main_window = g_GameWindow.window;
     if (g_GameWindow.window == NULL)
     {
         return 1;
@@ -147,14 +148,14 @@ retry:
         present_params.BackBufferHeight = g_screen_sizes[i].height;
         if (!reset)
         {
-            g_Supervisor.flags &= ~1;
-            if (!(g_Supervisor.config.flags_2c & 2))
+            g_Supervisor.flags &= ~SUPERVISOR_HW_VERTEX_PROCESSING;
+            if (!(g_Supervisor.config.flags & CONFIG_REFERENCE_RASTERIZER))
             {
                 if (g_Supervisor.d3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, g_GameWindow.window,
                                                    D3DCREATE_HARDWARE_VERTEXPROCESSING, &present_params,
                                                    &g_Supervisor.d3d_device) == D3D_OK)
                 {
-                    g_Supervisor.flags |= 1;
+                    g_Supervisor.flags |= SUPERVISOR_HW_VERTEX_PROCESSING;
                     goto created;
                 }
                 if (g_Supervisor.d3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, g_GameWindow.window,
@@ -195,7 +196,7 @@ retry:
                 }
                 continue;
             }
-            g_unk_4d9d1c &= ~0x40;
+            g_window_flags &= ~WINDOW_SLEEP_PACING;
         }
         g_Supervisor.present_params = present_params;
         break;
@@ -256,11 +257,11 @@ HARNESS_CALLED i32 init_d3d()
         g_GameErrorContext.log("\x83\x8a\x83t\x83\x8c\x83"
                                "b\x83V\x83\x85\x83\x8c\x81[\x83g\x82\xaa"
                                "60Hz\x82\xc5\x82\xcd\x82\xa0\x82\xe8\x82\xdc\x82\xb9\x82\xf1\r\n");
-        g_unk_4d9d1c &= ~0x40;
+        g_window_flags &= ~WINDOW_SLEEP_PACING;
     }
-    if (g_GameWindow.unk_2c)
+    if (g_GameWindow.started_by_launcher)
     {
-        g_Supervisor.unk_71c = 1;
+        g_Supervisor.no_vsync = 1;
     }
     D3DFORMAT format;
     if (!g_Supervisor.present_params.Windowed)
@@ -279,10 +280,10 @@ HARNESS_CALLED i32 init_d3d()
             present_params.BackBufferFormat = format =
                 (D3DFORMAT)((g_Supervisor.config.color_mode != 0) * 2 + D3DFMT_A8R8G8B8);
         }
-        if (g_Supervisor.unk_71c == 0)
+        if (g_Supervisor.no_vsync == 0)
         {
             present_params.FullScreen_RefreshRateInHz = 60;
-            if (g_unk_4d9d1c & 0x40)
+            if (g_window_flags & WINDOW_SLEEP_PACING)
             {
                 present_params.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
                 present_params.SwapEffect = D3DSWAPEFFECT_DISCARD;
@@ -291,7 +292,7 @@ HARNESS_CALLED i32 init_d3d()
             {
                 present_params.SwapEffect = D3DSWAPEFFECT_DISCARD;
                 present_params.PresentationInterval =
-                    g_Supervisor.config.unk_29 == 3 ? D3DPRESENT_INTERVAL_IMMEDIATE : D3DPRESENT_INTERVAL_ONE;
+                    g_Supervisor.config.frame_pacing == 3 ? D3DPRESENT_INTERVAL_IMMEDIATE : D3DPRESENT_INTERVAL_ONE;
             }
         }
         else
@@ -305,11 +306,11 @@ HARNESS_CALLED i32 init_d3d()
     {
         present_params.BackBufferFormat = format = display_mode.Format;
         present_params.SwapEffect = D3DSWAPEFFECT_DISCARD;
-        if (g_unk_4d9d1c & 0x40)
+        if (g_window_flags & WINDOW_SLEEP_PACING)
         {
             present_params.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
         }
-        else if (g_Supervisor.config.unk_29 == 3 || display_mode.RefreshRate != 60)
+        else if (g_Supervisor.config.frame_pacing == 3 || display_mode.RefreshRate != 60)
         {
             present_params.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
         }
@@ -319,7 +320,7 @@ HARNESS_CALLED i32 init_d3d()
         }
         present_params.Windowed = TRUE;
     }
-    g_Supervisor.flags |= 2;
+    g_Supervisor.flags |= SUPERVISOR_D3D_INITIALIZED;
     present_params.EnableAutoDepthStencil = TRUE;
     present_params.AutoDepthStencilFormat = D3DFMT_D16;
     present_params.Flags = D3DPRESENTFLAG_LOCKABLE_BACKBUFFER;
@@ -352,19 +353,19 @@ HARNESS_CALLED i32 init_d3d()
     if (g_Supervisor.d3d->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, format, 0, D3DRTYPE_TEXTURE,
                                             D3DFMT_A8R8G8B8) == D3D_OK)
     {
-        g_Supervisor.flags |= 4;
+        g_Supervisor.flags |= SUPERVISOR_ARGB_TEXTURES;
     }
     else
     {
-        g_Supervisor.flags &= ~4;
-        g_Supervisor.config.flags_2c |= 1;
+        g_Supervisor.flags &= ~SUPERVISOR_ARGB_TEXTURES;
+        g_Supervisor.config.flags |= CONFIG_REDUCED_COLOR;
         // D3DFMT_A8R8G8B8 をサポートしていません、減色モードで動作します
         g_GameErrorContext.log("D3DFMT_A8R8G8B8 \x82\xf0\x83T\x83|\x81[\x83g\x82\xb5\x82\xc4\x82\xa2\x82\xdc\x82\xb9"
                                "\x82\xf1\x81"
                                "A\x8c\xb8\x90"
                                "F\x83\x82\x81[\x83h\x82\xc5\x93\xae\x8d\xec\x82\xb5\x82\xdc\x82\xb7\r\n");
     }
-    g_GameWindow.unk_8 = 0;
+    g_GameWindow.exit_requested = 0;
     g_Supervisor.reset_render_state();
     g_Supervisor.unk_724 = 0;
     return 0;
@@ -409,6 +410,15 @@ static inline void stop_sound_threads()
     SoundManager::stop_threads();
 }
 
+// The program: sets up the critical sections, the single instance mutex
+// and the save directories, loads th16.cfg and shows the resolution dialog
+// (when CONFIG_SHOW_STARTUP_DIALOG is set or Shift is held), then creates
+// Direct3D, the window, input and sound and hands over to the Supervisor.
+// The frame loop runs a frame whenever no window message is waiting; when
+// the device is lost or the display mode changes (WINDOW_CHANGE_MODE) it
+// resets the device. A frame result of 2 (options that need a restart
+// changed) starts over from creating Direct3D. On exit it saves th16.cfg
+// and log.txt and restores the screen saver settings.
 // WinMain has C linkage, so it is annotated by its linker symbol.
 // TODO: 80%; the critical section loops count differently and some blocks are laid out in another order.
 // SYNTHETIC: TH16 0x459830 SYMBOL
@@ -442,7 +452,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
     {
         goto shutdown;
     }
-    *(HINSTANCE *)g_Supervisor.unk_0 = instance_copy;
+    g_Supervisor.instance = instance_copy;
     g_GameWindow.make_dirs_and_disable_screensaver();
     if (g_Supervisor.load_game_config("th16.cfg") != 0)
     {
@@ -450,10 +460,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
     }
     get_joypad_capabilities();
     clear_all_keydown_states();
-    if ((g_Supervisor.config.flags_2c & 0x100) || (GetKeyboardState(keys), keys[VK_SHIFT] & 0x80))
+    if ((g_Supervisor.config.flags & CONFIG_SHOW_STARTUP_DIALOG) || (GetKeyboardState(keys), keys[VK_SHIFT] & 0x80))
     {
         g_GameWindow.dialog =
-            CreateDialogParamA(instance_copy, MAKEINTRESOURCEA(0xcb), NULL, resolution_dialog_proc, 0);
+            CreateDialogParamA(instance_copy, MAKEINTRESOURCEA(IDD_RESOLUTION), NULL, resolution_dialog_proc, 0);
         ShowWindow(g_GameWindow.dialog, SW_SHOW);
         for (;;)
         {
@@ -471,48 +481,48 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
                 TranslateMessage(&msg);
                 DispatchMessageA(&msg);
             }
-            if (g_hardware_input_pressed & 0x80001)
+            if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
             {
                 read_resolution_dialog();
-                g_unk_4d9d1c &= ~0x180;
+                g_window_flags &= ~(WINDOW_DIALOG_CANCELLED | WINDOW_DIALOG_OPEN);
                 DestroyWindow(g_GameWindow.dialog);
                 g_GameWindow.dialog = NULL;
                 break;
             }
-            if (g_hardware_input_pressed & 0x20)
+            if (g_hardware_input_pressed & INPUT_DOWN)
             {
-                if (IsDlgButtonChecked(g_GameWindow.dialog, 0xcd) == BST_CHECKED)
+                if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_640) == BST_CHECKED)
                 {
-                    check_dialog_button(0xcd, FALSE);
-                    check_dialog_button(0xce, TRUE);
+                    check_dialog_button(IDC_SIZE_640, FALSE);
+                    check_dialog_button(IDC_SIZE_960, TRUE);
                 }
-                else if (IsDlgButtonChecked(g_GameWindow.dialog, 0xce) == BST_CHECKED)
+                else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_960) == BST_CHECKED)
                 {
-                    check_dialog_button(0xce, FALSE);
-                    check_dialog_button(0xcf, TRUE);
+                    check_dialog_button(IDC_SIZE_960, FALSE);
+                    check_dialog_button(IDC_SIZE_1280, TRUE);
                 }
-                else if (IsDlgButtonChecked(g_GameWindow.dialog, 0xcf) == BST_CHECKED)
+                else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_1280) == BST_CHECKED)
                 {
-                    check_dialog_button(0xcf, FALSE);
-                    check_dialog_button(0xcd, TRUE);
+                    check_dialog_button(IDC_SIZE_1280, FALSE);
+                    check_dialog_button(IDC_SIZE_640, TRUE);
                 }
             }
-            if (g_hardware_input_pressed & 0x10)
+            if (g_hardware_input_pressed & INPUT_UP)
             {
-                if (IsDlgButtonChecked(g_GameWindow.dialog, 0xcd) == BST_CHECKED)
+                if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_640) == BST_CHECKED)
                 {
-                    check_dialog_button(0xcd, FALSE);
-                    check_dialog_button(0xcf, TRUE);
+                    check_dialog_button(IDC_SIZE_640, FALSE);
+                    check_dialog_button(IDC_SIZE_1280, TRUE);
                 }
-                else if (IsDlgButtonChecked(g_GameWindow.dialog, 0xce) == BST_CHECKED)
+                else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_960) == BST_CHECKED)
                 {
-                    check_dialog_button(0xce, FALSE);
-                    check_dialog_button(0xcd, TRUE);
+                    check_dialog_button(IDC_SIZE_960, FALSE);
+                    check_dialog_button(IDC_SIZE_640, TRUE);
                 }
-                else if (IsDlgButtonChecked(g_GameWindow.dialog, 0xcf) == BST_CHECKED)
+                else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_1280) == BST_CHECKED)
                 {
-                    check_dialog_button(0xcf, FALSE);
-                    check_dialog_button(0xce, TRUE);
+                    check_dialog_button(IDC_SIZE_1280, FALSE);
+                    check_dialog_button(IDC_SIZE_960, TRUE);
                 }
             }
             if (g_GameWindow.dialog == NULL)
@@ -522,11 +532,11 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
             Sleep(6);
         }
     }
-    if (g_unk_4d9d1c & 0x180)
+    if (g_window_flags & (WINDOW_DIALOG_CANCELLED | WINDOW_DIALOG_OPEN))
     {
         goto shutdown;
     }
-    g_unk_4d9d1c ^= (g_Supervisor.config.window_size << 2 ^ g_unk_4d9d1c) & 0x3c;
+    g_window_flags ^= (g_Supervisor.config.window_size << WINDOW_SIZE_SHIFT ^ g_window_flags) & WINDOW_SIZE_MASK;
     g_Supervisor.compute_exe_checksum();
 create_d3d:
     g_Supervisor.d3d = Direct3DCreate9(D3D_SDK_VERSION);
@@ -572,10 +582,10 @@ create_d3d:
         }
         goto teardown;
     }
-    g_unk_4d9d1c |= 1;
+    g_window_flags |= WINDOW_RUNNING;
     result = 0;
     g_GameWindow.frame_skip_counter = -4;
-    while (g_GameWindow.unk_8 == 0)
+    while (g_GameWindow.exit_requested == 0)
     {
         if (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE))
         {
@@ -586,9 +596,9 @@ create_d3d:
         HRESULT hr = g_Supervisor.d3d_device->TestCooperativeLevel();
         if (hr == D3D_OK)
         {
-            if (!(g_unk_4d9d1c & 2))
+            if (!(g_window_flags & WINDOW_CHANGE_MODE))
             {
-                if (g_unk_4d9d1c & 0x40)
+                if (g_window_flags & WINDOW_SLEEP_PACING)
                 {
                     result = g_GameWindow.do_frame_sleeping();
                 }
@@ -605,7 +615,7 @@ create_d3d:
                 {
                     goto teardown;
                 }
-                g_Supervisor.flags &= ~0x10;
+                g_Supervisor.flags &= ~SUPERVISOR_DEVICE_WAS_RESET;
                 continue;
             }
         }
@@ -613,11 +623,11 @@ create_d3d:
         {
             continue;
         }
-        g_GameWindow.unk_2040 = 10;
-        if (g_unk_4d9d1c & 2)
+        g_GameWindow.device_reset_frames = 10;
+        if (g_window_flags & WINDOW_CHANGE_MODE)
         {
             D3DFORMAT format;
-            if ((g_unk_4d9d1c & 0x3c) <= 8)
+            if ((g_window_flags & WINDOW_SIZE_MASK) <= WINDOW_SIZE_FULLSCREEN_1280 << WINDOW_SIZE_SHIFT)
             {
                 GetWindowRect(g_GameWindow.window, &g_Supervisor.window_rect);
                 g_Supervisor.present_params.FullScreen_RefreshRateInHz = 60;
@@ -640,16 +650,17 @@ create_d3d:
         }
         g_Supervisor.reset_render_state();
         g_AnmManager->create_d3d_textures_for_loaded_anms();
-        g_Supervisor.flags |= 0x10;
+        g_Supervisor.flags |= SUPERVISOR_DEVICE_WAS_RESET;
         g_Supervisor.unk_714 = 3;
-        if (g_unk_4d9d1c & 2)
+        if (g_window_flags & WINDOW_CHANGE_MODE)
         {
             g_GameWindow.set_resolution_from_config();
-            if ((g_unk_4d9d1c & 0x3c) >= 0xc)
+            if ((g_window_flags & WINDOW_SIZE_MASK) >= WINDOW_SIZE_WINDOWED_640 << WINDOW_SIZE_SHIFT)
             {
                 i32 width = g_resolution_x + GetSystemMetrics(SM_CXDLGFRAME) * 2;
                 i32 height = GetSystemMetrics(SM_CYDLGFRAME) * 2 + GetSystemMetrics(SM_CYCAPTION) + g_resolution_y;
-                SetWindowLongA(g_GameWindow.window, GWL_STYLE, 0x10cb0000);
+                SetWindowLongA(g_GameWindow.window, GWL_STYLE,
+                               WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
                 SetWindowPos(g_GameWindow.window, NULL, g_Supervisor.window_rect.left, g_Supervisor.window_rect.top,
                              width, height, SWP_SHOWWINDOW | SWP_FRAMECHANGED);
                 ShowWindow(g_GameWindow.window, SW_SHOWNORMAL);
@@ -667,19 +678,19 @@ create_d3d:
                 {
                 }
                 SetCursor(NULL);
-                g_GameWindow.unk_14 = 0;
+                g_GameWindow.show_cursor = 0;
             }
         }
         g_Supervisor.setup_special_anms();
-        g_unk_4d9d1c &= ~2;
+        g_window_flags &= ~WINDOW_CHANGE_MODE;
     }
 teardown:
-    g_Supervisor.config.window_size = (g_unk_4d9d1c >> 2) & 0xf;
-    if (g_Supervisor.config.window_size >= 3)
+    g_Supervisor.config.window_size = (g_window_flags >> WINDOW_SIZE_SHIFT) & 0xf;
+    if (g_Supervisor.config.window_size >= WINDOW_SIZE_WINDOWED_640)
     {
         GetWindowRect(g_GameWindow.window, &g_Supervisor.window_rect);
-        g_Supervisor.config.unk_30 = g_Supervisor.window_rect.left;
-        g_Supervisor.config.unk_34 = g_Supervisor.window_rect.top;
+        g_Supervisor.config.window_x = g_Supervisor.window_rect.left;
+        g_Supervisor.config.window_y = g_Supervisor.window_rect.top;
     }
     g_Supervisor.teardown_everything();
     delete g_UpdateFuncRegistry;
@@ -731,12 +742,12 @@ shutdown:
                 DispatchMessageA(&msg);
             }
         }
-        g_Supervisor.flags &= ~0x180;
+        g_Supervisor.flags &= ~(SUPERVISOR_QUIT_REQUESTED | SUPERVISOR_FLAG_100);
         goto create_d3d;
     }
     strcpy(path, g_GameWindow.save_dir);
     strcat(path, "th16.cfg");
-    file_write(path, &g_Supervisor.config.unk_4, 0x64);
+    file_write(path, &g_Supervisor.config.version, 0x64);
     timeEndPeriod(1);
     strcpy(path, g_GameWindow.save_dir);
     strcat(path, "log.txt");

@@ -9,7 +9,9 @@
 #include "Rng.h"
 #include "Supervisor.h"
 
-extern i32 g_unk_4c0f40;
+// Nonzero: running fades and pulses end on their next tick (defined in
+// GameThread.cpp).
+extern i32 g_cancel_screen_effects;
 
 struct ZunRect
 {
@@ -49,10 +51,10 @@ HARNESS_CALLED void screen_effect_draw_rect(ZunRect *rect, D3DCOLOR color)
     g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
     g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, vertices, sizeof(vertices[0]));
     g_AnmManager->render_cache_184fbb5 = 0xff;
-    g_AnmManager->render_cache_184fbb6 = 0xff;
-    g_AnmManager->render_cache_184fbc0 = 0;
-    g_AnmManager->render_cache_184fbb0 = -1;
-    g_AnmManager->last_blend_mode = 10;
+    g_AnmManager->last_vertex_setup = ANM_VERTEX_SETUP_NONE;
+    g_AnmManager->last_texture_matrix_sprite = 0;
+    g_AnmManager->last_texture_id = -1;
+    g_AnmManager->last_blend_mode = ANM_BLEND_FORCE_RESET;
     g_AnmManager->render_cache_184fbb7 = 0xff;
     g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
     g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
@@ -63,7 +65,7 @@ HARNESS_CALLED void screen_effect_draw_rect(ZunRect *rect, D3DCOLOR color)
 // FUNCTION: TH16 0x45c630
 i32 __fastcall ScreenEffect::on_tick_fade_in(ScreenEffect *self)
 {
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
         return UPDATE_FUNC_CLEANUP;
     }
@@ -86,11 +88,11 @@ i32 __fastcall ScreenEffect::on_draw_viewport(ScreenEffect *self)
     ZunRect rect = {0.0f, 0.0f, (f32)g_resolution_x, (f32)g_resolution_y};
 
     g_AnmManager->flush_sprites();
-    g_Supervisor.viewport_dc.X = 0;
-    g_Supervisor.viewport_dc.Y = 0;
-    g_Supervisor.viewport_dc.Width = g_resolution_x;
-    g_Supervisor.viewport_dc.Height = g_resolution_y;
-    g_Supervisor.d3d_device->SetViewport(&g_Supervisor.viewport_dc);
+    g_Supervisor.full_window_viewport.X = 0;
+    g_Supervisor.full_window_viewport.Y = 0;
+    g_Supervisor.full_window_viewport.Width = g_resolution_x;
+    g_Supervisor.full_window_viewport.Height = g_resolution_y;
+    g_Supervisor.d3d_device->SetViewport(&g_Supervisor.full_window_viewport);
     screen_effect_draw_rect(&rect, (self->alpha << 24) | self->arg_1c);
     return UPDATE_FUNC_CONTINUE;
 }
@@ -98,7 +100,7 @@ i32 __fastcall ScreenEffect::on_draw_viewport(ScreenEffect *self)
 // FUNCTION: TH16 0x45c900
 i32 __fastcall ScreenEffect::on_tick_fade_out(ScreenEffect *self)
 {
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
         return UPDATE_FUNC_CLEANUP;
     }
@@ -121,7 +123,7 @@ i32 __fastcall ScreenEffect::on_tick_fade_out(ScreenEffect *self)
     {
         return UPDATE_FUNC_CLEANUP;
     }
-    if (g_GameThread == NULL || !(g_GameThread->flags.flag_0 | g_GameThread->flags.paused))
+    if (g_GameThread == NULL || !(g_GameThread->flags.flag_0 | g_GameThread->flags.loading))
     {
         self->timer++;
     }
@@ -199,7 +201,7 @@ i32 __fastcall ScreenEffect::on_draw_arcade(ScreenEffect *self)
 i32 __fastcall ScreenEffect::on_tick_pulse(ScreenEffect *self)
 {
     u32 start_alpha = (u32)self->arg_20 >> 24;
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
         return UPDATE_FUNC_CLEANUP;
     }
@@ -241,7 +243,7 @@ i32 __fastcall ScreenEffect::on_draw_arcade_2(ScreenEffect *self)
 // FUNCTION: TH16 0x45cd30
 i32 __fastcall ScreenEffect::on_tick_shake(ScreenEffect *self)
 {
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
         return UPDATE_FUNC_CLEANUP;
     }
@@ -254,32 +256,32 @@ i32 __fastcall ScreenEffect::on_tick_shake(ScreenEffect *self)
     switch (g_replay_unsafe_rng.rand_u32() % 3)
     {
     case 0:
-        g_Supervisor.cameras[3].unk_fc.x = 0.0f;
-        g_Supervisor.cameras[1].unk_fc.x = 0.0f;
+        g_Supervisor.cameras[3].shake_offset.x = 0.0f;
+        g_Supervisor.cameras[1].shake_offset.x = 0.0f;
         break;
     case 1:
-        g_Supervisor.cameras[3].unk_fc.x = amount;
-        g_Supervisor.cameras[1].unk_fc.x = amount * g_screen_coord_scale;
+        g_Supervisor.cameras[3].shake_offset.x = amount;
+        g_Supervisor.cameras[1].shake_offset.x = amount * g_screen_coord_scale;
         break;
     case 2:
-        g_Supervisor.cameras[3].unk_fc.x = -amount;
+        g_Supervisor.cameras[3].shake_offset.x = -amount;
         // Not negated, unlike every other case.
-        g_Supervisor.cameras[1].unk_fc.x = amount * g_screen_coord_scale;
+        g_Supervisor.cameras[1].shake_offset.x = amount * g_screen_coord_scale;
         break;
     }
     switch (g_replay_unsafe_rng.rand_u32() % 3)
     {
     case 0:
-        g_Supervisor.cameras[3].unk_fc.y = 0.0f;
-        g_Supervisor.cameras[1].unk_fc.y = 0.0f;
+        g_Supervisor.cameras[3].shake_offset.y = 0.0f;
+        g_Supervisor.cameras[1].shake_offset.y = 0.0f;
         break;
     case 1:
-        g_Supervisor.cameras[3].unk_fc.y = amount;
-        g_Supervisor.cameras[1].unk_fc.y = amount * g_screen_coord_scale;
+        g_Supervisor.cameras[3].shake_offset.y = amount;
+        g_Supervisor.cameras[1].shake_offset.y = amount * g_screen_coord_scale;
         break;
     case 2:
-        g_Supervisor.cameras[3].unk_fc.y = -amount;
-        g_Supervisor.cameras[1].unk_fc.y = -(amount * g_screen_coord_scale);
+        g_Supervisor.cameras[3].shake_offset.y = -amount;
+        g_Supervisor.cameras[1].shake_offset.y = -(amount * g_screen_coord_scale);
         break;
     }
     return UPDATE_FUNC_CONTINUE;
@@ -290,12 +292,12 @@ i32 __fastcall ScreenEffect::on_tick_shake_with_ramp(ScreenEffect *self)
 {
     f32 t;
 
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
         return UPDATE_FUNC_CLEANUP;
     }
-    if (g_GameThread == NULL || (g_GameThread->flags.flag_0 | g_GameThread->flags.paused) ||
-        g_GameThread->flags.flag_1 || g_GameThread->flags.flag_4 || g_GameThread->flags.flag_5 ||
+    if (g_GameThread == NULL || (g_GameThread->flags.flag_0 | g_GameThread->flags.loading) ||
+        g_GameThread->flags.flag_1 || g_GameThread->flags.in_menu || g_GameThread->flags.flag_5 ||
         g_GameThread->flags.flag_6)
     {
         return UPDATE_FUNC_CONTINUE;
@@ -321,31 +323,31 @@ i32 __fastcall ScreenEffect::on_tick_shake_with_ramp(ScreenEffect *self)
     switch (g_replay_safe_rng.rand_u32() % 3)
     {
     case 0:
-        g_Supervisor.cameras[3].unk_fc.x = 0.0f;
-        g_Supervisor.cameras[1].unk_fc.x = 0.0f;
+        g_Supervisor.cameras[3].shake_offset.x = 0.0f;
+        g_Supervisor.cameras[1].shake_offset.x = 0.0f;
         break;
     case 1:
-        g_Supervisor.cameras[3].unk_fc.x = amount;
-        g_Supervisor.cameras[1].unk_fc.x = amount * g_screen_coord_scale;
+        g_Supervisor.cameras[3].shake_offset.x = amount;
+        g_Supervisor.cameras[1].shake_offset.x = amount * g_screen_coord_scale;
         break;
     case 2:
-        g_Supervisor.cameras[3].unk_fc.x = -amount;
-        g_Supervisor.cameras[1].unk_fc.x = -(amount * g_screen_coord_scale);
+        g_Supervisor.cameras[3].shake_offset.x = -amount;
+        g_Supervisor.cameras[1].shake_offset.x = -(amount * g_screen_coord_scale);
         break;
     }
     switch (g_replay_safe_rng.rand_u32() % 3)
     {
     case 0:
-        g_Supervisor.cameras[3].unk_fc.y = 0.0f;
-        g_Supervisor.cameras[1].unk_fc.y = 0.0f;
+        g_Supervisor.cameras[3].shake_offset.y = 0.0f;
+        g_Supervisor.cameras[1].shake_offset.y = 0.0f;
         break;
     case 1:
-        g_Supervisor.cameras[3].unk_fc.y = amount;
-        g_Supervisor.cameras[1].unk_fc.y = amount * g_screen_coord_scale;
+        g_Supervisor.cameras[3].shake_offset.y = amount;
+        g_Supervisor.cameras[1].shake_offset.y = amount * g_screen_coord_scale;
         break;
     case 2:
-        g_Supervisor.cameras[3].unk_fc.y = -amount;
-        g_Supervisor.cameras[1].unk_fc.y = -(amount * g_screen_coord_scale);
+        g_Supervisor.cameras[3].shake_offset.y = -amount;
+        g_Supervisor.cameras[1].shake_offset.y = -(amount * g_screen_coord_scale);
         break;
     }
     return UPDATE_FUNC_CONTINUE;

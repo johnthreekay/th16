@@ -221,6 +221,14 @@ HARNESS_CALLED i32 get_keyboard_state(u8 *keys)
     return 0;
 }
 
+// Word indices into g_input of hold[1][0] and hold_total[1][0], the game's
+// hold counters.
+enum
+{
+    INPUT_GAME_HOLD_WORD = 0x25,
+    INPUT_GAME_HOLD_TOTAL_WORD = 0x65,
+};
+
 // The devices' detect_holds_and_repeats for the game's input, on the upper
 // half of the hold counters (hold[1] and hold_total[1]). It only matches
 // indexing them as words from the start of the object with an unsigned
@@ -231,28 +239,28 @@ void InputState::update()
     u32 *words = (u32 *)&g_input;
     u32 mask = 1;
     u32 bits = g_InputState.input;
-    g_InputState.unk_8c = 0;
-    g_InputState.unk_9c = 0;
+    g_InputState.input_repeat = 0;
+    g_InputState.input_held_long = 0;
     for (u32 i = 0; i < 32; i++, bits >>= 1, mask <<= 1)
     {
         if (bits & 1)
         {
-            words[0x25 + i]++;
-            words[0x65 + i]++;
-            if (words[0x25 + i] >= 8)
+            words[INPUT_GAME_HOLD_WORD + i]++;
+            words[INPUT_GAME_HOLD_TOTAL_WORD + i]++;
+            if (words[INPUT_GAME_HOLD_WORD + i] >= INPUT_HELD_LONG_FRAMES)
             {
-                g_InputState.unk_9c |= mask;
+                g_InputState.input_held_long |= mask;
             }
-            if (words[0x25 + i] >= 26)
+            if (words[INPUT_GAME_HOLD_WORD + i] >= INPUT_REPEAT_DELAY)
             {
-                g_InputState.unk_8c |= mask;
-                words[0x25 + i] -= 8;
+                g_InputState.input_repeat |= mask;
+                words[INPUT_GAME_HOLD_WORD + i] -= INPUT_REPEAT_INTERVAL;
             }
         }
         else
         {
-            words[0x25 + i] = 0;
-            words[0x65 + i] = 0;
+            words[INPUT_GAME_HOLD_WORD + i] = 0;
+            words[INPUT_GAME_HOLD_TOTAL_WORD + i] = 0;
         }
     }
     g_InputState.input_rising = (g_InputState.input ^ g_InputState.input_prev) & g_InputState.input;
@@ -264,3 +272,5 @@ static_assert(offsetof(InputGlobals, state) == 0x194, "InputGlobals::state");
 static_assert(offsetof(InputManager, held_long) == 0x22c, "InputManager::held_long");
 static_assert(offsetof(InputState, input) == 0x84, "InputState::input");
 static_assert(sizeof(InputGlobals) == 0x234, "InputGlobals");
+static_assert(offsetof(InputGlobals, hold) + 0x80 == INPUT_GAME_HOLD_WORD * 4, "InputGlobals::hold");
+static_assert(offsetof(InputGlobals, hold_total) + 0x80 == INPUT_GAME_HOLD_TOTAL_WORD * 4, "InputGlobals::hold_total");

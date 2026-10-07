@@ -15,20 +15,27 @@ extern JOYCAPSA g_joypad_caps;
 i32 get_joypad_capabilities();
 void clear_all_keydown_states();
 
-// Button state block around ExpHP's INPUT (0x4a52c8).
+// The game's button state, from the hardware or a replay (ExpHP's INPUT,
+// 0x4a52c8): the InputManager logic again, for game code.
 struct InputState
 {
     // Frames each button has been held.
     i32 hold_time[0x21];
+    // InputButton bits held this frame and last frame.
     u32 input;
     u32 input_prev;
-    u32 unk_8c;
+    // Buttons auto-repeating this frame (like InputManager::repeat).
+    u32 input_repeat;
     // Buttons pressed and released this frame.
     u32 input_rising;
     u32 input_falling;
+    // Never used.
     u32 unk_98;
-    u32 unk_9c;
+    // Buttons held for at least INPUT_HELD_LONG_FRAMES frames.
+    u32 input_held_long;
 
+    // Frames the button (an InputButton bit number) has been held, 0 if it
+    // is up.
     HARNESS_CALLED i32 get_hold_time(int button);
     // 0x418650. Updates the hold times and edges from input and
     // input_prev. Works on g_InputState.
@@ -45,20 +52,20 @@ union InputGlobals
     InputManager hardware;
     struct
     {
-        u8 unk_0[0x94];
+        u8 pad_before_repeat_time[0x94];
         // Per button: frames until InputState::update repeats it in
-        // unk_8c (hardware.hold_frames[0x20 + i]).
+        // input_repeat (hardware.hold_frames[0x20 + i]).
         i32 repeat_time[0x20];
     };
     struct
     {
-        u8 unk_0_[0x194];
+        u8 pad_before_state[0x194];
         InputState state;
     };
     // The hold counters by device: [0] the hardware's, [1] the game's.
     struct
     {
-        u8 unk_0__[0x14];
+        u8 pad_before_hold[0x14];
         u32 hold[2][0x20];
         u32 hold_total[2][0x20];
     };
@@ -73,8 +80,9 @@ extern InputGlobals g_input;
 // Hardware buttons auto-repeating and newly pressed this frame.
 #define g_hardware_input_repeat (g_input.hardware.repeat)
 #define g_hardware_input_pressed (g_input.hardware.rising_edge)
-// Frames the shot button has been held (hardware.hold_frames_total[0]).
-#define g_hardware_input_held_4a51c4 (g_input.hardware.hold_frames_total[0])
+// Frames the shot button has been held (hardware.hold_frames_total[0],
+// 0x4a51c4).
+#define g_hardware_shot_hold_frames (g_input.hardware.hold_frames_total[0])
 #define g_input_repeat_time (g_input.repeat_time)
 #define g_InputState (g_input.state)
 

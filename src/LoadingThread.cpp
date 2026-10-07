@@ -21,15 +21,17 @@ LoadingThread::LoadingThread()
 
 i32 load_shared_anms();
 
+// sig.anm goes in ANM slot 1 and text.anm in slot 0. thbgm.dat is opened
+// here unless config flag 0x10 is set (then only its name is kept).
 // FUNCTION: TH16 0x43adc0
 int LoadingThread::thread_start(void *arg)
 {
     LoadingThread *t = g_LoadingThread;
-    t->sig_anm = AnmManager::preload_anm(1, "sig.anm");
+    t->sig_anm = AnmManager::preload_anm(ANM_SLOT_SIG, "sig.anm");
     if (t->sig_anm != NULL)
     {
         t->on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
-        t->count_630 = 1;
+        t->logo_step = 1;
         AsciiInf *ascii = new AsciiInf();
         if (ascii->initialize() != 0)
         {
@@ -43,8 +45,8 @@ int LoadingThread::thread_start(void *arg)
         }
         else
         {
-            t->count_634 = 1;
-            g_Supervisor.text_anm = AnmManager::preload_anm(0, "text.anm");
+            t->now_loading_step = 1;
+            g_Supervisor.text_anm = AnmManager::preload_anm(ANM_SLOT_TEXT, "text.anm");
             if (g_Supervisor.text_anm != NULL)
             {
                 g_SoundManager.bgm_format = (ThBgmFormat *)file_read_all("../../bgm/thbgm.fmt", NULL, 0);
@@ -56,7 +58,7 @@ int LoadingThread::thread_start(void *arg)
                 g_SoundManager.reset();
                 if (file_exists("thbgm.dat"))
                 {
-                    if (!(g_Supervisor.config.flags_2c & 0x10))
+                    if (!(g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY))
                     {
                         g_SoundManager.open_bgm("thbgm.dat");
                     }
@@ -72,11 +74,12 @@ int LoadingThread::thread_start(void *arg)
             }
         }
     }
-    g_Supervisor.gamemode_to_switch_to = 3;
+    g_Supervisor.gamemode_to_switch_to = GAMEMODE_QUIT;
     t->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
     return 0;
 }
 
+// Registers the update functions and starts the thread.
 // FUNCTION: TH16 0x43af60
 int LoadingThread::initialize()
 {
@@ -100,6 +103,8 @@ int LoadingThread::initialize()
 
 i32 unload_shared_anms();
 
+// Unloads what thread_start loaded (sig.anm, the ASCII manager, text.anm)
+// and saves and frees the score file.
 // FUNCTION: TH16 0x43afe0
 LoadingThread::~LoadingThread()
 {
@@ -108,11 +113,11 @@ LoadingThread::~LoadingThread()
     g_UpdateFuncRegistry->unregister_locked(on_draw_func);
     unload_shared_anms();
     AnmManager *anm = g_AnmManager;
-    if (anm->loaded_anms[1] != NULL)
+    if (anm->loaded_anms[ANM_SLOT_SIG] != NULL)
     {
-        anm->loaded_anms[1]->release();
-        delete anm->loaded_anms[1];
-        anm->loaded_anms[1] = NULL;
+        anm->loaded_anms[ANM_SLOT_SIG]->release();
+        delete anm->loaded_anms[ANM_SLOT_SIG];
+        anm->loaded_anms[ANM_SLOT_SIG] = NULL;
     }
     g_LoadingThread = NULL;
     if (g_AsciiManager != NULL)
@@ -120,13 +125,13 @@ LoadingThread::~LoadingThread()
         delete g_AsciiManager;
     }
     anm = g_AnmManager;
-    if (anm->loaded_anms[0] != NULL)
+    if (anm->loaded_anms[ANM_SLOT_TEXT] != NULL)
     {
-        anm->loaded_anms[0]->release();
-        delete anm->loaded_anms[0];
-        anm->loaded_anms[0] = NULL;
+        anm->loaded_anms[ANM_SLOT_TEXT]->release();
+        delete anm->loaded_anms[ANM_SLOT_TEXT];
+        anm->loaded_anms[ANM_SLOT_TEXT] = NULL;
     }
-    scorefile_save_449a00();
+    scorefile_save();
     if (g_Scorefile != NULL)
     {
         delete g_Scorefile;
@@ -146,34 +151,37 @@ LoadingThread *LoadingThread::create()
     return t;
 }
 
+// Once the thread has loaded everything (on_tick only becomes active
+// then), sets up the special ANM VMs, starts the ASCII manager and goes to
+// the title (GAMEMODE_TITLE).
 // FUNCTION: TH16 0x43b290
 int LoadingThread::on_tick()
 {
     if (flags & 2)
     {
         g_Supervisor.setup_special_anms();
-        g_unk_4d9d90 = 1;
+        g_frame_pacing.mode = FRAME_PACING_MENU;
         g_AsciiManager->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
         g_AsciiManager->on_draw_func_1->flags |= UPDATE_FUNC_ACTIVE;
         g_AsciiManager->on_draw_func_2->flags |= UPDATE_FUNC_ACTIVE;
         g_AsciiManager->on_draw_func_3->flags |= UPDATE_FUNC_ACTIVE;
-        g_Supervisor.flags &= ~0x2000;
-        g_Supervisor.gamemode_to_switch_to = 4;
+        g_Supervisor.flags &= ~SUPERVISOR_IDLE_ON_EXIT;
+        g_Supervisor.gamemode_to_switch_to = GAMEMODE_TITLE;
         flags &= ~2;
     }
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // Shows the sig.anm logo and then the "now loading" text.
 // FUNCTION: TH16 0x43b300
 int LoadingThread::on_draw()
 {
-    if (count_630 == 1)
+    if (logo_step == 1)
     {
         anm_id = sig_anm->create_effect(0, -1, NULL);
-        count_630++;
+        logo_step++;
     }
-    if (count_634 == 1)
+    if (now_loading_step == 1)
     {
         AsciiInf *ascii = g_AsciiManager;
         D3DXVECTOR3 pos(960.0f, 784.0f, 0.0f);
@@ -181,10 +189,10 @@ int LoadingThread::on_draw()
         {
             ascii->now_loading_id = ascii->ascii_anm->create_vm(0x11, &pos, 0.0f, -1, 0);
         }
-        count_634++;
+        now_loading_step++;
     }
-    count_638++;
-    return 1;
+    draw_count++;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // The original's callback is a jmp to the member function, most likely the

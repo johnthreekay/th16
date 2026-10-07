@@ -6,9 +6,8 @@
 #include "Supervisor.h"
 #include "ZunMath.h"
 
-// TODO: the original compares uv.x with 0 only after storing uv.y; ours
-// compares it right after storing it (`uv.x < 0.0f` and a D3DXVECTOR2
-// assignment do not change it).
+// Grows the fog towards fog_radius, rebuilds its mesh around final_pos
+// and turns the wave angles.
 // FUNCTION: TH16 0x41cbd0
 void EnemyData::update_fog()
 {
@@ -17,24 +16,24 @@ void EnemyData::update_fog()
     {
         return;
     }
-    D3DXVECTOR3 *points = (D3DXVECTOR3 *)mesh->buffer_18;
-    f32 radius = fog.unk_c;
+    D3DXVECTOR3 *points = (D3DXVECTOR3 *)mesh->points;
+    f32 radius = fog.cur_radius;
     // The angles are ZunAngles in ZUN's struct: copied as such.
-    ZunAngle angle_x = *(ZunAngle *)&fog.unk_14;
-    ZunAngle angle_y = *(ZunAngle *)&fog.unk_18;
+    ZunAngle angle_x = *(ZunAngle *)&fog.wave_angle_x;
+    ZunAngle angle_y = *(ZunAngle *)&fog.wave_angle_y;
     if (fog.fog_radius > radius)
     {
-        fog.unk_c = g_game_speed * 2.0f + radius;
+        fog.cur_radius = g_game_speed * 2.0f + radius;
     }
     Float3 pos = final_pos.pos;
     mesh->set_rect(pos.x - radius - 20.0f, pos.y - radius - 20.0f, radius + radius + 40.0f, radius + radius + 40.0f);
     f32 center_x = g_resolution_x * 0.5f + pos.x;
     f32 center_y = g_game_2d_origin_y + pos.y;
     D3DXVECTOR3 d;
-    FogVertex *vertex = (FogVertex *)((Fog *)fog.fog_ptr)->buffer_14;
-    for (i32 i = 0; i < ((Fog *)fog.fog_ptr)->vm_count; i++)
+    FogVertex *vertex = (FogVertex *)((Fog *)fog.fog_ptr)->vertices;
+    for (i32 i = 0; i < ((Fog *)fog.fog_ptr)->strip_count; i++)
     {
-        for (i32 j = 0; j < ((Fog *)fog.fog_ptr)->unk_4; j++)
+        for (i32 j = 0; j < ((Fog *)fog.fog_ptr)->strip_points; j++)
         {
             d = D3DXVECTOR3(points->x - center_x, points->y - center_y, points->z - pos.z);
             f32 t = radius * radius - (d.x * d.x + d.y * d.y);
@@ -83,7 +82,9 @@ void EnemyData::update_fog()
                 points->y = g_game_2d_origin_y + 448.0f - 1.0f;
             }
             vertex->uv.x = points->x / g_resolution_x;
-            vertex->uv.y = points->y / g_resolution_y;
+            // Through D3DXVECTOR2's operator FLOAT*: the store may alias uv.x,
+            // so its test comes after it, as in the original.
+            vertex->uv[1] = points->y / g_resolution_y;
             if (0.0f > vertex->uv.x)
             {
                 vertex->uv.x = 0.0f;
@@ -96,6 +97,6 @@ void EnemyData::update_fog()
             vertex++;
         }
     }
-    fog.unk_14 = wrap_angle(g_game_speed * (ZUN_PI / 16) + fog.unk_14);
-    fog.unk_18 = wrap_angle(g_game_speed * (ZUN_PI / 32) + fog.unk_18);
+    fog.wave_angle_x = wrap_angle(g_game_speed * (ZUN_PI / 16) + fog.wave_angle_x);
+    fog.wave_angle_y = wrap_angle(g_game_speed * (ZUN_PI / 32) + fog.wave_angle_y);
 }

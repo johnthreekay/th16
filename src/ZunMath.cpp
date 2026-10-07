@@ -1,5 +1,6 @@
 #include <math.h>
 
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
 // FUNCTION: TH16 0x402d30
@@ -52,20 +53,7 @@ HARNESS_CALLED f32 LTCG_VECTORCALL normalize_angle(f32 a)
 // FUNCTION: TH16 0x4054d0
 HARNESS_CALLED void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius)
 {
-#ifdef TH16_PORT
-    port_sincosmul(&dst->x, angle, radius);
-#else
-    __asm
-    {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp dword ptr [eax]
-        fmul radius
-        fstp dword ptr [eax + 4]
-    }
-#endif
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // FUNCTION: TH16 0x43dc90

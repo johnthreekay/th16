@@ -29,10 +29,11 @@ endif()
 
 set(TH16_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-# Every game source except the matching build's scaffolding: src/stub/,
-# src/placeholder/ and src/harness/ hold opaque placeholders, LTCG-visible
-# stand-ins and stand-in callers that only exist to shape MSVC's output.
-# The non-recursive glob leaves those directories out.
+# Every game source except the matching build's scaffolding, which only
+# exists to shape MSVC's output: src/stub/ (Opaque.cpp, values kept out of
+# LTCG's sight and sinks for the harness) and src/harness/ (stand-in
+# callers). The non-recursive glob leaves both directories out; the one game
+# global in src/stub/, g_zero_vec2, is defined in src/game_tables.cpp.
 file(GLOB TH16_GAME_SOURCES CONFIGURE_DEPENDS ${TH16_ROOT}/src/*.cpp)
 file(GLOB TH16_PORT_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 

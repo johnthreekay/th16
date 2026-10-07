@@ -9,16 +9,25 @@
 // GLOBAL: TH16 0x4a6db8
 EffectManager *g_EffectManager;
 
+// The effect kinds that EffectManager::create_effect sets up. In the
+// original each row names its ANM script and points at its init callback
+// (anm_masked_effect_init, anm_gather_effect_init,
+// anm_jagged_line_blue_init and anm_jagged_line_gray_init in
+// AnmVmCallbacks.cpp) with the matching on_tick/on_draw/on_destroy indices;
+// not filled in here.
+// GLOBAL: TH16 0x4a2250
+EffectData g_effect_table[4];
+
 // FUNCTION: TH16 0x418790
 i32 preload_bullet_and_effect_anm()
 {
-    if (AnmManager::preload_anm(8, "effect.anm") == NULL)
+    if (AnmManager::preload_anm(ANM_SLOT_EFFECT, "effect.anm") == NULL)
     {
         // "Effect data not found. The data is corrupt."
         g_GameErrorContext.log("\x83G\x83t\x83" "F\x83N\x83g\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
-    if (AnmManager::preload_anm(7, "bullet.anm") == NULL)
+    if (AnmManager::preload_anm(ANM_SLOT_BULLET, "bullet.anm") == NULL)
     {
         g_GameErrorContext.log("\x83G\x83t\x83" "F\x83N\x83g\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
@@ -29,14 +38,14 @@ i32 preload_bullet_and_effect_anm()
 // FUNCTION: TH16 0x4187d0
 i32 EffectManager::initialize()
 {
-    bullet_anm = AnmManager::preload_anm(7, "bullet.anm");
+    bullet_anm = AnmManager::preload_anm(ANM_SLOT_BULLET, "bullet.anm");
     if (bullet_anm == NULL)
     {
         // "Screen layout data not found. The data is corrupt."
         g_GameErrorContext.log("\x89\xe6\x96\xca\x8d\\\x90\xac\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
-    effect_anm = AnmManager::preload_anm(8, "effect.anm");
+    effect_anm = AnmManager::preload_anm(ANM_SLOT_EFFECT, "effect.anm");
     if (effect_anm == NULL)
     {
         g_GameErrorContext.log("\x89\xe6\x96\xca\x8d\\\x90\xac\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
@@ -66,7 +75,6 @@ i32 EffectManager::initialize()
     return 0;
 }
 
-// TODO: register allocation in the unregister part (this in ebx, one spill).
 // FUNCTION: TH16 0x4188d0
 EffectManager::~EffectManager()
 {
@@ -74,8 +82,8 @@ EffectManager::~EffectManager()
     g_AnmManager->disable_vms_from_anm_file(bullet_anm);
     g_UpdateFuncRegistry->unregister_locked(on_tick);
     g_UpdateFuncRegistry->unregister_locked(on_draw);
-    g_AnmManager->unload_anm(8);
-    g_AnmManager->unload_anm(7);
+    g_AnmManager->unload_anm(ANM_SLOT_EFFECT);
+    g_AnmManager->unload_anm(ANM_SLOT_BULLET);
     g_EffectManager = NULL;
 }
 
@@ -120,7 +128,7 @@ i32 __fastcall EffectManager::on_draw_callback(EffectManager *self)
 
 // TODO: this and last_used_index's old value trade ebx and the stack slot
 // with the original since get_vm_with_id has a visible body (it matched
-// against the opaque stub).
+// while get_vm_with_id was an opaque placeholder).
 // FUNCTION: TH16 0x40e6c0
 i32 EffectManager::next_index()
 {
@@ -181,8 +189,8 @@ AnmId EffectManager::create_effect(i32 effect, D3DXVECTOR3 *pos, AnmVm *vm)
     vm->index_of_on_draw = data->index_of_on_draw;
     vm->index_of_on_destroy = data->index_of_on_destroy;
     vm->index_of_on_interrupt = data->index_of_on_interrupt;
-    vm->index_of_on_copy_1 = data->index_of_on_copy_1;
-    vm->index_of_on_copy_2 = data->index_of_on_copy_2;
+    vm->index_of_on_copy = data->index_of_on_copy;
+    vm->index_of_on_serialize = data->index_of_on_serialize;
     return id;
 }
 
@@ -214,13 +222,11 @@ HARNESS_CALLED AnmId EffectManager::create_ui_effect(i32 effect, D3DXVECTOR3 *po
     vm->index_of_on_draw = data->index_of_on_draw;
     vm->index_of_on_destroy = data->index_of_on_destroy;
     vm->index_of_on_interrupt = data->index_of_on_interrupt;
-    vm->index_of_on_copy_1 = data->index_of_on_copy_1;
-    vm->index_of_on_copy_2 = data->index_of_on_copy_2;
+    vm->index_of_on_copy = data->index_of_on_copy;
+    vm->index_of_on_serialize = data->index_of_on_serialize;
     return id;
 }
 
-// TODO: same as create_ui_effect: the original saves esi before the
-// critical section.
 // FUNCTION: TH16 0x418fe0
 HARNESS_CALLED AnmId AnmLoaded::create_ui_vm_at_origin(i32 script, i32 unused)
 {
@@ -232,10 +238,10 @@ HARNESS_CALLED AnmId AnmLoaded::create_ui_vm_at_origin(i32 script, i32 unused)
     vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     vm->rotation.z = 0.0f;
     vm->run();
-    vm->mode_of_create_child = 4;
+    vm->mode_of_create_child = ANM_CREATE_UI;
     AnmId id;
     id = g_AnmManager->insert_in_ui_list_back(vm);
-    vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
+    vm->flags_hi &= ~(ANM_VM_FREEZES_WITH_WORLD | ANM_VM_FREEZES_AFTER_FIRST_RUN);
     LEAVE_CS(CS_ANM_MANAGER);
     return id;
 }

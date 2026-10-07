@@ -37,5 +37,5 @@ TH16_PORT_CHECK(offsetof(BgmStream, wave_file) == offsetof(CSound, m_pWaveFile))
 TH16_PORT_CHECK(offsetof(BgmStream, fade_time_left) == offsetof(CSound, m_fade_time_left));
 TH16_PORT_CHECK(offsetof(BgmStream, fade_duration) == offsetof(CSound, m_fade_duration));
 TH16_PORT_CHECK(offsetof(BgmStream, fade_mode) == offsetof(CSound, m_fade_mode));
-TH16_PORT_CHECK(offsetof(BgmStream, unk_50) == offsetof(CSound, m_playing));
+TH16_PORT_CHECK(offsetof(BgmStream, playing) == offsetof(CSound, m_playing));
 TH16_PORT_CHECK(offsetof(BgmStream, refilling) == offsetof(CStreamingSound, m_refilling));

@@ -25,7 +25,7 @@ i32 LaserLineInf::on_destroy()
 // 2 if a circle at pos touches the laser's rectangle, else 0.
 // TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
 // FUNCTION: TH16 0x434f70
-i32 LaserLineInf::method_30(Float3 *pos, f32 radius)
+i32 LaserLineInf::touches_circle(Float3 *pos, f32 radius)
 {
     f32 dx = pos->x - position.x;
     f32 dy = pos->y - position.y;
@@ -36,29 +36,29 @@ i32 LaserLineInf::method_30(Float3 *pos, f32 radius)
     f32 y = dx * s + dy * c;
     D3DXVECTOR2 lo(x - radius, y - radius);
     D3DXVECTOR2 hi(x + radius, y + radius);
-    if (lo.x > unk_70 || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
+    if (lo.x > hit_length || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
     {
         return 0;
     }
     return 2;
 }
 
-// The same et_ex step as LaserCurveInf::method_3c.
+// The same et_ex step as LaserCurveInf::step_ex_accel.
 // FUNCTION: TH16 0x432dc0
-i32 LaserLineInf::method_3c()
+i32 LaserLineInf::step_ex_accel()
 {
     BulletExState *st = &ex_state[1];
     if (st->timer.current >= st->ints[0])
     {
-        ex_flags &= ~4;
+        ex_flags &= ~BULLET_EX_ACCEL;
         return 1;
     }
     length += st->floats[0] * g_game_speed;
     Float3 v = *(Float3 *)&st->floats[5] * g_game_speed;
-    D3DXVec3Add(&unk_60, &unk_60, &v);
-    if (fabsf(unk_60.x) > 0.0001f || fabsf(unk_60.y) > 0.0001f)
+    D3DXVec3Add(&tip_offset, &tip_offset, &v);
+    if (fabsf(tip_offset.x) > 0.0001f || fabsf(tip_offset.y) > 0.0001f)
     {
-        angle = atan2(unk_60.y, unk_60.x);
+        angle = atan2(tip_offset.y, tip_offset.x);
     }
     st->timer.tick();
     return 0;

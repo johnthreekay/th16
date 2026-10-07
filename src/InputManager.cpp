@@ -13,14 +13,14 @@ void InputManager::detect_holds_and_repeats()
         {
             hold_frames[i]++;
             hold_frames_total[i]++;
-            if (hold_frames[i] >= 8)
+            if (hold_frames[i] >= INPUT_HELD_LONG_FRAMES)
             {
                 held_long |= mask;
             }
-            if (hold_frames[i] >= 26)
+            if (hold_frames[i] >= INPUT_REPEAT_DELAY)
             {
                 repeat |= mask;
-                hold_frames[i] -= 8;
+                hold_frames[i] -= INPUT_REPEAT_INTERVAL;
             }
         }
         else

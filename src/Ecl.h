@@ -16,6 +16,7 @@ struct EclLocation
     i32 offset_from_first_instruction;
 };
 
+// One value on the ECL stack or in an argument.
 union EclStackItem
 {
     i32 i;
@@ -44,6 +45,93 @@ struct EclRawInstr
     u8 num_stack_refs;
     u8 unk_d[3];
     EclStackItem args[1];
+};
+
+// The instructions every ECL VM runs (EclRunContext::ecl_run). Names follow
+// ExpHP's th-re-data labels (in parentheses where ours differ); 300 and up
+// belong to the VM subclass (EnemyData::ecl_run_over_300).
+enum EclOpcode
+{
+    ECL_OP_NOP = 0,
+    // Ends the context.
+    ECL_OP_DELETE = 1,
+    ECL_OP_RETURN = 10,
+    ECL_OP_CALL = 11,
+    ECL_OP_JMP = 12,
+    // Pop; jump if zero / nonzero.
+    ECL_OP_JMP_EQ = 13,
+    ECL_OP_JMP_NEQ = 14,
+    ECL_OP_CALL_ASYNC = 15,
+    ECL_OP_CALL_ASYNC_ID = 16,
+    ECL_OP_KILL_ASYNC = 17,
+    // Unnamed by ExpHP: set and clear bit 0 of an async's flags_11e4, and
+    // set its unk_101c (neither is read anywhere).
+    ECL_OP_ASYNC_FLAG_SET = 18,
+    ECL_OP_ASYNC_FLAG_CLEAR = 19,
+    ECL_OP_ASYNC_SET_101C = 20,
+    ECL_OP_KILL_ALL_ASYNC = 21,
+    // Debug instructions, empty in release builds.
+    ECL_OP_DEBUG_22 = 22,
+    ECL_OP_WAIT = 23,
+    ECL_OP_WAITF = 24,
+    ECL_OP_DEBUG_30 = 30,
+    ECL_OP_DEBUG_31 = 31,
+    ECL_OP_STACK_ALLOC = 40,
+    // Closes the frame stackAlloc opened (unnamed by ExpHP).
+    ECL_OP_STACK_DEALLOC = 41,
+    ECL_OP_PUSH = 42,
+    ECL_OP_SET = 43,
+    ECL_OP_PUSHF = 44,
+    ECL_OP_SETF = 45,
+    ECL_OP_ADD = 50,
+    ECL_OP_ADDF = 51,
+    ECL_OP_SUB = 52,
+    ECL_OP_SUBF = 53,
+    ECL_OP_MUL = 54,
+    ECL_OP_MULF = 55,
+    ECL_OP_DIV = 56,
+    ECL_OP_DIVF = 57,
+    ECL_OP_MOD = 58,
+    ECL_OP_EQ = 59,
+    ECL_OP_EQF = 60,
+    ECL_OP_NEQ = 61,
+    ECL_OP_NEQF = 62,
+    ECL_OP_LESS = 63,
+    ECL_OP_LESSF = 64,
+    ECL_OP_LEQ = 65,
+    ECL_OP_LEQF = 66,
+    ECL_OP_GREATER = 67,
+    ECL_OP_GREATERF = 68,
+    ECL_OP_GEQ = 69,
+    ECL_OP_GEQF = 70,
+    ECL_OP_NOT = 71,
+    ECL_OP_NOTF = 72,
+    ECL_OP_OR = 73,
+    ECL_OP_AND = 74,
+    ECL_OP_XOR = 75,
+    ECL_OP_BIT_OR = 76,
+    ECL_OP_BIT_AND = 77,
+    // Decrements a variable, pushing its old value.
+    ECL_OP_DEC = 78,
+    ECL_OP_STACK_SIN = 79,
+    ECL_OP_STACK_COS = 80,
+    ECL_OP_MATH_CIRCLE_POS = 81,
+    // Wraps an angle variable into [-pi, pi].
+    ECL_OP_VALID_RAD = 82,
+    ECL_OP_NEG = 83,
+    ECL_OP_NEGF = 84,
+    ECL_OP_NORM_SQ = 85,
+    ECL_OP_NORM = 86,
+    ECL_OP_MATH_ANGLE = 87,
+    ECL_OP_STACK_SQRT = 88,
+    // Signed difference of two angles (ExpHP: linearFunc).
+    ECL_OP_ANGLE_DIFF = 89,
+    ECL_OP_POINT_ROTATE = 90,
+    ECL_OP_FLOAT_TIME = 91,
+    // floatTime with bezier control values (ExpHP: math92).
+    ECL_OP_FLOAT_TIME_BEZIER = 92,
+    // Random point in a ring (ExpHP: math93).
+    ECL_OP_RAND_RING_POS = 93,
 };
 
 // One extra argument of the call instructions: the type of the value as
@@ -138,12 +226,13 @@ struct EclRunContext
     EclStack stack;
     i32 async_id;
     SptInf *vm;
+    // Set on another async by ECL 20; never read.
     i32 unk_101c;
     u8 difficulty_mask;
     u8 unk_1021[3];
     InterpFloat float_i[8];
     EclLocation float_i_locs[8];
-    // Bit 0 set by instructions 18/19.
+    // Bit 0 set and cleared on another async by ECL 18 and 19; never read.
     u32 flags_11e4;
 
     EclRunContext();
@@ -207,6 +296,7 @@ struct EclRawFile
     u32 unk_14[4];
 };
 
+// One entry of the subroutine table, sorted by name.
 struct EclSubroutinePtrs
 {
     const char *name;

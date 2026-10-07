@@ -1,3 +1,6 @@
+// The player: setup from the shot type's files, movement, options,
+// shooting, damage sources, getting hit and respawning. The shot type
+// callbacks and PlayerBullet are in PlayerShot.cpp.
 #include <stdlib.h>
 #include <stddef.h>
 #include <math.h>
@@ -26,6 +29,24 @@
 #include "Laser.h"
 #include "ReplayManager.h"
 
+// Where the player can move, in pixels (the playfield is 384x448 with x
+// centered on 0).
+enum
+{
+    PLAYER_MIN_X = -184,
+    PLAYER_MAX_X = 184,
+    PLAYER_MIN_Y = 32,
+    PLAYER_MAX_Y = 432,
+};
+
+// While the shot key is held the short shot timer wraps from this back to
+// 0, the long one from SHOT_LONG_TIMER_WRAP.
+enum
+{
+    SHOT_SHORT_TIMER_WRAP = 14,
+    SHOT_LONG_TIMER_WRAP = 0x77,
+};
+
 // FUNCTION: TH16 0x440d50
 void Player::set_shoot_key_short_timer(i32 time)
 {
@@ -33,39 +54,37 @@ void Player::set_shoot_key_short_timer(i32 time)
 }
 
 // FUNCTION: TH16 0x440dc0
-void Player::interrupt_options()
+void Player::start_stage_options()
 {
-    inner.flags &= ~2;
+    inner.flags &= ~PLAYER_FLAG_STAGE_ENDED;
     for (i32 i = 0; i < 4; i++)
     {
-        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b0, 2);
-        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b4, 2);
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id, 2);
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id_full_power, 2);
     }
     for (i32 i = 0; i < 8; i++)
     {
-        AnmManager::interrupt_tree(inner.subseason_options[i].anm_id_b0, 2);
-        AnmManager::interrupt_tree(inner.subseason_options[i].anm_id_b4, 2);
+        AnmManager::interrupt_tree(inner.subseason_options[i].anm_id, 2);
+        AnmManager::interrupt_tree(inner.subseason_options[i].anm_id_full_power, 2);
     }
-    inner.unk_16074 = 0;
+    inner.time_since_stage_end = 0;
 }
 
-// The counterpart of interrupt_options, used when a game starts. Works on
-// g_Player.
 // FUNCTION: TH16 0x42ca80
-HARNESS_CALLED void Player::resume_options()
+HARNESS_CALLED void Player::withdraw_options()
 {
-    inner.flags |= 2;
+    inner.flags |= PLAYER_FLAG_STAGE_ENDED;
     for (i32 i = 0; i < 4; i++)
     {
-        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b0, 3);
-        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b4, 3);
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id, 3);
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id_full_power, 3);
     }
     for (i32 i = 0; i < 8; i++)
     {
-        AnmManager::interrupt_tree(inner.subseason_options[i].anm_id_b0, 3);
-        AnmManager::interrupt_tree(inner.subseason_options[i].anm_id_b4, 3);
+        AnmManager::interrupt_tree(inner.subseason_options[i].anm_id, 3);
+        AnmManager::interrupt_tree(inner.subseason_options[i].anm_id_full_power, 3);
     }
-    inner.unk_16074 = 0;
+    inner.time_since_stage_end = 0;
 }
 
 // FUNCTION: TH16 0x440e40
@@ -81,7 +100,10 @@ HARNESS_CALLED void Player::set_position(f32 x, f32 y)
     inner.main_options[3].should_instajump = 1;
 }
 
-// TODO: ours gets a /GS cookie (from pos and the inlined set_entity_pos) and keeps the option pointer in esi, not edi+0x60.
+// With the stage over, the options instead head for the player and vanish
+// after 30 frames.
+// TODO: ours gets a /GS cookie (from pos and the inlined set_entity_pos)
+// and keeps the option pointer in esi, not edi+0x60.
 // FUNCTION: TH16 0x442380
 HARNESS_CALLED i32 Player::update_options(PlayerOption *options, i32 count)
 {
@@ -92,11 +114,13 @@ HARNESS_CALLED i32 Player::update_options(PlayerOption *options, i32 count)
         {
             continue;
         }
-        if (!(inner.flags & 2))
+        if (!(inner.flags & PLAYER_FLAG_STAGE_ENDED))
         {
             i32 focused = inner.is_focused != 0;
-            option->scaled_preferred_pos.x = (&option->scaled_preferred_pos_rel_to_player)[focused].x + inner.pos_subpixel.x;
-            option->scaled_preferred_pos.y = inner.pos_subpixel.y + (&option->scaled_preferred_pos_rel_to_player)[focused].y;
+            option->scaled_preferred_pos.x =
+                option->scaled_preferred_pos_rel_to_player[focused].x + inner.pos_subpixel.x;
+            option->scaled_preferred_pos.y =
+                inner.pos_subpixel.y + option->scaled_preferred_pos_rel_to_player[focused].y;
             if (option->on_update != NULL)
             {
                 option->on_update(&inner.main_options[i]);
@@ -106,11 +130,11 @@ HARNESS_CALLED i32 Player::update_options(PlayerOption *options, i32 count)
         {
             option->scaled_preferred_pos.x = inner.pos_subpixel.x;
             option->scaled_preferred_pos.y = inner.pos_subpixel.y;
-            if (inner.unk_16074 >= 30)
+            if (inner.time_since_stage_end >= 30)
             {
                 option->active = 0;
-                AnmManager::interrupt_tree(option->anm_id_b0, 1);
-                AnmManager::interrupt_tree(option->anm_id_b4, 1);
+                AnmManager::interrupt_tree(option->anm_id, 1);
+                AnmManager::interrupt_tree(option->anm_id_full_power, 1);
                 continue;
             }
         }
@@ -136,8 +160,8 @@ HARNESS_CALLED i32 Player::update_options(PlayerOption *options, i32 count)
         option->scaled_cur_pos = option->scaled_preferred_pos;
     place:
         Float3 pos(option->scaled_cur_pos.x / 128.0f, option->scaled_cur_pos.y / 128.0f, 0.0f);
-        option->anm_id_b0.set_entity_pos(&pos);
-        option->anm_id_b4.set_entity_pos(&pos);
+        option->anm_id.set_entity_pos(&pos);
+        option->anm_id_full_power.set_entity_pos(&pos);
     }
     return 0;
 }
@@ -167,6 +191,7 @@ HARNESS_CALLED i32 Player::check_hit_rect(Float3 *pos, Float3 *size, i32 graze_o
     if (hurtbox.min_pos.x > hi.x || hurtbox.min_pos.y > hi.y || lo.x > hurtbox.max_pos.x ||
         lo.y > hurtbox.max_pos.y)
     {
+        // A miss grazes within 24 pixels.
         half = D3DXVECTOR3(24.0f, 24.0f, 24.0f);
         hi = *pos + half;
         lo = *pos - half;
@@ -185,7 +210,7 @@ HARNESS_CALLED i32 Player::check_hit_rect(Float3 *pos, Float3 *size, i32 graze_o
     {
         return 2;
     }
-    if (inner.state == 2 || inner.state == 4 || inner.state == 3)
+    if (inner.state == PLAYER_STATE_DEAD || inner.state == PLAYER_STATE_HIT || inner.state == PLAYER_STATE_3)
     {
         return 0;
     }
@@ -196,20 +221,22 @@ HARNESS_CALLED i32 Player::check_hit_rect(Float3 *pos, Float3 *size, i32 graze_o
     return 1;
 }
 
-// TODO: the original has an 8-byte frame, subtracts y before x, and puts
-// the return 0 for an open dialogue right after its test.
+// TODO: the original loads inner.pos.y first and sums x*x + y*y (ours
+// y*y + x*x, swapped registers), and puts the return 0 for an open dialogue
+// right after its test.
 // FUNCTION: TH16 0x4439e0
 HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_only)
 {
     D3DXVECTOR3 d = inner.pos - *pos;
     f32 hitbox = sht_file->hitbox_radius;
     f32 dist_sq = d.x * d.x + d.y * d.y;
-    if (inner.flags & 0x10)
+    if (inner.flags & PLAYER_FLAG_SCALED)
     {
         hitbox *= player_scale * 3.6f;
     }
     if (dist_sq >= hitbox * hitbox + radius * radius)
     {
+        // A miss grazes within 40 pixels (more for big bullets).
         f32 graze = radius / 2.5f;
         graze = 40.0f > graze ? 40.0f : graze;
         if (dist_sq >= (graze + hitbox) * (graze + hitbox) + radius * radius)
@@ -226,7 +253,7 @@ HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_o
     {
         return 2;
     }
-    if (inner.state == 2 || inner.state == 4 || inner.state == 3)
+    if (inner.state == PLAYER_STATE_DEAD || inner.state == PLAYER_STATE_HIT || inner.state == PLAYER_STATE_3)
     {
         return 0;
     }
@@ -237,8 +264,8 @@ HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_o
     return 1;
 }
 
-// TODO: the original reserves 8 bytes of locals where ours has 4.
-// TODO: the original realigns its frame to 8 bytes (ebx-based form); the body matches.
+// Also fails the spell card (once it has run a second) and counts the
+// miss; die does the same to the spell card.
 // FUNCTION: TH16 0x443cd0
 void Player::lose_life()
 {
@@ -249,6 +276,7 @@ void Player::lose_life()
         effects->anm_ids[index] = effects->effect_anm->create_vm(0x1c, &inner.pos, 0.0f, -1, 0);
     }
     g_Globals.lives--;
+    // Every life starts with three bombs.
     g_Globals.bombs = 3;
     if (g_Gui != NULL)
     {
@@ -259,27 +287,27 @@ void Player::lose_life()
         g_Gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
     }
     g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
-    inner.state = 2;
+    inner.state = PLAYER_STATE_DEAD;
     inner.time_in_state.reset();
     inner.iframes = 180;
-    anm_file->copy_vm_and_run(&vm, 0);
+    anm_file->copy_vm_and_run(&vm, PLAYER_SCRIPT_IDLE);
     for (i32 i = 0; i < 4; i++)
     {
         inner.main_options[i].active = 0;
-        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b0, 1);
-        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b4, 1);
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id, 1);
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id_full_power, 1);
     }
     inner.num_main_options = 0;
-    if (g_Spellcard->flags & 1)
+    if (g_Spellcard->flags & SPELLCARD_ACTIVE)
     {
         if (g_Spellcard->time.current >= 60)
         {
             g_Spellcard->bonus = 0;
-            g_Spellcard->flags &= ~0x22;
+            g_Spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_EARLY_BOMB);
         }
         else if (g_MainBomb->in_use == 1)
         {
-            g_Spellcard->flags |= 0x20;
+            g_Spellcard->flags |= SPELLCARD_EARLY_BOMB;
         }
     }
     g_EnemyManager->inner.miss_count++;
@@ -293,27 +321,27 @@ void Player::lose_life()
 // FUNCTION: TH16 0x443f10
 void Player::die()
 {
-    if (!(inner.flags & 8))
+    if (!(inner.flags & PLAYER_FLAG_SILENT_HIT))
     {
-        g_SoundManager.play_sound_centered(2, 0);
+        g_SoundManager.play_sound_centered(SE_PLDEAD00, 0);
     }
     g_EffectManager->effect_anm->create_vm(0x1d, &inner.pos, 0.0f, -1, 0);
-    if (g_Spellcard->flags & 1)
+    if (g_Spellcard->flags & SPELLCARD_ACTIVE)
     {
         if (g_Spellcard->time.current >= 60)
         {
             g_Spellcard->bonus = 0;
-            g_Spellcard->flags &= ~0x22;
+            g_Spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_EARLY_BOMB);
         }
         else if (g_MainBomb->in_use == 1)
         {
-            g_Spellcard->flags |= 0x20;
+            g_Spellcard->flags |= SPELLCARD_EARLY_BOMB;
         }
     }
     inner.time_in_state.reset();
-    inner.state = 4;
+    inner.state = PLAYER_STATE_HIT;
     inner.iframes = 6;
-    anm_file->copy_vm_and_run(&vm, 0);
+    anm_file->copy_vm_and_run(&vm, PLAYER_SCRIPT_IDLE);
 }
 
 // The push ecx/pop ecx around the call (rather than a tail jump) pads the
@@ -326,25 +354,27 @@ i32 __fastcall Player::on_tick_callback(Player *player)
     return player->on_tick_body();
 }
 
-// TODO: the original pushes the player (push ecx/pop ecx) as an unused
-// stack slot, like on_tick_callback.
+// TODO: the original pads the draw_vm call with push ecx/pop ecx for 8-byte
+// alignment, like on_tick_callback; ours does not, most likely because LTCG
+// does not see draw_vm needing alignment early (draw_vm does not match yet).
+// Draws the player sprite, except while dead.
 // FUNCTION: TH16 0x443730
 i32 __fastcall Player::on_draw_callback(Player *player)
 {
-    if (player->inner.state != 2)
+    if (player->inner.state != PLAYER_STATE_DEAD)
     {
         player->vm.entity_pos = player->inner.pos;
-        player->vm.flags_hi = (player->vm.flags_hi & ~ANM_VM_LAYER_UI) | ANM_VM_LAYER_SET;
+        player->vm.flags_hi = (player->vm.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
         g_AnmManager->draw_vm(&player->vm);
     }
     return 1;
 }
 
 // FUNCTION: TH16 0x444070
-void Player::start_respawn()
+void Player::recover_from_hit()
 {
     inner.time_in_state = 60;
-    inner.state = 1;
+    inner.state = PLAYER_STATE_NORMAL;
 }
 
 #ifdef TH16_PORT
@@ -366,7 +396,8 @@ static ShtFile *port_convert_sht_file(const u8 *raw, i32 size)
     const i32 raw_tail_offset = raw_funcs_offset + 4 * 4;
     const u8 *base = raw + header_size + raw_tables_size;
     const i32 raw_size = size - header_size - raw_tables_size;
-    const i32 table_count = ((const ShtFile *)raw)->sht_off_count < 0xa ? ((const ShtFile *)raw)->sht_off_count : 0xa;
+    const i32 file_table_count = ((const ShtFile *)raw)->shooter_array_count;
+    const i32 table_count = file_table_count < 0xa ? file_table_count : 0xa;
     u32 offsets[0xa];
     i32 total = 0;
     for (i32 i = 0; i < 0xa; i++)
@@ -429,7 +460,7 @@ HARNESS_CALLED i32 Player::read_sht_file(ShtFile **out, const char *path)
     {
         return -1;
     }
-    for (i32 i = 0; i < (*out)->sht_off_count; i++)
+    for (i32 i = 0; i < (*out)->shooter_array_count; i++)
     {
         (*out)->shooter_arrays[i] = (ShtShooter *)((u8 *)(*out)->shooters + (uptr)(*out)->shooter_arrays[i]);
         for (ShtShooter *shooter = (*out)->shooter_arrays[i]; shooter->fire_rate >= 0; shooter++)
@@ -443,32 +474,35 @@ HARNESS_CALLED i32 Player::read_sht_file(ShtFile **out, const char *path)
     return 0;
 }
 
+// Takes the first free source after the last one created, wrapping
+// around; with none free it gives index 0 + 1 without setting it up.
 // FUNCTION: TH16 0x4449b0
-HARNESS_CALLED i32 Player::create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 time, i32 damage)
+HARNESS_CALLED i32 Player::create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 radius_growth, i32 time,
+                                                i32 damage)
 {
     i32 index = inner.last_created_damage_source_index;
-    for (i32 i = 0; i < 0x100; i++)
+    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++)
     {
         index++;
-        if (index >= 0x100)
+        if (index >= PLAYER_DAMAGE_SOURCE_COUNT)
         {
             index = 0;
         }
         PlayerDamageSource *source = &inner.damage_sources[index];
-        if (!(source->flags & 1))
+        if (!(source->flags & DAMAGE_SOURCE_ACTIVE))
         {
-            source->flags = (source->flags & ~4) | 3;
+            source->flags = (source->flags & ~DAMAGE_SOURCE_BOMB) | DAMAGE_SOURCE_ACTIVE | DAMAGE_SOURCE_CIRCLE;
             memset(&source->pos, 0, sizeof(source->pos));
             source->pos.pos = *pos;
             source->radius = radius;
-            source->unk_8 = unk;
-            source->timer_60 = time;
+            source->radius_growth = radius_growth;
+            source->lifetime = time;
             source->damage = damage;
             source->total_damage_dealt = 0;
-            source->unk_7c = 9999999;
-            source->unk_80 = 1;
-            source->unk_90 = 0;
-            source->unk_84 = 0;
+            source->damage_limit = 9999999;
+            source->hit_interval = 1;
+            source->hit_func = 0;
+            source->last_enemy_id = 0;
             break;
         }
     }
@@ -482,30 +516,30 @@ HARNESS_CALLED i32 Player::create_rect_damage_source(D3DXVECTOR3 *pos, f32 width
 {
     Player *player = g_Player;
     i32 index = player->inner.last_created_damage_source_index;
-    for (i32 i = 0; i < 0x100; i++)
+    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++)
     {
         index++;
-        if (index >= 0x100)
+        if (index >= PLAYER_DAMAGE_SOURCE_COUNT)
         {
             index = 0;
         }
         PlayerDamageSource *source = &player->inner.damage_sources[index];
-        if (!(source->flags & 1))
+        if (!(source->flags & DAMAGE_SOURCE_ACTIVE))
         {
-            source->flags = (source->flags & ~6) | 1;
+            source->flags = (source->flags & ~(DAMAGE_SOURCE_CIRCLE | DAMAGE_SOURCE_BOMB)) | DAMAGE_SOURCE_ACTIVE;
             memset(&source->pos, 0, sizeof(source->pos));
             source->pos.pos = *pos;
-            source->unk_14 = width;
-            source->unk_18 = height;
-            source->unk_c = wrap_angle(angle);
-            source->unk_10 = 0;
-            source->timer_60 = time;
+            source->width = width;
+            source->height = height;
+            source->angle = wrap_angle(angle);
+            source->angular_speed_i = 0;
+            source->lifetime = time;
             source->damage = damage;
             source->total_damage_dealt = 0;
-            source->unk_7c = 9999999;
-            source->unk_80 = 1;
-            source->unk_90 = 0;
-            source->unk_84 = 0;
+            source->damage_limit = 9999999;
+            source->hit_interval = 1;
+            source->hit_func = 0;
+            source->last_enemy_id = 0;
             break;
         }
     }
@@ -525,6 +559,9 @@ HARNESS_CALLED void Player::set_position_subpixel(Int2 *pos)
     inner.main_options[2].should_instajump = 1;
     inner.main_options[3].should_instajump = 1;
 }
+
+// GLOBAL: TH16 0x4a6ef8
+Player *g_Player;
 
 // GLOBAL: TH16 0x4a6f00
 ShtFile *g_cached_sht_file;
@@ -554,7 +591,8 @@ Player::~Player()
     g_UpdateFuncRegistry->unregister_locked(on_tick);
     g_UpdateFuncRegistry->unregister_locked(on_draw);
     g_Player = NULL;
-    if (g_Globals.flags_lo_45c & 1)
+    // The same stage starts again (retry or continue): keep the files.
+    if (g_Globals.flags_lo_45c & GLOBALS_SAME_STAGE_AGAIN)
     {
         g_AnmManager->disable_vms_from_anm_file(anm_file);
         g_AnmManager->disable_vms_from_anm_file(subseason_anm_file);
@@ -563,14 +601,14 @@ Player::~Player()
     }
     else
     {
-        g_AnmManager->unload_anm(9);
+        g_AnmManager->unload_anm(ANM_SLOT_PLAYER);
         if (sht_file != NULL)
         {
             free(sht_file);
             sht_file = NULL;
         }
         g_cached_sht_file = NULL;
-        g_AnmManager->unload_anm(0x1e);
+        g_AnmManager->unload_anm(ANM_SLOT_SUBSEASON);
         if (sht_file_subseason != NULL)
         {
             free(sht_file_subseason);
@@ -595,25 +633,25 @@ HARNESS_CALLED Player *Player::create()
 // FUNCTION: TH16 0x441740
 HARNESS_CALLED void Player::reset()
 {
-    inner.state = 1;
+    inner.state = PLAYER_STATE_NORMAL;
     inner.shoot_key_short_timer = -1;
     inner.shoot_key_long_timer = -1;
     inner.time_in_state.reset();
     inner.time_in_stage.reset();
-    inner.timer_3c.reset();
-    inner.flags &= ~9;
+    inner.shot_time_in_stage.reset();
+    inner.flags &= ~(PLAYER_FLAG_1 | PLAYER_FLAG_SILENT_HIT);
     delete_vm_and_clear(inner.anm_id_focused_hitbox);
     inner.anm_id_focused_hitbox.id = 0;
     delete_vm_and_clear(snapshot_inner.anm_id_focused_hitbox);
     snapshot_inner.anm_id_focused_hitbox.id = 0;
-    delete_vm_and_clear(inner.anm_id_15fa0);
-    inner.anm_id_15fa0.id = 0;
-    delete_vm_and_clear(snapshot_inner.anm_id_15fa0);
-    snapshot_inner.anm_id_15fa0.id = 0;
+    delete_vm_and_clear(inner.timed_effect_anm_id);
+    inner.timed_effect_anm_id.id = 0;
+    delete_vm_and_clear(snapshot_inner.timed_effect_anm_id);
+    snapshot_inner.timed_effect_anm_id.id = 0;
     g_Gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
-    interrupt_options();
+    start_stage_options();
     inner.repopulate_options();
-    inner.flags &= ~4;
+    inner.flags &= ~PLAYER_FLAG_NO_SHOOTING;
     inner.speed_multiplier = 1.0f;
     inner.option_lasers[0] = 0;
     inner.option_lasers[1] = 0;
@@ -634,36 +672,37 @@ HARNESS_CALLED void Player::reset()
 i32 Player::shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner)
 {
     ShtShooter *shooter = get_shooter(shooter_ref);
-    if (shooter->unk_21 == 2)
+    if (shooter->kind == SHT_SHOOTER_LASER)
     {
         i32 option = (i8)shooter->option - 1;
-        if (option >= 100)
+        if (option >= SEASON_OPTION_INDEX_BASE)
         {
-            option -= 100;
+            option -= SEASON_OPTION_INDEX_BASE;
         }
-        if (this->inner.option_lasers[((shooter_ref & 0xf0000) != 0) * 8 + option] != 0)
+        if (this->inner.option_lasers[((shooter_ref & SHOOTER_REF_SEASON_MASK) != 0) * OPTION_LASER_SEASON_BASE +
+                                      option] != 0)
         {
             return 0;
         }
     }
     PlayerBullet *bullet = this->inner.bullets;
     i32 i;
-    for (i = 0; i < 0x100; i++, bullet++)
+    for (i = 0; i < PLAYER_BULLET_COUNT; i++, bullet++)
     {
-        if (bullet->state == 0)
+        if (bullet->state == PLAYER_BULLET_FREE)
         {
             break;
         }
     }
-    if (i >= 0x100)
+    if (i >= PLAYER_BULLET_COUNT)
     {
         return 0;
     }
     return bullet->create(shooter_ref, time, inner) != 0 ? -1 : 0;
 }
 
-// TODO: the original realigns its frame (and esp, -8), most likely for
-// PlayerBullet::create, an opaque stub here.
+// TODO: the original realigns its frame (ebx form); the body matches. Not
+// for PlayerBullet::create (real code now, no realignment of its own).
 // FUNCTION: TH16 0x445470
 i32 Player::do_shooting(i32 short_time, i32 long_time)
 {
@@ -671,6 +710,7 @@ i32 Player::do_shooting(i32 short_time, i32 long_time)
     i32 level = g_Globals.power / g_Globals.power_per_level;
     if (inner.is_focused)
     {
+        // The focused shooter arrays follow the unfocused ones.
         level += sht_file->num_power_levels + 1;
     }
     for (ShtShooter *shooter = sht_file->shooter_arrays[level]; shooter->fire_rate >= 0; shooter++, index++)
@@ -705,6 +745,7 @@ i32 Player::do_shooting(i32 short_time, i32 long_time)
         }
         if (fire)
         {
+            // 0x100 << 8 sets the season file bit of the shooter ref.
             shoot_one_bullet((season_level | 0x100) << 8 | index, short_time, &inner);
         }
     }
@@ -712,12 +753,12 @@ i32 Player::do_shooting(i32 short_time, i32 long_time)
 }
 
 // TODO: the original saves ecx and edi on entry (most likely an LTCG
-// convention asked for by Player::on_tick, a stub here); ours saves edi only
-// around the short timer part.
+// convention asked for by its caller, on_tick_body, which does not match
+// either); ours saves edi only around the short timer part.
 // FUNCTION: TH16 0x4455d0
 i32 Player::tick_shooting_state()
 {
-    if (inner.state == 1)
+    if (inner.state == PLAYER_STATE_NORMAL)
     {
         if (inner.shoot_key_short_timer.current < 0)
         {
@@ -735,11 +776,11 @@ i32 Player::tick_shooting_state()
         {
             do_shooting(inner.shoot_key_short_timer.current, inner.shoot_key_long_timer.current);
         }
-        if (inner.shoot_key_short_timer.current >= 14)
+        if (inner.shoot_key_short_timer.current >= SHOT_SHORT_TIMER_WRAP)
         {
             if (g_InputState.input & INPUT_SHOT)
             {
-                inner.shoot_key_short_timer -= 14;
+                inner.shoot_key_short_timer -= SHOT_SHORT_TIMER_WRAP;
             }
             else
             {
@@ -753,11 +794,11 @@ i32 Player::tick_shooting_state()
     long_timer:
         if (inner.shoot_key_long_timer.current >= 0)
         {
-            if (inner.shoot_key_long_timer.current >= 0x77)
+            if (inner.shoot_key_long_timer.current >= SHOT_LONG_TIMER_WRAP)
             {
                 if (g_InputState.input & INPUT_SHOT)
                 {
-                    inner.shoot_key_long_timer -= 0x77;
+                    inner.shoot_key_long_timer -= SHOT_LONG_TIMER_WRAP;
                 }
                 else
                 {
@@ -778,28 +819,29 @@ i32 Player::tick_shooting_state()
     return 0;
 }
 
-// TODO: our spawn_item is an ordinary thiscall (/INCLUDE keeps it so),
-// where the original's LTCG dropped this and folded unk_3 and unk_6; the
-// graze counters and the midpoint are also scheduled differently.
+// atan2 is spelled out so that it stays inline (see angle_to_player); the
+// double math realigns the frame, which also gives spawn_item known
+// alignment.
 // FUNCTION: TH16 0x444cf0
 HARNESS_CALLED void Player::do_graze(Float3 *pos)
 {
-    g_Globals.graze = g_Globals.graze + 1 > 99999999 ? 99999999 : g_Globals.graze + 1;
-    g_Globals.graze_in_chapter = g_Globals.graze_in_chapter + 1 > 99999999 ? 99999999 : g_Globals.graze_in_chapter + 1;
     Player *player = g_Player;
-    Float3 mid;
-    mid.x = (player->inner.pos.x + pos->x) * 0.5f;
-    mid.y = (pos->y + player->inner.pos.y) * 0.5f;
+    i32 graze_in_chapter = g_Globals.graze_in_chapter + 1;
+    i32 graze = g_Globals.graze + 1;
+    g_Globals.graze = graze > 99999999 ? 99999999 : graze;
+    g_Globals.graze_in_chapter = graze_in_chapter > 99999999 ? 99999999 : graze_in_chapter;
+    Float3 mid = (player->inner.pos + *pos) * 0.5f;
     mid.z = 0.0f;
     g_EffectManager->effect_anm->create_vm(0x18, &mid, 0.0f, -1, 0);
     g_PopupManager->generate_small_score_popup(&mid, g_Globals.graze_in_chapter, 0xffc0c0ff);
-    g_SoundManager.play_sound_at_position(0x2a, pos->x);
-    g_ItemManager->spawn_item(0x10, pos, 0, atan2f(pos->y - player->inner.pos.y, pos->x - player->inner.pos.x), 1.9f,
-                              0, 0);
+    g_SoundManager.play_sound_at_position(SE_GRAZE, pos->x);
+    g_ItemManager->spawn_item(ITEM_SEASON, pos, 0,
+                              (f32)atan2((double)(pos->y - player->inner.pos.y), (double)(pos->x - player->inner.pos.x)),
+                              1.9f, 0, 0);
 }
 
-// TODO: the original realigns its frame (and esp, -8) and orders the
-// rotation and the bounds differently (same convention and logic).
+// TODO: d.x and d.y take swapped stack slots and the scaled hurtbox bounds
+// are computed in a different order (frame and convention match).
 // FUNCTION: TH16 0x443af0
 HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only)
 {
@@ -828,7 +870,7 @@ HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 wi
     {
         return 2;
     }
-    if (inner.state == 2 || inner.state == 4 || inner.state == 3)
+    if (inner.state == PLAYER_STATE_DEAD || inner.state == PLAYER_STATE_HIT || inner.state == PLAYER_STATE_3)
     {
         return 0;
     }
@@ -840,44 +882,46 @@ HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 wi
     return 1;
 }
 
-// TODO: the original walks the sources with two pointers (source and &timer_60.current) and rereads pos/size from the stack; ours keeps one pointer and pos/size in registers.
+// TODO: the original walks the sources with two pointers (source and
+// &lifetime.current) and rereads pos/size from the stack; ours keeps one
+// pointer and pos/size in registers.
 // FUNCTION: TH16 0x445a30
 HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f32 rotation, f32 radius,
-                                                   i32 *hit_flag, Float3 *hit_pos, i32 no_score, i32 enemy_id)
+                                                   i32 *bomb_hit, Float3 *hit_pos, i32 no_score, i32 enemy_id)
 {
     Player *player = g_Player;
     if (player->inner.time_in_state.current == player->inner.time_in_state.previous)
     {
         return 0;
     }
-    i32 total = g_MainBomb->in_use == 0 ? 0 : g_MainBomb->method_c((iptr)pos, (iptr)size);
-    if (hit_flag != NULL)
+    i32 total = g_MainBomb->in_use == 0 ? 0 : g_MainBomb->compute_damage((iptr)pos, (iptr)size);
+    if (bomb_hit != NULL)
     {
-        *hit_flag = total > 0 ? 1 : 0;
+        *bomb_hit = total > 0 ? 1 : 0;
     }
-    for (i32 i = 0; i < 0x100; i++)
+    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++)
     {
         PlayerDamageSource *source = &player->inner.damage_sources[i];
-        if (!(source->flags & 1))
+        if (!(source->flags & DAMAGE_SOURCE_ACTIVE))
         {
             continue;
         }
-        if (source->timer_60.current == source->timer_60.previous || source->timer_60.current % source->unk_80 != 0)
+        if (source->lifetime.current == source->lifetime.previous || source->lifetime.current % source->hit_interval != 0)
         {
             continue;
         }
-        if (!(source->flags & 2))
+        if (!(source->flags & DAMAGE_SOURCE_CIRCLE))
         {
             if (size != NULL)
             {
-                if (!collision_test_rect_rect(source->pos.pos.x, source->pos.pos.y, source->unk_14, source->unk_18,
-                                              source->unk_c, pos->x, pos->y, size->x, size->y, rotation))
+                if (!collision_test_rect_rect(source->pos.pos.x, source->pos.pos.y, source->width, source->height,
+                                              source->angle, pos->x, pos->y, size->x, size->y, rotation))
                 {
                     continue;
                 }
             }
-            else if (!collision_test_circle_rect(source->pos.pos.x, source->pos.pos.y, source->unk_14,
-                                                 source->unk_18, source->unk_c, pos->x, pos->y, radius))
+            else if (!collision_test_circle_rect(source->pos.pos.x, source->pos.pos.y, source->width,
+                                                 source->height, source->angle, pos->x, pos->y, radius))
             {
                 continue;
             }
@@ -902,23 +946,23 @@ HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f3
         }
         if (enemy_id != 0)
         {
-            if (source->unk_84 == enemy_id)
+            if (source->last_enemy_id == enemy_id)
             {
                 continue;
             }
-            source->unk_84 = enemy_id;
+            source->last_enemy_id = enemy_id;
         }
-        if (hit_flag != NULL && (source->flags & 4))
+        if (bomb_hit != NULL && (source->flags & DAMAGE_SOURCE_BOMB))
         {
-            *hit_flag = 1;
+            *bomb_hit = 1;
         }
         i32 damage = source->damage;
         if (!no_score)
         {
-            if (source->unk_90 != 0)
+            if (source->hit_func != 0)
             {
-                source->hit_func = enemy_id;
-                damage = g_damage_source_hit_funcs[source->unk_90](source, (iptr)pos, (iptr)size, rotation, radius);
+                source->hit_enemy_id = enemy_id;
+                damage = g_damage_source_hit_funcs[source->hit_func](source, (iptr)pos, (iptr)size, rotation, radius);
             }
             source->total_damage_dealt += source->damage;
         }
@@ -927,9 +971,9 @@ HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f3
         {
             *hit_pos = source->pos.pos;
         }
-        if (source->unk_7c < 9999999 && source->unk_7c <= source->total_damage_dealt)
+        if (source->damage_limit < 9999999 && source->damage_limit <= source->total_damage_dealt)
         {
-            source->flags &= ~1;
+            source->flags &= ~DAMAGE_SOURCE_ACTIVE;
             source->damage = 0;
         }
     }
@@ -951,14 +995,15 @@ static __forceinline i32 is_on_screen(Float3 *pos)
            g_early_arcade_offset_y < pos->y && pos->y < g_early_arcade_offset_y + 448.0f;
 }
 
-// TODO: the original realigns its frame (ebx form) and reloads g_Player for every bullet; ours keeps it in a register.
+// TODO: the original realigns its frame (ebx form) and reloads g_Player for
+// every bullet; ours keeps it in a register.
 // FUNCTION: TH16 0x4456d0
 i32 Player::tick_bullets()
 {
-    for (i32 i = 0; i < 0x100; i++)
+    for (i32 i = 0; i < PLAYER_BULLET_COUNT; i++)
     {
         PlayerBullet *bullet = &inner.bullets[i];
-        if (bullet->state == 0)
+        if (bullet->state == PLAYER_BULLET_FREE)
         {
             continue;
         }
@@ -972,52 +1017,57 @@ i32 Player::tick_bullets()
         AnmVm *vm = g_AnmManager->get_vm_with_id(bullet->anm_id);
         if (vm == NULL)
         {
-            bullet->state = 0;
+            bullet->state = PLAYER_BULLET_FREE;
             bullet->anm_id.id = 0;
             if (bullet->damage_source_index != 0)
             {
-                g_Player->inner.damage_sources[bullet->damage_source_index - 1].flags &= ~1;
+                g_Player->inner.damage_sources[bullet->damage_source_index - 1].flags &= ~DAMAGE_SOURCE_ACTIVE;
             }
             continue;
         }
-        if (shooter->unk_21 != 2)
+        if (shooter->kind != SHT_SHOOTER_LASER)
         {
             Float3 corners[4];
             vm->write_sprite_corners(corners);
-            if (bullet->timer_c.current >= 15 && !is_on_screen(&corners[0]) && !is_on_screen(&corners[1]) &&
+            // Bullets (other than lasers) older than 15 frames go away once
+        // their sprite is entirely off screen.
+        if (bullet->age.current >= 15 && !is_on_screen(&corners[0]) && !is_on_screen(&corners[1]) &&
                 !is_on_screen(&corners[2]) && !is_on_screen(&corners[3]))
             {
                 {
                     delete_vm_and_clear(bullet->anm_id);
-                    bullet->state = 0;
+                    bullet->state = PLAYER_BULLET_FREE;
                     if (bullet->damage_source_index != 0)
                     {
-                        g_Player->inner.damage_sources[bullet->damage_source_index - 1].flags &= ~1;
+                        g_Player->inner.damage_sources[bullet->damage_source_index - 1].flags &= ~DAMAGE_SOURCE_ACTIVE;
                     }
                     continue;
                 }
             }
         }
-        if (bullet->damage_source_index != 0 && (bullet->flags & 1))
+        if (bullet->damage_source_index != 0 && (bullet->flags & PLAYER_BULLET_MOVES_DAMAGE_SOURCE))
         {
             PlayerDamageSource *source = &g_Player->inner.damage_sources[bullet->damage_source_index - 1];
             source->pos.pos = bullet->pos.pos;
-            source->unk_c = bullet->pos.angle.value;
-            source->unk_14 = bullet->laser_length;
-            source->unk_18 = bullet->unk_a4_f;
-            source->damage = bullet->unk_9c;
+            source->angle = bullet->pos.angle.value;
+            source->width = bullet->hitbox_width;
+            source->height = bullet->hitbox_height;
+            source->damage = bullet->damage;
         }
         vm->entity_pos = bullet->pos.pos;
-        if (vm->flags_hi & 0x80)
+        if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
         {
             vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
             vm->rotation.z = bullet->pos.angle.value;
         }
-        bullet->timer_c.tick();
+        bullet->age.tick();
     }
     return 0;
 }
 
+// Per character (the .sht file's own values are ignored): the sizes of the
+// focused item attraction box, the graze box, the unfocused attraction box
+// (also the item box) and the hitbox.
 // GLOBAL: TH16 0x492c68
 const f32 g_player_attract_radii[4] = {100.0f, 100.0f, 100.0f, 100.0f};
 // GLOBAL: TH16 0x492c78
@@ -1026,6 +1076,7 @@ const f32 g_player_graze_radii[4] = {5.0f, 5.0f, 5.0f, 5.0f};
 const f32 g_player_item_radii[4] = {60.0f, 60.0f, 60.0f, 60.0f};
 // GLOBAL: TH16 0x492c98
 const f32 g_player_hitbox_radii[4] = {3.0f, 3.0f, 3.0f, 3.0f};
+// The shot type files: per character (pl01 is Marisa's) and per subseason.
 // GLOBAL: TH16 0x492ca8
 const char *const g_player_sht_names[4] = {"pl00.sht", "pl02.sht", "pl03.sht", "pl01.sht"};
 // GLOBAL: TH16 0x492cb8
@@ -1037,18 +1088,22 @@ const char *const g_player_anm_names[4] = {"pl00.anm", "pl02.anm", "pl03.anm", "
 const char *const g_subseason_anm_names[5] = {"pl00sub.anm", "pl02sub.anm", "pl03sub.anm", "pl01sub.anm",
                                               "pl04sub.anm"};
 
-// TODO: block order of the .sht loading branch and the VM pointer register differ.
+// Loads pl0X.anm/pl0Xsub.anm and the .sht files (or takes the cached
+// ones), registers the update functions, sets the speeds, power and
+// season level thresholds, hitbox and item boxes from the shot type and
+// the character tables, and places the player at the bottom.
 // FUNCTION: TH16 0x440fb0
 i32 Player::initialize()
 {
-    anm_file = AnmManager::preload_anm(9, g_player_anm_names[g_Globals.character + g_Globals.subshot]);
+    anm_file = AnmManager::preload_anm(ANM_SLOT_PLAYER, g_player_anm_names[g_Globals.character + g_Globals.subshot]);
+    // "Player data not found. The data is corrupted."
     if (anm_file == NULL)
     {
         g_GameErrorContext.log("\x8e\xa9\x8b@\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81"
                                "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
-    subseason_anm_file = AnmManager::preload_anm(0x1e, g_subseason_anm_names[g_Globals.subseason]);
+    subseason_anm_file = AnmManager::preload_anm(ANM_SLOT_SUBSEASON, g_subseason_anm_names[g_Globals.subseason]);
     if (subseason_anm_file == NULL)
     {
         g_GameErrorContext.log("\x8e\xa9\x8b@\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81"
@@ -1089,16 +1144,20 @@ i32 Player::initialize()
         g_UpdateFuncRegistry->register_on_draw(f, 0x1d);
         on_draw = f;
     }
-    anm_file->copy_vm(&vm, 0);
-    vm.unk_5b0 = NULL;
-    vm.parent = NULL;
-    vm.run();
+    {
+        AnmVm *player_vm = &vm;
+        anm_file->copy_vm(player_vm, 0);
+        player_vm->parent_vm = NULL;
+        player_vm->root_vm = NULL;
+        player_vm->run();
+    }
     set_position(0.0f, 400.0f);
     for (i32 i = 0; i < 4; i++)
     {
         inner.speeds_subpixel[i] = (i32)((&sht_file->move_speed)[i] * 128.0f);
     }
     {
+        // The season power each season level takes.
         i32 season_deltas[8] = {0, 100, 130, 160, 200, 250, 300, 0};
         sht_file->power_per_level = 100;
         g_Globals.max_power = sht_file->power_per_level * sht_file->num_power_levels;
@@ -1131,7 +1190,7 @@ i32 Player::initialize()
     item_attract_box_unfocused.min_pos = inner.pos - item_attract_box_focused_halfsize;
     item_attract_box_unfocused.max_pos = inner.pos + item_attract_box_focused_halfsize;
     inner.time_in_state.reset_inline();
-    inner.timer_3c.reset_inline();
+    inner.shot_time_in_stage.reset_inline();
     inner.iframes.reset_inline();
     inner.percent_moved_by_options = 30;
     inner.num_main_options = 0;
@@ -1144,71 +1203,74 @@ i32 Player::initialize()
     {
         inner.subseason_options[i].scaled_cur_pos.y = -400 * 128;
     }
-    inner.flags &= ~4;
+    inner.flags &= ~PLAYER_FLAG_NO_SHOOTING;
     player_scale_i.end_time = 0;
     player_scale = 1.0f;
-    for (i32 i = 0; i < 0x100; i++)
+    for (i32 i = 0; i < PLAYER_BULLET_COUNT; i++)
     {
         inner.bullets[i].index_of_self = i;
     }
     return 0;
 }
 
+// The unit movement of each PlayerDirection.
 // GLOBAL: TH16 0x492c20
-const Int2 g_player_directions[9] = {{0, 0}, {0, -1}, {0, 1}, {-1, 0}, {1, 0}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
+const Int2 g_player_directions[9] = {{0, 0}, {0, -1}, {0, 1}, {-1, 0}, {1, 0}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
 
 // copy_vm_and_run as LTCG inlined it here.
 static __forceinline void player_set_script(Player *player, i32 script)
 {
     player->anm_file->copy_vm(&player->vm, script);
-    player->vm.unk_5b0 = NULL;
-    player->vm.parent = NULL;
+    player->vm.parent_vm = NULL;
+    player->vm.root_vm = NULL;
     player->vm.run();
 }
 
-// TODO: the original realigns its frame (and esp, -8) and keeps 1.0f in xmm2; register allocation differs.
+// TODO: the original realigns its frame (and esp, -8) and keeps 1.0f in
+// xmm2; register allocation differs.
 // FUNCTION: TH16 0x441cf0
 i32 Player::move()
 {
     u32 input = g_InputState.input;
     if ((input & (INPUT_UP | INPUT_LEFT)) == (INPUT_UP | INPUT_LEFT))
     {
-        attempted_direction = 5;
+        attempted_direction = PLAYER_DIR_UP_LEFT;
     }
     else if ((input & (INPUT_DOWN | INPUT_LEFT)) == (INPUT_DOWN | INPUT_LEFT))
     {
-        attempted_direction = 7;
+        attempted_direction = PLAYER_DIR_DOWN_LEFT;
     }
     else if ((input & (INPUT_UP | INPUT_RIGHT)) == (INPUT_UP | INPUT_RIGHT))
     {
-        attempted_direction = 6;
+        attempted_direction = PLAYER_DIR_UP_RIGHT;
     }
     else if ((input & (INPUT_DOWN | INPUT_RIGHT)) == (INPUT_DOWN | INPUT_RIGHT))
     {
-        attempted_direction = 8;
+        attempted_direction = PLAYER_DIR_DOWN_RIGHT;
     }
     else if (input & INPUT_DOWN)
     {
-        attempted_direction = 2;
+        attempted_direction = PLAYER_DIR_DOWN;
     }
     else if (input & INPUT_UP)
     {
-        attempted_direction = 1;
+        attempted_direction = PLAYER_DIR_UP;
     }
     else if (input & INPUT_LEFT)
     {
-        attempted_direction = 3;
+        attempted_direction = PLAYER_DIR_LEFT;
     }
     else if (input & INPUT_RIGHT)
     {
-        attempted_direction = 4;
+        attempted_direction = PLAYER_DIR_RIGHT;
     }
     else
     {
-        attempted_direction = 0;
+        attempted_direction = PLAYER_DIR_NONE;
     }
     if (g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 && inner.time_in_stage.current >= 4)
     {
+        // INPUT_FOCUS as 0 or 1.
         inner.is_focused = (g_InputState.input >> 3) & 1;
     }
     else
@@ -1224,12 +1286,13 @@ i32 Player::move()
     {
         if (inner.anm_id_focused_hitbox.id == 0)
         {
+            // effect.anm's focused hitbox.
             inner.anm_id_focused_hitbox = g_EffectManager->effect_anm->create_effect(0x1a, 0xe, NULL);
         }
         AnmVm *vm = get_vm_or_clear(inner.anm_id_focused_hitbox);
         if (vm != NULL)
         {
-            if (inner.flags & 0x10)
+            if (inner.flags & PLAYER_FLAG_SCALED)
             {
                 f32 scale = (player_scale - 1.0f) * 2.0f;
                 vm->scale_2.y = scale + 1.0f;
@@ -1242,8 +1305,10 @@ i32 Player::move()
             }
             vm->flags_lo |= ANM_VM_SCALE_CHANGED;
         }
-        speed_x = attempted_direction >= 5 ? inner.speeds_subpixel[3] : inner.speeds_subpixel[1];
-        speed_y = attempted_direction >= 5 ? inner.speeds_subpixel[3] : inner.speeds_subpixel[1];
+        speed_x = attempted_direction >= PLAYER_DIR_UP_LEFT ? inner.speeds_subpixel[PLAYER_SPEED_FOCUSED_DIAGONAL]
+                                                            : inner.speeds_subpixel[PLAYER_SPEED_FOCUSED];
+        speed_y = attempted_direction >= PLAYER_DIR_UP_LEFT ? inner.speeds_subpixel[PLAYER_SPEED_FOCUSED_DIAGONAL]
+                                                            : inner.speeds_subpixel[PLAYER_SPEED_FOCUSED];
     }
     else
     {
@@ -1252,54 +1317,57 @@ i32 Player::move()
             AnmManager::interrupt_tree(inner.anm_id_focused_hitbox, 1);
         }
         inner.anm_id_focused_hitbox.id = 0;
-        speed_x = attempted_direction >= 5 ? inner.speeds_subpixel[2] : inner.speeds_subpixel[0];
-        speed_y = attempted_direction >= 5 ? inner.speeds_subpixel[2] : inner.speeds_subpixel[0];
+        speed_x = attempted_direction >= PLAYER_DIR_UP_LEFT ? inner.speeds_subpixel[PLAYER_SPEED_UNFOCUSED_DIAGONAL]
+                                                            : inner.speeds_subpixel[PLAYER_SPEED_UNFOCUSED];
+        speed_y = attempted_direction >= PLAYER_DIR_UP_LEFT ? inner.speeds_subpixel[PLAYER_SPEED_UNFOCUSED_DIAGONAL]
+                                                            : inner.speeds_subpixel[PLAYER_SPEED_UNFOCUSED];
     }
-    i32 vx = (f32)(speed_x * dx - (i32)(inner.unk_1607c.x * -128.0f)) * inner.speed_multiplier;
-    i32 vy = (f32)(speed_y * dy - (i32)(inner.unk_1607c.y * -128.0f)) * inner.speed_multiplier;
+    // A change of horizontal direction starts the turning animations.
+    i32 vx = (f32)(speed_x * dx - (i32)(inner.push_velocity.x * -128.0f)) * inner.speed_multiplier;
+    i32 vy = (f32)(speed_y * dy - (i32)(inner.push_velocity.y * -128.0f)) * inner.speed_multiplier;
     if (vx < 0 && attempted_velocity.x >= 0)
     {
-        player_set_script(this, 1);
+        player_set_script(this, PLAYER_SCRIPT_TURN_LEFT);
     }
     if (vx > 0 && attempted_velocity.x <= 0)
     {
-        player_set_script(this, 3);
+        player_set_script(this, PLAYER_SCRIPT_TURN_RIGHT);
     }
     if (vx == 0 && attempted_velocity.x < 0)
     {
-        player_set_script(this, 2);
+        player_set_script(this, PLAYER_SCRIPT_LEFT_TO_IDLE);
     }
     if (vx == 0 && attempted_velocity.x > 0)
     {
-        player_set_script(this, 4);
+        player_set_script(this, PLAYER_SCRIPT_RIGHT_TO_IDLE);
     }
     attempted_velocity.x = vx;
     attempted_velocity.y = vy;
-    inner.unk_16050 = vx * g_game_speed;
-    inner.unk_16054 = vy * g_game_speed;
+    inner.attempted_delta_pos_subpixel.x = vx * g_game_speed;
+    inner.attempted_delta_pos_subpixel.y = vy * g_game_speed;
     if (attempted_direction != 0)
     {
-        inner.last_nonzero_delta_pos_subpixel = *(Float3 *)&inner.unk_16050;
+        inner.last_nonzero_delta_pos_subpixel = inner.attempted_delta_pos_subpixel;
     }
-    inner.velocity_subpixel.y = (i32)inner.unk_16054;
-    inner.velocity_subpixel.x = (i32)inner.unk_16050;
+    inner.velocity_subpixel.y = (i32)inner.attempted_delta_pos_subpixel.y;
+    inner.velocity_subpixel.x = (i32)inner.attempted_delta_pos_subpixel.x;
     inner.pos_subpixel.x += inner.velocity_subpixel.x;
     inner.pos_subpixel.y += inner.velocity_subpixel.y;
-    if (inner.pos_subpixel.x < -184 * 128)
+    if (inner.pos_subpixel.x < PLAYER_MIN_X * 128)
     {
-        inner.pos_subpixel.x = -184 * 128;
+        inner.pos_subpixel.x = PLAYER_MIN_X * 128;
     }
-    else if (inner.pos_subpixel.x > 184 * 128)
+    else if (inner.pos_subpixel.x > PLAYER_MAX_X * 128)
     {
-        inner.pos_subpixel.x = 184 * 128;
+        inner.pos_subpixel.x = PLAYER_MAX_X * 128;
     }
-    if (inner.pos_subpixel.y < 32 * 128)
+    if (inner.pos_subpixel.y < PLAYER_MIN_Y * 128)
     {
-        inner.pos_subpixel.y = 32 * 128;
+        inner.pos_subpixel.y = PLAYER_MIN_Y * 128;
     }
-    else if (inner.pos_subpixel.y > 432 * 128)
+    else if (inner.pos_subpixel.y > PLAYER_MAX_Y * 128)
     {
-        inner.pos_subpixel.y = 432 * 128;
+        inner.pos_subpixel.y = PLAYER_MAX_Y * 128;
     }
     inner.pos.x = inner.pos_subpixel.x / 128.0f;
     inner.pos.y = inner.pos_subpixel.y / 128.0f;
@@ -1311,41 +1379,42 @@ i32 Player::move()
             vm->entity_pos = inner.pos;
         }
     }
-    if (inner.flags & 2)
+    if (inner.flags & PLAYER_FLAG_STAGE_ENDED)
     {
-        inner.unk_16074++;
+        inner.time_since_stage_end++;
     }
     update_options(inner.main_options, 4);
     update_options(inner.subseason_options, 8);
-    if (inner.unk_16074 >= 30)
+    if (inner.time_since_stage_end >= 30)
     {
         inner.num_main_options = 0;
         inner.num_season_options = 0;
     }
-    if (inner.timer_15fa4.current > 0)
+    if (inner.timed_effect_timer.current > 0)
     {
-        if (get_vm_or_clear(inner.anm_id_15fa0) == NULL)
+        if (get_vm_or_clear(inner.timed_effect_anm_id) == NULL)
         {
-            inner.anm_id_15fa0 = g_EffectManager->effect_anm->create_effect(0x1b, 0xe, NULL);
+            inner.timed_effect_anm_id = g_EffectManager->effect_anm->create_effect(0x1b, 0xe, NULL);
         }
-        AnmVm *vm = g_AnmManager->get_vm_with_id(inner.anm_id_15fa0);
+        AnmVm *vm = g_AnmManager->get_vm_with_id(inner.timed_effect_anm_id);
         if (vm != NULL)
         {
             vm->entity_pos = inner.pos;
         }
-        inner.timer_15fa4.decrement(1.0f);
-        if (inner.timer_15fa4.current <= 0)
+        inner.timed_effect_timer.decrement(1.0f);
+        if (inner.timed_effect_timer.current <= 0)
         {
-            AnmManager::interrupt_tree(inner.anm_id_15fa0, 1);
-            inner.timer_15fa4.reset_inline();
-            inner.anm_id_15fa0.id = 0;
+            AnmManager::interrupt_tree(inner.timed_effect_anm_id, 1);
+            inner.timed_effect_timer.reset_inline();
+            inner.timed_effect_anm_id.id = 0;
         }
     }
     return 0;
 }
 
-// Where each power level's options start in a .sht file's option position
-// list (the options of level n are entries [n - 1] onwards).
+// Per subseason and per character: where the option positions of each
+// level start in the .sht file's option_pos list (at level n, option i
+// sits at entry [n - 1] + i).
 // GLOBAL: TH16 0x4a5db0
 i32 g_season_option_layouts[5][8] = {
     {0, 1, 3, 6, 10, 15, 21, 28}, {0, 1, 3, 6, 10, 15, 21, 28}, {0, 1, 3, 6, 10, 15, 21, 28},
@@ -1358,11 +1427,14 @@ i32 g_main_option_layouts[4][8] = {
     {0, 1, 3, 6, 10, 11, 13, 16},
     {0, 1, 3, 6, 10, 11, 13, 16},
 };
+// The options' ANM scripts: per subseason (in pl0Xsub.anm) and per
+// character (in pl0X.anm).
 // GLOBAL: TH16 0x492be0
 const i32 g_season_option_scripts[8] = {1, 1, 1, 0x12, 1, 0, 0, 0};
 // GLOBAL: TH16 0x492c00
 const i32 g_main_option_scripts[4] = {8, 7, 11, 11};
-// The look of the main options at full power.
+// The look of the main options at full power (ExpHP:
+// PLAYER_OPTION_ANM_SCRIPT_IDS_2).
 // GLOBAL: TH16 0x492c10
 const i32 g_main_option_max_power_scripts[4] = {9, 8, 12, 13};
 
@@ -1381,7 +1453,9 @@ static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
     }
 }
 
-// TODO: ours gets a /GS cookie for the zero position passed to create_vm_inline; the original zeroes one local before the loops and aligns its frame.
+// TODO: ours gets a /GS cookie for the zero position passed to
+// create_vm_inline; the original zeroes one local before the loops and
+// aligns its frame.
 // FUNCTION: TH16 0x4440e0
 void PlayerInner::repopulate_options()
 {
@@ -1393,19 +1467,19 @@ void PlayerInner::repopulate_options()
         for (i32 i = 0; i < level; i++)
         {
             PlayerOption *option = &main_options[i];
-            g_AnmManager->delete_vm_inline(option->anm_id_b4);
-            option->anm_id_b4.id = 0;
-            option->anm_id_b4 =
+            g_AnmManager->delete_vm_inline(option->anm_id_full_power);
+            option->anm_id_full_power.id = 0;
+            option->anm_id_full_power =
                 g_Player->anm_file->create_vm_front(g_main_option_max_power_scripts[g_Globals.character], -1, 0);
-            get_vm_or_clear(option->anm_id_b4)->entity_pos.y = -32.0f;
+            get_vm_or_clear(option->anm_id_full_power)->entity_pos.y = -32.0f;
         }
     }
     else
     {
         for (i32 i = 0; i < 4; i++)
         {
-            AnmManager::interrupt_tree(main_options[i].anm_id_b4, 1);
-            main_options[i].anm_id_b4.id = 0;
+            AnmManager::interrupt_tree(main_options[i].anm_id_full_power, 1);
+            main_options[i].anm_id_full_power.id = 0;
         }
     }
     Player *player = g_Player;
@@ -1417,29 +1491,32 @@ void PlayerInner::repopulate_options()
             PlayerOption *option = &main_options[i];
             option->scaled_cur_pos.x = player->inner.pos_subpixel.x;
             option->scaled_cur_pos.y = player->inner.pos_subpixel.y;
-            g_AnmManager->delete_vm_inline(option->anm_id_b0);
-            option->anm_id_b0.id = 0;
+            g_AnmManager->delete_vm_inline(option->anm_id);
+            option->anm_id.id = 0;
             option->index = i;
-            Float2 *positions = (Float2 *)player->sht_file->option_pos;
-            option->scaled_preferred_pos_rel_to_player.x = (i32)(positions[layout[level - 1] + i].x * 128.0f);
-            option->scaled_preferred_pos_rel_to_player.y = (i32)(positions[layout[level - 1] + i].y * 128.0f);
-            option->unk_6c = (i32)(positions[layout[level - 1] + i + 21].x * 128.0f);
-            option->unk_70 = (i32)(positions[layout[level - 1] + i + 21].y * 128.0f);
-            Int2 *rel = player->inner.is_focused ? (Int2 *)&option->unk_6c : &option->scaled_preferred_pos_rel_to_player;
+            Float2 *positions = player->sht_file->option_pos;
+            option->scaled_preferred_pos_rel_to_player[0].x = (i32)(positions[layout[level - 1] + i].x * 128.0f);
+            option->scaled_preferred_pos_rel_to_player[0].y = (i32)(positions[layout[level - 1] + i].y * 128.0f);
+            option->scaled_preferred_pos_rel_to_player[1].x =
+                (i32)(positions[layout[level - 1] + i + SHT_OPTION_POS_COUNT].x * 128.0f);
+            option->scaled_preferred_pos_rel_to_player[1].y =
+                (i32)(positions[layout[level - 1] + i + SHT_OPTION_POS_COUNT].y * 128.0f);
+            Int2 *rel = player->inner.is_focused ? &option->scaled_preferred_pos_rel_to_player[1]
+                                                 : &option->scaled_preferred_pos_rel_to_player[0];
             option->scaled_preferred_pos.x = player->inner.pos_subpixel.x + rel->x;
             option->scaled_preferred_pos.y = player->inner.pos_subpixel.y + rel->y;
             option->scaled_cur_pos = option->scaled_preferred_pos;
             Float3 pos(0.0f, 0.0f, 0.0f);
-            option->anm_id_b0 = player->anm_file->create_vm_inline(g_main_option_scripts[g_Globals.character], &pos,
+            option->anm_id = player->anm_file->create_vm_inline(g_main_option_scripts[g_Globals.character], &pos,
                                                                    0.0f, 0xe);
-            get_vm_or_clear(option->anm_id_b0)->entity_pos.y = -32.0f;
+            get_vm_or_clear(option->anm_id)->entity_pos.y = -32.0f;
             option->active = 2;
             player = g_Player;
         }
         for (; i < 4; i++)
         {
             main_options[i].active = 0;
-            interrupt_tree_inline(main_options[i].anm_id_b0, 1);
+            interrupt_tree_inline(main_options[i].anm_id, 1);
         }
         num_main_options = level;
         g_Player->inner.main_options[0].should_instajump = 1;
@@ -1457,29 +1534,32 @@ void PlayerInner::repopulate_options()
             PlayerOption *option = &subseason_options[i];
             option->scaled_cur_pos.x = player->inner.pos_subpixel.x;
             option->scaled_cur_pos.y = player->inner.pos_subpixel.y;
-            g_AnmManager->delete_vm_inline(option->anm_id_b0);
-            option->anm_id_b0.id = 0;
+            g_AnmManager->delete_vm_inline(option->anm_id);
+            option->anm_id.id = 0;
             option->index = i;
-            Float2 *positions = (Float2 *)player->sht_file_subseason->option_pos;
-            option->scaled_preferred_pos_rel_to_player.x = (i32)(positions[layout[season_level - 1] + i].x * 128.0f);
-            option->scaled_preferred_pos_rel_to_player.y = (i32)(positions[layout[season_level - 1] + i].y * 128.0f);
-            option->unk_6c = (i32)(positions[layout[season_level - 1] + i + 21].x * 128.0f);
-            option->unk_70 = (i32)(positions[layout[season_level - 1] + i + 21].y * 128.0f);
-            Int2 *rel = player->inner.is_focused ? (Int2 *)&option->unk_6c : &option->scaled_preferred_pos_rel_to_player;
+            Float2 *positions = player->sht_file_subseason->option_pos;
+            option->scaled_preferred_pos_rel_to_player[0].x = (i32)(positions[layout[season_level - 1] + i].x * 128.0f);
+            option->scaled_preferred_pos_rel_to_player[0].y = (i32)(positions[layout[season_level - 1] + i].y * 128.0f);
+            option->scaled_preferred_pos_rel_to_player[1].x =
+                (i32)(positions[layout[season_level - 1] + i + SHT_OPTION_POS_COUNT].x * 128.0f);
+            option->scaled_preferred_pos_rel_to_player[1].y =
+                (i32)(positions[layout[season_level - 1] + i + SHT_OPTION_POS_COUNT].y * 128.0f);
+            Int2 *rel = player->inner.is_focused ? &option->scaled_preferred_pos_rel_to_player[1]
+                                                 : &option->scaled_preferred_pos_rel_to_player[0];
             option->scaled_preferred_pos.x = player->inner.pos_subpixel.x + rel->x;
             option->scaled_preferred_pos.y = player->inner.pos_subpixel.y + rel->y;
             option->scaled_cur_pos = option->scaled_preferred_pos;
             Float3 pos(0.0f, 0.0f, 0.0f);
-            option->anm_id_b0 = g_Player->subseason_anm_file->create_vm_inline(
+            option->anm_id = g_Player->subseason_anm_file->create_vm_inline(
                 g_season_option_scripts[g_Globals.subseason], &pos, 0.0f, 0xe);
-            get_vm_or_clear(option->anm_id_b0)->entity_pos.y = -32.0f;
+            get_vm_or_clear(option->anm_id)->entity_pos.y = -32.0f;
             option->active = 2;
             player = g_Player;
         }
         for (; i < 8; i++)
         {
             subseason_options[i].active = 0;
-            interrupt_tree_inline(subseason_options[i].anm_id_b0, 1);
+            interrupt_tree_inline(subseason_options[i].anm_id, 1);
         }
         num_season_options = season_level;
         for (i32 j = 0; j < 8; j++)
@@ -1519,10 +1599,12 @@ i32 Player::on_tick_body()
 {
     switch (inner.state)
     {
-    case 0:
+    case PLAYER_STATE_RESPAWNING:
     {
-        // Respawning: rise from the bottom, clearing bullets and lasers.
-        inner.pos_subpixel.y = 0xf000 - inner.time_in_state.current * 0x2800 / 60;
+        // Rise from y 480 to 400 in a second. For half a second lasers
+        // are cleared in a growing circle around where the player died,
+        // then bullets and lasers in a wide one around the player.
+        inner.pos_subpixel.y = 480 * 128 - inner.time_in_state.current * (80 * 128) / 60;
         inner.pos.y = inner.pos_subpixel.y / 128.0f;
         inner.main_options[0].should_instajump = 1;
         inner.main_options[1].should_instajump = 1;
@@ -1538,7 +1620,7 @@ i32 Player::on_tick_body()
         }
         else
         {
-            center = &unk_2c76c;
+            center = &death_pos;
             radius = inner.time_in_state.current * 512.0f / 30.0f + 64.0f;
             g_LaserManager->cancel_in_radius(center, radius, 0, 1);
             radius *= 0.25f;
@@ -1548,10 +1630,10 @@ i32 Player::on_tick_body()
         {
             break;
         }
-        inner.state = 1;
+        inner.state = PLAYER_STATE_NORMAL;
         inner.time_in_state.set_value(0);
     }
-    case 1:
+    case PLAYER_STATE_NORMAL:
         if (g_MainBomb != NULL && g_MainBomb->can_activate() && (g_InputState.input_rising & INPUT_BOMB))
         {
             g_MainBomb->activate();
@@ -1563,25 +1645,26 @@ i32 Player::on_tick_body()
         }
         move();
         break;
-    case 4:
-        // Hit: a few frames to bomb out of it.
+    case PLAYER_STATE_HIT:
+        // Hit: 8 frames to bomb out of it (a deathbomb); then the life is
+        // lost and the player is dead.
         if (inner.time_in_state.current < 8)
         {
             if (g_MainBomb != NULL && (g_InputState.input_rising & INPUT_BOMB) && g_MainBomb->can_activate())
             {
                 g_MainBomb->activate();
-                start_respawn();
+                recover_from_hit();
                 if (g_SubseasonBomb != NULL && g_SubseasonBomb->can_activate() &&
                     (g_InputState.input_rising & INPUT_RELEASE))
                 {
                     g_SubseasonBomb->activate();
-                    start_respawn();
+                    recover_from_hit();
                 }
             }
             break;
         }
         lose_life();
-    case 2:
+    case PLAYER_STATE_DEAD:
         if (inner.time_in_state.current == 3)
         {
             // Drop half a power level as items, spread toward the top.
@@ -1599,6 +1682,7 @@ i32 Player::on_tick_body()
             {
                 angle = zun_atan2f(dy, dx);
             }
+            // Seven power items (item type 1).
             i32 items[7] = {1, 1, 1, 1, 1, 1, 1};
             for (i32 i = 0; i < 7; i++)
             {
@@ -1611,16 +1695,19 @@ i32 Player::on_tick_body()
         {
             break;
         }
+        // Out of lives: the game over menu (not during replays).
         if (g_Globals.lives < 0 && inner.time_in_state.current == 30)
         {
             if (g_ReplayManager->mode != REPLAY_PLAYBACK)
             {
-                pause_menu_43f350();
+                open_game_over_menu();
             }
             inner.time_in_state++;
             break;
         }
-        inner.state = 0;
+        // Respawn: a blast where the player died, full bombs, and the
+        // player back below the playfield.
+        inner.state = PLAYER_STATE_RESPAWNING;
         g_game_speed = 1.0f;
         create_damage_source(&inner.pos, 32.0f, 16.0f, 30, 150);
         g_Globals.bombs = 3;
@@ -1628,12 +1715,12 @@ i32 Player::on_tick_body()
         {
             g_Gui->update_bombs(3, g_Globals.bomb_fragments);
         }
-        unk_2c76c = inner.pos;
+        death_pos = inner.pos;
         set_position(0.0f, 480.0f);
         inner.iframes.set_inline(280);
         inner.time_in_state.reset_inline();
         break;
-    case 3:
+    case PLAYER_STATE_3:
         switch (inner.time_in_state.current)
         {
         case 4:
@@ -1644,24 +1731,28 @@ i32 Player::on_tick_body()
         }
         break;
     }
-    for (i32 i = 0; i < 0x100; i++)
+    // Move, grow, turn and age the damage sources.
+    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++)
     {
         PlayerDamageSource *source = &inner.damage_sources[i];
-        if (!(source->flags & 1))
+        if (!(source->flags & DAMAGE_SOURCE_ACTIVE))
         {
             continue;
         }
         source->pos.update_secondary_fields();
         source->pos.step();
-        source->radius += source->unk_8;
-        source->unk_c = wrap_angle(source->unk_c + source->angular_speed);
-        source->unk_84 = 0;
-        source->timer_60.decrement(1.0f);
-        if (source->timer_60.current <= 0)
+        source->radius += source->radius_growth;
+        source->angle = wrap_angle(source->angle + source->angular_speed);
+        source->last_enemy_id = 0;
+        source->lifetime.decrement(1.0f);
+        if (source->lifetime.current <= 0)
         {
-            source->flags &= ~1;
+            source->flags &= ~DAMAGE_SOURCE_ACTIVE;
         }
     }
+    // Flash blue every third frame while invincible; otherwise red or
+    // yellow afterimages while the winter or autumn release boosts the
+    // player.
     if (inner.iframes.current > 0)
     {
         inner.iframes.decrement(1.0f);
@@ -1678,13 +1769,14 @@ i32 Player::on_tick_body()
     else
     {
         vm.flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
-        if (inner.flags & 0x20)
+        if (inner.flags & PLAYER_FLAG_DAMAGE_BOOSTED)
         {
             if (inner.time_in_state.current % 8 < 4)
             {
                 vm.color_2.d3d = 0xffff0000;
                 vm.flags_lo = (vm.flags_lo & ~ANM_VM_COLOR_MODE_MASK) | ANM_VM_COLOR_MODE_1;
             }
+            // An afterimage with the player's current sprite.
             i32 scripts[4] = {4, 4, 4, 4};
             AnmId id = anm_file->create_vm(scripts[g_Globals.character], &inner.pos, 0.0f, -1, 0);
             anm_file->set_sprite(get_vm_or_clear(id), vm.sprite_id);
@@ -1703,9 +1795,10 @@ i32 Player::on_tick_body()
         }
     }
     inner.speed_multiplier = 1.0f;
-    inner.unk_1607c = g_zero_vec;
+    inner.push_velocity = g_zero_vec;
     vm.run();
-    if (inner.flags & 0x10)
+    // Scale the sprite and recompute the hurtbox and item boxes.
+    if (inner.flags & PLAYER_FLAG_SCALED)
     {
         if (player_scale_i.end_time != 0)
         {
@@ -1751,10 +1844,11 @@ i32 Player::on_tick_body()
     }
     inner.time_in_state.tick();
     inner.time_in_stage.tick();
-    inner.timer_3c.tick();
+    inner.shot_time_in_stage.tick();
+    // Shooting: not during dialogue or before the stage's enemies run.
     if (g_Gui->msg == NULL && g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 &&
-        !(*(u32 *)&g_GameThread->flags & 0x4000) && inner.timer_3c.current >= 20 && !(inner.flags & 4) &&
-        !(inner.flags & 0x10))
+        !(*(u32 *)&g_GameThread->flags & GAME_THREAD_GAME_CLEARED) && inner.shot_time_in_stage.current >= 20 &&
+        !(inner.flags & PLAYER_FLAG_NO_SHOOTING) && !(inner.flags & PLAYER_FLAG_SCALED))
     {
         tick_shooting_state();
     }
@@ -1764,6 +1858,7 @@ i32 Player::on_tick_body()
         inner.shoot_key_long_timer = -1;
         unk_2c790 = 0;
         unk_2c794 = 0;
+        // The looping shot sounds.
         stop_sound_inline(0x1e);
         stop_sound_inline(0x37);
     }

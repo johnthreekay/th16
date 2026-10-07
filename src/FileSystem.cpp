@@ -6,6 +6,7 @@
 #include "FileSystem.h"
 #include "Log.h"
 
+// The file that file_create or file_open opened, until file_close.
 // GLOBAL: TH16 0x49f270
 HANDLE g_file = INVALID_HANDLE_VALUE;
 
@@ -142,6 +143,7 @@ i32 LTCG_FASTCALL file_create(const char *path)
     return 0;
 }
 
+// The error message says "write error" here too.
 // FUNCTION: TH16 0x402880
 i32 LTCG_FASTCALL file_open(const char *path)
 {
@@ -181,6 +183,7 @@ u8 *LTCG_FASTCALL file_read(i32 size)
     return buf;
 }
 
+// Closes g_file and leaves the file critical section, if a file is open.
 // FUNCTION: TH16 0x4029a0
 i32 file_close()
 {

@@ -16,6 +16,7 @@ PopupManager::PopupManager()
     flags |= 2;
 }
 
+// Registers the tick and draw callbacks.
 // FUNCTION: TH16 0x449cd0
 int PopupManager::initialize()
 {
@@ -35,8 +36,9 @@ int PopupManager::initialize()
     g_UpdateFuncRegistry->register_on_draw(f, 0x2f);
     on_draw_func = f;
 
-    ascii_anm->init_vm_with_sprite(&vm, 0x103);
-    vm.flags_hi = (vm.flags_hi & ~0x440000) | 0x380000;
+    ascii_anm->init_vm_with_sprite(&vm, ASCII_SPRITE_POPUP_DIGITS);
+    vm.flags_hi = (vm.flags_hi & ~(ANM_VM_ORIGIN_GAME | ANM_VM_RESOLUTION_HALF_SCALED_4)) | ANM_VM_ORIGIN_HUD |
+                  ANM_VM_RESOLUTION_SCALED_3;
     return 0;
 }
 
@@ -86,8 +88,8 @@ int PopupManager::on_tick()
     {
         if (str->active)
         {
-            str->pos.y -= str->unk_18 * g_game_speed;
-            str->unk_18 *= 0.95f;
+            str->pos.y -= str->rise_speed * g_game_speed;
+            str->rise_speed *= 0.95f;
             str->time.tick();
             if (str->time.current > 60)
             {
@@ -151,7 +153,7 @@ HARNESS_CALLED void PopupManager::generate_small_score_popup(Float3 *pos, i32 va
     str->color = color;
     str->time.reset();
     str->pos = *pos;
-    str->unk_18 = 1.0f;
+    str->rise_speed = 1.0f;
     mgr->next_index++;
 }
 
@@ -164,7 +166,7 @@ static_assert(offsetof(PopupManager, strings) == 0x614, "PopupManager::strings")
 // FUNCTION: TH16 0x44a000
 int PopupManager::on_draw()
 {
-    if (!(g_Supervisor.config.flags_2c & 4))
+    if (!(g_Supervisor.config.flags & CONFIG_NO_FOG))
     {
         g_Supervisor.disable_d3d_fog_inline();
     }
@@ -185,6 +187,8 @@ int PopupManager::on_draw()
         vm.color_1.d3d = s->color;
         f32 dx = g_Player->inner.pos.x - s->pos.x;
         f32 dy = g_Player->inner.pos.y - s->pos.y;
+        // Squared distance: opaque beyond 128 units of the player, half
+        // alpha within 64, a ramp between.
         i32 dist = dy * dy + dx * dx;
         i32 alpha;
         if (dist > 0x4000)
@@ -199,13 +203,15 @@ int PopupManager::on_draw()
         {
             alpha = 0x80;
         }
+        // Digit d is ascii.anm sprite 0x103 + d, then the 0x10e and 0x118
+        // sets as it fades out (each digit two frames after the one before).
         u8 *digit = (u8 *)&s->digits[s->num_digits - 1];
         for (i32 j = s->num_digits; j > 0; j--, digit--)
         {
             i32 sprite;
             if (s->time.current < 0x34 - j * 2 || *digit == 10)
             {
-                sprite = *digit + 0x103;
+                sprite = *digit + ASCII_SPRITE_POPUP_DIGITS;
             }
             else if (s->time.current < 0x38 - j * 2)
             {

@@ -3,6 +3,8 @@
 #include "AnmManager.h"
 #include "EnemyManager.h"
 
+// Boss i, NULL if there is none (the last enemy of the list if its id is
+// gone, like EnemyRef::get).
 // FUNCTION: TH16 0x417580
 HARNESS_CALLED EnemyInf *EnemyManager::get_boss(i32 i)
 {
