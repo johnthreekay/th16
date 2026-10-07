@@ -51,13 +51,6 @@ i32 LaserCurveInf::on_destroy()
     return 0;
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x439d60
-i32 LaserCurveInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
-{
-    return unit5_placeholder(this);
-}
-
 // Cancels the segments inside a bomb's rectangle (an effect and items on
 // every tenth), then cuts the laser: a hit head is dropped, the laser ends
 // at the first hit run, and every later unhit run of at least 4 segments

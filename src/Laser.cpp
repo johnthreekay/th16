@@ -1149,11 +1149,11 @@ i32 LaserInfiniteInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
             i32 damage = 18;
             if (width >= 96.0f)
             {
-                damage = 22;
+                damage = (i32)(damage + 3.0f + 1.0f);
             }
             else if (width >= 16.0f && 96.0f > width)
             {
-                damage = (i32)((width - 16.0f) / 80.0f * 3.0f + 18.0f + 1.0f);
+                damage = (i32)((width - 16.0f) / 80.0f * 3.0f + damage + 1.0f);
             }
             g_LaserManager->unk_608 += damage;
         }
@@ -1161,6 +1161,75 @@ i32 LaserInfiniteInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
         world_x += step.x;
         local_y += local_step.y;
         world_y += step.y;
+    }
+    return count;
+}
+
+// Never called. LaserInfiniteInf::method_1c for the segments of a curvy
+// laser: sets *boss_hit once a segment is within 8 units of the boss's
+// sprite, and counts the segments inside the rectangle, adding a damage
+// value by laser length and width for each to g_LaserManager->unk_608.
+// TODO: as LaserInfiniteInf::method_1c; ours also keeps g_EnemyManager in edi across the loop where the original reloads it.
+// FUNCTION: TH16 0x439d60
+i32 LaserCurveInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
+{
+    Float3 *center = (Float3 *)a;
+    Float3 *size = (Float3 *)b;
+    f32 rect_angle = *(f32 *)&c;
+    i32 *boss_hit = (i32 *)f;
+    if (e != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    i32 count = 0;
+    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    for (i32 i = 0; i < inner.segment_count; i++, segment++)
+    {
+        Float3 seg_pos = segment->pos;
+        if (*boss_hit == 0)
+        {
+            if (test_circle_rect_inline(laser_boss()->enemy.final_pos.pos.x, laser_boss()->enemy.final_pos.pos.y,
+                                        laser_boss_sprite()->sprite_width * 0.75f,
+                                        laser_boss_sprite()->sprite_height * 0.75f, 0.0f, seg_pos.x, seg_pos.y, 8.0f))
+            {
+                *boss_hit = 1;
+            }
+        }
+        f32 half_w = size->x;
+        f32 half_h = size->y;
+        f32 dx = seg_pos.x - center->x;
+        f32 dy = seg_pos.y - center->y;
+        if (rect_angle != 0.0f)
+        {
+            f32 neg_angle = -rect_angle;
+            f32 s = zun_sinf(neg_angle);
+            f32 cs = zun_cosf(neg_angle);
+            f32 rx = dx * cs - dy * s;
+            dy = dy * cs + dx * s;
+            dx = rx;
+        }
+        if (half_w * 0.5f >= (f32)fabs(dx) && half_h * 0.5f >= (f32)fabs(dy))
+        {
+            count++;
+            i32 damage = 15;
+            if (length >= 12.0f)
+            {
+                damage = 45;
+            }
+            else if (length >= 4.0f && 12.0f > length)
+            {
+                damage = (i32)(((length - 4.0f) / 8.0f * 2.0f + 1.0f) * 15.0f);
+            }
+            if (width >= 96.0f)
+            {
+                damage = (i32)(damage + 3.0f + 1.0f);
+            }
+            else if (width >= 16.0f && 96.0f > width)
+            {
+                damage = (i32)((width - 16.0f) / 80.0f * 3.0f + damage + 1.0f);
+            }
+            g_LaserManager->unk_608 += damage;
+        }
     }
     return count;
 }
