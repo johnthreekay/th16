@@ -175,7 +175,7 @@ u32 ScorefileSection::compute_checksum(i32 size)
     return sum;
 }
 
-// Placeholder for the pause menu's end-of-replay handling (0x43f240).
+// PauseMenu.cpp: opens the menu shown when a replay ends.
 void open_replay_end_menu();
 
 // TODO: the original realigns its frame to 8 bytes and keeps the recorded

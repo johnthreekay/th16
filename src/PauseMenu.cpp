@@ -184,24 +184,24 @@ void PauseMenu::draw_keyboard(Float3 pos)
     g_AsciiManager->color.d3d = 0xffffffff;
     pos.x = 48.0f;
     Float3 key_pos(112.0f, 320.0f, 0.0f);
-    for (i32 i = 0; i < 0x5b; i++)
+    for (i32 i = 0; i < NAME_ENTRY_CHOICES; i++)
     {
         g_AsciiManager->color.d3d = name_entry_menu.next_selection == i ? 0xffffff00 : 0xff808080;
         i32 c;
-        if (i < 0x58)
+        if (i < NAME_ENTRY_CHAR_COUNT)
         {
             c = g_name_entry_chars[i];
         }
-        else if (i == 0x58)
+        else if (i == NAME_ENTRY_SPACE)
         {
             c = 0x81;
         }
         else
         {
-            c = i == 0x59 ? 0x7f : 0x80;
+            c = i == NAME_ENTRY_BACKSPACE ? 0x7f : 0x80;
         }
         g_AsciiManager->create_stringf(&key_pos, "%c", c);
-        if (i % 13 == 12)
+        if (i % NAME_ENTRY_COLUMNS == NAME_ENTRY_COLUMNS - 1)
         {
             key_pos.x = 112.0f;
             key_pos.y += 16.0f;
@@ -552,7 +552,7 @@ void PauseMenu::begin_score_entry()
                 item_menu.wraps = 1;
                 item_menu.set_cursor(rank);
                 name_entry_menu.set_cursor(0);
-                name_entry_menu.num_choices = 0x5b;
+                name_entry_menu.num_choices = NAME_ENTRY_CHOICES;
                 name_entry_menu.wraps = 1;
                 strcpy(name, ((ScorefileData *)g_Scorefile)->status.name);
                 name_cursor = 0;
@@ -1043,34 +1043,34 @@ void PauseMenu::tick_open()
         menu_save_selection(&name_entry_menu);
         if (input_pressed_or_repeating(INPUT_UP))
         {
-            name_entry_menu.move_cursor(-13);
+            name_entry_menu.move_cursor(-NAME_ENTRY_COLUMNS);
         }
         if (input_pressed_or_repeating(INPUT_DOWN))
         {
-            name_entry_menu.move_cursor(13);
+            name_entry_menu.move_cursor(NAME_ENTRY_COLUMNS);
         }
         if (input_pressed_or_repeating(INPUT_LEFT))
         {
             i32 selection = name_entry_menu.next_selection;
-            if (selection % 13 != 0)
+            if (selection % NAME_ENTRY_COLUMNS != 0)
             {
                 name_entry_menu.move_cursor(-1);
             }
             else
             {
-                name_entry_menu.move_cursor(12);
+                name_entry_menu.move_cursor(NAME_ENTRY_COLUMNS - 1);
             }
         }
         if (input_pressed_or_repeating(INPUT_RIGHT))
         {
             i32 selection = name_entry_menu.next_selection;
-            if (selection % 13 != 12)
+            if (selection % NAME_ENTRY_COLUMNS != NAME_ENTRY_COLUMNS - 1)
             {
                 name_entry_menu.move_cursor(1);
             }
             else
             {
-                name_entry_menu.move_cursor(-12);
+                name_entry_menu.move_cursor(-(NAME_ENTRY_COLUMNS - 1));
             }
         }
         if (menu_selection_moved(&name_entry_menu))
@@ -1080,7 +1080,7 @@ void PauseMenu::tick_open()
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
         {
             i32 choice = name_entry_menu.next_selection;
-            if (choice < 0x58)
+            if (choice < NAME_ENTRY_CHAR_COUNT)
             {
                 if (name_cursor < 8)
                 {
@@ -1088,7 +1088,7 @@ void PauseMenu::tick_open()
                     name_cursor++;
                     if (name_cursor >= 8)
                     {
-                        name_entry_menu.set_cursor(0x5a);
+                        name_entry_menu.set_cursor(NAME_ENTRY_END);
                     }
                 }
                 else
@@ -1096,7 +1096,7 @@ void PauseMenu::tick_open()
                     name[name_cursor - 1] = g_name_entry_chars[choice];
                 }
             }
-            else if (choice == 0x58)
+            else if (choice == NAME_ENTRY_SPACE)
             {
                 if (name_cursor < 8)
                 {
@@ -1104,7 +1104,7 @@ void PauseMenu::tick_open()
                     name_cursor++;
                     if (name_cursor >= 8)
                     {
-                        name_entry_menu.set_cursor(0x5a);
+                        name_entry_menu.set_cursor(NAME_ENTRY_END);
                     }
                 }
                 else
@@ -1112,7 +1112,7 @@ void PauseMenu::tick_open()
                     name[name_cursor - 1] = ' ';
                 }
             }
-            else if (choice == 0x59)
+            else if (choice == NAME_ENTRY_BACKSPACE)
             {
                 if (name_cursor == 0)
                 {
@@ -1123,7 +1123,7 @@ void PauseMenu::tick_open()
                 g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 return;
             }
-            else if (choice == 0x5a)
+            else if (choice == NAME_ENTRY_END)
             {
                 if (substate == PAUSE_SUB_REPLAY_NAME_ENTRY)
                 {
@@ -1229,7 +1229,7 @@ void PauseMenu::tick_open()
             menu_flags |= PAUSE_SHOW_REPLAY_NAME;
             set_substate(PAUSE_SUB_REPLAY_NAME_ENTRY);
             name_entry_menu.set_cursor(0);
-            name_entry_menu.num_choices = 0x5b;
+            name_entry_menu.num_choices = NAME_ENTRY_CHOICES;
             name_entry_menu.wraps = 1;
             if (stage_finished != 0 && g_Globals.game_mode == 0)
             {

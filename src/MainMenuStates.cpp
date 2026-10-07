@@ -175,7 +175,7 @@ i32 TitleInf::do_replay_save()
         {
             replay_slot = menu.next_selection;
             name_entry_menu.set_cursor(0);
-            name_entry_menu.num_choices = 0x5b;
+            name_entry_menu.num_choices = NAME_ENTRY_CHOICES;
             name_entry_menu.wraps = 1;
             g_ReplayManager->set_end_stage(1);
             strcpy(replay_name, g_Scorefile->last_replay_name);
@@ -197,34 +197,34 @@ i32 TitleInf::do_replay_save()
         menu_save_selection(&name_entry_menu);
         if (pressed_or_repeating_inline(INPUT_UP))
         {
-            name_entry_menu.move_cursor(-13);
+            name_entry_menu.move_cursor(-NAME_ENTRY_COLUMNS);
         }
         if (pressed_or_repeating_inline(INPUT_DOWN))
         {
-            name_entry_menu.move_cursor(13);
+            name_entry_menu.move_cursor(NAME_ENTRY_COLUMNS);
         }
         if (pressed_or_repeating_inline(INPUT_LEFT))
         {
             i32 selection = name_entry_menu.next_selection;
-            if (selection % 13 != 0)
+            if (selection % NAME_ENTRY_COLUMNS != 0)
             {
                 name_entry_menu.move_cursor(-1);
             }
             else
             {
-                name_entry_menu.move_cursor(12);
+                name_entry_menu.move_cursor(NAME_ENTRY_COLUMNS - 1);
             }
         }
         if (pressed_or_repeating_inline(INPUT_RIGHT))
         {
             i32 selection = name_entry_menu.next_selection;
-            if (selection % 13 != 12)
+            if (selection % NAME_ENTRY_COLUMNS != NAME_ENTRY_COLUMNS - 1)
             {
                 name_entry_menu.move_cursor(1);
             }
             else
             {
-                name_entry_menu.move_cursor(-12);
+                name_entry_menu.move_cursor(-(NAME_ENTRY_COLUMNS - 1));
             }
         }
         if (menu_selection_moved(&name_entry_menu))
@@ -234,7 +234,7 @@ i32 TitleInf::do_replay_save()
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
             i32 choice = name_entry_menu.next_selection;
-            if (choice < 88)
+            if (choice < NAME_ENTRY_CHAR_COUNT)
             {
                 if (replay_name_cursor < 8)
                 {
@@ -242,7 +242,7 @@ i32 TitleInf::do_replay_save()
                     replay_name_cursor++;
                     if (replay_name_cursor >= 8)
                     {
-                        name_entry_menu.set_cursor(90);
+                        name_entry_menu.set_cursor(NAME_ENTRY_END);
                     }
                 }
                 else
@@ -250,7 +250,7 @@ i32 TitleInf::do_replay_save()
                     replay_name[replay_name_cursor - 1] = g_name_entry_chars[choice];
                 }
             }
-            else if (choice == 88)
+            else if (choice == NAME_ENTRY_SPACE)
             {
                 if (replay_name_cursor < 8)
                 {
@@ -258,7 +258,7 @@ i32 TitleInf::do_replay_save()
                     replay_name_cursor++;
                     if (replay_name_cursor >= 8)
                     {
-                        name_entry_menu.set_cursor(90);
+                        name_entry_menu.set_cursor(NAME_ENTRY_END);
                     }
                 }
                 else
@@ -266,7 +266,7 @@ i32 TitleInf::do_replay_save()
                     replay_name[replay_name_cursor - 1] = ' ';
                 }
             }
-            else if (choice == 89)
+            else if (choice == NAME_ENTRY_BACKSPACE)
             {
                 if (replay_name_cursor == 0)
                 {
@@ -275,7 +275,7 @@ i32 TitleInf::do_replay_save()
                 replay_name_cursor--;
                 replay_name[replay_name_cursor] = ' ';
             }
-            else if (choice == 90)
+            else if (choice == NAME_ENTRY_END)
             {
                 g_SoundManager.play_sound_centered(SE_EXTEND, 0);
                 sprintf(path, "th16_%.2d.rpy", menu.next_selection + 1);
@@ -1897,7 +1897,7 @@ i32 TitleInf::do_score_name_entry()
             menu.wraps = 1;
             menu.set_cursor(rank);
             name_entry_menu.set_cursor(0);
-            name_entry_menu.num_choices = 0x5b;
+            name_entry_menu.num_choices = NAME_ENTRY_CHOICES;
             name_entry_menu.wraps = 1;
             strcpy(replay_name, g_Scorefile->last_replay_name);
             if (strcmp(replay_name, "        ") != 0)
@@ -1930,34 +1930,34 @@ i32 TitleInf::do_score_name_entry()
             menu_save_selection(&name_entry_menu);
             if (input_pressed_or_repeating(INPUT_UP))
             {
-                name_entry_menu.move_cursor(-13);
+                name_entry_menu.move_cursor(-NAME_ENTRY_COLUMNS);
             }
             if (input_pressed_or_repeating(INPUT_DOWN))
             {
-                name_entry_menu.move_cursor(13);
+                name_entry_menu.move_cursor(NAME_ENTRY_COLUMNS);
             }
             if (input_pressed_or_repeating(INPUT_LEFT))
             {
                 i32 selection = name_entry_menu.next_selection;
-                if (selection % 13 != 0)
+                if (selection % NAME_ENTRY_COLUMNS != 0)
                 {
                     name_entry_menu.move_cursor(-1);
                 }
                 else
                 {
-                    name_entry_menu.move_cursor(12);
+                    name_entry_menu.move_cursor(NAME_ENTRY_COLUMNS - 1);
                 }
             }
             if (input_pressed_or_repeating(INPUT_RIGHT))
             {
                 i32 selection = name_entry_menu.next_selection;
-                if (selection % 13 != 12)
+                if (selection % NAME_ENTRY_COLUMNS != NAME_ENTRY_COLUMNS - 1)
                 {
                     name_entry_menu.move_cursor(1);
                 }
                 else
                 {
-                    name_entry_menu.move_cursor(-12);
+                    name_entry_menu.move_cursor(-(NAME_ENTRY_COLUMNS - 1));
                 }
             }
             if (menu_selection_moved(&name_entry_menu))
@@ -1970,7 +1970,7 @@ i32 TitleInf::do_score_name_entry()
             if (score_not_ranked == 0)
             {
                 i32 choice = name_entry_menu.next_selection;
-                if (choice < 88)
+                if (choice < NAME_ENTRY_CHAR_COUNT)
                 {
                     if (replay_name_cursor < 8)
                     {
@@ -1978,7 +1978,7 @@ i32 TitleInf::do_score_name_entry()
                         replay_name_cursor++;
                         if (replay_name_cursor >= 8)
                         {
-                            name_entry_menu.set_cursor(90);
+                            name_entry_menu.set_cursor(NAME_ENTRY_END);
                         }
                     }
                     else
@@ -1986,7 +1986,7 @@ i32 TitleInf::do_score_name_entry()
                         replay_name[replay_name_cursor - 1] = g_name_entry_chars[choice];
                     }
                 }
-                else if (choice == 88)
+                else if (choice == NAME_ENTRY_SPACE)
                 {
                     if (replay_name_cursor < 8)
                     {
@@ -1994,7 +1994,7 @@ i32 TitleInf::do_score_name_entry()
                         replay_name_cursor++;
                         if (replay_name_cursor >= 8)
                         {
-                            name_entry_menu.set_cursor(90);
+                            name_entry_menu.set_cursor(NAME_ENTRY_END);
                         }
                     }
                     else
@@ -2002,7 +2002,7 @@ i32 TitleInf::do_score_name_entry()
                         replay_name[replay_name_cursor - 1] = ' ';
                     }
                 }
-                else if (choice == 89)
+                else if (choice == NAME_ENTRY_BACKSPACE)
                 {
                     if (replay_name_cursor == 0)
                     {
@@ -2011,7 +2011,7 @@ i32 TitleInf::do_score_name_entry()
                     replay_name_cursor--;
                     replay_name[replay_name_cursor] = ' ';
                 }
-                else if (choice == 90)
+                else if (choice == NAME_ENTRY_END)
                 {
                     strcpy(((ScorefileData *)g_Scorefile)
                                ->charas[g_Globals.subshot + g_Globals.character]
@@ -2132,24 +2132,24 @@ HARNESS_CALLED i32 TitleInf::on_draw__score_name_entry()
     g_AsciiManager->color.d3d = 0xffffffff;
     pos.y = 360.0f;
     pos.z = 0.0f;
-    for (i32 i = 0; i < 91; i++)
+    for (i32 i = 0; i < NAME_ENTRY_CHOICES; i++)
     {
         g_AsciiManager->color.d3d = name_entry_menu.next_selection == i ? 0xffffff00 : 0xff808080;
         i32 c;
-        if (i < 88)
+        if (i < NAME_ENTRY_CHAR_COUNT)
         {
             c = g_name_entry_chars[i];
         }
-        else if (i == 88)
+        else if (i == NAME_ENTRY_SPACE)
         {
             c = 0x81;
         }
         else
         {
-            c = (i != 89) + 0x7f;
+            c = (i != NAME_ENTRY_BACKSPACE) + 0x7f;
         }
         g_AsciiManager->create_stringf(&pos, "%c", c);
-        if (i % 13 == 12)
+        if (i % NAME_ENTRY_COLUMNS == NAME_ENTRY_COLUMNS - 1)
         {
             pos.x = 212.0f;
             pos.y += 16.0f;
@@ -2239,24 +2239,24 @@ HARNESS_CALLED i32 TitleInf::on_draw__replay_save()
             g_AsciiManager->color.d3d = 0xffffffff;
             pos.y = 360.0f;
             pos.z = 0.0f;
-            for (i32 i = 0; i < 91; i++)
+            for (i32 i = 0; i < NAME_ENTRY_CHOICES; i++)
             {
                 g_AsciiManager->color.d3d = name_entry_menu.next_selection == i ? 0xffffff00 : 0xff808080;
                 i32 c;
-                if (i < 88)
+                if (i < NAME_ENTRY_CHAR_COUNT)
                 {
                     c = g_name_entry_chars[i];
                 }
-                else if (i == 88)
+                else if (i == NAME_ENTRY_SPACE)
                 {
                     c = 0x81;
                 }
                 else
                 {
-                    c = (i != 89) + 0x7f;
+                    c = (i != NAME_ENTRY_BACKSPACE) + 0x7f;
                 }
                 g_AsciiManager->create_stringf(&pos, "%c", c);
-                if (i % 13 == 12)
+                if (i % NAME_ENTRY_COLUMNS == NAME_ENTRY_COLUMNS - 1)
                 {
                     pos.x = 212.0f;
                     pos.y += 16.0f;
