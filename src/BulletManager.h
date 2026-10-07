@@ -136,6 +136,10 @@ struct Bullet
     // 0x415570. Slows to a stop over a number of frames, then picks a new
     // angle and speed, some number of times.
     i32 step_ex_04();
+    // 0x414fb0 and 0x4151e0. Accelerate by a vector for a number of
+    // frames, steering the angle and speed to follow the velocity.
+    i32 step_ex_02();
+    i32 step_ex_21();
 
     // ZUN's angle is a ZunAngle; some transforms call its operators.
     ZunAngle &angle_ref()

@@ -673,6 +673,8 @@ i32 Bullet::step_ex_19()
     return 0;
 }
 
+// A ZunAngle operator as LTCG inlines it into step_ex_03: the store goes
+// through the angle's pointer, so the angle is read again afterwards.
 static void add_angle_twice(ZunAngle *a, f32 delta)
 {
     a->value = wrap_angle(wrap_angle(a->value + delta));
@@ -740,5 +742,42 @@ i32 Bullet::step_ex_04()
     }
     bullet_sincosmul(&velocity, angle, new_speed);
     ex_state[3].timer.tick();
+    return 0;
+}
+
+// FUNCTION: TH16 0x414fb0
+i32 Bullet::step_ex_02()
+{
+    if (ex_state[1].timer.current >= ex_state[1].ints[0])
+    {
+        active_ex_flags &= ~4;
+        return 1;
+    }
+    speed += ex_state[1].floats[0] * g_game_speed;
+    velocity += *(D3DXVECTOR3 *)&ex_state[1].floats[5] * g_game_speed;
+    if (fabsf(velocity.x) > 0.0001f || fabsf(velocity.y) > 0.0001f)
+    {
+        angle = wrap_angle(atan2(velocity.y, velocity.x));
+        speed = D3DXVec2Length((D3DXVECTOR2 *)&velocity);
+    }
+    ex_state[1].timer.tick();
+    return 0;
+}
+
+// FUNCTION: TH16 0x4151e0
+i32 Bullet::step_ex_21()
+{
+    if (ex_state[10].timer.current >= ex_state[10].ints[0])
+    {
+        active_ex_flags &= ~0x200000;
+        return 1;
+    }
+    speed += ex_state[10].floats[0] * g_game_speed;
+    velocity += *(D3DXVECTOR3 *)&ex_state[10].floats[5] * g_game_speed;
+    if (fabsf(velocity.x) > 0.0001f || fabsf(velocity.y) > 0.0001f)
+    {
+        angle = wrap_angle(atan2(velocity.y, velocity.x));
+    }
+    ex_state[10].timer.tick();
     return 0;
 }
