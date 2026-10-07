@@ -986,8 +986,10 @@ int EnemyInf::on_tick()
     return result;
 }
 
-// TODO: the original keeps the summed position in xmm1-3 across find_or_clear (LTCG knows the
-// stubbed get_vm_with_id leaves them alone) and saves ebx/edi up front.
+// TODO: ours realigns the frame (and esp, -8) because of the direct zun_atan2f call; the
+// original calls it without realigning (a harness for thread_start's aligned
+// EnemyManager::create and HARNESS_CALLED update/on_tick do not change it). Separate float
+// locals for the summed position keep it in registers and avoid a /GS cookie.
 // FUNCTION: TH16 0x41d2e0
 int EnemyData::on_tick()
 {
@@ -1022,16 +1024,22 @@ int EnemyData::on_tick()
             {
                 continue;
             }
-            Float3 pos = anm_pos_array[i] + final_pos.pos;
+            f32 x = anm_pos_array[i].x + final_pos.pos.x;
+            f32 y = anm_pos_array[i].y + final_pos.pos.y;
+            f32 z = anm_pos_array[i].z + final_pos.pos.z;
             if (unk_224[i] >= 0)
             {
                 AnmVm *base = anm_ids[unk_224[i]].find_or_clear();
                 if (base != NULL)
                 {
-                    pos += base->pos;
+                    x += base->pos.x;
+                    y += base->pos.y;
+                    z += base->pos.z;
                 }
             }
-            vm->entity_pos = pos;
+            vm->entity_pos.x = x;
+            vm->entity_pos.y = y;
+            vm->entity_pos.z = z;
             if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
             {
                 vm->rotation.z = zun_atan2f(final_pos.velocity.y, final_pos.velocity.x);
