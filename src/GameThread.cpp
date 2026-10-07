@@ -552,7 +552,7 @@ DECOMP_NOINLINE GameThread::~GameThread()
     g_GameThread = NULL;
     if (!(g_Globals.game_mode == 2 && (GLOBALS_FLAGS_45C & 1)) && !(GLOBALS_FLAGS_45C & 0x42))
     {
-        if (g_Supervisor.config.flags_2c & 0x10)
+        if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
             g_SoundManager.modify_bgm(4, 0, "dummy");
         }
@@ -666,7 +666,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
             {
                 g_Supervisor.stop_bgm();
             }
-            AnmManager::interrupt_tree(*(AnmId *)&g_Supervisor.config.unk_0, 1);
+            AnmManager::interrupt_tree(*(AnmId *)&g_Supervisor.config.loading_effect_id, 1);
         }
         unk_8c++;
         if (unk_8c < unk_90 && unk_8c > 1)
@@ -867,7 +867,7 @@ HARNESS_CALLED i32 GameThread::sub_42dc50()
     }
     AnmManager::interrupt_tree(g_AsciiManager->unk_19244, 1);
     g_AsciiManager->hide_now_loading_inline();
-    AnmManager::interrupt_tree(*(AnmId *)&g_Supervisor.config.unk_0, 1);
+    AnmManager::interrupt_tree(*(AnmId *)&g_Supervisor.config.loading_effect_id, 1);
     return 0;
 }
 
@@ -881,7 +881,7 @@ i32 GameThread::sub_42dee0()
     {
         flags.flag_11 = 0;
         restart_stage_objects();
-        if (g_Supervisor.config.flags_2c & 0x10)
+        if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
             g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
         }
@@ -890,7 +890,7 @@ i32 GameThread::sub_42dee0()
             g_SoundManager.modify_bgm(BGM_STOP, 0, "dummy");
         }
         i32 music = g_stage_data->music_ids[0];
-        if (g_Supervisor.config.flags_2c & 0x10)
+        if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
             g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
         }

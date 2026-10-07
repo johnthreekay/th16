@@ -56,7 +56,7 @@ int LoadingThread::thread_start(void *arg)
                 g_SoundManager.reset();
                 if (file_exists("thbgm.dat"))
                 {
-                    if (!(g_Supervisor.config.flags_2c & 0x10))
+                    if (!(g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY))
                     {
                         g_SoundManager.open_bgm("thbgm.dat");
                     }

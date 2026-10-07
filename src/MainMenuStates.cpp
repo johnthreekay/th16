@@ -744,7 +744,7 @@ i32 TitleInf::do_subseason_select()
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
             AnmId id;
             id = g_EffectManager->create_ui_effect(0, NULL, NULL);
-            g_Supervisor.config.unk_0 = id.id;
+            g_Supervisor.config.loading_effect_id = id.id;
             AnmManager::interrupt_tree(id, 7);
         }
         goto start;
@@ -954,7 +954,7 @@ i32 TitleInf::do_practice_stage_select()
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
             AnmId id;
             id = g_EffectManager->create_ui_effect(0, NULL, NULL);
-            g_Supervisor.config.unk_0 = id.id;
+            g_Supervisor.config.loading_effect_id = id.id;
             AnmManager::interrupt_tree(id, 7);
         }
         if (time_in_state.current >= 40)
@@ -1589,7 +1589,7 @@ i32 TitleInf::do_replay_menu()
         {
             AnmId id;
             id = g_EffectManager->create_ui_effect(0, NULL, NULL);
-            g_Supervisor.config.unk_0 = id.id;
+            g_Supervisor.config.loading_effect_id = id.id;
             AnmManager::interrupt_tree(id, 7);
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
         }
@@ -2552,7 +2552,7 @@ i32 TitleInf::do_music_room()
             time_in_state.reset();
             if (!g_Scorefile->bgm_unlocked[music_comment_track] && music_warning == 0)
             {
-                if (g_Supervisor.config.flags_2c & 0x10)
+                if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
                 {
                     g_SoundManager.modify_bgm(4, 0, "dummy");
                 }
@@ -2564,7 +2564,7 @@ i32 TitleInf::do_music_room()
                 return 0;
             }
             g_Supervisor.play_bgm_wav(0, music_filenames[menu.next_selection]);
-            if (g_Supervisor.config.flags_2c & 0x10)
+            if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
             {
                 g_SoundManager.modify_bgm(4, 0, "dummy");
             }
@@ -2965,7 +2965,7 @@ i32 TitleInf::do_spell_practice_subseason()
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
             AnmId id;
             id = g_EffectManager->create_ui_effect(0, NULL, NULL);
-            g_Supervisor.config.unk_0 = id.id;
+            g_Supervisor.config.loading_effect_id = id.id;
             AnmManager::interrupt_tree(id, 7);
         }
         if (time_in_state.current >= 40)
@@ -3079,7 +3079,7 @@ i32 TitleInf::do_spell_practice_difficulty()
                 g_AsciiManager->show_now_loading(480.0f, 392.0f);
                 AnmId id;
                 id = g_EffectManager->create_ui_effect(0, NULL, NULL);
-                g_Supervisor.config.unk_0 = id.id;
+                g_Supervisor.config.loading_effect_id = id.id;
                 AnmManager::interrupt_tree(id, 7);
             }
             if (time_in_state.current >= 40)

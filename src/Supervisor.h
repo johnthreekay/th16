@@ -14,39 +14,97 @@
 
 extern i16 g_pad_mapping[10];
 
-// The game's settings, as stored in th16.cfg. Layout from ExpHP's
-// th-re-data; most fields are still unknown.
+// th16.cfg's version field; a file with another version is reset to the
+// defaults.
+constexpr u32 CONFIG_VERSION = 0x160002;
+
+// Config::flags. Most are startup options from custom.exe; the game logs
+// each one it finds when it loads th16.cfg.
+enum ConfigFlags
+{
+    // Set by the game when the device cannot use A8R8G8B8 textures
+    // ("running in reduced color mode").
+    CONFIG_REDUCED_COLOR = 1 << 0,
+    // Create the device with the reference rasterizer.
+    CONFIG_REFERENCE_RASTERIZER = 1 << 1,
+    // Never turn fog on.
+    CONFIG_NO_FOG = 1 << 2,
+    // Read pad and keyboard without DirectInput.
+    CONFIG_NO_DIRECTINPUT = 1 << 3,
+    // Read the BGM tracks into memory instead of streaming them from
+    // thbgm.dat.
+    CONFIG_BGM_IN_MEMORY = 1 << 4,
+    // Do not wait for vsync (Supervisor::no_vsync).
+    CONFIG_NO_VSYNC = 1 << 5,
+    // Do not detect the text rendering environment.
+    CONFIG_NO_TEXT_ENV_DETECTION = 1 << 6,
+    // Show the resolution dialog at startup (its check box; holding Shift
+    // shows it too).
+    CONFIG_SHOW_STARTUP_DIALOG = 1 << 8,
+    // Holding shot for 10 frames or more also holds focus.
+    CONFIG_SHOT_HOLD_FOCUS = 1 << 9,
+};
+
+// Config::window_size and the window size bits of g_window_flags: three
+// resolutions, full screen or windowed.
+enum WindowSize
+{
+    WINDOW_SIZE_FULLSCREEN_640 = 0,
+    WINDOW_SIZE_FULLSCREEN_960 = 1,
+    WINDOW_SIZE_FULLSCREEN_1280 = 2,
+    WINDOW_SIZE_WINDOWED_640 = 3,
+    WINDOW_SIZE_WINDOWED_960 = 4,
+    WINDOW_SIZE_WINDOWED_1280 = 5,
+};
+
+// The game's settings. Everything from version on is th16.cfg (ConfigData,
+// GameThread.h, is the same 0x64 bytes as a struct of its own, used to read
+// and write the file and in replays). Layout from ExpHP's th-re-data and
+// the code.
 struct Config
 {
-    u32 unk_0;
-    u32 unk_4;
-    // Copied from g_pad_mapping by a static initializer.
-    i16 pad_mapping_copy[10];
+    // Not part of the file: the "now loading" effect (an EffectManager UI
+    // effect) the title menu starts before a game, which the game thread
+    // removes once the stage is up.
+    u32 loading_effect_id;
+    // CONFIG_VERSION.
+    u32 version;
+    // The pad button for each game button (g_pad_mapping).
+    i16 pad_mapping[10];
     // Analog stick dead zones (DirectInput axis units).
     i16 deadzone_x;
     i16 deadzone_y;
-    // 0xff: not chosen yet (the device setup then picks 32-bit color).
+    // 0: 32-bit color, 1: 16-bit; 0xff: not chosen yet (the device setup
+    // then picks 32-bit color).
     u8 color_mode;
-    // 0 turns the BGM off.
+    // 0: no BGM, 1: WAV (thbgm.dat). Values up to 2 are accepted.
     u8 bgm_mode;
-    u8 unk_22;
-    // Window size option; 0, 1, 2 pick ascii.anm, ascii_960.anm,
-    // ascii_1280.anm.
+    // Nonzero: sound effects play.
+    u8 se_enabled;
+    // A WindowSize. AsciiManager picks ascii.anm, ascii_960.anm or
+    // ascii_1280.anm by window_size % 3.
     u8 window_size;
     // Frames skipped per drawn frame (FpsCounter counts them as drawn).
     u8 frame_skip;
+    // Accepted from 0 to 2 (default 2); the game never reads it.
     u8 unk_25;
     // Percentages from the options menu.
     i8 bgm_volume;
     i8 se_volume;
+    // Reset to 0 with the volumes by the options menu's default command;
+    // nothing else uses it.
     u8 unk_28;
-    // 1: sleep before presenting so frames come at 60 Hz.
-    u8 unk_29;
+    // How frames are paced to 60 Hz: 1 sleeps before presenting, 2 (the
+    // default) paces by sleeping when nothing is skipped
+    // (WINDOW_SLEEP_PACING), 3 presents without waiting for vsync.
+    u8 frame_pacing;
     u8 unk_2a[0x2c - 0x2a];
-    // 0x8 skips DirectInput setup.
-    u32 flags_2c;
-    u32 unk_30;
-    u32 unk_34;
+    // ConfigFlags.
+    u32 flags;
+    // Where the window goes in the windowed sizes (CW_USEDEFAULT until the
+    // game saves its position on exit).
+    u32 window_x;
+    u32 window_y;
     u8 unk_38[0x68 - 0x38];
 
     // The defaults ConfigData::set_defaults also writes, for the whole

@@ -7,29 +7,30 @@
 #include "ZunTimer.h"
 #include "types.h"
 
-// The 0x64 bytes of settings a game in progress (and a replay, at +0x18)
-// carries; the same values as Config from its second field on. The constructor
-// sets the defaults (0x42e630, ExpHP: GameThreadChild64::constructor).
+// th16.cfg: the 0x64 bytes of settings that Config holds from its version
+// field on, as a struct of its own. A game in progress (and a replay, at
+// +0x18) carries a copy. Field meanings are Config's. The constructor sets
+// the defaults (0x42e630, ExpHP: GameThreadChild64::constructor).
 struct ConfigData
 {
     u32 version;
     i16 pad_mapping[10];
     i16 deadzone_x;
     i16 deadzone_y;
-    u8 unk_1c;
-    u8 unk_1d;
-    u8 unk_1e;
-    u8 unk_1f;
-    u8 unk_20;
+    u8 color_mode;
+    u8 bgm_mode;
+    u8 se_enabled;
+    u8 window_size;
+    u8 frame_skip;
     u8 unk_21;
-    u8 unk_22;
-    u8 unk_23;
+    u8 bgm_volume;
+    u8 se_volume;
     u8 unk_24;
-    u8 unk_25;
+    u8 frame_pacing;
     u8 unk_26[2];
     u32 flags;
-    u32 unk_2c;
-    u32 unk_30;
+    u32 window_x;
+    u32 window_y;
     u8 unk_34[0x64 - 0x34];
 
     // Not itself the constructor: it returns nothing.
@@ -43,22 +44,22 @@ struct ConfigData
     __forceinline void set_defaults_inline()
     {
         memset(this, 0, sizeof(ConfigData));
-        flags |= 0x100;
-        unk_1c = 0;
-        unk_1d = 1;
-        version = 0x160002;
+        flags |= CONFIG_SHOW_STARTUP_DIALOG;
+        color_mode = 0;
+        bgm_mode = 1;
+        version = CONFIG_VERSION;
         deadzone_x = deadzone_y = 600;
-        unk_1e = 1;
-        unk_1f = 5;
-        unk_20 = 0;
+        se_enabled = 1;
+        window_size = WINDOW_SIZE_WINDOWED_1280;
+        frame_skip = 0;
         memcpy(pad_mapping, g_pad_mapping, sizeof(pad_mapping));
         unk_21 = 2;
-        unk_22 = 100;
+        bgm_volume = 100;
         unk_24 = 0;
-        unk_25 = 2;
-        unk_23 = 80;
-        unk_2c = 0x80000000;
-        unk_30 = 0x80000000;
+        frame_pacing = 2;
+        se_volume = 80;
+        window_x = 0x80000000;
+        window_y = 0x80000000;
     }
 };
 

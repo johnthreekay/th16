@@ -363,7 +363,7 @@ HARNESS_CALLED void GameWindow::update_window()
 {
     double now = get_runtime();
     frame_start_time = now;
-    if (g_Supervisor.config.unk_29 == 1)
+    if (g_Supervisor.config.frame_pacing == 1)
     {
         double elapsed = now - present_time;
         if (elapsed < 1.0 / 60.0 && elapsed > 0.0)

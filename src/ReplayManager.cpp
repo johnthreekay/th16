@@ -189,7 +189,7 @@ int ReplayManager::on_tick_record()
     g_InputState.input = (u16)g_hardware_input;
     InputState::update();
     u32 input;
-    if (g_Supervisor.config.flags_2c & 0x200)
+    if (g_Supervisor.config.flags & CONFIG_SHOT_HOLD_FOCUS)
     {
         input = g_InputState.input;
         if ((input & 1) && (u32)g_InputState.hold_time[0] >= 10)

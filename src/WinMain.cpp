@@ -76,7 +76,7 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
     u32 flags = g_unk_4d9d1c;
     flags ^= (g_Supervisor.config.window_size << 2 ^ flags) & 0x3c;
     g_Supervisor.present_params.Windowed = (flags & 0x3c) >= 0xc;
-    if (g_Supervisor.config.frame_skip == 0 && g_Supervisor.config.unk_29 == 2)
+    if (g_Supervisor.config.frame_skip == 0 && g_Supervisor.config.frame_pacing == 2)
     {
         flags |= 0x40;
     }
@@ -111,7 +111,7 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
         i32 height = GetSystemMetrics(SM_CYDLGFRAME) * 2 + GetSystemMetrics(SM_CYCAPTION) + g_resolution_y;
         g_GameWindow.window =
             CreateWindowExA(0, "BASE", "\x93\x8c\x95\xfb\x93V\x8b\xf3\xe0\xf6\x81@\x81` Hidden Star in Four Seasons. ver 1.00a",
-                            0x100b0000, g_Supervisor.config.unk_30, g_Supervisor.config.unk_34,
+                            0x100b0000, g_Supervisor.config.window_x, g_Supervisor.config.window_y,
                             width, height, NULL, NULL, instance, NULL);
     }
     GetWindowRect(g_GameWindow.window, &g_Supervisor.window_rect);
@@ -148,7 +148,7 @@ retry:
         if (!reset)
         {
             g_Supervisor.flags &= ~1;
-            if (!(g_Supervisor.config.flags_2c & 2))
+            if (!(g_Supervisor.config.flags & CONFIG_REFERENCE_RASTERIZER))
             {
                 if (g_Supervisor.d3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, g_GameWindow.window,
                                                    D3DCREATE_HARDWARE_VERTEXPROCESSING, &present_params,
@@ -291,7 +291,7 @@ HARNESS_CALLED i32 init_d3d()
             {
                 present_params.SwapEffect = D3DSWAPEFFECT_DISCARD;
                 present_params.PresentationInterval =
-                    g_Supervisor.config.unk_29 == 3 ? D3DPRESENT_INTERVAL_IMMEDIATE : D3DPRESENT_INTERVAL_ONE;
+                    g_Supervisor.config.frame_pacing == 3 ? D3DPRESENT_INTERVAL_IMMEDIATE : D3DPRESENT_INTERVAL_ONE;
             }
         }
         else
@@ -309,7 +309,7 @@ HARNESS_CALLED i32 init_d3d()
         {
             present_params.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
         }
-        else if (g_Supervisor.config.unk_29 == 3 || display_mode.RefreshRate != 60)
+        else if (g_Supervisor.config.frame_pacing == 3 || display_mode.RefreshRate != 60)
         {
             present_params.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
         }
@@ -357,7 +357,7 @@ HARNESS_CALLED i32 init_d3d()
     else
     {
         g_Supervisor.flags &= ~4;
-        g_Supervisor.config.flags_2c |= 1;
+        g_Supervisor.config.flags |= CONFIG_REDUCED_COLOR;
         // D3DFMT_A8R8G8B8 をサポートしていません、減色モードで動作します
         g_GameErrorContext.log("D3DFMT_A8R8G8B8 \x82\xf0\x83T\x83|\x81[\x83g\x82\xb5\x82\xc4\x82\xa2\x82\xdc\x82\xb9"
                                "\x82\xf1\x81"
@@ -450,7 +450,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
     }
     get_joypad_capabilities();
     clear_all_keydown_states();
-    if ((g_Supervisor.config.flags_2c & 0x100) || (GetKeyboardState(keys), keys[VK_SHIFT] & 0x80))
+    if ((g_Supervisor.config.flags & CONFIG_SHOW_STARTUP_DIALOG) || (GetKeyboardState(keys), keys[VK_SHIFT] & 0x80))
     {
         g_GameWindow.dialog =
             CreateDialogParamA(instance_copy, MAKEINTRESOURCEA(0xcb), NULL, resolution_dialog_proc, 0);
@@ -678,8 +678,8 @@ teardown:
     if (g_Supervisor.config.window_size >= 3)
     {
         GetWindowRect(g_GameWindow.window, &g_Supervisor.window_rect);
-        g_Supervisor.config.unk_30 = g_Supervisor.window_rect.left;
-        g_Supervisor.config.unk_34 = g_Supervisor.window_rect.top;
+        g_Supervisor.config.window_x = g_Supervisor.window_rect.left;
+        g_Supervisor.config.window_y = g_Supervisor.window_rect.top;
     }
     g_Supervisor.teardown_everything();
     delete g_UpdateFuncRegistry;
@@ -736,7 +736,7 @@ shutdown:
     }
     strcpy(path, g_GameWindow.save_dir);
     strcat(path, "th16.cfg");
-    file_write(path, &g_Supervisor.config.unk_4, 0x64);
+    file_write(path, &g_Supervisor.config.version, 0x64);
     timeEndPeriod(1);
     strcpy(path, g_GameWindow.save_dir);
     strcat(path, "log.txt");

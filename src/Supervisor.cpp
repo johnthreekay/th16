@@ -52,30 +52,30 @@ static_assert(offsetof(Supervisor, ver_file_size) == 0xa1c, "Supervisor::ver_fil
 static_assert(offsetof(Supervisor, frame_time) == 0xa34, "Supervisor::frame_time");
 static_assert(offsetof(Supervisor, background_color) == 0xa3c, "Supervisor::background_color");
 static_assert(offsetof(Config, color_mode) == 0x20, "Config::color_mode");
-static_assert(offsetof(Config, unk_29) == 0x29, "Config::unk_29");
-static_assert(offsetof(Config, flags_2c) == 0x2c, "Config::flags_2c");
+static_assert(offsetof(Config, frame_pacing) == 0x29, "Config::frame_pacing");
+static_assert(offsetof(Config, flags) == 0x2c, "Config::flags");
 static_assert(offsetof(GameWindow, save_dir) == 0x2d, "GameWindow::save_dir");
 static_assert(offsetof(SoundManager, bgm_dat_name) == 0x5560, "SoundManager::bgm_dat_name");
 
 Config::Config()
 {
     memset(this, 0, sizeof(Config));
-    flags_2c |= 0x100;
+    flags |= CONFIG_SHOW_STARTUP_DIALOG;
     color_mode = 0;
     bgm_mode = 1;
-    unk_4 = 0x160002;
+    version = CONFIG_VERSION;
     deadzone_x = deadzone_y = 600;
-    unk_22 = 1;
-    window_size = 5;
+    se_enabled = 1;
+    window_size = WINDOW_SIZE_WINDOWED_1280;
     frame_skip = 0;
-    memcpy(pad_mapping_copy, g_pad_mapping, sizeof(pad_mapping_copy));
+    memcpy(pad_mapping, g_pad_mapping, sizeof(pad_mapping));
     unk_25 = 2;
     bgm_volume = 100;
     unk_28 = 0;
-    unk_29 = 2;
+    frame_pacing = 2;
     se_volume = 80;
-    unk_30 = 0x80000000;
-    unk_34 = 0x80000000;
+    window_x = 0x80000000;
+    window_y = 0x80000000;
 }
 
 // FUNCTION: TH16 0x40d510
@@ -1297,7 +1297,7 @@ int Supervisor::initialize()
 // FUNCTION: TH16 0x43c050
 HARNESS_CALLED int Supervisor::load_game_config(const char *path)
 {
-    ConfigData *data = (ConfigData *)&g_Supervisor.config.unk_4;
+    ConfigData *data = (ConfigData *)&g_Supervisor.config.version;
     data->set_defaults_inline();
     _chdir(g_GameWindow.save_dir);
     i32 size;
@@ -1313,8 +1313,9 @@ HARNESS_CALLED int Supervisor::load_game_config(const char *path)
     {
         *data = *file;
         free(file);
-        if (data->unk_1c >= 2 || data->unk_1d >= 3 || data->unk_1e >= 2 || data->unk_1f >= 6 || data->unk_20 >= 3 ||
-            data->unk_21 >= 3 || data->version != 0x160002 || size != sizeof(ConfigData))
+        if (data->color_mode >= 2 || data->bgm_mode >= 3 || data->se_enabled >= 2 || data->window_size >= 6 ||
+            data->frame_skip >= 3 || data->unk_21 >= 3 || data->version != CONFIG_VERSION ||
+            size != sizeof(ConfigData))
         {
             // "Config data was broken, so it was reinitialized"
             g_GameErrorContext.log("\x83R\x83\x93\x83t\x83" "B\x83O\x83" "f\x81[\x83^\x82\xaa\x88\xd9\x8f\xed\x82\xc5\x82\xb5\x82\xbd\x82\xcc\x82\xc5\x8d\xc4\x8f\x89\x8a\xfa\x89\xbb\x82\xb5\x82\xdc\x82\xb5\x82\xbd\r\n");
@@ -1327,7 +1328,7 @@ HARNESS_CALLED int Supervisor::load_game_config(const char *path)
         }
     }
     unk_71c = 0;
-    if (config.flags_2c & 4)
+    if (config.flags & CONFIG_NO_FOG)
     {
         // "Fog is suppressed"
         g_GameErrorContext.log("\x83t\x83H\x83O\x82\xcc\x8eg\x97p\x82\xf0\x97}\x90\xa7\x82\xb5\x82\xdc\x82\xb7\r\n");
@@ -1337,28 +1338,28 @@ HARNESS_CALLED int Supervisor::load_game_config(const char *path)
         // "Starting in window mode"
         g_GameErrorContext.log("\x83" "E\x83" "B\x83\x93\x83h\x83" "E\x83\x82\x81[\x83h\x82\xc5\x8bN\x93\xae\x82\xb5\x82\xdc\x82\xb7\r\n");
     }
-    if (config.flags_2c & 2)
+    if (config.flags & CONFIG_REFERENCE_RASTERIZER)
     {
         // "Forcing the reference rasterizer"
         g_GameErrorContext.log("\x83\x8a\x83t\x83@\x83\x8c\x83\x93\x83X\x83\x89\x83X\x83^\x83\x89\x83" "C\x83U\x82\xf0\x8b\xad\x90\xa7\x82\xb5\x82\xdc\x82\xb7\r\n");
     }
-    if (config.flags_2c & 8)
+    if (config.flags & CONFIG_NO_DIRECTINPUT)
     {
         // "Not using DirectInput for pad and keyboard input"
         g_GameErrorContext.log("\x83p\x83" "b\x83h\x81" "A\x83L\x81[\x83{\x81[\x83h\x82\xcc\x93\xfc\x97\xcd\x82\xc9 DirectInput \x82\xf0\x8eg\x97p\x82\xb5\x82\xdc\x82\xb9\x82\xf1\r\n");
     }
-    if (config.flags_2c & 0x10)
+    if (config.flags & CONFIG_BGM_IN_MEMORY)
     {
         // "Loading the BGM into memory"
         g_GameErrorContext.log("\x82" "a\x82" "f\x82l\x82\xf0\x83\x81\x83\x82\x83\x8a\x82\xc9\x93\xc7\x82\xdd\x8d\x9e\x82\xdd\x82\xdc\x82\xb7\r\n");
     }
-    if (config.flags_2c & 0x20)
+    if (config.flags & CONFIG_NO_VSYNC)
     {
         // "Not waiting for vsync"
         g_GameErrorContext.log("\x90\x82\x92\xbc\x93\xaf\x8a\xfa\x82\xf0\x8e\xe6\x82\xe8\x82\xdc\x82\xb9\x82\xf1\r\n");
         g_Supervisor.unk_71c = 1;
     }
-    if (config.flags_2c & 0x40)
+    if (config.flags & CONFIG_NO_TEXT_ENV_DETECTION)
     {
         // "Not detecting the text rendering environment"
         g_GameErrorContext.log("\x95\xb6\x8e\x9a\x95`\x89\xe6\x82\xcc\x8a\xc2\x8b\xab\x82\xf0\x8e\xa9\x93\xae\x8c\x9f\x8fo\x82\xb5\x82\xdc\x82\xb9\x82\xf1\r\n");
@@ -1391,7 +1392,7 @@ HARNESS_CALLED i32 Supervisor::play_bgm_wav(i32 arg, const char *name)
 // FUNCTION: TH16 0x43c3f0
 HARNESS_CALLED i32 Supervisor::play_bgm(i32 arg, i32 track)
 {
-    if (g_Supervisor.config.flags_2c & 0x10)
+    if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
     {
         g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
     }
@@ -1403,7 +1404,7 @@ HARNESS_CALLED i32 Supervisor::play_bgm(i32 arg, i32 track)
 // FUNCTION: TH16 0x43c440
 HARNESS_CALLED i32 Supervisor::stop_bgm()
 {
-    if (g_Supervisor.config.flags_2c & 0x10)
+    if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
     {
         g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
     }

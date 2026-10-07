@@ -496,7 +496,7 @@ HARNESS_CALLED i32 SoundManager::preload_bgm(i32 slot, const char *name)
         return 0;
     }
     strcpy(g_SoundManager.preload_names[slot], name);
-    if (!(g_Supervisor.config.flags_2c & 0x10))
+    if (!(g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY))
     {
         return 0;
     }
@@ -554,7 +554,7 @@ HARNESS_CALLED i32 SoundManager::play_preloaded_bgm(i32 slot)
     {
         return -1;
     }
-    if (!(g_Supervisor.config.flags_2c & 0x10))
+    if (!(g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY))
     {
         return g_SoundManager.select_bgm(g_SoundManager.preload_names[slot]);
     }
@@ -972,7 +972,7 @@ i32 SoundManager::update_sound_thread()
             }
             goto pop;
         case 1:
-            if (g_Supervisor.config.flags_2c & 0x10)
+            if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
             {
                 if (cmd->unk_8 != 0)
                 {
@@ -984,7 +984,7 @@ i32 SoundManager::update_sound_thread()
             again = 1;
             goto pop;
         case 2:
-            if ((g_Supervisor.config.flags_2c & 0x10) && cmd->arg >= 0)
+            if ((g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY) && cmd->arg >= 0)
             {
                 switch (cmd->unk_8)
                 {
@@ -1171,7 +1171,7 @@ i32 SoundManager::update_sound_thread()
 step:
     cmd->unk_8++;
 done:
-    if (g_Supervisor.config.unk_22)
+    if (g_Supervisor.config.se_enabled)
     {
         for (i32 i = 0; i < SOUND_QUEUE_SIZE; i++)
         {

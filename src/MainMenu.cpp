@@ -622,7 +622,7 @@ i32 TitleInf::do_key_config()
                 g_pad_mapping[9] = key_config[2];
                 g_pad_mapping[2] = key_config[3];
                 g_pad_mapping[3] = key_config[4];
-                memcpy(g_Supervisor.config.pad_mapping_copy, g_pad_mapping, sizeof(g_pad_mapping));
+                memcpy(g_Supervisor.config.pad_mapping, g_pad_mapping, sizeof(g_pad_mapping));
                 break;
             default:
                 return 1;
@@ -981,7 +981,7 @@ i32 TitleInf::on_tick()
         unk_5ce4++;
         if (unk_5ce4 >= 10)
         {
-            if (g_Supervisor.config.flags_2c & 0x10)
+            if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
             {
                 g_SoundManager.modify_bgm(4, 0, "dummy");
             }
@@ -991,7 +991,7 @@ i32 TitleInf::on_tick()
             }
             g_SoundManager.bgm_name[0] = 0;
             g_Supervisor.play_bgm_wav(0, "th16_01");
-            if (g_Supervisor.config.flags_2c & 0x10)
+            if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
             {
                 g_SoundManager.modify_bgm(4, 0, "dummy");
             }

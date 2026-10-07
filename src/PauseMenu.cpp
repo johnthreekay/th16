@@ -618,7 +618,7 @@ void pause_menu_43f350()
         strcpy(menu->saved_bgm_name, g_SoundManager.get_bgm_name());
         menu->saved_bgm_time = g_SoundManager.bgm_play_time();
         g_Supervisor.play_bgm_wav(0, "th128_08");
-        if (g_Supervisor.config.flags_2c & 0x10)
+        if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
             g_SoundManager.modify_bgm(4, 0, "dummy");
         }

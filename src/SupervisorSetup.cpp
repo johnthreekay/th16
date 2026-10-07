@@ -182,7 +182,7 @@ INT_PTR CALLBACK resolution_dialog_proc(HWND dialog, UINT message, WPARAM wparam
     switch (message)
     {
     case WM_INITDIALOG:
-        if (g_Supervisor.config.flags_2c & 0x100)
+        if (g_Supervisor.config.flags & CONFIG_SHOW_STARTUP_DIALOG)
         {
             SendMessageA(GetDlgItem(dialog, 0xca), BM_SETCHECK, BST_CHECKED, 0);
         }
@@ -236,11 +236,11 @@ void read_resolution_dialog()
 {
     if (IsDlgButtonChecked(g_GameWindow.dialog, 0xca) == BST_CHECKED)
     {
-        g_Supervisor.config.flags_2c |= 0x100;
+        g_Supervisor.config.flags |= CONFIG_SHOW_STARTUP_DIALOG;
     }
     else
     {
-        g_Supervisor.config.flags_2c &= ~0x100;
+        g_Supervisor.config.flags &= ~CONFIG_SHOW_STARTUP_DIALOG;
     }
     if (IsDlgButtonChecked(g_GameWindow.dialog, 0xcd) == BST_CHECKED)
     {
@@ -261,7 +261,7 @@ void read_resolution_dialog()
 // FUNCTION: TH16 0x45c360
 i32 Supervisor::dx_direct_input_initialize()
 {
-    if (config.flags_2c & 8)
+    if (config.flags & CONFIG_NO_DIRECTINPUT)
     {
         return -1;
     }
