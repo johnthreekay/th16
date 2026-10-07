@@ -751,7 +751,6 @@ int EnemyData::on_tick()
     return 0;
 }
 
-// TODO: the original frame has 4 more bytes (as in other functions with Float3 temporaries).
 // FUNCTION: TH16 0x41c1f0
 void EnemyData::update_final_pos()
 {
