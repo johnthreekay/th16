@@ -15,6 +15,7 @@
 #include "Rng.h"
 #include "Spellcard.h"
 
+// TODO: the score table loop has eax and ecx swapped (the pointer is in ecx in the original).
 // FUNCTION: TH16 0x4493c0
 void ScorefileChara::init()
 {
@@ -26,7 +27,7 @@ void ScorefileChara::init()
     {
         for (i32 i = 0; i < 10; i++)
         {
-            scores[d][i].score = (10 - i) * 10000;
+            scores[d][i].score = 100000 - i * 10000;
             scores[d][i].stage = 1;
             strcpy(scores[d][i].name, "--------");
             scores[d][i].unk_10 = 0;
@@ -44,6 +45,7 @@ void ScorefileChara::init()
     }
 }
 
+// TODO: the original keeps EnterCriticalSection's address in ebx and does not align the loop.
 // FUNCTION: TH16 0x449720
 void ScorefileStatus::init()
 {
