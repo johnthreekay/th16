@@ -1096,6 +1096,88 @@ static __forceinline AnmLoadedSprite *laser_boss_sprite()
 
 static_assert(offsetof(EnemyInf, enemy.anm_ids) == 0x1330, "EnemyInf::enemy.anm_ids");
 
+// Never called. LaserInfiniteInf::method_1c for a straight laser: the boss
+// is only tested when it exists, and the damage per point also depends on
+// the laser's length, as in LaserCurveInf::method_1c.
+// FUNCTION: TH16 0x434010
+i32 LaserLineInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
+{
+    Float3 *pos = (Float3 *)a;
+    Float3 *size = (Float3 *)b;
+    f32 rect_angle = *(f32 *)&c;
+    i32 *boss_hit = (i32 *)f;
+    if (e != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    f32 dist = 8.0f;
+    i32 count = 0;
+    f32 dx = position.x - pos->x;
+    f32 dy = position.y - pos->y;
+    f32 s = zun_sinf(rect_angle);
+    f32 cs = zun_cosf(rect_angle);
+    f32 rx = dx * cs - dy * s;
+    f32 ry = dx * s + dy * cs;
+    Float3 local_step;
+    laser_sincosmul(&local_step, wrap_angle(angle + rect_angle), 8.0f);
+    f32 local_x = local_step.x + rx;
+    f32 local_y = local_step.y + ry;
+    local_step.z = 0.0f;
+    f32 half_w = size->x * 0.5f;
+    f32 half_h = size->y * 0.5f;
+    local_step.x += local_step.x;
+    local_step.y += local_step.y;
+    Float3 step;
+    laser_sincosmul(&step, angle, 8.0f);
+    f32 world_x = position.x + step.x;
+    f32 world_y = position.y + step.y;
+    step.x += step.x;
+    step.y += step.y;
+    step.z = 0.0f;
+    u8 hit[0x100];
+    u8 *h = hit;
+    for (; dist + 8.0f <= unk_70; dist += 16.0f, h++)
+    {
+        if (*boss_hit == 0 && laser_boss() != NULL)
+        {
+            if (test_circle_rect_inline(laser_boss()->enemy.final_pos.pos.x, laser_boss()->enemy.final_pos.pos.y,
+                                        laser_boss_sprite()->sprite_width * 0.75f,
+                                        laser_boss_sprite()->sprite_height * 0.75f, 0.0f, world_x, world_y, 8.0f))
+            {
+                *boss_hit = 1;
+            }
+        }
+        if (!(-half_w > local_x || local_x > half_w || -half_h > local_y || local_y > half_h))
+        {
+            count++;
+            *h = 1;
+            i32 damage = 15;
+            if (length >= 12.0f)
+            {
+                damage = 45;
+            }
+            else if (length >= 4.0f && 12.0f > length)
+            {
+                damage = (i32)(((length - 4.0f) / 8.0f * 2.0f + 1.0f) * 15.0f);
+            }
+            if (width >= 96.0f)
+            {
+                damage = (i32)(damage + 3.0f + 1.0f);
+            }
+            else if (width >= 16.0f && 96.0f > width)
+            {
+                damage = (i32)((width - 16.0f) / 80.0f * 3.0f + damage + 1.0f);
+            }
+            g_LaserManager->unk_608 += damage;
+        }
+        world_y += step.y;
+        world_x += step.x;
+        local_x += local_step.x;
+        local_y += local_step.y;
+    }
+    return count;
+}
+
 // Never called. Walks the laser in steps of 16 units: while *boss_hit is
 // clear, sets it once a point is within 8 units of the boss's sprite (at
 // three quarters size). Counts the points inside the rectangle at pos (size,
