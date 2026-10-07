@@ -81,6 +81,10 @@ struct ZunTimer
     // 0x406490. The out-of-line copy of set.
     HARNESS_CALLED void set_value(i32 time);
 
+    // 0x464d80. set() to another timer's current frame; the timer comes by
+    // value (ExpHP: Timer::copy).
+    HARNESS_CALLED void set_from(ZunTimer other);
+
     // Count back by the given number of frames, scaled like tick().
     void operator-=(i32 frames);
 

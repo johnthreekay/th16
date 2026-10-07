@@ -38,6 +38,12 @@ HARNESS_CALLED void ZunTimer::operator++(int)
     tick();
 }
 
+// FUNCTION: TH16 0x464d80
+HARNESS_CALLED void ZunTimer::set_from(ZunTimer other)
+{
+    set(other.current);
+}
+
 // FUNCTION: TH16 0x406490
 HARNESS_CALLED void ZunTimer::set_value(i32 time)
 {

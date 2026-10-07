@@ -9,22 +9,6 @@ i32 SoundManager::initialize(HWND window)
     return 0;
 }
 
-// STUB: TH16 0x4718a0
-HRESULT CWaveFile::open_bgm(ThBgmFormat *track, i32 unk)
-{
-    return 0;
-}
-
-// STUB: TH16 0x471270
-HRESULT BgmStream::stop(i32 unk)
-{
-    return 0;
-}
-
-CStreamingSound::~CStreamingSound()
-{
-}
-
 // STUB: TH16 0x406e10
 D3DXVECTOR3 InterpFloat3::step()
 {
@@ -56,10 +40,4 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
 // STUB: TH16 0x4660b0
 void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
 {
-}
-
-// STUB: TH16 0x4714c0
-HRESULT BgmStream::handle_wave_stream_notification(i32 unused)
-{
-    return 0;
 }

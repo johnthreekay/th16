@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <mmreg.h>
+#include <mmsystem.h>
 
 #include "decomp.h"
 #include "types.h"
@@ -20,11 +21,84 @@ struct ThBgmFormat
     u8 unk_32[2];
 };
 
-// The DirectSound sample's CWaveFile, reading from thbgm.dat.
+#define WAVEFILE_READ 1
+
+// The DirectSound sample's CWaveFile, reading from thbgm.dat. TH06's layout,
+// with ZUN's file handle in place of the mmio one.
 struct CWaveFile
 {
+    WAVEFORMATEX *m_pwfx;
+    MMCKINFO m_ck;
+    MMCKINFO m_ckRiff;
+    DWORD m_dwSize;
+    MMIOINFO m_mmioinfoOut;
+    DWORD m_dwFlags;
+    BOOL m_bIsReadingFromMemory;
+    BYTE *m_pbData;
+    BYTE *m_pbDataCur;
+    ULONG m_ulDataSize;
+    HANDLE m_file;
+    // The track being read.
+    ThBgmFormat *m_track;
+    const char *m_filename;
+    // File position saved by CSound::Pause.
+    DWORD m_paused_position;
+    // Set once the stream has reached the end of the track and looped.
+    BOOL m_looped;
+
     // 0x4718a0. Switches to a track of thbgm.dat.
     HRESULT open_bgm(ThBgmFormat *track, i32 unk);
+
+    CWaveFile()
+    {
+        m_track = NULL;
+        m_pwfx = NULL;
+        m_dwSize = 0;
+        m_bIsReadingFromMemory = FALSE;
+    }
+
+    ~CWaveFile()
+    {
+        Close();
+    }
+
+    // Opens thbgm.dat for reading at the start of a track.
+    HRESULT Open(const char *filename, ThBgmFormat *track)
+    {
+        m_dwFlags = WAVEFILE_READ;
+        m_bIsReadingFromMemory = FALSE;
+        return open_file(filename, track);
+    }
+
+    HRESULT Close()
+    {
+        if (m_dwFlags == WAVEFILE_READ)
+        {
+            CloseHandle(m_file);
+            m_file = INVALID_HANDLE_VALUE;
+        }
+        return S_OK;
+    }
+
+    // 0x4717e0. Open's out-of-line part.
+    HRESULT open_file(const char *filename, ThBgmFormat *track);
+    // 0x471930. Seeks to offset bytes into the track, or to the loop start
+    // when loop is set.
+    HARNESS_CALLED HRESULT ResetFile(bool loop, DWORD offset);
+    HRESULT OpenFromMemory(BYTE *pbData, ULONG ulDataSize, ThBgmFormat *track)
+    {
+        m_track = track;
+        m_ulDataSize = ulDataSize;
+        m_pbData = pbData;
+        m_pbDataCur = m_pbData;
+        m_bIsReadingFromMemory = TRUE;
+        return S_OK;
+    }
+
+    // ResetFile as LTCG inlined it into the CSound constructor.
+    HRESULT reset_file_inline(bool loop, DWORD offset);
+    // 0x471a30
+    HARNESS_CALLED HRESULT Read(BYTE *pBuffer, DWORD dwSizeToRead, DWORD *pdwSizeRead);
 };
 
 // The BGM stream (an adapted DirectSound sample CStreamingSound). Fields
@@ -57,13 +131,139 @@ struct BgmStream
     void destroy();
 };
 
-// Only the virtual destructor, so that BgmStream can be deleted the way
-// ZUN's code does it.
-class CStreamingSound
+class CStreamingSound;
+
+// The DirectSound sample's CSoundManager.
+struct CSoundManager
+{
+    struct IDirectSound8 *m_pDS;
+
+    // 0x470250. Every caller asks for 44.1 kHz 16-bit stereo; LTCG folded
+    // the arguments.
+    HARNESS_CALLED HRESULT SetPrimaryBufferFormat(DWORD dwPrimaryChannels, DWORD dwPrimaryFreq,
+                                                  DWORD dwPrimaryBitRate);
+    // 0x470320. Streams a track of thbgm.dat. The file name, flags and
+    // notification count are the same at every call site; LTCG folded them.
+    HARNESS_CALLED HRESULT CreateStreaming(CStreamingSound **ppStreamingSound, const char *strWaveFileName,
+                                           DWORD dwCreationFlags, GUID guid3DAlgorithm, DWORD dwNotifyCount,
+                                           DWORD dwNotifySize, HANDLE hNotifyEvent, ThBgmFormat *track);
+    // 0x470680. The same for a track already in memory.
+    HARNESS_CALLED HRESULT CreateStreamingFromMemory(CStreamingSound **ppStreamingSound, BYTE *pbData,
+                                                     ULONG ulDataSize, ThBgmFormat *track, DWORD dwCreationFlags,
+                                                     GUID guid3DAlgorithm, DWORD dwNotifyCount, DWORD dwNotifySize,
+                                                     HANDLE hNotifyEvent);
+};
+
+// The DirectSound sample's CSound with ZUN's fades, pausing and track
+// switching. Its doubles are only 4-aligned: MSVC would otherwise pad the
+// vtable pointer to 8 bytes.
+#pragma pack(push, 4)
+// VTABLE: TH16 0x4943a0
+class CSound
 {
   public:
-    virtual ~CStreamingSound();
+    struct IDirectSoundBuffer **m_apDSBuffer;
+    DWORD m_dwDSBufferSize;
+    CWaveFile *m_pWaveFile;
+    DWORD m_dwNumBuffers;
+    // ZUN's fade state (see BgmStream).
+    i32 m_fade_time_left;
+    i32 m_fade_duration;
+    i32 m_fade_mode;
+    // The arguments of the last Play.
+    DWORD m_play_priority;
+    DWORD m_play_flags;
+    u8 unk_28[4];
+    i32 unk_2c;
+    // get_runtime() at Play and at Pause, and the time spent paused.
+    double m_start_time;
+    double m_pause_time;
+    double m_paused_total;
+    double unk_48;
+    BOOL m_playing;
+    BOOL m_paused;
+    // The DSBUFFERDESC the buffer was created with.
+    u8 m_desc[0x24];
+    CSoundManager *m_manager;
+
+    // 0x4709b0. The buffer count is 1 at every call site; LTCG folded it.
+    CSound(struct IDirectSoundBuffer **apDSBuffer, DWORD dwDSBufferSize, DWORD dwNumBuffers, CWaveFile *pWaveFile);
+    // 0x470e10
+    virtual ~CSound();
+
+    // 0x470ed0
+    HRESULT FillBufferWithSound(struct IDirectSoundBuffer *pDSB, BOOL bRepeatWavIfBufferLarger, DWORD offset);
+    // FillBufferWithSound as LTCG inlined it into the constructor.
+    HRESULT fill_buffer_inline(struct IDirectSoundBuffer *pDSB, BOOL bRepeatWavIfBufferLarger, DWORD offset);
+    // Inline: LTCG split it into the NULL check, left in the callers, and
+    // the rest (0x471040, restore_dsound_buffer in DSUtil.cpp).
+    HRESULT RestoreBuffer(struct IDirectSoundBuffer *pDSB, BOOL *pbWasRestored);
+    // 0x4710b0
+    struct IDirectSoundBuffer *GetFreeBuffer();
+    // 0x471120. offset is where to start in the track.
+    HRESULT Play(DWORD dwPriority, DWORD dwFlags, DWORD offset);
+    // 0x4711f0. Volume in hundredths of dB, scaled by the BGM volume
+    // setting.
+    HRESULT SetVolume(i32 volume);
+    // 0x471270. Also closes the file if close_file is set.
+    HRESULT Stop(BOOL close_file);
+    // 0x4712f0 and 0x471380
+    HRESULT Pause();
+    HRESULT Unpause();
+    // 0x4713f0
+    HRESULT Reset();
 };
+#pragma pack(pop)
+
+// The DirectSound sample's CStreamingSound.
+// VTABLE: TH16 0x494398
+class CStreamingSound : public CSound
+{
+  public:
+    DWORD m_dwLastPlayPos;
+    DWORD m_dwPlayProgress;
+    DWORD m_dwNextWriteOffset;
+    DWORD unk_8c;
+    BOOL m_bFillNextNotificationWithSilence;
+    DWORD m_dwNotifySize;
+    HANDLE m_hNotifyEvent;
+    // Set while the streaming thread refills the buffer.
+    BOOL m_refilling;
+
+    // 0x471430
+    CStreamingSound(struct IDirectSoundBuffer *pDSBuffer, DWORD dwDSBufferSize, CWaveFile *pWaveFile,
+                    DWORD dwNotifySize);
+    virtual ~CStreamingSound();
+
+    // 0x4714c0. Always called with bLoopedPlay set; LTCG folded it.
+    HARNESS_CALLED HRESULT HandleWaveStreamNotification(BOOL bLoopedPlay);
+    // 0x471720
+    HRESULT Reset(DWORD offset);
+    // 0x470bb0. Creates the buffers again in the format of a track.
+    HRESULT recreate_buffers(ThBgmFormat *track);
+    // 0x471b00. Switches to another track, continuing at the same time.
+    HRESULT switch_track(ThBgmFormat *track);
+    // 0x471bd0. Seconds into the track, counting from the loop start after
+    // the first loop.
+    HARNESS_CALLED double get_play_time();
+    // 0x471c90. Restarts the track the given number of seconds in.
+    HARNESS_CALLED void seek(double seconds);
+};
+
+inline void BgmStream::set_volume(i32 volume)
+{
+    ((CSound *)this)->SetVolume(volume);
+}
+
+inline HRESULT BgmStream::stop(i32 unk)
+{
+    return ((CSound *)this)->Stop(unk);
+}
+
+inline HRESULT BgmStream::handle_wave_stream_notification(i32 unused)
+{
+    return ((CStreamingSound *)this)->HandleWaveStreamNotification(TRUE);
+}
 
 inline void BgmStream::destroy()
 {
@@ -169,7 +369,9 @@ struct SoundManager
     BgmStream *bgm_stream;
     u8 unk_5664[0x5668 - 0x5664];
     HANDLE bgm_event;
-    u8 unk_566c[0x5674 - 0x566c];
+    u8 unk_566c[0x5670 - 0x566c];
+    // Where the tracks start in thbgm.dat.
+    i32 bgm_file_offset;
     HANDLE init_thread;
     HANDLE load_thread;
     DWORD init_thread_id;

@@ -60,7 +60,8 @@ struct AnmRawEntry
     u32 texture;
     u8 has_data;
     u8 unk_21;
-    u16 low_res_scale;
+    u8 low_res_scale;
+    u8 unk_23;
     u32 offset_to_next;
     u32 unused[6];
 };
@@ -85,7 +86,8 @@ struct AnmLoaded
     i32 load_wait;
     // Set to have sub_46d690 unload the file.
     i32 unload_requested;
-    u8 unk_130[0x134 - 0x130];
+    // Bytes of texture memory the file's textures take.
+    i32 texture_memory;
     // Counts VMs created from this file.
     i32 vm_count;
     void *unk_138;
@@ -142,7 +144,35 @@ struct AnmLoaded
     // 0x46d0c0 (ExpHP: load_one_script). Checks an entry and reads its
     // image file unless the texture is embedded.
     i32 load_entry(i32 index, AnmRawEntry *entry);
+    // 0x46d8a0. Stores a sprite and works out its UVs and size.
+    void load_sprite(i32 index, AnmLoadedSprite *sprite);
 };
+
+// A sprite as stored in an .anm entry.
+struct AnmRawSprite
+{
+    i32 id;
+    f32 x;
+    f32 y;
+    f32 width;
+    f32 height;
+};
+
+// An embedded texture (THTX), the image of entries with has_data set.
+struct AnmRawTexture
+{
+    char magic[4];
+    u16 unk_4;
+    i16 format;
+    i16 width;
+    i16 height;
+    u32 size;
+    u8 data[1];
+};
+
+// Bytes per pixel and Direct3D format of each ANM texture format.
+extern i32 g_anm_format_bpp[9];
+extern D3DFORMAT g_anm_d3d_formats[9];
 
 // A VM from the manager's preallocated pool (ExpHP: zAnmFastVm).
 struct AnmFastVm
@@ -153,6 +183,11 @@ struct AnmFastVm
     u8 unk_60d[3];
     // Index in the pool; the low 13 bits of the VM's id.
     i32 fast_id;
+
+    // 0x46b770 and 0x46b790, which AnmManager's constructor and destructor
+    // pass to the vector constructor and destructor iterators.
+    AnmFastVm();
+    ~AnmFastVm();
 };
 
 // Vertex formats of the batched sprites and primitives (ExpHP:
@@ -272,6 +307,9 @@ struct AnmManager
     i32 render_sprite_2d(AnmVm *vm, i32 unk);
     // Render mode 5.
     void draw_vm__mode_5(AnmVm *vm);
+    // 0x468350. Draws vertex_count vertices (a triangle fan, in screen
+    // space) with the VM's texture and blending.
+    i32 draw_vm__mode_11(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count);
     // 0x46efa0
     AnmVm *get_vm_with_id(AnmId id);
     // 0x46f1c0. Marks the VM and its children for deletion. Reaches the
@@ -319,6 +357,25 @@ struct AnmManager
     // 0x46d1c0. Creates the textures of the next entry, or the prototype
     // VMs once all are done.
     static AnmLoaded *__stdcall load_next_entry(AnmLoaded *anm);
+    // 0x46d3b0. Creates the texture, sprites and script table of one entry.
+    static i32 __stdcall setup_entry(AnmLoaded *anm, i32 index, i32 first_sprite, i32 first_script,
+                                     AnmRawEntry *entry);
+    // Texture creation for setup_entry. They return the bytes the texture
+    // takes (0 for render targets), or a negative value on failure.
+    // 0x46cd80. A render target ("@R" entries).
+    static i32 __stdcall create_render_target(AnmLoadedD3D *d3d, i32 width, i32 height);
+    // 0x46cd30. An empty texture ("@" entries).
+    static i32 __stdcall create_empty_texture(AnmLoadedD3D *d3d, i32 width, i32 height, i32 format);
+    // 0x46c920. From the image file read by AnmLoaded::load_entry, cropped
+    // to the entry's size. The third argument is the same at every call
+    // site; LTCG folded it.
+    static i32 __stdcall load_texture_from_file(AnmLoadedD3D *d3d, i32 format, i32 unused, i32 width, i32 height,
+                                                i32 offset_x, i32 offset_y);
+    // 0x46cb60. From a texture embedded in the .anm file.
+    static i32 __stdcall load_texture_from_data(AnmLoadedD3D *d3d, AnmRawTexture *raw, i32 format, i32 width,
+                                                i32 height);
+    // 0x46c0d0. Fixes up the pixels of a freshly loaded texture.
+    static void __stdcall convert_texture(IDirect3DTexture9 *texture);
     // Frees ANM files marked for unloading; nonzero while one is still busy.
     // Every caller goes through g_AnmManager (see the list inserts).
     HARNESS_CALLED i32 sub_46d690();
@@ -334,6 +391,11 @@ struct AnmManager
     HARNESS_CALLED AnmId restore_snapshot(AnmId id);
     // 0x46f970. Copies a snapshot and its children back into live VMs.
     AnmId restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent);
+    // 0x46fac0. Writes a VM, its extra data and its children to dst, adding
+    // the bytes used to *size.
+    HARNESS_CALLED void save_vm_tree(AnmVm *dst, AnmVm *src, i32 *size);
+    // 0x46fc30. Reads a tree written by save_vm_tree back into snapshot VMs.
+    AnmId load_vm_tree(AnmVm *src, AnmVm *parent, i32 *size);
     // 0x46e7d0 and the next three. Every caller goes through g_AnmManager,
     // so LTCG replaced this with a load of the global (and kept its stack
     // slot). They hand out the VM's new id.
@@ -398,6 +460,14 @@ struct AnmManager
     static int __fastcall on_draw_4e_layer_40(AnmManager *mgr);
     static int __fastcall on_draw_50_layer_41(AnmManager *mgr);
     static int __fastcall on_draw_53_layer_42(AnmManager *mgr);
+
+    // 0x46d720. unload_anm as LTCG kept it out of line for one caller (an
+    // ECL instruction).
+    void unload_anm_out_of_line(i32 slot);
+    // 0x46c8b0. Loads an image file in memory into the top level of an
+    // existing texture. The last three arguments are the same at every call
+    // site; LTCG folded them. Does not use this.
+    HARNESS_CALLED i32 reload_texture(AnmLoadedD3D *d3d, void *data, u32 size, i32 unk_3, i32 unk_4, i32 unk_5);
 
     // Frees the ANM file in a slot, if one is loaded there.
     void unload_anm(i32 slot)
