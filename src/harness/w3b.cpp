@@ -2,6 +2,7 @@
 // whose shape depends on callers that are not decompiled yet.
 #include "../AsciiManager.h"
 #include "../EffectManager.h"
+#include "../EnemyManager.h"
 #include "../Item.h"
 #include "../Laser.h"
 
@@ -44,4 +45,10 @@ LaserDataInf *harness_w3b_find_laser(i32 id)
 AnmId harness_w3b_create_vm_front(AnmLoaded *anm, i32 script, i32 layer)
 {
     return anm->create_vm_front(script, layer, 0);
+}
+
+// The ECL reads the bosses' variables.
+EnemyInf *harness_w3b_get_boss(i32 i)
+{
+    return g_EnemyManager->get_boss(i);
 }

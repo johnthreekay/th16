@@ -20,22 +20,10 @@ int EnemyInf::get_int_global(int var)
     return unit8b_placeholder_sink(this, var);
 }
 
-// STUB: TH16 0x423f80
-int *EnemyInf::get_int_global_ptr(int var)
-{
-    return (int *)unit8b_placeholder_sink(this, var);
-}
-
 // STUB: TH16 0x424110
 f32 EnemyInf::get_float_global(int var)
 {
     return (f32)unit8b_placeholder_sink(this, var);
-}
-
-// STUB: TH16 0x424c10
-f32 *EnemyInf::get_float_global_ptr(int var)
-{
-    return (f32 *)unit8b_placeholder_sink(this, var);
 }
 
 // STUB: TH16 0x472030

@@ -4,7 +4,7 @@
 #include "EnemyManager.h"
 
 // FUNCTION: TH16 0x417580
-EnemyInf *EnemyManager::get_boss(i32 i)
+HARNESS_CALLED EnemyInf *EnemyManager::get_boss(i32 i)
 {
     EnemyInf *e = NULL;
     i32 id = g_EnemyManager->inner.boss_ids[i];

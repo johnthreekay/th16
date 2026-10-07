@@ -1169,3 +1169,185 @@ int EnemyData::ecl_enm_create()
     g_EnemyManager->allocate_new_enemy((const char *)&instr->args[1], &params, 0);
     return 0;
 }
+
+// ECL variable numbers (ExpHP's truth). Only the ones read here.
+enum EclVar
+{
+    ECL_VAR_I0 = -9985,
+    ECL_VAR_I1 = -9984,
+    ECL_VAR_I2 = -9983,
+    ECL_VAR_I3 = -9982,
+    ECL_VAR_MISS_COUNT = -9949,
+    ECL_VAR_BOMB_COUNT = -9948,
+    ECL_VAR_CAN_STILL_CAPTURE = -9947,
+    ECL_VAR_BOSS_I0 = -9943,
+    ECL_VAR_BOSS_I1 = -9942,
+    ECL_VAR_BOSS_I2 = -9941,
+    ECL_VAR_BOSS_I3 = -9940,
+    ECL_VAR_GI0 = -9926,
+    ECL_VAR_GI1 = -9925,
+    ECL_VAR_GI2 = -9924,
+    ECL_VAR_GI3 = -9923,
+    ECL_VAR_ABS_X = -9995,
+    ECL_VAR_ABS_Y = -9994,
+    ECL_VAR_REL_X = -9993,
+    ECL_VAR_REL_Y = -9992,
+    ECL_VAR_F0 = -9981,
+    ECL_VAR_F1 = -9980,
+    ECL_VAR_F2 = -9979,
+    ECL_VAR_F3 = -9978,
+    ECL_VAR_BOSS_F0 = -9939,
+    ECL_VAR_BOSS_F1 = -9938,
+    ECL_VAR_BOSS_F2 = -9937,
+    ECL_VAR_BOSS_F3 = -9936,
+    ECL_VAR_F4 = -9935,
+    ECL_VAR_F5 = -9934,
+    ECL_VAR_F6 = -9933,
+    ECL_VAR_F7 = -9932,
+    ECL_VAR_GF0 = -9922,
+    ECL_VAR_GF1 = -9921,
+    ECL_VAR_GF2 = -9920,
+    ECL_VAR_GF3 = -9919,
+    ECL_VAR_GF4 = -9918,
+    ECL_VAR_GF5 = -9917,
+    ECL_VAR_GF6 = -9916,
+    ECL_VAR_GF7 = -9915,
+};
+
+// FUNCTION: TH16 0x423f80
+int *EnemyInf::get_int_global_ptr(int var)
+{
+    EnemyInf *boss;
+    switch (var)
+    {
+    case ECL_VAR_I0:
+        return &enemy.ecl_int_vars[0];
+    case ECL_VAR_I1:
+        return &enemy.ecl_int_vars[1];
+    case ECL_VAR_I2:
+        return &enemy.ecl_int_vars[2];
+    case ECL_VAR_I3:
+        return &enemy.ecl_int_vars[3];
+    case ECL_VAR_MISS_COUNT:
+        return &g_EnemyManager->inner.miss_count;
+    case ECL_VAR_BOMB_COUNT:
+        return &g_EnemyManager->inner.bomb_count;
+    case ECL_VAR_CAN_STILL_CAPTURE:
+        return &g_EnemyManager->inner.can_still_capture_spell;
+    case ECL_VAR_BOSS_I0:
+        boss = g_EnemyManager->get_boss(0);
+        if (boss == NULL)
+        {
+            return &enemy.ecl_int_vars[0];
+        }
+        return &boss->enemy.ecl_int_vars[0];
+    case ECL_VAR_BOSS_I1:
+        boss = g_EnemyManager->get_boss(0);
+        if (boss == NULL)
+        {
+            return &enemy.ecl_int_vars[1];
+        }
+        return &boss->enemy.ecl_int_vars[1];
+    case ECL_VAR_BOSS_I2:
+        boss = g_EnemyManager->get_boss(0);
+        if (boss == NULL)
+        {
+            return &enemy.ecl_int_vars[2];
+        }
+        return &boss->enemy.ecl_int_vars[2];
+    case ECL_VAR_BOSS_I3:
+        boss = g_EnemyManager->get_boss(0);
+        if (boss == NULL)
+        {
+            return &enemy.ecl_int_vars[3];
+        }
+        return &boss->enemy.ecl_int_vars[3];
+    case ECL_VAR_GI0:
+        return &g_EnemyManager->inner.ecl_int_vars[0];
+    case ECL_VAR_GI1:
+        return &g_EnemyManager->inner.ecl_int_vars[1];
+    case ECL_VAR_GI2:
+        return &g_EnemyManager->inner.ecl_int_vars[2];
+    case ECL_VAR_GI3:
+        return &g_EnemyManager->inner.ecl_int_vars[3];
+    }
+    return NULL;
+}
+
+// FUNCTION: TH16 0x424c10
+f32 *EnemyInf::get_float_global_ptr(int var)
+{
+    EnemyInf *boss;
+    switch (var)
+    {
+    case ECL_VAR_F0:
+        return &enemy.ecl_float_vars[0];
+    case ECL_VAR_F1:
+        return &enemy.ecl_float_vars[1];
+    case ECL_VAR_F2:
+        return &enemy.ecl_float_vars[2];
+    case ECL_VAR_F3:
+        return &enemy.ecl_float_vars[3];
+    case ECL_VAR_F4:
+        return &enemy.ecl_float_vars[4];
+    case ECL_VAR_F5:
+        return &enemy.ecl_float_vars[5];
+    case ECL_VAR_F6:
+        return &enemy.ecl_float_vars[6];
+    case ECL_VAR_F7:
+        return &enemy.ecl_float_vars[7];
+    case ECL_VAR_BOSS_F0:
+        boss = g_EnemyManager->get_boss(0);
+        if (boss == NULL)
+        {
+            return &enemy.ecl_float_vars[0];
+        }
+        return &boss->enemy.ecl_float_vars[0];
+    case ECL_VAR_BOSS_F1:
+        boss = g_EnemyManager->get_boss(0);
+        if (boss == NULL)
+        {
+            return &enemy.ecl_float_vars[1];
+        }
+        return &boss->enemy.ecl_float_vars[1];
+    case ECL_VAR_BOSS_F2:
+        boss = g_EnemyManager->get_boss(0);
+        if (boss == NULL)
+        {
+            return &enemy.ecl_float_vars[2];
+        }
+        return &boss->enemy.ecl_float_vars[2];
+    case ECL_VAR_BOSS_F3:
+        boss = g_EnemyManager->get_boss(0);
+        if (boss == NULL)
+        {
+            return &enemy.ecl_float_vars[3];
+        }
+        return &boss->enemy.ecl_float_vars[3];
+    case ECL_VAR_GF0:
+        return &g_EnemyManager->inner.ecl_float_vars[0];
+    case ECL_VAR_GF1:
+        return &g_EnemyManager->inner.ecl_float_vars[1];
+    case ECL_VAR_GF2:
+        return &g_EnemyManager->inner.ecl_float_vars[2];
+    case ECL_VAR_GF3:
+        return &g_EnemyManager->inner.ecl_float_vars[3];
+    case ECL_VAR_GF4:
+        return &g_EnemyManager->inner.ecl_float_vars[4];
+    case ECL_VAR_GF5:
+        return &g_EnemyManager->inner.ecl_float_vars[5];
+    case ECL_VAR_GF6:
+        return &g_EnemyManager->inner.ecl_float_vars[6];
+    case ECL_VAR_GF7:
+        return &g_EnemyManager->inner.ecl_float_vars[7];
+    case ECL_VAR_ABS_X:
+        return &enemy.abs_pos.pos.x;
+    case ECL_VAR_ABS_Y:
+        return &enemy.abs_pos.pos.y;
+    case ECL_VAR_REL_X:
+        return &enemy.rel_pos.pos.x;
+    case ECL_VAR_REL_Y:
+        return &enemy.rel_pos.pos.y;
+    }
+    return NULL;
+}

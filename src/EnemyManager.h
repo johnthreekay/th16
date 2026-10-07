@@ -94,7 +94,7 @@ struct EnemyManager
     static int __fastcall on_tick_callback(EnemyManager *mgr);
     static int __fastcall on_draw_callback(EnemyManager *mgr);
     // Uses g_EnemyManager; callers pass no this.
-    EnemyInf *get_boss(i32 i);
+    HARNESS_CALLED EnemyInf *get_boss(i32 i);
     // 0x41aa70. Creates an enemy running the named subroutine and adds it
     // to the active list. unused is 0 everywhere.
     EnemyInf *allocate_new_enemy(const char *sub_name, EnemyCreateParams *params, i32 unused);
