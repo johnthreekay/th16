@@ -126,7 +126,7 @@ struct Bullet
     // 0x412670. Frees the bullet: back to the free list, off the tick list.
     void sub_412670();
     // 0x413860. Starts the et_ex transforms that are due.
-    i32 run_ex();
+    void run_ex();
     // 0x4162d0. Keeps the bullet going while it is off screen and still
     // heading back towards it, for a number of frames at most.
     i32 step_ex_08();
