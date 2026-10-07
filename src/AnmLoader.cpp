@@ -94,7 +94,7 @@ AnmLoaded *AnmManager::do_preload_anm(i32 slot, const char *path)
     return anm;
 }
 
-// TODO: the original frame has 8 bytes of unused slots and saves esi/edi at the start.
+// TODO: the original frame has 8 unused bytes (sub esp, 8; ours has none), otherwise the same code.
 // FUNCTION: TH16 0x46d020
 AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *path)
 {
@@ -124,7 +124,7 @@ AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *path)
     return anm;
 }
 
-// TODO: the original frame has 4 more bytes and saves esi/edi at the start.
+// TODO: code matches; our frame leaves 8 unused bytes between buf and the /GS cookie (0x124 vs 0x11c).
 // FUNCTION: TH16 0x46d0c0
 i32 AnmLoaded::load_entry(i32 index, AnmRawEntry *entry)
 {

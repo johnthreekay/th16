@@ -35,10 +35,7 @@ D3DXVECTOR3 AnmVm::world_pos()
     return result;
 }
 
-// TODO: the original frame has 4 more bytes and saves esi before taking
-// the critical section.
-// TODO: the original realigns the frame (and esp, -8) and saves esi in the
-// prologue (ours after entering the critical section, as in create_vm).
+// TODO: the original realigns the frame (and esp, -8; sub esp, 0x10) and so saves esi in the prologue; ours pushes esi after entering the critical section.
 // FUNCTION: TH16 0x406380
 DECOMP_NOINLINE AnmId AnmLoaded::create_effect(i32 script, i32 layer, AnmVm **out)
 {
