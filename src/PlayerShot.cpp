@@ -1,8 +1,12 @@
 // Shot type callbacks: the functions a .sht file's shooters name by index
 // (g_sht_*_funcs), called with the bullet in ecx.
+#include <math.h>
+
 #include "Player.h"
 
 #include "EffectManager.h"
+#include "Enemy.h"
+#include "EnemyManager.h"
 #include "Rng.h"
 #include "SoundManager.h"
 
@@ -71,6 +75,82 @@ DamageSourceHitFunc const g_damage_source_hit_funcs[4] = {
     damage_source_on_hit_4474a0,
     NULL,
 };
+
+// Homing: turns toward the nearest enemy, slowing down while the turn is
+// sharp and speeding up once it is on course.
+// FUNCTION: TH16 0x445ee0
+i32 __fastcall sht_on_tick_445ee0(PlayerBullet *bullet)
+{
+    if (bullet->state == 2)
+    {
+        return 0;
+    }
+    EnemyRef *target = (EnemyRef *)&bullet->unk_90;
+    if (g_EnemyManager == NULL)
+    {
+        target->id = 0;
+    }
+    else if (target->id == 0)
+    {
+        Float3 pos = bullet->pos.pos;
+        *target = g_EnemyManager->find_closest(&pos, 256.0f);
+    }
+    if (bullet->unk_90 != 0)
+    {
+        if (!g_EnemyManager->is_enemy_alive(bullet->unk_90))
+        {
+            bullet->unk_90 = 0;
+        }
+        else
+        {
+            EnemyInf *enemy = target->get();
+            if (!(enemy->enemy.flags_low & 0xc000021))
+            {
+                f32 angle = atan2f(enemy->enemy.final_pos.pos.y - bullet->pos.pos.y,
+                                   enemy->enemy.final_pos.pos.x - bullet->pos.pos.x);
+                f32 current = bullet->pos.angle.value;
+                f32 diff;
+                if (angle - current > ZUN_PI)
+                {
+                    diff = angle - (current + ZUN_2PI);
+                }
+                else if (current - angle > ZUN_PI)
+                {
+                    diff = angle - (current - ZUN_2PI);
+                }
+                else
+                {
+                    diff = angle - current;
+                }
+                f32 speed = bullet->pos.speed;
+                if (bullet->timer_c.current < 60)
+                {
+                    f32 turn = (f32)fabs(diff);
+                    if (turn >= ZUN_PI / 4)
+                    {
+                        f32 slower = speed - 0.2f;
+                        speed = 4.0f > slower ? 4.0f : slower;
+                    }
+                    else if (turn < ZUN_PI / 12)
+                    {
+                        f32 faster = speed + 0.2f;
+                        speed = 16.0f < faster ? 16.0f : faster;
+                    }
+                    bullet->pos.set_angle((bullet->pos.angle + diff * 0.08f).value);
+                    bullet->pos.speed = speed;
+                }
+                else
+                {
+                    bullet->pos.speed = speed + 0.2f;
+                }
+                return 0;
+            }
+        }
+    }
+    f32 faster = bullet->pos.speed + 0.1f;
+    bullet->pos.speed = 16.0f < faster ? 16.0f : faster;
+    return 0;
+}
 
 // FUNCTION: TH16 0x445ed0
 i32 __fastcall sht_on_init_445ed0(PlayerBullet *bullet)
@@ -200,6 +280,22 @@ i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     source->pos = bullet->pos;
     g_SoundManager.play_sound_at_position(0x41, bullet->pos.pos.x);
     return bullet->unk_9c;
+}
+
+// A tinted effect pointing back the way the bullet came, give or take 20
+// degrees.
+// FUNCTION: TH16 0x4460c0
+i32 __fastcall sht_on_hit_4460c0(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
+{
+    f32 angle = wrap_angle(bullet->pos.angle.value + g_replay_unsafe_rng.randf_neg_1_to_1() * 0.34906584f);
+    angle = wrap_angle(angle + ZUN_PI);
+    AnmId id = g_EffectManager->effect_anm->create_vm(0x98, &bullet->pos.pos, angle, -1, 0);
+    AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+    vm->color_1.r = (g_replay_unsafe_rng.rand_u32() & 0x7f) + 0x7f;
+    vm->color_1.g = (g_replay_unsafe_rng.rand_u32() & 0x3f) + 0x40;
+    vm->color_1.b = (g_replay_unsafe_rng.rand_u32() & 0x3f) + 0x40;
+    vm->color_1.a = (g_replay_unsafe_rng.rand_u32() & 0x3f) + 0x60;
+    return bullet->hit();
 }
 
 // Turns the effect up to 20 degrees either way.

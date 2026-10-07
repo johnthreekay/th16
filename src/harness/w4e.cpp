@@ -26,3 +26,11 @@ void harness_w4e_update_options(Player *player)
     player->update_options(player->inner.main_options, 4);
     player->update_options(player->inner.subseason_options, 8);
 }
+
+#include "../EnemyManager.h"
+
+// ECL's enemy-alive check (0x42288c).
+i32 harness_w4e_is_enemy_alive(i32 id)
+{
+    return g_EnemyManager->is_enemy_alive(id);
+}
