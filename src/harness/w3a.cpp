@@ -90,15 +90,6 @@ Float3 *harness_zero_vec_ptr()
     return &g_zero_vec;
 }
 
-// Like AnmManager::draw_vm (0x468754) and the sprite corner writers
-// (0x465fb8), which place a VM by its transformed position.
-f32 harness_vm_transformed_x(AnmVm *vm)
-{
-    Float3 pos;
-    vm->get_own_transformed_pos(&pos);
-    return pos.x + pos.y;
-}
-
 // Like ECL's bullet cancel instructions (0x4221b8, 0x422237).
 void harness_cancel_radius(D3DXVECTOR3 *pos, f32 radius, i32 mode)
 {

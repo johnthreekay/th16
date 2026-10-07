@@ -1,6 +1,8 @@
+#include <stdlib.h>
 #include <stddef.h>
 
 #include "AnmManager.h"
+#include "Rng.h"
 #include "Supervisor.h"
 
 static_assert(offsetof(AnmManager, render_cache_184fbb0) == 0x184fbb0, "AnmManager layout");
@@ -314,6 +316,8 @@ struct AnmFanData
     f32 radius[33];
     f32 radius_speed[32];
     f32 uv_speed;
+    f32 unk_4a8;
+    u8 unk_4ac[4];
 };
 
 // This file's copy of ZunMath.h's sincosmul.
@@ -329,6 +333,67 @@ static void __fastcall fan_sincosmul(Float3 *dst, f32 angle, f32 radius)
         fmul radius
         fstp [eax+4]
     }
+}
+
+// Sets up render mode 10 (ANM instruction 302): a fan of random radii
+// around the VM, moved by on_tick 4 and drawn by on_draw 6.
+// TODO: the original keeps the angle in xmm4 and the radius speed in memory, storing the speed after the random call.
+// FUNCTION: TH16 0x469e20
+int __fastcall anm_effect_4_init(AnmVm *vm)
+{
+    if (vm->ins_508_extra_data != NULL)
+    {
+        free(vm->ins_508_extra_data);
+        vm->ins_508_extra_data = NULL;
+        vm->ins_508_extra_data_size = 0;
+    }
+    vm->alloc_extra_data(sizeof(AnmFanData));
+    vm->index_of_on_tick = 4;
+    vm->index_of_on_draw = 6;
+    AnmFanData *data = (AnmFanData *)vm->ins_508_extra_data;
+    data->uv_speed = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);
+    data->unk_4a8 = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);
+    f32 angle = -ZUN_PI;
+    *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
+    data->vertices[0].pos.w = 1.0f;
+    data->vertices[0].uv.x = 0.5f;
+    data->vertices[0].uv.y = 0.5f;
+    f32 speed = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 15.0f);
+    RenderVertex144 *vertex = &data->vertices[1];
+    f32 *radius = data->radius;
+    for (i32 i = 31; i != 0; i--)
+    {
+        if (angle >= ZUN_PI)
+        {
+            angle -= ZUN_2PI;
+        }
+        vertex->pos.w = 1.0f;
+        Float3 uv;
+        fan_sincosmul(&uv, angle, 0.5f);
+        vertex->pos.z = 0.0f;
+        vertex->uv.x = uv.x + 0.5f;
+        vertex->uv.y = uv.y + 0.5f;
+        f32 r = g_replay_safe_rng.randf_neg_1_to_1() * 8.0f + 80.0f;
+        radius[33] = speed;
+        *radius = r;
+        speed += g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 30.0f);
+        if (speed < -(1.0f / 15.0f))
+        {
+            speed = -(1.0f / 15.0f);
+        }
+        else if (speed > 1.0f / 15.0f)
+        {
+            speed = 1.0f / 15.0f;
+        }
+        fan_sincosmul((Float3 *)&vertex->pos, angle, *radius);
+        vertex->pos.x = vertex->pos.x + (vm->entity_pos.x + vm->pos.x);
+        vertex->pos.y = vertex->pos.y + (vm->pos.y + vm->entity_pos.y);
+        vertex->pos.z = vertex->pos.z + (vm->entity_pos.z + vm->pos.z);
+        angle += ZUN_2PI / 31.0f;
+        vertex++;
+        radius++;
+    }
+    return 0;
 }
 
 // Scrolls the fan's texture coordinates, keeping them from going negative.
@@ -461,14 +526,15 @@ void AnmManager::render_sub_466f00(AnmVm *vm)
 }
 
 // FUNCTION: TH16 0x4671b0
-void AnmManager::draw_vm__mode_5(AnmVm *vm)
+i32 AnmManager::draw_vm__mode_5(AnmVm *vm)
 {
     render_sub_466f00(vm);
-    render_sprite_2d(vm, 0);
+    i32 result = render_sprite_2d(vm, 0);
     g_sprite_temp_buffer[3].pos.w = 1.0f;
     g_sprite_temp_buffer[2].pos.w = 1.0f;
     g_sprite_temp_buffer[1].pos.w = 1.0f;
     g_sprite_temp_buffer[0].pos.w = 1.0f;
+    return result;
 }
 
 // TODO: the original reserves a dead 4-byte local (push ecx/pop ecx).
