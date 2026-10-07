@@ -1463,6 +1463,11 @@ void __fastcall anm_vm_interrupt_2_run(AnmVm *vm)
     vm->run();
 }
 
+// Starts a dialogue script: creates the text and furigana VMs (text.anm
+// scripts 0 and 1; the second of each gets interrupt 7, presumably to make
+// it the lower line),
+// clears bullets, lasers and enemies, and puts the bubble at its default
+// place.
 // TODO: ours gets a /GS cookie and keeps the create_effect results in a
 // local; the original has no cookie and reuses script's argument slot for them.
 // FUNCTION: TH16 0x429b20

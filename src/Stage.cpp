@@ -11,6 +11,7 @@
 #include "Rng.h"
 #include "ScreenEffect.h"
 #include "Spellcard.h"
+#include "StageData.h"
 #include "Supervisor.h"
 #include "ZunAngle.h"
 
@@ -19,6 +20,14 @@ Stage *g_Stage;
 
 // GLOBAL: TH16 0x4a6d9c
 Stage *g_Stage2;
+
+// The stage table (file names, music and bosses per stage number; defined
+// here without the original's contents) and the current stage's entry.
+// GLOBAL: TH16 0x4a22d0
+StageData g_stage_table[8];
+
+// GLOBAL: TH16 0x4a6f18
+StageData *g_stage_data;
 
 // STD_FOG_TIME.
 // FUNCTION: TH16 0x409490
