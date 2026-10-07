@@ -380,8 +380,8 @@ HARNESS_CALLED LaserCurveNode *LaserCurveInf::append_node(f32 value)
         node = node->next;
     }
     node->next = new LaserCurveNode;
-    node->unk_c = value;
-    node->next->unk_8 = value;
+    node->end_time = value;
+    node->next->start_time = value;
     node->next->next = NULL;
     node->next->prev = node;
     return node->next;

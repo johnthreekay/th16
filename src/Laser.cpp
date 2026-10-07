@@ -2111,8 +2111,8 @@ i32 LaserCurveInf::initialize(void *params)
         nodes.start_pos = position;
         nodes.velocity.z = 0.0f;
         nodes.mode = 0;
-        nodes.unk_8 = 0.0f;
-        nodes.unk_c = 999999.0f;
+        nodes.start_time = 0.0f;
+        nodes.end_time = 999999.0f;
         ex_index = *(i32 *)inner.unk_34c;
     }
     *(Float3 *)((LaserCurveSegment *)segments)->unk_c = tip_offset;
@@ -2127,7 +2127,7 @@ i32 LaserCurveInf::initialize(void *params)
         f32 t = segment_timer.current_f - (f32)i;
         for (LaserCurveNode *node = &nodes; node != NULL; node = node->next)
         {
-            if (t >= node->unk_8 && node->unk_c > t)
+            if (t >= node->start_time && node->end_time > t)
             {
                 if (i == 0)
                 {
@@ -2271,7 +2271,7 @@ void LaserCurveInf::run_ex()
         {
             LaserCurveNode *node = append_node((f32)ex->b);
             node->mode = 1;
-            node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->unk_c);
+            node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->end_time);
             node->start_pos.z = 0.0f;
             laser_sincosmul(&node->velocity, node->angle, 1.0f);
             node->velocity.z = 0.0f;
@@ -2279,18 +2279,18 @@ void LaserCurveInf::run_ex()
             node->angle_delta = ex->s;
             if (ex->a >= 0)
             {
-                node->unk_c = (f32)ex->a + (f32)ex->b;
-                node = append_node(node->unk_c);
+                node->end_time = (f32)ex->a + (f32)ex->b;
+                node = append_node(node->end_time);
                 node->mode = 0;
-                node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->unk_c);
+                node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->end_time);
                 node->start_pos.z = 0.0f;
                 laser_sincosmul(&node->velocity, node->angle, 1.0f);
                 node->velocity.z = 0.0f;
-                node->unk_c = 999999.0f;
+                node->end_time = 999999.0f;
             }
             else
             {
-                node->unk_c = 999999.0f;
+                node->end_time = 999999.0f;
             }
             break;
         }
@@ -2298,7 +2298,7 @@ void LaserCurveInf::run_ex()
         {
             LaserCurveNode *node = append_node((f32)ex->b);
             node->mode = 2;
-            node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->unk_c);
+            node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->end_time);
             node->start_pos.z = 0.0f;
             laser_sincosmul(&node->velocity, node->angle, 1.0f);
             node->velocity.z = 0.0f;
@@ -2306,18 +2306,18 @@ void LaserCurveInf::run_ex()
             node->angle_delta = ex->s;
             if (ex->a >= 0)
             {
-                node->unk_c = (f32)ex->a + (f32)ex->b;
-                node = append_node(node->unk_c);
+                node->end_time = (f32)ex->a + (f32)ex->b;
+                node = append_node(node->end_time);
                 node->mode = 0;
-                node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->unk_c);
+                node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->end_time);
                 node->start_pos.z = 0.0f;
                 laser_sincosmul(&node->velocity, node->angle, 1.0f);
                 node->velocity.z = 0.0f;
-                node->unk_c = 999999.0f;
+                node->end_time = 999999.0f;
             }
             else
             {
-                node->unk_c = 999999.0f;
+                node->end_time = 999999.0f;
             }
             break;
         }
@@ -2512,7 +2512,7 @@ void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
 // FUNCTION: TH16 0x437ee0
 void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, f32 time)
 {
-    time -= unk_8;
+    time -= start_time;
     switch (mode)
     {
     case 0:
@@ -2806,7 +2806,7 @@ i32 LaserCurveInf::on_tick()
                 LaserCurveNode *node;
                 for (node = &nodes; node != NULL; node = node->next)
                 {
-                    if (t >= node->unk_8 && node->unk_c > t)
+                    if (t >= node->start_time && node->end_time > t)
                     {
                         if (!placed)
                         {

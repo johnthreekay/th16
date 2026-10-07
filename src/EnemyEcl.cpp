@@ -112,7 +112,7 @@ static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)
 // would be a stack temporary, which makes LTCG align the frame.
 static __forceinline void get_shot_origin(EnemyData *enemy, i32 i, D3DXVECTOR3 *out)
 {
-    if (enemy->bullet_mgr_origins[i].unk_8 > 0.9f)
+    if (enemy->bullet_mgr_origins[i].z > 0.9f)
     {
         *out = D3DXVECTOR3(enemy->bullet_mgr_origins[i].xy.x + enemy->bullet_mgr_offsets[i].xy.x,
                            enemy->bullet_mgr_origins[i].xy.y + enemy->bullet_mgr_offsets[i].xy.y, 0.0f);
@@ -121,7 +121,7 @@ static __forceinline void get_shot_origin(EnemyData *enemy, i32 i, D3DXVECTOR3 *
     {
         *out = D3DXVECTOR3(enemy->bullet_mgr_offsets[i].xy.x + enemy->final_pos.pos.x,
                            enemy->bullet_mgr_offsets[i].xy.y + enemy->final_pos.pos.y,
-                           enemy->bullet_mgr_offsets[i].unk_8 + enemy->final_pos.pos.z);
+                           enemy->bullet_mgr_offsets[i].z + enemy->final_pos.pos.z);
     }
 }
 
@@ -1433,7 +1433,7 @@ int EnemyData::ecl_run_over_300()
         bullet_mgr_offsets[slot].xy.y = 0.0f;
         bullet_mgr_origins[slot].xy.x = 0.0f;
         bullet_mgr_origins[slot].xy.y = 0.0f;
-        bullet_mgr_origins[slot].unk_8 = 0.0f;
+        bullet_mgr_origins[slot].z = 0.0f;
         et_ex_index[slot] = 0;
         break;
     }
@@ -1452,7 +1452,7 @@ int EnemyData::ecl_run_over_300()
     case 601:
     {
         i32 slot = get_int_arg(0);
-        if (bullet_mgr_origins[slot].unk_8 > 0.9f)
+        if (bullet_mgr_origins[slot].z > 0.9f)
         {
             bullet_props[slot].pos =
                 D3DXVECTOR3(bullet_mgr_origins[slot].xy.x + bullet_mgr_offsets[slot].xy.x,
@@ -1462,7 +1462,7 @@ int EnemyData::ecl_run_over_300()
         {
             bullet_props[slot].pos = D3DXVECTOR3(bullet_mgr_offsets[slot].xy.x + final_pos.pos.x,
                                                  bullet_mgr_offsets[slot].xy.y + final_pos.pos.y,
-                                                 bullet_mgr_offsets[slot].unk_8 + final_pos.pos.z);
+                                                 bullet_mgr_offsets[slot].z + final_pos.pos.z);
         }
         g_BulletManager->et_protect_range = et_protect_range;
         g_BulletManager->shoot_bullets(&bullet_props[slot]);
@@ -1512,11 +1512,11 @@ int EnemyData::ecl_run_over_300()
         bullet_mgr_origins[slot].xy.y = get_float_arg(2);
         if (-990.0f > bullet_mgr_origins[slot].xy.x)
         {
-            bullet_mgr_origins[slot].unk_8 = 0.0f;
+            bullet_mgr_origins[slot].z = 0.0f;
         }
         else
         {
-            bullet_mgr_origins[slot].unk_8 = 1.0f;
+            bullet_mgr_origins[slot].z = 1.0f;
         }
         break;
     }

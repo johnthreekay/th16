@@ -60,10 +60,12 @@ struct EnemyBulletShooter
     }
 };
 
+// A shooter's offset (etOffset) or absolute origin (etOffsetAbs). For
+// origins, z is 1 while the origin is set and 0 otherwise.
 struct BulletOffset
 {
     D3DXVECTOR2 xy;
-    f32 unk_8;
+    f32 z;
 };
 
 // ExpHP: zEnemyLife.
