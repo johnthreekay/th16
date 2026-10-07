@@ -31,9 +31,3 @@ i32 Spellcard::on_tick_body()
     return 1;
 }
 
-// STUB: TH16 0x411e70
-i32 Bullet::on_tick()
-{
-    return 0;
-}
-

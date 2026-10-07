@@ -79,7 +79,9 @@ struct Bullet
     // 1 while the bullet is active; ECL's funcset 1 cancels bullets near
     // the player by setting 2.
     i32 unk_c4c;
-    u8 unk_c50[0xc5c - 0xc50];
+    u8 unk_c50[0xc58 - 0xc50];
+    // Counts down every tick; while positive the bullet may be offscreen.
+    i32 unk_c58;
     // Script of bullet.anm played where the bullet is cancelled (none if
     // negative).
     i32 cancel_script;
@@ -120,6 +122,10 @@ struct Bullet
     i32 sub_4124b0(i32 graze_only);
     // 0x412670. Frees the bullet: back to the free list, off the tick list.
     void sub_412670();
+    // 0x413860. Starts the et_ex transforms that are due.
+    i32 run_ex();
+    // 0x4162d0.
+    i32 step_ex_08();
     // 0x414ec0. The first et_ex transform: a speed boost that fades over
     // 16 frames; 1 once it is over.
     i32 step_ex_00();

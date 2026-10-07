@@ -949,3 +949,184 @@ void Bullet::sub_412670()
     g_BulletManager->freelist_head.insert_after(&freelist_node);
     tick_list_node.unlink_inline();
 }
+
+// TODO: ours realigns the frame (and esp, -8), places the free path at
+// the end and orders the half-step moves differently.
+// FUNCTION: TH16 0x411e70
+i32 Bullet::on_tick()
+{
+    timer_1460.tick();
+    if (flags & 8)
+    {
+    die:
+        sub_412670();
+        return -1;
+    }
+    if (active_ex_flags & 0x400000)
+    {
+        scale = scale_i.step();
+        if (scale_i.end_time == 0)
+        {
+            active_ex_flags &= ~0x400000;
+            if (scale == 1.0f)
+            {
+                flags &= ~BULLET_FLAG_SCALED;
+            }
+        }
+    }
+    switch (state)
+    {
+    case 2:
+        pos = pos + velocity * g_game_speed * 0.5f;
+        if (timer_144c.current >= 8 && sub_4124b0(0) == 1)
+        {
+            break;
+        }
+        if (vm0.int_vars[0] == 0)
+        {
+            break;
+        }
+        state = 1;
+    case 1:
+        do
+        {
+            if (!(active_ex_flags & 0x4000000))
+            {
+                run_ex();
+            }
+            if (active_ex_flags == 0)
+            {
+                break;
+            }
+            i32 done = 0;
+            if (active_ex_flags & 1)
+            {
+                done = step_ex_00();
+            }
+            if (active_ex_flags & 4)
+            {
+                done += step_ex_02();
+            }
+            if (active_ex_flags & 0x200000)
+            {
+                done += step_ex_21();
+            }
+            if (active_ex_flags & 8)
+            {
+                done += step_ex_03();
+            }
+            if (active_ex_flags & 0x10)
+            {
+                done += step_ex_04();
+            }
+            if (active_ex_flags & 0x40)
+            {
+                done += step_ex_06();
+            }
+            if (active_ex_flags & 0x20000)
+            {
+                done += step_ex_17();
+            }
+            if (active_ex_flags & 0x80000)
+            {
+                done += step_ex_19();
+            }
+            if (active_ex_flags & 0x100)
+            {
+                done += step_ex_08();
+            }
+            if (active_ex_flags & 0x80000000)
+            {
+                if (ex_state[5].timer.current <= 0)
+                {
+                    active_ex_flags ^= 0x80000000;
+                    done++;
+                }
+                else
+                {
+                    ex_state[5].timer--;
+                }
+            }
+            if (active_ex_flags & 0x4000000)
+            {
+                if (ex_state[13].timer.current <= 0)
+                {
+                    flags &= ~BULLET_FLAG_NO_DRAW;
+                    active_ex_flags ^= 0x4000000;
+                    done++;
+                }
+                else
+                {
+                    flags |= BULLET_FLAG_NO_DRAW;
+                    ex_state[13].timer--;
+                }
+            }
+            if (ex_invuln_remaining_frames != 0)
+            {
+                ex_invuln_remaining_frames--;
+            }
+            if (done == 0)
+            {
+                break;
+            }
+        } while (1);
+        if (!(flags & BULLET_FLAG_NO_DRAW))
+        {
+            pos += velocity * g_game_speed;
+            sub_4124b0(0);
+        }
+        break;
+    case 3:
+        pos = pos + velocity * g_game_speed * 0.5f;
+        break;
+    case 5:
+        if (timer_144c.current < 3)
+        {
+            break;
+        }
+        if (timer_144c.current == 3)
+        {
+            vm0.interrupt_out_of_line(1);
+            if (cancel_script >= 0)
+            {
+                AnmVm *vm = g_BulletManager->bullet_anm->create_vm(cancel_script, &pos, 0.0f, -1, 0).find_or_clear();
+                D3DXVECTOR3 goal = velocity * g_game_speed * 10.0f;
+                vm->set_pos_time(30, 6, &g_zero_vec, &goal);
+            }
+        }
+        pos = pos + velocity * g_game_speed * 0.5f;
+        break;
+    }
+    if (vm_sprite(&vm0) != NULL)
+    {
+        if (active_ex_flags & 0x1000)
+        {
+            step_ex_12();
+        }
+        if (!(active_ex_flags & 0x100) && unk_c58 < 1)
+        {
+            if (outside_range(pos.x, vm_sprite(&vm0)->sprite_width * scale, -192.0f, 192.0f) ||
+                outside_range(pos.y, vm_sprite(&vm0)->sprite_height * scale, -64.0f, 480.0f))
+            {
+                goto die;
+            }
+        }
+    }
+    if (ex_invuln_remaining_frames != 0)
+    {
+        ex_invuln_remaining_frames--;
+    }
+    if (unk_c58 > 0)
+    {
+        unk_c58--;
+    }
+    if (!(flags & BULLET_FLAG_NO_DRAW) && vm0.run())
+    {
+        goto die;
+    }
+    if (vm1.flags_lo & 1)
+    {
+        vm1.run();
+    }
+    return 0;
+}
