@@ -196,8 +196,9 @@ HARNESS_CALLED i32 Player::check_hit_rect(Float3 *pos, Float3 *size, i32 graze_o
     return 1;
 }
 
-// TODO: the original has an 8-byte frame, subtracts y before x, and puts
-// the return 0 for an open dialogue right after its test.
+// TODO: the original loads inner.pos.y first and sums x*x + y*y (ours
+// y*y + x*x, swapped registers), and puts the return 0 for an open dialogue
+// right after its test.
 // FUNCTION: TH16 0x4439e0
 HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_only)
 {
@@ -587,8 +588,8 @@ i32 Player::shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner)
     return bullet->create(shooter_ref, time, inner) != 0 ? -1 : 0;
 }
 
-// TODO: the original realigns its frame (and esp, -8), most likely for
-// PlayerBullet::create, an opaque stub here.
+// TODO: the original realigns its frame (ebx form); the body matches. Not
+// for PlayerBullet::create (real code now, no realignment of its own).
 // FUNCTION: TH16 0x445470
 i32 Player::do_shooting(i32 short_time, i32 long_time)
 {

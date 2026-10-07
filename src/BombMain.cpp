@@ -69,7 +69,8 @@ static inline void spellcard_on_bomb()
 }
 
 // TODO: player and &pos trade registers (esi/edi) with the original, which
-// also pushes the sound argument later.
+// also pushes the sound argument later (get_vm instead of a direct
+// get_vm_with_id call removed the /GS cookie).
 // FUNCTION: TH16 0x40e780
 i32 BombAyaAInf::begin()
 {
@@ -83,7 +84,7 @@ i32 BombAyaAInf::begin()
     g_SoundManager.play_sound_centered(30, 0);
 
     anm_id = player->anm_file->create_vm(14, &pos, 0.0f, -1, 0);
-    AnmVm *vm = g_AnmManager->get_vm_with_id(anm_id);
+    AnmVm *vm = get_vm(anm_id);
     if (vm != NULL)
     {
         vm->rotation.z = angle;
@@ -218,17 +219,13 @@ i32 BombMarisaAInf::begin()
 
 // Marisa's master spark: turns with the player's movement and keeps three
 // stretches of damage along the beam.
-// TODO: ours gets a /GS cookie for beam_pos and swaps edi/ebx (the ANM
-// manager and the VM).
+// TODO: ours gets a /GS cookie for beam_pos (it goes away without the
+// interrupt_tree calls, also when those go through an inline helper), and
+// sums beam_pos and pos in a different operand order.
 // FUNCTION: TH16 0x40fb00
 i32 BombMarisaAInf::on_tick()
 {
-    AnmManager *anm = g_AnmManager;
-    AnmVm *vm = anm->get_vm_with_id(anm_id);
-    if (vm == NULL)
-    {
-        anm_id.id = 0;
-    }
+    AnmVm *vm = get_vm_or_clear(anm_id);
     g_Player->inner.iframes = 40;
     if (vm == NULL)
     {
@@ -246,8 +243,8 @@ i32 BombMarisaAInf::on_tick()
         g_Player->inner.flags &= ~4;
         g_Player->inner.speed_multiplier = 1.0f;
     }
-    vm->flags_lo |= 4;
     vm->rotation.z = angle;
+    vm->flags_lo |= 4;
     Player *player = g_Player;
     if (0.0f > player->inner.unk_16050)
     {
@@ -264,27 +261,21 @@ i32 BombMarisaAInf::on_tick()
         D3DXVECTOR3 beam_pos;
         beam_pos.z = 0.0f;
         marisa_sincosmul(&beam_pos, angle, 208.0f);
-        beam_pos.x = pos.x + beam_pos.x;
-        beam_pos.y = pos.y + beam_pos.y;
-        beam_pos.z = pos.z + beam_pos.z;
+        beam_pos += pos;
         g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 32.0f, angle, 0, 60))->flags |= 4;
         marisa_sincosmul(&beam_pos, angle, 240.0f);
-        beam_pos.x = pos.x + beam_pos.x;
-        beam_pos.y = pos.y + beam_pos.y;
-        beam_pos.z = pos.z + beam_pos.z;
+        beam_pos += pos;
         g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 128.0f, angle, 0, 20))->flags |= 4;
         marisa_sincosmul(&beam_pos, angle, 304.0f);
-        beam_pos.x = pos.x + beam_pos.x;
-        beam_pos.y = pos.y + beam_pos.y;
-        beam_pos.z = pos.z + beam_pos.z;
+        beam_pos += pos;
         g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 256.0f, angle, 0, 20))->flags |= 4;
     }
-    vm = anm->get_vm_with_id(anm_id);
+    vm = get_vm(anm_id);
     if (vm != NULL)
     {
         vm->entity_pos = pos;
     }
-    vm = anm->get_vm_with_id(anm_id_64);
+    vm = get_vm(anm_id_64);
     if (vm != NULL)
     {
         vm->entity_pos = pos;
