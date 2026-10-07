@@ -776,7 +776,6 @@ int patch_anm(void *file_inout, size_t size_out, size_t size_in, const char *fn,
     uint8_t *in_end = in + size_in;
     uint8_t *out = (uint8_t *)file_inout;
     size_t entry_num = 0;
-    size_t images = 0;
     while (in != NULL && in < in_end)
     {
         Entry entry;
@@ -801,7 +800,6 @@ int patch_anm(void *file_inout, size_t size_out, size_t size_in, const char *fn,
                 if ((size_t)img.stride * img.h <= size)
                 {
                     stack_game_png_apply(img, entry.sprites, entry.name, fn, entry_num);
-                    images++;
                 }
             }
             else

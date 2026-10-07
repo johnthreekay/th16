@@ -197,6 +197,19 @@ if(TH16_THCRAP)
         target_include_directories(th16 PRIVATE ${TH16_STRINGS_DIR})
         target_compile_definitions(th16 PRIVATE TH16_THCRAP_GENERATED_STRINGS)
     endif()
+    # Tests of the thcrap support without the game or its data
+    # (tests/thcrap_test.cpp; GDI and the game's fonts are stand-ins).
+    add_executable(th16_thcrap_test tests/thcrap_test.cpp ${TH16_THCRAP_SOURCES})
+    target_include_directories(th16_thcrap_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${TH16_ROOT}/src)
+    target_compile_definitions(th16_thcrap_test PRIVATE TH16_PORT TH16_THCRAP)
+    target_compile_options(th16_thcrap_test PRIVATE
+        -include ${CMAKE_CURRENT_SOURCE_DIR}/include/port_prelude.h -Wall -Wno-unknown-pragmas)
+    target_link_libraries(th16_thcrap_test PRIVATE PkgConfig::TH16_JANSSON PkgConfig::TH16_PNG Threads::Threads)
+    if(DEFINED TH16_STRINGS)
+        target_include_directories(th16_thcrap_test PRIVATE ${TH16_STRINGS_DIR})
+        target_compile_definitions(th16_thcrap_test PRIVATE TH16_THCRAP_GENERATED_STRINGS)
+    endif()
     message(STATUS "thcrap support: on")
 else()
     set(TH16_THCRAP_MISSING "")
@@ -251,10 +264,13 @@ if(APPLE)
     target_link_libraries(th16_platform_test PRIVATE ${ICONV_LIBRARY})
 endif()
 
-# `ctest` runs the mixer tests that need no game data, on SDL's dummy driver
-# (tests/run_dsound_tests.sh runs the rest).
+# `ctest` runs the tests that need no game data (the mixer on SDL's dummy driver,
+# the platform layer, the thcrap support); tests/run_dsound_tests.sh runs the rest.
 enable_testing()
 add_test(NAME dsound COMMAND th16_dsound_test)
 set_tests_properties(dsound PROPERTIES ENVIRONMENT "SDL_AUDIODRIVER=dummy;SDL_AUDIO_DRIVER=dummy")
 add_test(NAME platform COMMAND th16_platform_test)
 set_tests_properties(platform PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_JOYSTICK_HIDAPI=0")
+if(TH16_THCRAP)
+    add_test(NAME thcrap COMMAND th16_thcrap_test)
+endif()
