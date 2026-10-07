@@ -566,6 +566,43 @@ decompiled code the surroundings it had in the original:
   but Gui::sub_426d70 keeps the cookie where the original copies the
   struct from memory.
 
+- Source shapes found in the player/bomb TODO sweep:
+  - A local pointer to a member changes which register addresses it:
+    `AnmVm *vm = &this->vm;` before copy_vm and the field stores gives the
+    original's stores through the VM pointer (Player::initialize).
+  - `AnmLoaded *anm = g_Player->anm_file;` before a struct-returning
+    create_vm/create_effect call loads the object first, which decides the
+    registers around the call (BombReimuAOrb::start). With one such local
+    per branch the script argument is no longer hoisted above the branch
+    (PlayerBullet::create).
+  - `vm->rotation.z = x;` before `vm->flags_lo |= ...` gives the original's
+    load of x ahead of the `or` (PlayerBullet::create, Marisa's bomb).
+  - `v += *p` with `Float3 *p = &member` and `v += member` give different
+    addss operand orders (BombCirnoAInf::on_tick).
+  - The same loop through an inline helper and written in place compile
+    differently: Globals::season_level's loop tests its counter in
+    BombInf::activate, the loop written out there tests the pointer like
+    the original.
+  - Player::do_graze: `Player *player = g_Player;` first decides esi/edi;
+    reading graze_in_chapter into a temp before graze gives the
+    interleaved cmov clamps; `(player->inner.pos + *pos) * 0.5f` gives the
+    midpoint's scheduling; atan2 spelled out (as in angle_to_player) keeps
+    it inline, which realigns the frame and makes the spawn_item call fold
+    unk_3 and unk_6 like the original.
+  - A union in BombReimuAOrb puts a PosVel member over pos (pos is its
+    first field), so update addresses it through `this` instead of a
+    second pointer register.
+- /GS: direct calls to AnmManager::interrupt_tree are a cookie trigger as
+  well (sht_on_tick_4470f0 and BombMarisaAInf::on_tick lose their cookie
+  when the calls are removed). An inline wrapper node around it does not
+  help, and neither does defining g_anm_on_switch_funcs (the table its
+  inlined AnmVm::interrupt calls through) with its real entries in /GL
+  code. get_vm instead of a direct get_vm_with_id call removed the cookie
+  from BombAyaAInf::begin and BombReimuAOrb::update.
+- do_shooting's ebx-form realignment does not come from
+  AnmLoaded::create_effect: making that realign (a volatile double)
+  changes nothing in do_shooting or tick_shooting_state.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
