@@ -167,7 +167,8 @@ class LaserLineInf : public LaserDataInf
 struct LaserInfiniteInner
 {
     D3DXVECTOR3 start_pos;
-    u8 unk_c[0x18 - 0xc];
+    // Moves the laser's origin each frame.
+    D3DXVECTOR3 velocity;
     f32 ang_aim;
     f32 laser_st_rotation;
     f32 laser_new_arg_2;
