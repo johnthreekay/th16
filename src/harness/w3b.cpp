@@ -37,3 +37,4 @@ LaserDataInf *harness_w3b_find_laser(i32 id)
 {
     return g_LaserManager->find_by_id(id, 0);
 }
+

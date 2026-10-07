@@ -831,3 +831,74 @@ int EnemyInf::die()
     }
     return 1;
 }
+
+// TODO: the inlined tick adds speed and current_f the other way round (register choice).
+// FUNCTION: TH16 0x41d900
+void EnemyManager::kill_all()
+{
+    EnemyManager *mgr = g_EnemyManager;
+    EnemyList *next;
+    for (EnemyList *node = mgr->active_enemy_list_head; node != NULL; node = next)
+    {
+        next = node->next;
+        EnemyInf *enemy = node->entry;
+        if (!(enemy->enemy.flags_low & 0xc004a0) || enemy->enemy.flags_low & 0x100)
+        {
+            enemy->enemy.drops.reset();
+            enemy->enemy.last_damage_pos.x = 0.0f;
+            enemy->enemy.last_damage_pos.y = 192.0f;
+            enemy->enemy.unk_452c = 0;
+            enemy->die();
+            enemy->enemy.flags_low |= 0x2000000;
+        }
+    }
+    mgr->inner.time_in_stage.tick();
+}
+
+// TODO: register allocation: the original keeps value in ebx and spills next to the argument slot.
+// FUNCTION: TH16 0x41da30
+void __stdcall EnemyManager::kill_all_with_unk_278(i32 value)
+{
+    EnemyManager *mgr = g_EnemyManager;
+    EnemyList *node = mgr->active_enemy_list_head;
+    while (node != NULL)
+    {
+        EnemyList *next = node->next;
+        EnemyInf *enemy = node->entry;
+        if ((!(enemy->enemy.flags_low & 0xc004a0) || enemy->enemy.flags_low & 0x100) && enemy->enemy.unk_278 == value)
+        {
+            enemy->enemy.drops.reset();
+            enemy->enemy.last_damage_pos.x = 0.0f;
+            enemy->enemy.last_damage_pos.y = 192.0f;
+            enemy->enemy.unk_452c = 0;
+            enemy->die();
+            enemy->enemy.flags_low |= 0x2000000;
+        }
+        node = next;
+    }
+    mgr->inner.time_in_stage.tick();
+}
+
+// TODO: the inlined tick adds speed and current_f the other way round (register choice).
+// FUNCTION: TH16 0x41db70
+void EnemyManager::kill_all_no_set_death()
+{
+    EnemyManager *mgr = g_EnemyManager;
+    EnemyList *next;
+    for (EnemyList *node = mgr->active_enemy_list_head; node != NULL; node = next)
+    {
+        next = node->next;
+        EnemyInf *enemy = node->entry;
+        if (!(enemy->enemy.flags_low & 0xc004a0) || enemy->enemy.flags_low & 0x100)
+        {
+            enemy->enemy.drops.reset();
+            enemy->enemy.last_damage_pos.x = 0.0f;
+            enemy->enemy.last_damage_pos.y = 192.0f;
+            enemy->enemy.unk_452c = 0;
+            enemy->enemy.set_death[0] = '\0';
+            enemy->die();
+            enemy->enemy.flags_low |= 0x2000000;
+        }
+    }
+    mgr->inner.time_in_stage.tick();
+}

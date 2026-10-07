@@ -81,6 +81,10 @@ struct EnemyManager
     // 0x41d900. Kills every enemy; reaches the manager through
     // g_EnemyManager.
     static void kill_all();
+    // 0x41da30. kill_all for the enemies whose unk_278 is value.
+    static void __stdcall kill_all_with_unk_278(i32 value);
+    // 0x41db70. kill_all, skipping the set_death subroutines.
+    static void kill_all_no_set_death();
     BOOL is_enemy_alive(int id);
     EnemyInf *find_enemy_by_id(int id);
     HARNESS_CALLED struct EnemyRef find_closest(D3DXVECTOR3 *pos, f32 max_dist);
