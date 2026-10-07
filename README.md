@@ -770,6 +770,40 @@ decompiled code the surroundings it had in the original:
     imul hoisted above the stores in the original; ours coalesces it into
     eax (do_replay_menu and two spell practice states).
 
+- ANM TODO sweep (group 5):
+  - A device/vtable register swap around a D3D call is often fixed by
+    `IDirect3DDevice9 *device = g_Supervisor.d3d_device; device->X(...)`
+    (setup_vertex_buffer, flush_sprites). Not every swap: mode_9/mode_11's
+    SetTexture did not move.
+  - Commutative operands of two memory values: the operand created later
+    in the IL is loaded into the destination register. `a + b` loads b
+    first, also through D3DXVECTOR3's operator+: ZUN wrote
+    `entity_pos + pos + pos_2` (get_own_transformed_pos, world_pos). For a
+    temporary's fields read later, the order of the field assignments
+    decides: draw_vm__mode_7 matches D3DXVec3Length's accumulator only with
+    `diff.y` assigned before `diff.x`. Writing the operands of `x * x + y * y`
+    the other way round changes nothing.
+  - A load that the original does before an aliasing store: compute it into
+    a local first (`root = parent->parent ? ... : parent;` before the
+    `unk_5b0` store in restore_snapshot_vm).
+  - ZunTimer::tick_split's shape (speed pointer loaded before `previous` is
+    stored, `*speed + current_f`) is the original's in anm_effect_3_on_tick
+    and anm_effect_2_on_tick; tick_in_place stores `previous` first. Other
+    tick_in_place users (StageInner::step_fog, Gui) may want tick_split.
+  - A function that passes a local's address to itself (world_pos's
+    recursion) gets a /GS cookie the original does not have. With the body
+    in a `__forceinline` helper the cookie goes, but alias analysis then
+    keeps `parent` cached across the result stores; not solved.
+  - Several "ours never uses ebx" functions (anm_on_draw_masked,
+    draw_triangle_fan, draw_circle_outline, draw_ring) differ only in that;
+    draw_triangle_fan's original frame is consistent with known 8-byte
+    alignment from its only caller, anm_effect_3_on_draw, which realigns in
+    the original and not in ours.
+  - AnmVm::run case 2: `instr_offset = -1; return 0;` written separately
+    gives the original's jump to the final `xor eax, eax`, but then case 1's
+    `return 1` merges with the on_wait `return 1`; the fallthrough form keeps
+    case 1 right and case 2 wrong.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.

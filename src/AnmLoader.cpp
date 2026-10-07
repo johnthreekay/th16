@@ -74,7 +74,6 @@ i32 AnmLoaded::load(const char *path)
     return 0;
 }
 
-// TODO: the original frame has 4 more bytes and saves esi at the start.
 // FUNCTION: TH16 0x46cf80
 AnmLoaded *AnmManager::do_preload_anm(i32 slot, const char *path)
 {
@@ -95,7 +94,7 @@ AnmLoaded *AnmManager::do_preload_anm(i32 slot, const char *path)
     return anm;
 }
 
-// TODO: the original frame has 8 bytes of unused slots and saves esi/edi at the start.
+// TODO: the original frame has 8 unused bytes (sub esp, 8; ours has none), otherwise the same code.
 // FUNCTION: TH16 0x46d020
 AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *path)
 {
@@ -125,7 +124,7 @@ AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *path)
     return anm;
 }
 
-// TODO: the original frame has 4 more bytes and saves esi/edi at the start.
+// TODO: code matches; our frame leaves 8 unused bytes between buf and the /GS cookie (0x124 vs 0x11c).
 // FUNCTION: TH16 0x46d0c0
 i32 AnmLoaded::load_entry(i32 index, AnmRawEntry *entry)
 {
@@ -566,7 +565,6 @@ struct AnmQuadXyzTex
     RenderVertexXyzTex v[4];
 };
 
-// TODO: 99%; the device pointer for CreateVertexBuffer is loaded into ecx (its vtable into eax) in the original.
 // FUNCTION: TH16 0x46b900
 void AnmManager::setup_vertex_buffer()
 {
@@ -594,8 +592,9 @@ void AnmManager::setup_vertex_buffer()
     g_quad_vertices_4df8a0[2].uv.y = quad[2].uv.y;
     g_quad_vertices_4df8a0[3].uv.x = quad[3].uv.x;
     g_quad_vertices_4df8a0[3].uv.y = quad[3].uv.y;
-    g_Supervisor.d3d_device->CreateVertexBuffer(sizeof(mgr->quad_184fbc8) * 9, 0, D3DFVF_XYZ | D3DFVF_TEX1,
-                                                D3DPOOL_MANAGED, &mgr->vertex_buffer, NULL);
+    IDirect3DDevice9 *device = g_Supervisor.d3d_device;
+    device->CreateVertexBuffer(sizeof(mgr->quad_184fbc8) * 9, 0, D3DFVF_XYZ | D3DFVF_TEX1, D3DPOOL_MANAGED,
+                               &mgr->vertex_buffer, NULL);
     AnmQuadXyzTex *buffer;
     mgr->vertex_buffer->Lock(0, 0, (void **)&buffer, 0);
     // One copy per anchoring, at (anchor_y * 3 + anchor_x) quads in.

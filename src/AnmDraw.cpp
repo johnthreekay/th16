@@ -568,7 +568,7 @@ i32 AnmManager::draw_vm__mode_6(AnmVm *vm)
     }
 }
 
-// TODO: 93%; register allocation in the per-corner fog loop differs.
+// TODO: the y and z differences trade xmm0/xmm1; the loop end compares with g_sprite_temp_buffer's end, which our data layout follows with another global.
 // FUNCTION: TH16 0x467200
 i32 AnmManager::draw_vm__mode_7(AnmVm *vm)
 {
@@ -580,9 +580,10 @@ i32 AnmManager::draw_vm__mode_7(AnmVm *vm)
     for (i32 i = 0; i < 4; i++)
     {
         D3DXVec3Transform(&transformed[i], &quad_184fbc8[i].pos, (D3DXMATRIX *)&matrix_184f56c);
-        D3DXVECTOR3 diff(transformed[i].x - g_Supervisor.current_camera->position.x,
-                         transformed[i].y - g_Supervisor.current_camera->position.y,
-                         transformed[i].z - g_Supervisor.current_camera->position.z);
+        D3DXVECTOR3 diff;
+        diff.y = transformed[i].y - g_Supervisor.current_camera->position.y;
+        diff.x = transformed[i].x - g_Supervisor.current_camera->position.x;
+        diff.z = transformed[i].z - g_Supervisor.current_camera->position.z;
         f32 distance = D3DXVec3Length(&diff);
         ZunColor *diffuse = diffuse_of(i);
         if (distance > g_Supervisor.current_camera->sky.begin_distance)

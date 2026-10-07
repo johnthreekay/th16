@@ -12,35 +12,30 @@ void AnmLoaded::copy_vm_and_run(AnmVm *vm, i32 script)
     vm->run();
 }
 
-// TODO: our build adds a /GS cookie for the parent position temporary and
-// sums the vectors in a different register order.
+// TODO: only difference: ours adds a /GS cookie for the recursive call's parent_pos (with the body in an inline helper the cookie goes, but parent stays cached in edi).
 // FUNCTION: TH16 0x40e490
 D3DXVECTOR3 AnmVm::world_pos()
 {
     D3DXVECTOR3 result;
-    result.x = pos.x + entity_pos.x + pos_2.x;
-    result.y = pos.y + entity_pos.y + pos_2.y;
-    result.z = pos.z + entity_pos.z + pos_2.z;
+    result = entity_pos + pos + pos_2;
     if (parent != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
     {
         if (flags_hi & ANM_VM_ROTATE_WITH_PARENT)
         {
-            f32 s = sinf(parent->rotation.z);
-            f32 c = cosf(parent->rotation.z);
+            f32 s = zun_sinf(parent->rotation.z);
+            f32 c = zun_cosf(parent->rotation.z);
             f32 x = result.x;
             f32 y = result.y;
             result.x = x * c - y * s;
             result.y = y * c + x * s;
         }
-        result += parent->world_pos();
+        D3DXVECTOR3 parent_pos = parent->world_pos();
+        result += parent_pos;
     }
     return result;
 }
 
-// TODO: the original frame has 4 more bytes and saves esi before taking
-// the critical section.
-// TODO: the original realigns the frame (and esp, -8) and saves esi in the
-// prologue (ours after entering the critical section, as in create_vm).
+// TODO: the original realigns the frame (and esp, -8; sub esp, 0x10) and so saves esi in the prologue; ours pushes esi after entering the critical section.
 // FUNCTION: TH16 0x406380
 DECOMP_NOINLINE AnmId AnmLoaded::create_effect(i32 script, i32 layer, AnmVm **out)
 {

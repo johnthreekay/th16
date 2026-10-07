@@ -479,7 +479,7 @@ void create_fonts()
     }
 }
 
-// TODO: code matches; buf shares the stack slot of a different spill (frame 0x38 vs 0x34).
+// TODO: code matches; the original packs buf into the slot of text's spill ([ebp-0x18]), ours gives it its own (frame 0x3c vs 0x34).
 // FUNCTION: TH16 0x459240
 HARNESS_CALLED void __stdcall draw_text(RECT *dst_rect, i32 x, i32 font_height, D3DCOLOR color,
                                          D3DCOLOR shadow_color, const char *text,

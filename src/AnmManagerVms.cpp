@@ -216,7 +216,6 @@ void __stdcall AnmManager::interrupt_tree_and_run(AnmId id, i32 interrupt)
     }
 }
 
-// TODO: the original loads the first child after storing the flags.
 // FUNCTION: TH16 0x46f1c0
 HARNESS_CALLED void AnmManager::delete_vm(AnmId id)
 {
@@ -1009,7 +1008,6 @@ HARNESS_CALLED AnmId AnmManager::restore_snapshot(AnmId id)
     return restore_snapshot_vm(snapshot, NULL);
 }
 
-// TODO: the original stores unk_5b0 after loading the parent's parent.
 // FUNCTION: TH16 0x46f970
 AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
 {
@@ -1045,8 +1043,9 @@ AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
     }
     if (parent != NULL)
     {
+        AnmVm *root = parent->parent != NULL ? parent->parent : parent;
         vm->unk_5b0 = parent;
-        vm->parent = parent->parent != NULL ? parent->parent : parent;
+        vm->parent = root;
         parent->list_of_children.insert_after(&vm->node_as_child);
     }
     LEAVE_CS(CS_ANM_MANAGER);
@@ -1057,7 +1056,6 @@ AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
     return id;
 }
 
-// TODO: identical code; reccmp only flags the unannotated AnmFastVm::~AnmFastVm (0x46b790).
 // FUNCTION: TH16 0x46b7d0
 AnmManager::~AnmManager()
 {
