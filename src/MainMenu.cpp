@@ -857,7 +857,7 @@ char *__fastcall skip_line(char *p, i32 *remaining)
 
 // Copies the line starting at src into dst and returns the start of the
 // next line.
-// TODO: the second loop reloads *remaining each time; the original keeps the count in ecx and stores it at the loop top.
+// TODO: ours pads the second loop's head with a nop to 16 bytes; the original does not align it.
 // FUNCTION: TH16 0x455370
 char *__fastcall read_line(char *dst, char *src, i32 *remaining)
 {
@@ -879,15 +879,19 @@ char *__fastcall read_line(char *dst, char *src, i32 *remaining)
     *p = '\0';
     strcpy(dst, src);
     p++;
-    *remaining = left - 1;
-    while (*p == '\n' || *p == '\r')
+    for (i32 n = left - 1;; n--)
     {
-        if (*remaining == 0)
+        char c = *p;
+        *remaining = n;
+        if (c != '\n' && c != '\r')
+        {
+            break;
+        }
+        if (n == 0)
         {
             return p;
         }
         p++;
-        (*remaining)--;
     }
     return p;
 }
