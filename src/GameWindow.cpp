@@ -448,3 +448,112 @@ void GameWindow::set_resolution_from_config()
     early_arcade_offset_x = (i32)(g_resolution_x - 384.0f) / 2;
     early_arcade_offset_y = (i32)(g_resolution_y - 448.0f) / 2;
 }
+
+// Sets the window size option bits of g_unk_4d9d1c (GameWindow::flags).
+#define SET_WINDOW_SIZE(n) (g_unk_4d9d1c = (g_unk_4d9d1c & ~0x3c) | ((n) << 2))
+
+// The window procedure (TH06: GameWindow_WindowProc). Alt+Enter and
+// maximizing switch between the windowed and fullscreen sizes.
+// TODO: the original keeps window in edx for the DefWindowProcA calls; ours pushes it from the stack.
+// FUNCTION: TH16 0x45a450
+LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
+{
+    switch (message)
+    {
+    case WM_ERASEBKGND:
+        return 1;
+    case WM_ACTIVATEAPP:
+        g_GameWindow.is_app_active = wparam;
+        g_GameWindow.unk_14 = wparam == 0;
+        break;
+    case WM_SIZE:
+        if (g_unk_4d9d1c & 1)
+        {
+            switch (wparam)
+            {
+            case SIZE_MAXIMIZED:
+                g_unk_4d9d1c |= 2;
+                switch ((g_unk_4d9d1c >> 2) & 0xf)
+                {
+                case 3:
+                    SET_WINDOW_SIZE(0);
+                    break;
+                case 4:
+                    SET_WINDOW_SIZE(1);
+                    break;
+                case 5:
+                    SET_WINDOW_SIZE(2);
+                    break;
+                }
+                break;
+            }
+        }
+        break;
+    case WM_CLOSE:
+        g_Supervisor.flags = (g_Supervisor.flags & ~0x100) | 0x80;
+        return 1;
+    case WM_SETCURSOR:
+        if (!g_Supervisor.present_params.Windowed)
+        {
+            if (g_GameWindow.unk_14)
+            {
+                SetCursor(LoadCursorA(NULL, IDC_ARROW));
+                while (ShowCursor(TRUE) < 0)
+                {
+                }
+            }
+            else
+            {
+                while (ShowCursor(FALSE) >= 0)
+                {
+                }
+                SetCursor(NULL);
+            }
+        }
+        else
+        {
+            SetCursor(LoadCursorA(NULL, IDC_ARROW));
+            ShowCursor(TRUE);
+        }
+        return 1;
+    case WM_LBUTTONDOWN:
+        SetForegroundWindow(window);
+        break;
+    case WM_SYSCOMMAND:
+        switch (wparam & 0xfff0)
+        {
+        case SC_MOUSEMENU:
+        case SC_KEYMENU:
+            return 1;
+        }
+        break;
+    case WM_SYSKEYDOWN:
+        if (wparam == VK_RETURN)
+        {
+            g_unk_4d9d1c |= 2;
+            switch ((g_unk_4d9d1c >> 2) & 0xf)
+            {
+            case 3:
+                SET_WINDOW_SIZE(0);
+                break;
+            case 4:
+                SET_WINDOW_SIZE(1);
+                break;
+            case 5:
+                SET_WINDOW_SIZE(2);
+                break;
+            case 0:
+                SET_WINDOW_SIZE(3);
+                break;
+            case 1:
+                SET_WINDOW_SIZE(4);
+                break;
+            case 2:
+                SET_WINDOW_SIZE(5);
+                break;
+            }
+        }
+        break;
+    }
+    return DefWindowProcA(window, message, wparam, lparam);
+}
