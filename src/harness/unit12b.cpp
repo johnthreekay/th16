@@ -38,7 +38,8 @@ i32 harness_create_tracked_effect(i32 effect, D3DXVECTOR3 *pos)
     return g_EffectManager->create_tracked(effect, pos, 0);
 }
 
-// The player's own shots (around 0x442669) make other rectangles.
+// The player's own shots (PlayerBullet::create, 0x44529f) make other
+// rectangles.
 void harness_rect_damage_source(D3DXVECTOR3 *pos, f32 w, f32 h, f32 angle, i32 a, i32 b)
 {
     g_Player->create_rect_damage_source(pos, w, h, angle, a, b);
