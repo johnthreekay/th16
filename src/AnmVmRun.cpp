@@ -872,7 +872,14 @@ __forceinline i32 AnmVm::run_script()
             pos_i.bezier_1 = g_zero_vec;
             pos_i.bezier_2 = g_zero_vec;
             pos_i.method = ins->args[1].i;
-            pos_i.initial = !(flags_lo & ANM_VM_POS_I_TO_POS_2) ? pos : pos_2;
+            if (!(flags_lo & ANM_VM_POS_I_TO_POS_2))
+            {
+                pos_i.initial = pos;
+            }
+            else
+            {
+                pos_i.initial = pos_2;
+            }
             pos_i.goal = Float3(ANM_FLOAT(2), ANM_FLOAT(3), ANM_FLOAT(4));
             pos_i.reset_timer();
             break;
@@ -883,7 +890,14 @@ __forceinline i32 AnmVm::run_script()
             pos_i.bezier_1 = g_zero_vec;
             pos_i.bezier_2 = g_zero_vec;
             pos_i.method = ins->args[1].i;
-            pos_i.initial = !(flags_lo & ANM_VM_POS_I_TO_POS_2) ? pos : pos_2;
+            if (!(flags_lo & ANM_VM_POS_I_TO_POS_2))
+            {
+                pos_i.initial = pos;
+            }
+            else
+            {
+                pos_i.initial = pos_2;
+            }
             Float3 goal;
             anm_sincosmul(&goal, ANM_FLOAT(2), ANM_FLOAT(3));
             goal.z = 0.0f;
@@ -906,7 +920,14 @@ __forceinline i32 AnmVm::run_script()
             pos_i.bezier_1 = bezier_1;
             pos_i.bezier_2 = bezier_2;
             pos_i.method = INTERP_BEZIER;
-            pos_i.initial = !(flags_lo & ANM_VM_POS_I_TO_POS_2) ? pos : pos_2;
+            if (!(flags_lo & ANM_VM_POS_I_TO_POS_2))
+            {
+                pos_i.initial = pos;
+            }
+            else
+            {
+                pos_i.initial = pos_2;
+            }
             pos_i.goal = Float3(ANM_FLOAT(4), ANM_FLOAT(5), ANM_FLOAT(6));
             pos_i.reset_timer();
             break;
