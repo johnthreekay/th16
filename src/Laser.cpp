@@ -915,3 +915,126 @@ i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i3
     }
     return count;
 }
+
+// Cancels the points (every 16 units) inside a bomb's circle. A hit head
+// shortens the laser to nothing, otherwise it ends at the first hit run;
+// every later unhit run that starts on screen becomes a straight laser.
+// Returns the number of points hit.
+// TODO: the original zeroes i (ebx) before the memset and stores step.z first; the run loops' register use and the params copy differ.
+// FUNCTION: TH16 0x436670
+i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 d)
+{
+    if (d != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    Float3 origin = position;
+    i32 count = 0;
+    f32 dist = 8.0f;
+    u8 hit[0x100];
+    memset(hit, 0, sizeof(hit));
+    Float3 step;
+    laser_sincosmul(&step, angle, 8.0f);
+    step.z = 0.0f;
+    Float3 pos;
+    pos = position + step;
+    pos.z = 0.0f;
+    step.x += step.x;
+    step.y += step.y;
+    step.z += step.z;
+    radius = radius * radius;
+    i32 i;
+    for (i = 0; unk_70 > dist + 8.0f; i++)
+    {
+        if (!((center->x - pos.x) * (center->x - pos.x) + (center->y - pos.y) * (center->y - pos.y) > radius))
+        {
+            count++;
+            hit[i] = 1;
+            gen_items_from_cancel(&pos, mode);
+            if (!(pos.x + 32.0f <= -192.0f || pos.x - 32.0f >= 192.0f || pos.y + 32.0f <= 0.0f ||
+                  pos.y - 32.0f >= 448.0f))
+            {
+                if (bullet_type <= 0x11 || bullet_type == 0x22 || bullet_type == 0x26)
+                {
+                    g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0xd1, &pos, 0.0f, -1, 0);
+                }
+                else if (bullet_type <= 0x1f || bullet_type == 0x1b)
+                {
+                    g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x101, &pos, 0.0f, -1, 0);
+                }
+                else if (bullet_type <= 0x21)
+                {
+                    g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x119, &pos, 0.0f, -1, 0);
+                }
+            }
+        }
+        pos += step;
+        dist += 16.0f;
+    }
+    if (count != 0)
+    {
+        i32 j;
+        for (j = 0; j < i; j++)
+        {
+            if (!hit[j])
+            {
+                break;
+            }
+        }
+        if (j != 0)
+        {
+            unk_70 = 0.0f;
+        }
+        else
+        {
+            i32 run = 0;
+            for (; j < i; j++, run++)
+            {
+                if (hit[j])
+                {
+                    break;
+                }
+            }
+            if (j < i)
+            {
+                unk_70 = (f32)run * 16.0f;
+            }
+        }
+        while (j < i)
+        {
+            if (hit[j])
+            {
+                j++;
+                continue;
+            }
+            i32 run = 0;
+            i32 start = j;
+            while (!hit[j])
+            {
+                j++;
+                run++;
+                if (j >= i)
+                {
+                    break;
+                }
+            }
+            f32 start_f = (f32)start;
+            pos = origin + step * start_f;
+            if (!(pos.x + 32.0f <= -192.0f || pos.x - 32.0f >= 192.0f || pos.y + 32.0f <= 0.0f ||
+                  pos.y - 32.0f >= 448.0f))
+            {
+                LaserLineInner params;
+                params.start_pos = pos;
+                params.speed = 8.0f;
+                params.bullet_type = inner.type;
+                params.bullet_color = inner.color;
+                params.laser_new_arg_2 = params.laser_new_arg_1 = (f32)run * 16.0f;
+                params.ang_aim = angle;
+                params.laser_new_arg_4 = width;
+                params.laser_new_arg_3 = inner.laser_new_arg_2 - start_f * 16.0f;
+                g_LaserManager->allocate_new_laser(LASER_LINE, &params);
+            }
+        }
+    }
+    return count;
+}
