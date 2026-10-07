@@ -15,7 +15,6 @@
 #include "Rng.h"
 #include "Spellcard.h"
 
-// TODO: the score table loop has eax and ecx swapped (the pointer is in ecx in the original).
 // FUNCTION: TH16 0x4493c0
 void ScorefileChara::init()
 {
@@ -30,11 +29,10 @@ void ScorefileChara::init()
             scores[d][i].score = 100000 - i * 10000;
             scores[d][i].stage = 1;
             strcpy(scores[d][i].name, "--------");
-            scores[d][i].unk_10 = 0;
-            scores[d][i].unk_14 = 0;
-            scores[d][i].unk_5 = 0;
-            scores[d][i].unk_1c = 0;
-            scores[d][i].unk_18 = 0;
+            scores[d][i].date = 0;
+            scores[d][i].continues = 0;
+            scores[d][i].subseason = 0;
+            scores[d][i].slowdown = 0.0f;
         }
     }
     for (i32 i = 0; i < 0x77; i++)

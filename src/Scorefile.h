@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdlib.h>
+#include <time.h>
 
 #include "decomp.h"
 #include "types.h"
@@ -138,19 +139,22 @@ struct ScorefileHeader
     u32 size;
 };
 
-// One entry of a high score table.
+// One entry of a high score table. Packed so that the date does not make
+// the sections 8-aligned.
+#pragma pack(push, 4)
 struct ScorefileScore
 {
     u32 score;
     u8 stage;
-    u8 unk_5;
+    u8 continues;
     char name[9];
     u8 unk_f;
-    u32 unk_10;
-    u32 unk_14;
-    u32 unk_18;
-    u32 unk_1c;
+    __time64_t date;
+    // Percent of frames lost.
+    f32 slowdown;
+    i32 subseason;
 };
+#pragma pack(pop)
 
 // The real layout of the character sections ('CR'), which start 8 bytes
 // into Scorefile, after the two buffer pointers; ScorefileCharacter views
@@ -167,6 +171,9 @@ struct ScorefileChara
 
     // 0x4493c0. The defaults of a new score file.
     void init();
+    // 0x43e250. Puts the current game's score into the table of its
+    // difficulty; returns the rank or -1.
+    i32 insert_score();
 };
 static_assert(sizeof(ScorefileChara) == 0x5318, "ScorefileChara size");
 

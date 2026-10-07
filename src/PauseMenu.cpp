@@ -2,8 +2,11 @@
 
 #include "PauseMenu.h"
 #include "ReplayManager.h"
+#include "FpsCounter.h"
 #include "GameThread.h"
+#include "Globals.h"
 #include "Gui.h"
+#include "Scorefile.h"
 #include "Supervisor.h"
 
 // GLOBAL: TH16 0x4a6ef4
@@ -25,6 +28,37 @@ void PauseMenu::set_unk_1f4(i32 value)
 {
     unk_1f4 = value;
     time_in_current_menu.reset();
+}
+
+// FUNCTION: TH16 0x43e250
+i32 ScorefileChara::insert_score()
+{
+    ScorefileScore *entry = scores[g_Globals.difficulty];
+    i32 i;
+    for (i = 0; i < 10; i++)
+    {
+        if (entry->score <= g_Globals.score)
+        {
+            break;
+        }
+        entry++;
+    }
+    if (i >= 10)
+    {
+        return -1;
+    }
+    for (i32 j = 9; j > i; j--)
+    {
+        scores[g_Globals.difficulty][j] = scores[g_Globals.difficulty][j - 1];
+    }
+    entry->score = g_Globals.score;
+    entry->continues = g_Globals.continues_used;
+    entry->stage = g_Globals.stage_num;
+    _time64(&entry->date);
+    strcpy(entry->name, "        ");
+    entry->slowdown = 100.0f - (f32)(g_FpsCounter->total_actual / g_FpsCounter->total_expected) * 100.0f;
+    entry->subseason = g_Globals.subseason;
+    return i;
 }
 
 // FUNCTION: TH16 0x43e350
