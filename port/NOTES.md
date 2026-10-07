@@ -287,8 +287,9 @@ also locks `th16-port.lock` in the save folder, so a second copy of the
 port on the same save folder gets `ERROR_ALREADY_EXISTS` and the game's
 "cannot start twice" error. Thread priorities are ignored;
 TerminateThread and CREATE_SUSPENDED are not supported (the game uses
-neither). Time: one steady clock for QueryPerformanceCounter (1 ns units),
-timeGetTime and GetTickCount.
+neither). Time: QueryPerformanceCounter/Frequency, timeGetTime and
+GetTickCount all read SDL's performance counter, so the game's clocks agree
+with SDL's. The port builds with `_FILE_OFFSET_BITS=64`.
 
 ### Window and messages (win32_user.cpp)
 
@@ -420,7 +421,8 @@ through the namespace, the loading, sound and BGM threads, a new th16.cfg
 and scoreth16.dat in the save folder, keyboard input through DirectInput,
 quitting from the menu and on SIGINT/SIGTERM, screenshots (P/Home:
 `_beginthread`, `_mkdir`, a 1280x960 BMP in snapshot/), Alt+Enter both
-ways, Japanese text. SDL's HIDAPI controller probing (libusb) can take a
+ways, Japanese text, and starting a game (Z through the menus) and playing
+on for 90 s to the game over screen. SDL's HIDAPI controller probing (libusb) can take a
 second or more at startup, much longer under gdb; `SDL_JOYSTICK_HIDAPI=0`
 skips it for tests.
 
@@ -602,7 +604,10 @@ directory and the score file sections, which hold no pointers.
   file; with 8-byte pointers `ShtShooter` is 0x68 bytes, not 0x58, and the
   shooters start at 0x1e0, not 0x1b8. The port converts the file to the
   in-memory layout first (`port_convert_sht_file`), then the original loop
-  resolves offsets and indices.
+  resolves offsets and indices. Each array ends with a 4-byte record (a
+  negative fire_rate), so the arrays are not 0x58-aligned in the file: the
+  conversion goes array by array and ends each with a whole record (a
+  fixed-stride copy lost the terminators and crashed when a game started).
 - Scorefile (Scorefile.h): `ScorefileData` (the real layout) starts with
   two pointers, `Scorefile` (the view most code uses) assumes 8 bytes for
   them. The view gets 8 bytes of padding on 64-bit and `ScorefileData` is
