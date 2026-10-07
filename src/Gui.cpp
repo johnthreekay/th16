@@ -1785,7 +1785,7 @@ i32 Gui::on_tick_body()
 
     // The boss's spell card counter.
     EnemyManager *enemies = g_EnemyManager;
-    if (enemies != NULL && unk_1d0 >= 0 && enemies->get_boss(0) != NULL && !enemies->inner.boss_bit && msg == NULL &&
+    if (enemies != NULL && unk_1d0 >= 0 && enemies->get_boss(0) != NULL && !enemies->inner.life_bar_hidden && msg == NULL &&
         !(*(u32 *)&g_GameThread->flags & 0x10000))
     {
         vm_94->set_flag_lo_2_tree();
@@ -1862,7 +1862,7 @@ i32 Gui::on_tick_body()
     }
 
     // The life bars of the two bosses.
-    if (g_EnemyManager != NULL && !g_EnemyManager->inner.boss_bit)
+    if (g_EnemyManager != NULL && !g_EnemyManager->inner.life_bar_hidden)
     {
         for (i32 i = 0; i < 2; i++)
         {
@@ -2379,7 +2379,7 @@ i32 Gui::on_draw_2_body()
 
     // The boss's spell card counter next to vm_94.
     if (g_EnemyManager != NULL && unk_1d0 >= 0 && g_EnemyManager->get_boss(0) != NULL &&
-        !g_EnemyManager->inner.boss_bit && msg == NULL && !(*(u32 *)&g_GameThread->flags & 0x10000))
+        !g_EnemyManager->inner.life_bar_hidden && msg == NULL && !(*(u32 *)&g_GameThread->flags & 0x10000))
     {
         AnmVm *vm = vm_94;
         f32 x = vm->pos.x + 16.0f;

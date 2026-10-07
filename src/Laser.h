@@ -164,6 +164,8 @@ struct LaserLineInner
 static_assert(offsetof(LaserLineInner, ex) == 0x38, "LaserLineInner::ex");
 static_assert(offsetof(LaserLineInner, shot_sfx) == 0x350, "LaserLineInner::shot_sfx");
 
+// A straight laser that flies like a bullet (ECL laserOn, et_ex LASER).
+// The name is ZUN's, from RTTI.
 // VTABLE: TH16 0x492424
 class LaserLineInf : public LaserDataInf
 {
@@ -242,6 +244,8 @@ struct LaserInfiniteInner
     LaserInfiniteInner();
 };
 
+// A laser fixed at its origin that warns, widens, stays and shrinks
+// (ECL laserStOn). The name is ZUN's, from RTTI.
 // VTABLE: TH16 0x4923b8
 class LaserInfiniteInf : public LaserDataInf
 {
@@ -267,6 +271,8 @@ class LaserInfiniteInf : public LaserDataInf
     virtual i32 check_graze_or_kill(i32 a);
 };
 
+// One stretch of a curvy laser's path: its head follows the nodes in
+// turn, and the segments retrace them.
 struct LaserCurveNode
 {
     LaserCurveNode *next;
@@ -355,6 +361,8 @@ struct LaserCurveSegment
     f32 length;
 };
 
+// A curvy laser: segment_count points that follow the head's path (ECL
+// laserCuOn). The name is ZUN's, from RTTI.
 // VTABLE: TH16 0x4922e0
 class LaserCurveInf : public LaserDataInf
 {
@@ -395,6 +403,7 @@ class LaserCurveInf : public LaserDataInf
     static i32 __fastcall on_sprite_set(AnmVm *vm, i32 sprite);
 };
 
+// Parameters of a beam laser (ECL 713).
 struct LaserBeamInner
 {
     D3DXVECTOR3 start_pos;
@@ -420,6 +429,7 @@ struct LaserBeamInner
     }
 };
 
+// A beam laser (ECL 713). The name is ZUN's, from RTTI.
 // VTABLE: TH16 0x49234c
 class LaserBeamInf : public LaserDataInf
 {

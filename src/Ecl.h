@@ -16,6 +16,7 @@ struct EclLocation
     i32 offset_from_first_instruction;
 };
 
+// One value on the ECL stack or in an argument.
 union EclStackItem
 {
     i32 i;
@@ -295,6 +296,7 @@ struct EclRawFile
     u32 unk_14[4];
 };
 
+// One entry of the subroutine table, sorted by name.
 struct EclSubroutinePtrs
 {
     const char *name;

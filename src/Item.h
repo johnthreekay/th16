@@ -133,6 +133,7 @@ inline i32 item_collect_line()
 // ANM scripts of each item type: the item and its offscreen arrow.
 extern const i32 g_item_anm_scripts[17][2];
 
+// Every item and the two free lists (ExpHP: zItemManagerInner).
 struct ItemManagerInner
 {
     // 0x258 normal items followed by 0x1000 cancel items.
@@ -142,6 +143,7 @@ struct ItemManagerInner
     f32 slowdown;
 };
 
+// Owns every item (ExpHP: zItemManager).
 struct ItemManager
 {
     u32 flags;

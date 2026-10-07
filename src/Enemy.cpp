@@ -151,9 +151,9 @@ HARNESS_CALLED void EnemyManager::set_boss_id(int index, EnemyInf *enemy)
 }
 
 // FUNCTION: TH16 0x41a950
-HARNESS_CALLED void EnemyManager::set_boss_bit(int value)
+HARNESS_CALLED void EnemyManager::set_life_bar_hidden(int value)
 {
-    inner.boss_bit = value;
+    inner.life_bar_hidden = value;
 }
 
 // FUNCTION: TH16 0x41a980
@@ -301,8 +301,8 @@ HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
 // FUNCTION: TH16 0x41b3d0
 int EnemyManager::update()
 {
-    inner.unk_a0[0] = 0;
-    inner.unk_a0[1] = 0;
+    inner.damage_this_frame[0] = 0;
+    inner.damage_this_frame[1] = 0;
     EnemyList *next;
     for (EnemyList *node = active_enemy_list_head; node != NULL; node = next)
     {
@@ -666,16 +666,16 @@ int EnemyData::step_logic()
             {
                 if (dealt >= life.current)
                 {
-                    g_EnemyManager->inner.unk_a0[0] += (dealt - life.current) / 4 + life.current;
+                    g_EnemyManager->inner.damage_this_frame[0] += (dealt - life.current) / 4 + life.current;
                 }
                 else
                 {
-                    g_EnemyManager->inner.unk_a0[0] += dealt;
+                    g_EnemyManager->inner.damage_this_frame[0] += dealt;
                 }
             }
             else
             {
-                g_EnemyManager->inner.unk_a0[1] += dealt;
+                g_EnemyManager->inner.damage_this_frame[1] += dealt;
             }
         }
         i32 life_damage = dealt;

@@ -290,7 +290,7 @@ int EnemyData::ecl_run_over_300()
         break;
     // lifeHide(hide)
     case 631:
-        g_EnemyManager->inner.boss_bit = full->context.current_context->get_int_arg(0);
+        g_EnemyManager->inner.life_bar_hidden = full->context.current_context->get_int_arg(0);
         break;
     // zIndex(layer)
     case 552:
@@ -1334,7 +1334,7 @@ int EnemyData::ecl_run_over_300()
     case 512:
     {
         i32 boss_id = get_int_arg(0);
-        g_EnemyManager->set_boss_bit(0);
+        g_EnemyManager->set_life_bar_hidden(0);
         if (boss_id < 0)
         {
             if (flags_low & ENEMY_FLAG_BOSS)
