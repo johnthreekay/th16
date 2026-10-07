@@ -304,6 +304,102 @@ HARNESS_CALLED void AnmManager::draw_triangle_fan(i32 count, Float3 *center, Flo
     mgr->unk_cc++;
 }
 
+// The extra data of the VMs drawn by anm_on_draw_fan: a fan of 33 vertices
+// (the center, 31 points around it and the first point again), with each
+// point's radius and its growth, and the texture scroll speed.
+struct AnmFanData
+{
+    RenderVertex144 vertices[33];
+    u8 unk_39c[4];
+    f32 radius[33];
+    f32 radius_speed[32];
+    f32 uv_speed;
+};
+
+// This file's copy of ZunMath.h's sincosmul.
+// FUNCTION: TH16 0x46a350
+static void __fastcall fan_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
+
+// Scrolls the fan's texture coordinates, keeping them from going negative.
+static inline void fan_scroll_u(AnmFanData *data, RenderVertex144 *vertex)
+{
+    vertex->uv.x += data->uv_speed;
+    if (vertex->uv.x < 0.0f)
+    {
+        for (i32 i = 0; i < 33; i++)
+        {
+            data->vertices[i].uv.x += 1.0f;
+        }
+    }
+}
+
+static inline void fan_scroll_v(AnmFanData *data, RenderVertex144 *vertex)
+{
+    vertex->uv.y += data->uv_speed;
+    if (vertex->uv.y < 0.0f)
+    {
+        for (i32 i = 0; i < 33; i++)
+        {
+            data->vertices[i].uv.y += 1.0f;
+        }
+    }
+}
+
+// The on_tick callback of the fan VMs: grows the points, scrolls the
+// texture and places the fan at the VM.
+// TODO: the original hoists the -pi, 0 and 1 constants into xmm4-6 at entry and walks the radii with ebx; scheduling differs.
+// FUNCTION: TH16 0x46a0b0
+i32 __fastcall anm_on_tick_fan(AnmVm *vm)
+{
+    AnmFanData *data = (AnmFanData *)vm->ins_508_extra_data;
+    *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
+    data->vertices[0].uv.x += data->uv_speed;
+    if (data->vertices[0].uv.x < 0.0f)
+    {
+        for (i32 i = 0; i < 33; i++)
+        {
+            data->vertices[i].uv.x += 1.0f;
+        }
+    }
+    data->vertices[0].uv.y += data->uv_speed;
+    if (data->vertices[0].uv.y < 0.0f)
+    {
+        for (i32 i = 0; i < 33; i++)
+        {
+            data->vertices[i].uv.y += 1.0f;
+        }
+    }
+    data->vertices[0].diffuse = vm->color_1.d3d;
+    f32 angle = -ZUN_PI;
+    for (i32 i = 0; i < 31; i++)
+    {
+        RenderVertex144 *vertex = &data->vertices[i + 1];
+        fan_scroll_u(data, vertex);
+        fan_scroll_v(data, vertex);
+        vertex->diffuse = vm->color_1.d3d;
+        ((ZunColor *)&vertex->diffuse)->a = 0;
+        data->radius[i] = data->radius_speed[i] + data->radius[i];
+        fan_sincosmul((Float3 *)&vertex->pos, angle, data->radius[i]);
+        angle += ZUN_2PI / 31.0f;
+        vertex->pos.x = vertex->pos.x + (vm->pos.x + vm->entity_pos.x);
+        vertex->pos.y = (vm->pos.y + vm->entity_pos.y) + vertex->pos.y;
+        vertex->pos.z = (vm->entity_pos.z + vm->pos.z) + vertex->pos.z;
+    }
+    data->vertices[32] = data->vertices[1];
+    return 0;
+}
+
 // The on_draw callback of VMs that carry their own vertices: a fan of 33
 // vertices in the extra data of instruction 508 (ExpHP: AnmVm::on_draw__6).
 // FUNCTION: TH16 0x46a330
