@@ -518,7 +518,7 @@ struct AnmVm
     void set_rgb2_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
     void set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
     // Advances every running interpolator and applies its value.
-    void step_interpolators();
+    HARNESS_CALLED void step_interpolators();
     // Applies angular velocity, scale growth and UV scrolling for one frame
     // (ExpHP: leaf_4630f0__flag_534_24_only).
     void step_velocities();

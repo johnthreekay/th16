@@ -55,6 +55,10 @@ i32 Supervisor::compute_exe_checksum()
 // to annotate it). Any reference pulls that object in, and the data formats
 // c_dfDIKeyboard and c_dfDIJoystick2 (dinput8.lib) refer to the axis, POV
 // and key ids, so all of them are here.
+// GLOBAL: TH16 0x48b53c
+extern "C" const DIDATAFORMAT c_dfDIKeyboard;
+// GLOBAL: TH16 0x48b744
+extern "C" const DIDATAFORMAT c_dfDIJoystick2;
 // GLOBAL: TH16 0x48b75c
 extern "C" const GUID IID_IDirectInput8A = {0xbf798030, 0x483a, 0x4da2, {0xaa, 0x99, 0x5d, 0x64, 0xed, 0x36, 0x97, 0x00}};
 // GLOBAL: TH16 0x48b76c
@@ -254,7 +258,6 @@ void read_resolution_dialog()
     }
 }
 
-// TODO: code identical; reccmp does not know the addresses of dinput8.lib's c_dfDIKeyboard (0x48b53c) and c_dfDIJoystick2 (0x48b744).
 // FUNCTION: TH16 0x45c360
 i32 Supervisor::dx_direct_input_initialize()
 {

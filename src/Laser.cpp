@@ -1941,7 +1941,7 @@ i32 LaserInfiniteInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32
 
 // Sets the laser up from its parameters: the body and its origin VM, the
 // shot sound, and the start offset along the aim.
-// TODO: the original realigns the frame (and esp, -8); everything else matches.
+// TODO: the original realigns the frame (and esp, -8); everything else matches. A dead double in a HARNESS_CALLED AnmVm::run matches it (see README).
 // FUNCTION: TH16 0x435050
 i32 LaserInfiniteInf::initialize(void *params)
 {
@@ -3026,7 +3026,7 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
 
 // Sets the laser up from its parameters: the body, origin and tip VMs, the
 // delay timers, the shot sound and the start offset along the aim.
-// TODO: the original realigns the frame (and esp, -8); everything else matches.
+// TODO: the original realigns the frame (and esp, -8); everything else matches. A dead double in a HARNESS_CALLED AnmVm::run matches it (see README).
 // FUNCTION: TH16 0x431b30
 i32 LaserLineInf::initialize(void *params)
 {

@@ -281,7 +281,7 @@ i32 InterpInt::step()
 
 // TODO: ours aligns the frame (and esp, -8) and orders the bezier terms and the method 17 adds differently.
 // FUNCTION: TH16 0x463d40
-D3DXVECTOR2 InterpFloat2::step()
+HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step()
 {
     if (end_time > 0)
     {
@@ -537,10 +537,9 @@ D3DXVECTOR3 InterpStrange1::step()
     return current;
 }
 
-// TODO: the timer tick (tick_mixed) adds current_f and the speed the other way round and stores
-// current_f before current on the unscaled path, and one lea swaps its operands.
+// TODO: the timer tick: with tick() the stores match, but the result goes to the speed's xmm1 (the original loads current_f into xmm0, see README); method 17's bezier_2 + goal gets x or y/z operand order right, never both; one lea swaps its operands.
 // FUNCTION: TH16 0x464590
-Int3 InterpInt3::step()
+HARNESS_CALLED Int3 InterpInt3::step()
 {
     if (end_time > 0)
     {
@@ -594,9 +593,8 @@ Int3 InterpInt3::step()
     return current;
 }
 
-// TODO: the original frame is 4 bytes bigger (sub esp, 0x20); the code is otherwise identical.
 // FUNCTION: TH16 0x464080
-ZunAngle InterpAngle::step()
+HARNESS_CALLED ZunAngle InterpAngle::step()
 {
     if (end_time > 0)
     {

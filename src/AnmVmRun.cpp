@@ -1541,9 +1541,10 @@ void AnmVm::set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor 
     rgb1_i.time = 0;
 }
 
-// TODO: /GS cookie from the stubbed InterpFloat3/InterpAngle steps, and the 8-byte frame alignment InterpFloat2::step has too.
+// HARNESS_CALLED: with AnmVm::run as its only caller LTCG knows its stack is
+// 8-aligned, so it does not realign its frame (the original does not).
 // FUNCTION: TH16 0x463b30
-void AnmVm::step_interpolators()
+HARNESS_CALLED void AnmVm::step_interpolators()
 {
     if (pos_i.end_time != 0)
     {

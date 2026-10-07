@@ -56,7 +56,7 @@ struct InterpFloat2
     i32 method;
 
     void reset_timer();
-    D3DXVECTOR2 step();
+    HARNESS_CALLED D3DXVECTOR2 step();
     // Starts an interpolation from initial to goal over end_time frames
     // (ECL's moveCircleTime and moveEllipseTime). Takes the components
     // separately: D3DXVECTOR2 locals would make LTCG align the caller's
@@ -112,7 +112,7 @@ struct InterpAngle
 
     // The same code as InterpFloat::reset, but a separate function.
     void reset_time();
-    ZunAngle step();
+    HARNESS_CALLED ZunAngle step();
 };
 
 struct InterpInt
@@ -140,7 +140,7 @@ struct InterpInt3
     i32 end_time;
     i32 method;
 
-    Int3 step();
+    HARNESS_CALLED Int3 step();
 };
 
 struct InterpStrange1
