@@ -1130,7 +1130,7 @@ i32 Player::initialize()
 
 // The unit movement of each PlayerDirection.
 // GLOBAL: TH16 0x492c20
-const Int2 g_player_directions[9] = {{0, 0}, {0, -1}, {0, 1}, {-1, 0}, {1, 0}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
+const Int2 g_player_directions[9] = {{0, 0}, {0, -1}, {0, 1}, {-1, 0}, {1, 0}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
 
 // copy_vm_and_run as LTCG inlined it here.
 static __forceinline void player_set_script(Player *player, i32 script)
