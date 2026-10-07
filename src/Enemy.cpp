@@ -533,11 +533,11 @@ int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage)
     {
         pos.y += 24.0f;
         Float2 size(vm->scale.x * 192.0f, vm->scale.y * 32.0f);
-        bar_damage = g_Player->compute_damage_to_enemy(&pos, &size, vm->rotation.z, 0.0f, &hit, 0, 0,
+        bar_damage = g_Player->compute_damage_to_enemy(&pos, (Float3 *)&size, vm->rotation.z, 0.0f, &hit, NULL, 0,
                                                        enemy->full->enemy_id);
         pos.y += 32.0f;
         circle_damage =
-            g_Player->compute_damage_to_enemy(&pos, NULL, 0.0f, 48.0f, &hit, 0, 0, enemy->full->enemy_id);
+            g_Player->compute_damage_to_enemy(&pos, NULL, 0.0f, 48.0f, &hit, NULL, 0, enemy->full->enemy_id);
     }
     return damage + bar_damage + circle_damage;
 }

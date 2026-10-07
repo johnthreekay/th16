@@ -14,10 +14,6 @@
 // GLOBAL: TH16 0x4a6ef8
 Player *g_Player;
 
-// STUB: TH16 0x4440e0
-void PlayerInner::repopulate_options()
-{
-}
 
 // Opaque sink for the /GL placeholders in src/placeholder/unit2.cpp.
 void placeholder_sink(int a, float b)

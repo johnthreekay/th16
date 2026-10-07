@@ -68,11 +68,11 @@ i32 *harness_w3d_unk_4d9d90()
     return &g_unk_4d9d90;
 }
 
-// The title menu (0x44b621). has_cleared keeps this in ecx: a second
-// object stops LTCG from folding it.
+// has_cleared keeps this in ecx: a second object stops LTCG from folding
+// it.
 i32 harness_w3d_scorefile(Scorefile *scorefile, i32 character)
 {
-    return g_Scorefile->any_cleared() + scorefile->has_cleared(character);
+    return scorefile->has_cleared(character);
 }
 
 // GameThread creates the player (0x42ce15) and deletes it in its
@@ -87,12 +87,6 @@ void harness_w3d_player(i32 create)
     {
         delete g_Player;
     }
-}
-
-// Player::initialize (0x441025) takes the cached .sht files back.
-ShtFile *harness_w3d_cached_sht()
-{
-    return (ShtFile *)((u8 *)g_cached_sht_file + (u32)g_cached_sht_file_subseason);
 }
 
 // GameThread's stage setup (0x42dcf3, 0x42df0b).

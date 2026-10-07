@@ -5,19 +5,6 @@
 #include "../Player.h"
 #include "../PopupManager.h"
 
-// Like Player::initialize (0x441109) and Player::on_tick (0x44294f).
-void harness_player_set_position(Player *player, i32 respawn)
-{
-    if (respawn)
-    {
-        player->set_position(0.0f, 480.0f);
-    }
-    else
-    {
-        player->set_position(0.0f, 400.0f);
-    }
-}
-
 // Like the bullet and laser collision code (0x412512, 0x41254a, 0x41255e,
 // 0x41c8bc) and the many aimed bullets (0x413a33...).
 i32 harness_player_hit(Float3 *pos, Float3 *size, f32 radius, i32 graze_only)

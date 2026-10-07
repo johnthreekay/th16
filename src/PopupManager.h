@@ -26,7 +26,10 @@ struct PopupString
             u8 num_digits;
         };
     };
-    u8 unk_40[0x48 - 0x40];
+    // The season release bonus strings (13 and up): the bonus (negative
+    // for none) and its multiplier.
+    i32 bonus;
+    f32 bonus_rate;
 };
 
 // The small score popups over collected items and destroyed enemies.
