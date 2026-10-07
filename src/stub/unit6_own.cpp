@@ -20,30 +20,6 @@ void play_sound_centered_stub(i32 id, i32 unused)
 {
 }
 
-// STUB: TH16 0x43ce10
-int Supervisor::switch_gamemodes()
-{
-    return 0;
-}
-
-// STUB: TH16 0x43b520
-int __fastcall Supervisor::on_registration(void *arg)
-{
-    return 0;
-}
-
-// STUB: TH16 0x43d140
-int __fastcall Supervisor::on_draw_01(void *arg)
-{
-    return 1;
-}
-
-// STUB: TH16 0x43d2f0
-int __fastcall Supervisor::on_draw_0f(void *arg)
-{
-    return 1;
-}
-
 #include "../PauseMenu.h"
 #include "../ReplayManager.h"
 
@@ -69,28 +45,6 @@ int PopupManager::on_draw()
 }
 
 #include "../LoadingThread.h"
-
-// STUB: TH16 0x43d970
-void Supervisor::setup_special_anms()
-{
-}
-
-// STUB: TH16 0x43afe0
-LoadingThread::~LoadingThread()
-{
-}
-
-// STUB: TH16 0x43adc0
-unsigned __stdcall LoadingThread::thread_start(void *arg)
-{
-    return 0;
-}
-
-// STUB: TH16 0x43b300
-int LoadingThread::on_draw()
-{
-    return 1;
-}
 
 // STUB: TH16 0x447760
 int ReplayManager::initialize(i32 mode, const char *filename)

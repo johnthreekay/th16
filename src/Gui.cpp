@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "AnmManager.h"
+#include "AsciiManager.h"
 #include "BulletManager.h"
 #include "EnemyManager.h"
 #include "GameThread.h"
@@ -510,6 +511,157 @@ void Gui::update_score()
     }
 }
 
+// Shows a HUD notice: kind 0 is the spell card bonus (unk is the amount),
+// 1 bonus failed, 2 full power, 3 hiscore, 4 extend. Every caller passes
+// 0-4, which is how the original's jump table goes without a bounds check;
+// the __assume reproduces that.
+// TODO: in the digit loop the original keeps the manager in ebx and spills the counter; ours does the reverse.
+// FUNCTION: TH16 0x42bcf0
+HARNESS_CALLED void Gui::sub_42bcf0(i32 unk, i32 kind)
+{
+    switch (kind)
+    {
+    case 0:
+    {
+        delete_vm_and_clear(id_c8);
+        id_c8 = front_anm->create_effect(0x3d, -1, NULL);
+        i32 divisor = 10000000;
+        i32 rest = unk;
+        i32 shown = 0;
+        AnmManager *anm;
+        AnmVm *vm;
+        for (i32 i = 0; i < 8; i++)
+        {
+            delete_vm_and_clear(ids_a0[i]);
+            ids_a0[i] = g_AsciiManager->ascii_anm->create_effect(i + 4, -1, NULL);
+            anm = g_AnmManager;
+            i32 digit = rest / divisor;
+            rest = rest % divisor;
+            if (digit != 0)
+            {
+                shown = 1;
+            }
+            vm = anm->get_vm_with_id(ids_a0[i]);
+            if (vm != NULL)
+            {
+                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, digit + 0xef);
+            }
+            if (!shown)
+            {
+                vm = anm->get_vm_with_id(ids_a0[i]);
+                if (vm != NULL)
+                {
+                    vm->clear_flag_lo_2_tree_inline();
+                }
+            }
+            else
+            {
+                vm = anm->get_vm_with_id(ids_a0[i]);
+                if (vm != NULL)
+                {
+                    vm->set_flag_lo_2_tree_inline();
+                }
+            }
+            divisor /= 10;
+        }
+        delete_vm_and_clear(ids_a0[8]);
+        if (unk >= 1000000)
+        {
+            ids_a0[8] = g_AsciiManager->ascii_anm->create_effect(0xc, -1, NULL);
+            anm = g_AnmManager;
+            vm = anm->get_vm_with_id(ids_a0[8]);
+            if (vm != NULL)
+            {
+                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, 0xfd);
+            }
+        }
+        delete_vm_and_clear(ids_a0[9]);
+        if (unk >= 1000)
+        {
+            ids_a0[9] = g_AsciiManager->ascii_anm->create_effect(0xd, -1, NULL);
+            anm = g_AnmManager;
+            vm = anm->get_vm_with_id(ids_a0[9]);
+            if (vm != NULL)
+            {
+                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, 0xfd);
+            }
+        }
+        unk_14c = 1;
+        ids_11c[3] = front_anm->create_effect(0x60, -1, NULL);
+        break;
+    }
+    case 1:
+        delete_vm_and_clear(id_c8);
+        id_c8 = front_anm->create_effect(0x3e, -1, NULL);
+        unk_14c = 1;
+        ids_11c[3] = front_anm->create_effect(0x60, -1, NULL);
+        break;
+    case 2:
+        delete_vm_and_clear(id_cc);
+        id_cc = front_anm->create_effect(0x3f, -1, NULL);
+        break;
+    case 3:
+        delete_vm_and_clear(id_cc);
+        id_cc = front_anm->create_effect(0x40, -1, NULL);
+        break;
+    case 4:
+        delete_vm_and_clear(id_cc);
+        id_cc = front_anm->create_effect(0x41, -1, NULL);
+        break;
+    case 6:
+        delete_vm_and_clear(id_c8);
+        id_c8 = front_anm->create_effect(0x42, -1, NULL);
+        break;
+    default:
+        __assume(0);
+    }
+}
+
+// AnmLoaded::create_vm as LTCG inlined it into some callers.
+static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECTOR3 *pos, f32 rotation, i32 layer)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    anm->vm_count++;
+    AnmVm *vm = g_AnmManager->allocate_vm();
+    anm->copy_vm(vm, script);
+    vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+    if (layer >= 0)
+    {
+        vm->layer = layer;
+        if (layer <= 23)
+        {
+            vm->flags_hi &= ~ANM_VM_LAYER_UI;
+            vm->flags_hi |= ANM_VM_LAYER_SET;
+        }
+    }
+    if (pos == NULL)
+    {
+        vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    }
+    else
+    {
+        vm->entity_pos = *pos;
+    }
+    vm->rotation.z = rotation;
+    vm->run();
+    vm->mode_of_create_child = 0;
+    AnmId id;
+    id = g_AnmManager->insert_in_world_list_back(vm);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return id;
+}
+
+// FUNCTION: TH16 0x42c070
+void Gui::show_stage_clear_bonus()
+{
+    Gui *gui = g_Gui;
+    gui->ids_11c[1] = create_vm_inline(gui->front_anm, 0x78, NULL, 0.0f, -1);
+    gui->stage_clear_bonus = g_Globals.stage_num * 1000000;
+    g_Globals.add_to_score(gui->stage_clear_bonus);
+    gui->flags_1ac |= 0x100;
+    gui->timer_1b0.reset();
+}
+
 // FUNCTION: TH16 0x42c1b0
 HARNESS_CALLED void Gui::sub_42c1b0()
 {
@@ -626,6 +778,75 @@ void Gui::sub_42c5c0()
     if (vm != NULL)
     {
         vm->set_flag_lo_2_tree_inline();
+    }
+}
+
+// The id of the first descendant of the VM running the script (0 if there
+// is none, forgetting the id if the VM is gone). LTCG knows get_vm_with_id
+// leaves g_AnmManager alone and loads it once; with the opaque stub we have
+// to pass it in.
+static inline AnmId find_child_id_of(AnmManager *anm, AnmId &id, i32 script)
+{
+    AnmVm *child = NULL;
+    AnmVm *vm = anm->get_vm_with_id(id);
+    if (vm == NULL)
+    {
+        id.id = 0;
+    }
+    else
+    {
+        vm = anm->get_vm_with_id(id);
+        if (vm == NULL)
+        {
+            id.id = 0;
+        }
+        child = vm->search_children(script, 0);
+    }
+    AnmId result;
+    result.id = child != NULL ? child->id.id : 0;
+    return result;
+}
+
+// TODO: the original keeps g_AnmManager and then the level in ebx; ours spills both (get_vm_with_id is an opaque stub here).
+// FUNCTION: TH16 0x42c600
+void Gui::update_season_gauge()
+{
+    AnmManager *anm = g_AnmManager;
+    Gui *gui = g_Gui;
+    AnmVm *gauge = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, 0x73));
+    AnmVm *level_vm = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, 0x74));
+    i32 level = g_Globals.season_level();
+    if (level == 0)
+    {
+        gauge->sprite_size.x = get_season_gauge_fill_ratio() * 100.0f;
+        gauge->flags_lo |= ANM_VM_SCALE_CHANGED;
+        level_vm->clear_flag_lo_2_tree_inline();
+        if (gui->season_gauge_has_level == 1)
+        {
+            gauge->interrupt(3);
+            gauge->run();
+        }
+        gui->season_gauge_has_level = 0;
+    }
+    else
+    {
+        if (g_Globals.season_power < g_Globals.max_season_power)
+        {
+            gauge->sprite_size.x = get_season_gauge_fill_ratio() * 100.0f;
+        }
+        else
+        {
+            gauge->sprite_size.x = 100.0f;
+        }
+        gauge->flags_lo |= ANM_VM_SCALE_CHANGED;
+        level_vm->set_flag_lo_2_tree_inline();
+        level_vm->interrupt(level + 7);
+        if (gui->season_gauge_has_level == 0)
+        {
+            gauge->interrupt(2);
+            gauge->run();
+        }
+        gui->season_gauge_has_level = 1;
     }
 }
 

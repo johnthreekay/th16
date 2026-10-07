@@ -2,7 +2,11 @@
 #include <string.h>
 
 #include "AsciiManager.h"
+#include "FileSystem.h"
+#include "GameErrorContext.h"
 #include "LoadingThread.h"
+#include "Scorefile.h"
+#include "SoundManager.h"
 #include "Supervisor.h"
 
 // GLOBAL: TH16 0x4a6ee4
@@ -13,6 +17,64 @@ LoadingThread::LoadingThread()
     memset(this, 0, sizeof(LoadingThread));
     flags |= 2;
     g_LoadingThread = this;
+}
+
+i32 load_shared_anms();
+
+// FUNCTION: TH16 0x43adc0
+int LoadingThread::thread_start(void *arg)
+{
+    LoadingThread *t = g_LoadingThread;
+    t->sig_anm = AnmManager::preload_anm(1, "sig.anm");
+    if (t->sig_anm != NULL)
+    {
+        t->on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+        t->count_630 = 1;
+        AsciiInf *ascii = new AsciiInf();
+        if (ascii->initialize() != 0)
+        {
+            delete ascii;
+            ascii = NULL;
+        }
+        if (ascii == NULL)
+        {
+            // "error : Failed to initialize the text"
+            g_GameErrorContext.log("error : \x95\xb6\x8e\x9a\x82\xcc\x8f\x89\x8a\xfa\x89\xbb\x82\xc9\x8e\xb8\x94s\x82\xb5\x82\xdc\x82\xb5\x82\xbd\r\n");
+        }
+        else
+        {
+            t->count_634 = 1;
+            g_Supervisor.text_anm = AnmManager::preload_anm(0, "text.anm");
+            if (g_Supervisor.text_anm != NULL)
+            {
+                g_SoundManager.bgm_format = (ThBgmFormat *)file_read_all("../../bgm/thbgm.fmt", NULL, 0);
+                if (g_SoundManager.bgm_format == NULL)
+                {
+                    // "error : Failed to initialize the BGM"
+                    g_GameErrorContext.log("error : BGM \x82\xcc\x8f\x89\x8a\xfa\x89\xbb\x82\xc9\x8e\xb8\x94s\x82\xb5\x82\xdc\x82\xb5\x82\xbd\r\n");
+                }
+                g_SoundManager.reset();
+                if (file_exists("thbgm.dat"))
+                {
+                    if (!(g_Supervisor.config.flags_2c & 0x10))
+                    {
+                        g_SoundManager.open_bgm_dat("thbgm.dat");
+                    }
+                    else
+                    {
+                        strcpy(g_SoundManager.bgm_dat_name, "thbgm.dat");
+                    }
+                }
+                load_shared_anms();
+                t->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
+                g_Scorefile = new Scorefile;
+                return 0;
+            }
+        }
+    }
+    g_Supervisor.gamemode_to_switch_to = 3;
+    t->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
+    return 0;
 }
 
 // FUNCTION: TH16 0x43af60
@@ -32,8 +94,44 @@ int LoadingThread::initialize()
     g_UpdateFuncRegistry->register_on_draw(f, 0x44);
     on_draw_func = f;
 
-    thread.restart(thread_start, this);
+    thread.restart((ThreadStart)thread_start, this);
     return 0;
+}
+
+i32 unload_shared_anms();
+
+// FUNCTION: TH16 0x43afe0
+LoadingThread::~LoadingThread()
+{
+    thread.join_if_running();
+    g_UpdateFuncRegistry->unregister_locked(on_tick_func);
+    g_UpdateFuncRegistry->unregister_locked(on_draw_func);
+    unload_shared_anms();
+    AnmManager *anm = g_AnmManager;
+    if (anm->loaded_anms[1] != NULL)
+    {
+        anm->loaded_anms[1]->release();
+        delete anm->loaded_anms[1];
+        anm->loaded_anms[1] = NULL;
+    }
+    g_LoadingThread = NULL;
+    if (g_AsciiManager != NULL)
+    {
+        delete g_AsciiManager;
+    }
+    anm = g_AnmManager;
+    if (anm->loaded_anms[0] != NULL)
+    {
+        anm->loaded_anms[0]->release();
+        delete anm->loaded_anms[0];
+        anm->loaded_anms[0] = NULL;
+    }
+    scorefile_save_449a00();
+    if (g_Scorefile != NULL)
+    {
+        delete g_Scorefile;
+    }
+    g_Scorefile = NULL;
 }
 
 // FUNCTION: TH16 0x43b1f0
@@ -63,6 +161,29 @@ int LoadingThread::on_tick()
         g_Supervisor.gamemode_to_switch_to = 4;
         flags &= ~2;
     }
+    return 1;
+}
+
+// Shows the sig.anm logo and then the "now loading" text.
+// FUNCTION: TH16 0x43b300
+int LoadingThread::on_draw()
+{
+    if (count_630 == 1)
+    {
+        anm_id = sig_anm->create_effect(0, -1, NULL);
+        count_630++;
+    }
+    if (count_634 == 1)
+    {
+        AsciiInf *ascii = g_AsciiManager;
+        D3DXVECTOR3 pos(960.0f, 784.0f, 0.0f);
+        if (ascii->now_loading_id.id == 0)
+        {
+            ascii->now_loading_id = ascii->ascii_anm->create_vm(0x11, &pos, 0.0f, -1, 0);
+        }
+        count_634++;
+    }
+    count_638++;
     return 1;
 }
 

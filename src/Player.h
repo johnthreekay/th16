@@ -289,6 +289,8 @@ struct Player
     }
     void set_shoot_key_short_timer(i32 time);
     void interrupt_options();
+    // 0x42ca80. Sends the options interrupt 3. Called as g_Player->.
+    HARNESS_CALLED void resume_options();
     HARNESS_CALLED void set_position(f32 x, f32 y);
     // Works on g_Player (replay playback restores the position with it).
     HARNESS_CALLED void set_position_subpixel(Int2 *pos);

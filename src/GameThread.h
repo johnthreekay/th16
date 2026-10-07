@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 #include "Supervisor.h"
 #include "UpdateFunc.h"
 #include "ZunTimer.h"
@@ -36,6 +38,28 @@ struct ConfigData
         set_defaults();
     }
     DECOMP_NOINLINE void set_defaults();
+
+    // set_defaults' body, which Supervisor::load_game_config has inline.
+    __forceinline void set_defaults_inline()
+    {
+        memset(this, 0, sizeof(ConfigData));
+        flags |= 0x100;
+        unk_1c = 0;
+        unk_1d = 1;
+        version = 0x160002;
+        deadzone_x = deadzone_y = 600;
+        unk_1e = 1;
+        unk_1f = 5;
+        unk_20 = 0;
+        memcpy(pad_mapping, g_pad_mapping, sizeof(pad_mapping));
+        unk_21 = 2;
+        unk_22 = 100;
+        unk_24 = 0;
+        unk_25 = 2;
+        unk_23 = 80;
+        unk_2c = 0x80000000;
+        unk_30 = 0x80000000;
+    }
 };
 
 struct GameThreadFlags

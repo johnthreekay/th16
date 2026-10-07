@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "FileSystem.h"
+#include "CriticalSections.h"
 #include "GameErrorContext.h"
 #include "HelpManual.h"
 #include "Supervisor.h"
@@ -119,4 +120,31 @@ i32 __fastcall HelpManual::on_tick_callback(HelpManual *manual)
 i32 __fastcall HelpManual::on_draw_callback(HelpManual *manual)
 {
     return 1;
+}
+
+// TODO: same frame difference as create_vm (4 more bytes, esi saved before the critical section).
+// FUNCTION: TH16 0x42efb0
+HARNESS_CALLED AnmId AnmLoaded::create_ui_vm(i32 script, D3DXVECTOR3 *pos, i32 unused)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    vm_count++;
+    AnmVm *vm = g_AnmManager->allocate_vm();
+    copy_vm(vm, script);
+    vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+    if (pos == NULL)
+    {
+        vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    }
+    else
+    {
+        vm->entity_pos = *pos;
+    }
+    vm->rotation.z = 0.0f;
+    vm->run();
+    vm->mode_of_create_child = 4;
+    AnmId id;
+    id = g_AnmManager->insert_in_ui_list_back(vm);
+    vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return id;
 }

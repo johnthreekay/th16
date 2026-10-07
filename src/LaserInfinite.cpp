@@ -13,11 +13,44 @@ i32 LaserInfiniteInf::initialize(void *params)
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x436fd0
+// Runs the laser's pending et_ex transforms.
+// TODO: in the blend mode case the original increments ex_index in memory (inc, reload) instead of from the loaded index.
+// FUNCTION: TH16 0x436fd0
 void LaserInfiniteInf::run_ex()
 {
-    unit5_placeholder(this);
+    while (ex_index < 0x12)
+    {
+        BulletEx *ex = &inner.ex[ex_index];
+        if (ex->type == 0)
+        {
+            return;
+        }
+        if (ex->slot == 0 && ex_flags != 0)
+        {
+            return;
+        }
+        switch (ex->type)
+        {
+        case 0x80:
+            countdown_5c8 = ex->a;
+            break;
+        case 0x400:
+            state = 3;
+            break;
+        case 0x100000:
+            if (ex->a != 0)
+            {
+                vm_950.flags_lo = vm_950.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+            }
+            else
+            {
+                vm_950.flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
+            }
+            ex_index++;
+            continue;
+        }
+        ex_index++;
+    }
 }
 
 // Placeholder (not decompiled yet).
@@ -62,11 +95,25 @@ i32 LaserInfiniteInf::cancel(i32 mode, i32 b)
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x436ef0
-i32 LaserInfiniteInf::method_30(i32 a, i32 b)
+// 2 if a circle at pos touches the laser's rectangle, else 0.
+// TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
+// FUNCTION: TH16 0x436ef0
+i32 LaserInfiniteInf::method_30(Float3 *pos, f32 radius)
 {
-    return unit5_placeholder(this);
+    f32 dx = pos->x - position.x;
+    f32 dy = pos->y - position.y;
+    f32 a = -angle;
+    f32 s = zun_sinf(a);
+    f32 c = zun_cosf(a);
+    f32 x = dx * c - dy * s;
+    f32 y = dx * s + dy * c;
+    D3DXVECTOR2 lo(x - radius, y - radius);
+    D3DXVECTOR2 hi(x + radius, y + radius);
+    if (lo.x > unk_70 || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
+    {
+        return 0;
+    }
+    return 2;
 }
 
 // Placeholder (not decompiled yet).

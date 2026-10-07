@@ -12,6 +12,8 @@ static_assert(offsetof(AnmManager, freelist_head) == 0x184f4dc, "AnmManager free
 static_assert(offsetof(AnmManager, loaded_anms) == 0x184f4f0, "AnmManager loaded_anms");
 static_assert(offsetof(AnmManager, layer_list_dummy_heads) == 0x1c6fc30, "AnmManager layer_list_dummy_heads");
 static_assert(offsetof(AnmManager, last_discriminator) == 0x1c7fd84, "AnmManager last_discriminator");
+static_assert(offsetof(AnmManager, vertex_buffer) == 0x184fbc4, "AnmManager vertex_buffer");
+static_assert(offsetof(AnmManager, unk_1c7fd88) == 0x1c7fd88, "AnmManager unk_1c7fd88");
 static_assert(sizeof(AnmManager) == 0x1c7fd90, "AnmManager size");
 
 // GLOBAL: TH16 0x4c0f48

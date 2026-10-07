@@ -43,3 +43,9 @@ struct Camera
     Float3 unk_104;
     CameraSky sky;
 };
+
+// 0x43c780. Recomputes a camera's matrices for a flat view of its viewport.
+void __stdcall camera_update_43c780(Camera *camera);
+// 0x43c940. Recomputes a camera's matrices from its position, rocking and
+// facing, and makes them the device's.
+void __stdcall camera_apply_43c940(Camera *camera);

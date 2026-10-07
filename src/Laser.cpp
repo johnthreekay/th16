@@ -1,3 +1,4 @@
+#include <math.h>
 #include <string.h>
 
 #include "AnmManager.h"
@@ -6,9 +7,32 @@
 #include "GameThread.h"
 #include "Globals.h"
 #include "Laser.h"
+#include "SoundManager.h"
 
 // GLOBAL: TH16 0x4a6ee0
 LaserManager *g_LaserManager;
+
+// GLOBAL: TH16 0x49f2e0
+BulletTypeInfo g_bullet_types[BULLET_TYPE_COUNT];
+
+// This file's copy of ZunMath.h's sincosmul, which TH16 keeps once per
+// object file. A static of its own so that it can be annotated. ZUN's laser
+// code was one file; the laser methods that call it are kept here so that
+// they call this copy (LTCG knows it leaves ecx and edx alone, which it
+// would not assume for an external function).
+// FUNCTION: TH16 0x43ad00
+static void __fastcall laser_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
 
 // FUNCTION: TH16 0x42cb00
 void LaserManager::destroy_all()
@@ -97,7 +121,7 @@ i32 LaserDataInf::method_2c(i32 a, i32 b, i32 c, i32 d)
 }
 
 // FUNCTION: TH16 0x430ee0
-i32 LaserDataInf::method_30(i32 a, i32 b)
+i32 LaserDataInf::method_30(Float3 *pos, f32 radius)
 {
     return 0;
 }
@@ -190,7 +214,7 @@ LaserDataInf::LaserDataInf()
 // FUNCTION: TH16 0x431050
 void LaserLineInf::get_point(f32 distance, Float3 *out)
 {
-    sincosmul(out, angle, distance);
+    laser_sincosmul(out, angle, distance);
     *out += position;
 }
 
@@ -210,21 +234,21 @@ LaserLineInf::LaserLineInf()
 // FUNCTION: TH16 0x4311f0
 void LaserCurveInf::get_point(f32 distance, Float3 *out)
 {
-    sincosmul(out, angle, distance);
+    laser_sincosmul(out, angle, distance);
     *out += position;
 }
 
 // FUNCTION: TH16 0x431250
 void LaserInfiniteInf::get_point(f32 distance, Float3 *out)
 {
-    sincosmul(out, angle, distance);
+    laser_sincosmul(out, angle, distance);
     *out += position;
 }
 
 // FUNCTION: TH16 0x4312b0
 void LaserBeamInf::get_point(f32 distance, Float3 *out)
 {
-    sincosmul(out, angle, distance);
+    laser_sincosmul(out, angle, distance);
     *out += position;
 }
 
@@ -503,4 +527,139 @@ LaserInfiniteInner::LaserInfiniteInner()
 {
     memset(this, 0, sizeof(LaserInfiniteInner));
     speed = 8.0f;
+}
+
+// FUNCTION: TH16 0x433720
+i32 LaserLineInf::on_draw()
+{
+    i32 i = 0;
+    vm_92c.pos = position;
+    f32 rotation = angle + ZUN_PI / 2;
+    while (rotation > ZUN_PI)
+    {
+        rotation -= ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    while (rotation < -ZUN_PI)
+    {
+        rotation += ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    AnmVm *vm = &vm_92c;
+    vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
+    vm->rotation.z = rotation;
+    g_AnmManager->draw_vm(vm);
+    Float3 *tip = &vm_1524.pos;
+    laser_sincosmul(tip, angle, unk_70);
+    tip->z = 0.0f;
+    tip->x += position.x;
+    tip->y += position.y;
+    g_AnmManager->draw_vm(&vm_1524);
+    if (unk_7c == 0.0f)
+    {
+        vm_f28.pos = position;
+        g_AnmManager->draw_vm(&vm_f28);
+    }
+    return 0;
+}
+
+// An et_ex step: moves the curve's origin by ex_state[1]'s velocity (scaled
+// by the game speed) and turns it to face its direction of motion, until
+// the step's time runs out.
+// TODO: the original adds and stores the velocity one component at a time and reloads unk_60.x for the fabsf test.
+// FUNCTION: TH16 0x4395b0
+i32 LaserCurveInf::method_3c()
+{
+    BulletExState *st = &ex_state[1];
+    if (st->timer.current >= st->ints[0])
+    {
+        ex_flags &= ~4;
+        return 1;
+    }
+    length += st->floats[0] * g_game_speed;
+    unk_60 += *(Float3 *)&st->floats[5] * g_game_speed;
+    if (fabsf(unk_60.x) > 0.0001f || fabsf(unk_60.y) > 0.0001f)
+    {
+        angle = atan2(unk_60.y, unk_60.x);
+    }
+    st->timer.tick();
+    return 0;
+}
+
+// An et_ex step: turns the curve by ex_state[2]'s angular speed and grows
+// it, until the step's time runs out.
+// TODO: the original stores the new angle after loading floats[0] (scheduling).
+// FUNCTION: TH16 0x439460
+i32 LaserCurveInf::method_40()
+{
+    BulletExState *st = &ex_state[2];
+    if (st->timer.current >= st->ints[0])
+    {
+        ex_flags &= ~8;
+        return 1;
+    }
+    i32 i = 0;
+    f32 a = st->floats[1] * g_game_speed + angle;
+    while (a > ZUN_PI)
+    {
+        a -= ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    while (a < -ZUN_PI)
+    {
+        a += ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    angle = a;
+    length += st->floats[0] * g_game_speed;
+    laser_sincosmul(&unk_60, angle, length);
+    st->timer.tick();
+    return 0;
+}
+
+// An et_ex step: retracts the curve over ex_state[3]'s time, then turns it
+// and gives it a new length; after ints[1] rounds the step ends.
+// TODO: the original keeps the new angle in xmm0 (ours xmm1), increments ints[2] later and adds current_f into the speed register in the timer tick.
+// FUNCTION: TH16 0x4392c0
+i32 LaserCurveInf::method_44()
+{
+    f32 len;
+    if (ex_state[3].timer.current >= ex_state[3].ints[0])
+    {
+        if (inner.shot_transform_sfx >= 0)
+        {
+            g_SoundManager.play_sound_centered(inner.shot_transform_sfx, 0);
+        }
+        f32 a = ex_state[3].floats[1] + angle;
+        ex_state[3].ints[2]++;
+        len = ex_state[3].floats[0];
+        length = len;
+        angle = a;
+        ex_state[3].timer.reset();
+        if (ex_state[3].ints[2] >= ex_state[3].ints[1])
+        {
+            laser_sincosmul(&unk_60, a, len);
+            ex_flags &= ~0x10;
+            return 1;
+        }
+    }
+    else
+    {
+        len = length - ex_state[3].timer.current_f * length / ex_state[3].ints[0];
+    }
+    laser_sincosmul(&unk_60, angle, len);
+    ex_state[3].timer.tick();
+    return 0;
 }

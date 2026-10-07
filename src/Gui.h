@@ -122,9 +122,13 @@ struct Gui
     AnmId difficulty_id;
     AnmId season_gauge_id;
     AnmId id_110;
-    u8 unk_114[0x11c - 0x114];
+    // Whether the season gauge shows a level (update_season_gauge).
+    i32 season_gauge_has_level;
+    u8 unk_118[0x11c - 0x118];
     AnmId ids_11c[5];
-    u8 unk_130[0x150 - 0x130];
+    u8 unk_130[0x14c - 0x130];
+    // Set by sub_42bcf0's notices.
+    i32 unk_14c;
     AnmId id_150;
     ZunTimer time_in_stage;
     UpdateFunc *on_draw_2;
@@ -148,7 +152,9 @@ struct Gui
     i32 unk_1d8;
     GuiBossBar boss_bars[3];
     AnmLoaded *front_anm;
-    u8 unk_2dc[0x2e4 - 0x2dc];
+    // Score awarded for clearing the stage (show_stage_clear_bonus).
+    i32 stage_clear_bonus;
+    u8 unk_2e0[0x2e4 - 0x2e0];
 
     Gui();
     ~Gui();
@@ -187,7 +193,7 @@ struct Gui
     // Shows a HUD notice (2: full power, 4: extend). Its callers in the
     // original keep the stack 8-byte aligned for it (LTCG moved the
     // alignment out of the callee).
-    void sub_42bcf0(i32 unk, i32 kind);
+    HARNESS_CALLED void sub_42bcf0(i32 unk, i32 kind);
     // 0x42c600
     static void update_season_gauge();
 };

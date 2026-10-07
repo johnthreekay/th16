@@ -49,7 +49,9 @@ class LaserDataInf
     ZunTimer timer_5a0;
     ZunTimer timer_5b4;
     i32 countdown_5c8;
-    u8 unk_5cc[0x5d4 - 0x5cc];
+    // Index into g_bullet_types, and the color within it.
+    i32 bullet_type;
+    i32 bullet_color;
 
     LaserDataInf();
 
@@ -70,7 +72,7 @@ class LaserDataInf
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
     virtual i32 method_2c(i32 a, i32 b, i32 c, i32 d);
-    virtual i32 method_30(i32 a, i32 b);
+    virtual i32 method_30(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
     virtual i32 method_38();
     virtual i32 method_3c();
@@ -127,12 +129,16 @@ class LaserLineInf : public LaserDataInf
     virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(i32 a, i32 b);
+    virtual i32 method_30(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
     virtual i32 method_3c();
     virtual i32 method_44();
     virtual i32 method_50();
     virtual LaserDataInf *clone();
+
+    // Sprite mapping callback 2 of the line laser VMs: the sprite of the
+    // laser's color (ExpHP: AnmVm::on_sprite_set__2).
+    static i32 __fastcall on_sprite_set(AnmVm *vm, i32 sprite);
 };
 
 // Parameters of an infinite laser, filled in by ECL before the laser is
@@ -189,7 +195,7 @@ class LaserInfiniteInf : public LaserDataInf
     virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(i32 a, i32 b);
+    virtual i32 method_30(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
 };
 
@@ -206,14 +212,38 @@ struct LaserCurveNode
     }
 };
 
+// Parameters of a curvy laser. Layout from ExpHP (zLaserCurveInner); his
+// field names say which BulletManager shooter field each one comes from.
 struct LaserCurveInner
 {
-    u8 data[0x358];
+    D3DXVECTOR3 start_pos;
+    f32 ang_aim;
+    f32 laser_new_arg_4;
+    // ExpHP: spd1.
+    f32 speed;
+    i32 type;
+    i32 color;
+    // Number of segments (ExpHP: __bmgr_350).
+    i32 segment_count;
+    f32 distance;
+    i32 unk_28;
+    BulletEx ex[0x12];
+    i32 shot_sfx;
+    i32 shot_transform_sfx;
+    u8 unk_34c[0x358 - 0x34c];
 
     LaserCurveInner()
     {
         memset(this, 0, sizeof(*this));
     }
+};
+
+// One point of a curvy laser's body (LaserCurveInf::unk_1524 holds
+// segment_count of them).
+struct LaserCurveSegment
+{
+    Float3 pos;
+    u8 unk_c[0x20 - 0xc];
 };
 
 // VTABLE: TH16 0x4922e0
@@ -240,7 +270,7 @@ class LaserCurveInf : public LaserDataInf
     virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(i32 a, i32 b);
+    virtual i32 method_30(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
     virtual i32 method_3c();
     virtual i32 method_40();
@@ -248,6 +278,10 @@ class LaserCurveInf : public LaserDataInf
     virtual i32 method_60();
 
     HARNESS_CALLED LaserCurveNode *append_node(f32 value);
+
+    // Sprite mapping callback 3: one sprite per color, from 0x20c on (ExpHP:
+    // AnmVm::on_sprite_set__3).
+    static i32 __fastcall on_sprite_set(AnmVm *vm, i32 sprite);
 };
 
 struct LaserBeamInner
@@ -282,7 +316,7 @@ class LaserBeamInf : public LaserDataInf
     virtual i32 on_destroy();
     virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(i32 a, i32 b);
+    virtual i32 method_30(Float3 *pos, f32 radius);
 };
 
 // Placeholder virtual methods (not decompiled yet) live in the laser .cpp

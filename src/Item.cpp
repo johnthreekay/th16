@@ -23,6 +23,22 @@ const i32 g_item_anm_scripts[17][2] = {
 
 i32 unit5_placeholder(void *object);
 
+// This file's copy of ZunMath.h's sincosmul, which TH16 keeps once per
+// object file. A static of its own so that it can be annotated.
+// FUNCTION: TH16 0x430df0
+static void __fastcall item_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
+
 // FUNCTION: TH16 0x42f0b0
 ItemManager::ItemManager()
 {
@@ -116,6 +132,58 @@ i32 __fastcall ItemManager::on_draw_1_callback(ItemManager *mgr)
         return 1;
     }
     return mgr->on_draw_body(1);
+}
+
+// Items above the top of the screen show their arrow instead, fading in
+// over the 32 pixels above it.
+// FUNCTION: TH16 0x4307a0
+i32 ItemManager::on_draw_body(i32 layer)
+{
+    Item *item = inner.items;
+    for (i32 i = 0; i < 0x1258; i++, item++)
+    {
+        if (item->state == 0 || !(item->vm.flags_lo & ANM_VM_VISIBLE) || item->intangibility_frames > 0)
+        {
+            continue;
+        }
+        if (layer == 0)
+        {
+            if (item->item_type != 16)
+            {
+                continue;
+            }
+        }
+        else if (layer == 1 && item->item_type == 16)
+        {
+            continue;
+        }
+        item->vm.entity_pos = item->position;
+        item->vm_2.entity_pos = item->position;
+        if (item->vm.pos.y < -8.0f)
+        {
+            if (item->vm_2.flags_lo & ANM_VM_VISIBLE)
+            {
+                f32 distance = item->vm_2.pos.y + 8.0f;
+                item->vm_2.pos.y = 8.0f;
+                if (distance >= 32.0f)
+                {
+                    item->vm_2.color_1.a = 0xff;
+                }
+                else
+                {
+                    item->vm_2.color_1.a = distance * (1.0f / 32.0f) * 255.0f;
+                }
+                g_AnmManager->draw_vm(&item->vm_2);
+            }
+            item->unk_c58 = 1;
+        }
+        else
+        {
+            g_AnmManager->draw_vm(&item->vm);
+            item->unk_c58 = 0;
+        }
+    }
+    return 1;
 }
 
 // FUNCTION: TH16 0x430940
@@ -264,7 +332,7 @@ HARNESS_CALLED Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f
             item->item_type = type;
             item->unk_c58 = type;
             item->position = *pos;
-            sincosmul(&item->velocity, angle, speed);
+            item_sincosmul(&item->velocity, angle, speed);
             item->velocity.z = 0.0f;
             item->time = 0;
             item->angle = angle;
@@ -302,7 +370,7 @@ HARNESS_CALLED Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f
                 g_Globals.item_spawn_count++;
             }
             i32 anm_type = type != 15 ? type : 6;
-            sincosmul(&item->velocity, angle, speed);
+            item_sincosmul(&item->velocity, angle, speed);
             item->velocity.z = 0.0f;
             item->time.set_value(0);
             item->speed = 0.0f;

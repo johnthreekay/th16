@@ -28,3 +28,6 @@ struct StageData
 };
 
 extern StageData *g_stage_data;
+
+// The stage table, indexed by stage number.
+extern StageData g_stage_table[8];

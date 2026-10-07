@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#include "AnmManager.h"
+#include "CriticalSections.h"
 #include "Laser.h"
 
 // Placeholder (not decompiled yet).
@@ -74,18 +76,81 @@ i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d)
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x43a620
-i32 LaserCurveInf::cancel(i32 mode, i32 b)
+// AnmLoaded::create_vm as LTCG inlined it into some callers.
+static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECTOR3 *pos, f32 rotation, i32 layer)
 {
-    return unit5_placeholder(this);
+    ENTER_CS(CS_ANM_MANAGER);
+    anm->vm_count++;
+    AnmVm *vm = g_AnmManager->allocate_vm();
+    anm->copy_vm(vm, script);
+    vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+    if (layer >= 0)
+    {
+        vm->layer = layer;
+        if (layer <= 23)
+        {
+            vm->flags_hi &= ~ANM_VM_LAYER_UI;
+            vm->flags_hi |= ANM_VM_LAYER_SET;
+        }
+    }
+    if (pos == NULL)
+    {
+        vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    }
+    else
+    {
+        vm->entity_pos = *pos;
+    }
+    vm->rotation.z = rotation;
+    vm->run();
+    vm->mode_of_create_child = 0;
+    AnmId id;
+    id = g_AnmManager->insert_in_world_list_back(vm);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return id;
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x43a760
-i32 LaserCurveInf::method_30(i32 a, i32 b)
+// Cancels the laser, leaving a cancel effect on every third segment.
+// FUNCTION: TH16 0x43a620
+i32 LaserCurveInf::cancel(i32 mode, i32 b)
 {
-    return unit5_placeholder(this);
+    if (b != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    for (i32 i = 0; i < inner.segment_count; i++, segment++)
+    {
+        D3DXVECTOR3 pos = segment->pos;
+        if (i % 3 == 0)
+        {
+            AnmLoaded *anm = g_BulletManager->bullet_anm;
+            create_vm_inline(anm, inner.color * 2 + 0xd1, &pos, 0.0f, -1);
+        }
+    }
+    state = 1;
+    return 0;
+}
+
+// 2 if a circle at pos touches the laser's rectangle, else 0.
+// TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
+// FUNCTION: TH16 0x43a760
+i32 LaserCurveInf::method_30(Float3 *pos, f32 radius)
+{
+    f32 dx = pos->x - position.x;
+    f32 dy = pos->y - position.y;
+    f32 a = -angle;
+    f32 s = zun_sinf(a);
+    f32 c = zun_cosf(a);
+    f32 x = dx * c - dy * s;
+    f32 y = dx * s + dy * c;
+    D3DXVECTOR2 lo(x - radius, y - radius);
+    D3DXVECTOR2 hi(x + radius, y + radius);
+    if (lo.x > unk_70 || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
+    {
+        return 0;
+    }
+    return 2;
 }
 
 // Placeholder (not decompiled yet).
@@ -95,32 +160,21 @@ i32 LaserCurveInf::check_graze_or_kill(i32 a)
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x4395b0
-i32 LaserCurveInf::method_3c()
-{
-    return unit5_placeholder(this);
-}
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x439460
-i32 LaserCurveInf::method_40()
-{
-    return unit5_placeholder(this);
-}
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x4392c0
-i32 LaserCurveInf::method_44()
-{
-    return unit5_placeholder(this);
-}
-
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x439730
+// Counts down ex_state[11]'s timer; when it runs out, flips ex_flags bit
+// 0x100 and returns 1.
+// TODO: the original keeps the multiply of the speed by 1.0f (see ZunTimer::operator--).
+// FUNCTION: TH16 0x439730
 i32 LaserCurveInf::method_60()
 {
-    return unit5_placeholder(this);
+    ex_state[11].timer.decrement(1.0f);
+    if (ex_state[11].timer.current <= 0)
+    {
+        ex_flags ^= 0x100;
+        return 1;
+    }
+    return 0;
 }
 
 // FUNCTION: TH16 0x431190
@@ -137,4 +191,10 @@ HARNESS_CALLED LaserCurveNode *LaserCurveInf::append_node(f32 value)
     node->next->next = NULL;
     node->next->prev = node;
     return node->next;
+}
+
+// FUNCTION: TH16 0x43a840
+i32 __fastcall LaserCurveInf::on_sprite_set(AnmVm *vm, i32 sprite)
+{
+    return ((LaserCurveInf *)vm->associated_game_entity)->bullet_color + 0x20c;
 }

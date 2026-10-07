@@ -27,10 +27,12 @@ struct LoadingThread
     int initialize();
     static LoadingThread *create();
 
-    static unsigned __stdcall thread_start(void *arg);
+    // Started through ThreadInf::restart; like the other loaders a plain
+    // cdecl function.
+    static int thread_start(void *arg);
     // Registered through jmp thunks (ExpHP's "__stub" functions).
     DECOMP_NOINLINE int on_tick();
-    int on_draw();
+    DECOMP_NOINLINE int on_draw();
     static int __fastcall on_tick_thunk(void *arg);
     static int __fastcall on_draw_thunk(void *arg);
 };

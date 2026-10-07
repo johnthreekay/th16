@@ -121,6 +121,9 @@ struct AnmLoaded
     AnmId create_effect(i32 script, i32 layer, AnmVm **out);
     // 0x42c920. Like create_effect, for the UI list.
     AnmId create_ui_effect(i32 script, i32 unused, AnmVm **out);
+    // 0x42efb0. Like create_vm at rotation 0, for the UI list. HelpManual,
+    // its only user, passes a constant for unused, which LTCG folds.
+    HARNESS_CALLED AnmId create_ui_vm(i32 script, D3DXVECTOR3 *pos, i32 unused);
     // 0x426160. Like create_vm at the origin, but inserted at the front of
     // the world list.
     // Every caller passes 0 for unused, which LTCG folded.
@@ -276,7 +279,8 @@ struct AnmManager
     u8 last_address_v;
     u8 unk_184fbbe[2];
     i32 render_cache_184fbc0;
-    u8 unk_184fbc4[0x184fc18 - 0x184fbc4];
+    IDirect3DVertexBuffer9 *vertex_buffer;
+    u8 unk_184fbc8[0x184fc18 - 0x184fbc8];
     // Sprites waiting for flush_sprites, six vertices each (ExpHP:
     // zAnmVertexBuffers).
     i32 unrendered_sprite_count;
@@ -290,7 +294,9 @@ struct AnmManager
     AnmVm layer_list_dummy_heads[0x2b];
     // The upper 19 bits of the next VM id.
     volatile i32 last_discriminator;
-    u8 unk_1c7fd88[0x1c7fd90 - 0x1c7fd88];
+    // Reset to these by Supervisor::on_draw_01 every frame.
+    ZunColor unk_1c7fd88;
+    i32 unk_1c7fd8c;
 
     // 0x46b7d0. Destroys every VM still alive.
     ~AnmManager();

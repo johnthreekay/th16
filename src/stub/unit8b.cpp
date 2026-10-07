@@ -10,11 +10,6 @@ AnmVm *AnmManager::get_vm_with_id(AnmId id)
     return NULL;
 }
 
-// STUB: TH16 0x43c780
-void __stdcall camera_update_43c780(Camera *camera)
-{
-}
-
 // GLOBAL: TH16 0x491b58
 AnmVmFunc g_anm_on_destroy_funcs[4];
 

@@ -38,6 +38,22 @@ struct Config
     u8 unk_30[0x68 - 0x30];
 };
 
+// A screenshot being saved: Supervisor's 0x43bbd0 copies the back buffer
+// and starts write_screenshot (0x43be40) on a thread to save it as a BMP.
+struct Screenshot
+{
+    // Nonzero while the writer thread runs.
+    uintptr_t thread;
+    BITMAPFILEHEADER file_header;
+    BITMAPINFO *info;
+    // The bottom-up 24-bit rows to write.
+    u8 *bmp_data;
+    // A copy of the locked back buffer, and its pitch.
+    u8 *pixels;
+    i32 pitch;
+    char path[MAX_PATH];
+};
+
 // Owns the Direct3D/DirectInput objects and global game state. ZUN's name
 // for it in older games was MotherInf (per ExpHP).
 struct Supervisor
@@ -78,14 +94,22 @@ struct Supervisor
     i32 gamemode_prev;
     i32 unk_6fc;
     // Copied into each stage's replay snapshot (RpyGamestate::flag_290) and
-    // read by ECL variable -9927.
+    // read by ECL variable -9927. Set by switch_gamemodes before it starts
+    // a game (0 for a replay restart).
     i32 unk_700;
-    u8 unk_704[0x728 - 0x704];
+    i32 unk_704;
+    u8 unk_708[0x71c - 0x708];
+    // Set by load_game_config for config flag 0x20.
+    i32 unk_71c;
+    u8 unk_720[0x728 - 0x720];
     // text.anm: dialogue text and furigana lines.
     struct AnmLoaded *text_anm;
     u8 unk_72c[0x730 - 0x72c];
     u32 flags;
-    u8 unk_734[0x998 - 0x734];
+    // timeGetTime() when on_registration ran; also the RNG seed.
+    u32 start_time;
+    u8 unk_738[0x870 - 0x738];
+    Screenshot screenshot;
     ThreadInf thread;
     i32 unk_9b4;
     i32 unk_9b8;
@@ -96,7 +120,8 @@ struct Supervisor
     // th16_<version>.ver, read in on_registration.
     i32 ver_file_size;
     void *ver_file_data;
-    u8 unk_a24[0xa3c - 0xa24];
+    struct LoadingThread *loading_thread;
+    u8 unk_a28[0xa3c - 0xa28];
     D3DCOLOR background_color;
 
     u32 read_joypad(u32 input);
@@ -109,8 +134,22 @@ struct Supervisor
     void release_surfaces();
     void sub_43c630();
     void sub_43c6a0();
+    // 0x43bbd0. Copies the back buffer and starts write_screenshot to save
+    // it to path. Works on g_Supervisor; returns 1 for an unsupported
+    // back buffer format.
+    int take_screenshot(const char *path);
+    // 0x43be40. The screenshot thread: converts and saves g_Supervisor's
+    // screenshot.
+    static void __cdecl write_screenshot(void *arg);
+    // 0x43c050. Loads th16.cfg (the only path passed, which LTCG folds),
+    // falling back to the defaults, and writes it back.
+    HARNESS_CALLED int load_game_config(const char *path);
+    // 0x43cb10. Sets up the four cameras for the window size.
+    void setup_cameras();
 
     int switch_gamemodes();
+    // 0x43b660. Frees everything on exit.
+    int teardown_everything();
     void setup_special_anms();
     // Members that do not use this; LTCG dropped it.
     // 0x401d50. Reads keyboard and pad into g_hardware_input and returns
@@ -124,6 +163,16 @@ struct Supervisor
     i32 play_bgm(i32 arg, i32 track);
     i32 stop_bgm();
     HARNESS_CALLED i32 fade_out_bgm(f32 seconds);
+    // 0x43b480. Opens th16.dat and reads the version file from it, for
+    // on_registration.
+    static i32 open_data_files();
+    // 0x43b950. Deletes the game, menu, loading, ending, replay, effect and
+    // manual objects.
+    static void destroy_game_objects();
+    // 0x43d8b0. A text.anm effect VM (script 0x3b at the one call site,
+    // which LTCG folds) with vertices for count * 2 points as its extra
+    // data; render mode 12 when count > 2. Fog's initialize uses it.
+    HARNESS_CALLED AnmId create_fog_vm(i32 count, i32 script);
 
     static int __fastcall on_tick(void *arg);
     static int __fastcall on_registration(void *arg);
@@ -167,6 +216,13 @@ extern f32 g_screen_coord_scale;
 // Size of the arcade region (384x448 unscaled).
 extern i32 g_arcade_height;
 extern i32 g_arcade_width;
+// Half the window width and the scaled top of the arcade region, for HUD
+// elements drawn at full resolution (ExpHP: ARCADE_HUD_ORIGIN_X/Y).
+extern i32 g_arcade_hud_origin_x;
+extern i32 g_arcade_hud_origin_y;
+// Unknown flags; setup_cameras makes camera 2 960 pixels high when the
+// bits 0x3c are 8.
+extern u32 g_unk_4d9d1c;
 // Where game coordinate (0, 0) is on the arcade surface.
 extern i32 g_game_2d_origin_x;
 extern i32 g_game_2d_origin_y;
@@ -181,6 +237,10 @@ extern AnmId g_anm_ids_4c0f4c[3];
 extern i32 g_unk_4a6ef0;
 // When set, Supervisor::on_draw_1a calls it instead of drawing.
 extern void (*g_draw_hook_4a6ee8)();
+// When set, Supervisor::on_draw_0f calls it instead of drawing.
+extern void (*g_draw_hook_4a6eec)();
+// Set to 3 by switch_gamemodes when it returns to the title screen (mode 16).
+extern i32 g_unk_4a6f1c;
 // Set once the loading screen is done.
 extern i32 g_unk_4d9d90;
 // Counted down once per frame by Supervisor::on_tick.
