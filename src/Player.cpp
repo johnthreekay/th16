@@ -144,7 +144,9 @@ HARNESS_CALLED f32 Player::angle_to_player(Float3 *pos)
     {
         return ZUN_PI / 2;
     }
-    return atan2f(dy, dx);
+    // atan2f's body: whether LTCG inlines atan2f here depends on how many
+    // other callers it has.
+    return (f32)atan2((double)dy, (double)dx);
 }
 
 // TODO: register allocation: the original keeps size in ecx and the player

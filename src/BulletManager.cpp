@@ -6,13 +6,16 @@
 #include "Bomb.h"
 #include "Collision.h"
 #include "Enemy.h"
+#include "EnemyManager.h"
 #include "Item.h"
+#include "Laser.h"
 #include "Player.h"
 #include "Rng.h"
 #include "SoundManager.h"
 #include "Spellcard.h"
 #include "GameErrorContext.h"
 #include "GameThread.h"
+#include "Gui.h"
 #include "UpdateFunc.h"
 #include "ZunAngle.h"
 #include "ZunMath.h"
@@ -463,6 +466,768 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
             g_ItemManager->spawn_item(g_SubseasonBomb->season_level + 8, pos, 0,
                                       g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f, 2.2f, 0, 0);
         }
+    }
+}
+
+// Cancel scripts of bullet.anm for types of cancel kind 1, by color.
+// GLOBAL: TH16 0x490ec0
+extern const i32 g_bullet_cancel_scripts[8] = {4, 8, 12, 16, 20, 24, 28, 34};
+
+// TODO: register allocation of the angle math differs (the original adds into angle's register and wraps the angle in xmm0), and case 5 does not share case 3's tail.
+// FUNCTION: TH16 0x412cb0
+i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 angle_to_player)
+{
+    Bullet *bullet = (Bullet *)freelist_head.next;
+    if (bullet == NULL)
+    {
+        return 1;
+    }
+    bullet->freelist_node.unlink_inline();
+    g_BulletManager->tick_list_head.insert_after(&bullet->tick_list_node);
+
+    f32 angle = 0.0f;
+    f32 speed;
+    if (props->layers > 1)
+    {
+        speed = props->spd1 - (props->spd1 - props->spd2) * (f32)layer / (f32)(props->layers - 1);
+    }
+    else
+    {
+        speed = props->spd1;
+    }
+    f32 x;
+    switch ((u16)props->aim_type)
+    {
+    case 0:
+    case 1:
+        if (props->count & 1)
+        {
+            angle += (f32)((i + 1) / 2) * props->ang_bullet_dist;
+        }
+        else
+        {
+            angle += (f32)(i / 2) * props->ang_bullet_dist + props->ang_bullet_dist * 0.5f;
+        }
+        if (i & 1)
+        {
+            angle *= -1.0f;
+        }
+        if ((u16)props->aim_type == 0)
+        {
+            angle += angle_to_player;
+        }
+        angle += props->ang_aim;
+        break;
+    case 2:
+        angle += angle_to_player;
+    case 3:
+        angle += (f32)i * ZUN_2PI / (f32)props->count;
+        angle += (f32)layer * props->ang_bullet_dist + props->ang_aim;
+        break;
+    case 4:
+        angle += angle_to_player;
+    case 5:
+        angle += ZUN_PI / (f32)props->count;
+        angle += (f32)i * ZUN_2PI / (f32)props->count;
+        angle += (f32)layer * props->ang_bullet_dist + props->ang_aim;
+        break;
+    case 6:
+        angle = props->ang_aim + g_replay_safe_rng.randf_neg_to(props->ang_bullet_dist);
+        break;
+    case 7:
+        speed = g_replay_safe_rng.randf_0_to(props->spd2) + props->spd1;
+        angle += (f32)i * ZUN_2PI / (f32)props->count;
+        angle += (f32)layer * props->ang_bullet_dist + props->ang_aim;
+        break;
+    case 8:
+        angle = props->ang_aim + g_replay_safe_rng.randf_neg_to(props->ang_bullet_dist);
+        speed = g_replay_safe_rng.randf_0_to(props->spd2) + props->spd1;
+        break;
+    case 9:
+    case 10:
+        x = (f32)i * ZUN_2PI / (f32)props->count;
+        if (props->layers & 1)
+        {
+            angle = (f32)((layer + 1) / 2) * props->ang_bullet_dist + x;
+            if (props->layers > 1)
+            {
+                speed = (props->spd2 - props->spd1) * (f32)((layer + 1) & 0xfffe) / (f32)(props->layers - 1) +
+                        props->spd1;
+            }
+        }
+        else
+        {
+            angle = (f32)(layer / 2) * props->ang_bullet_dist + props->ang_bullet_dist * 0.5f + x;
+            if (props->layers > 1)
+            {
+                speed = (props->spd2 - props->spd1) * (f32)(layer & 0xfffe) / (f32)(props->layers - 1) + props->spd1;
+            }
+        }
+        if (layer & 1)
+        {
+            angle *= -1.0f;
+        }
+        if ((u16)props->aim_type == 9)
+        {
+            angle += angle_to_player;
+        }
+        angle += props->ang_aim;
+        break;
+    case 11:
+        x = (f32)i * ZUN_2PI / (f32)props->count;
+        angle += props->ang_aim + x;
+        speed *= 1.0f - (f32)fabs(sinf(x)) * props->spd2;
+        break;
+    case 12:
+        x = (f32)i * ZUN_2PI / (f32)props->count + ZUN_PI / (f32)props->count;
+        angle += props->ang_aim + x;
+        speed *= 1.0f - (f32)fabs(sinf(x)) * props->spd2;
+        break;
+    }
+    bullet->speed = speed;
+    bullet->angle = wrap_angle(wrap_angle(angle + 0.0f));
+    bullet->pos = props->pos;
+    if (props->distance != 0.0f)
+    {
+        D3DXVECTOR3 offset;
+        bullet_sincosmul(&offset, bullet->angle, props->distance);
+        bullet->pos.x += offset.x;
+        bullet->pos.y += offset.y;
+    }
+    bullet->pos.z = 0.1f;
+    bullet->flags |= 1;
+    bullet->state = 1;
+    bullet->timer_144c.reset();
+    bullet->timer_1460.reset();
+    bullet->ex_invuln_remaining_frames = 0;
+    bullet->scale = 1.0f;
+    bullet->scale_i.end_time = 0;
+    if (et_protect_range > 0.0f)
+    {
+        if (et_protect_range > (bullet->pos.x - g_Player->inner.pos.x) * (bullet->pos.x - g_Player->inner.pos.x) +
+                                   (bullet->pos.y - g_Player->inner.pos.y) * (bullet->pos.y - g_Player->inner.pos.y))
+        {
+            bullet->sub_412670();
+            return -1;
+        }
+    }
+    bullet_sincosmul(&bullet->velocity, angle, speed);
+    bullet->active_ex_flags = props->sfx_flags;
+    bullet->color = props->color;
+    bullet->sprite = props->type;
+    bullet->unk_c7c = 0;
+    bullet->flags = (bullet->flags & ~0xc) | 2;
+    bullet->unk_1448 = 60;
+    bullet->timer_1420.reset();
+    bullet->timer_1434.reset();
+    AnmVm *vm = &bullet->vm0;
+    vm->wipe();
+    bullet->vm0.index_of_sprite_mapping_func = 1;
+    bullet->vm0.associated_game_entity = bullet;
+    bullet_anm->set_vm_script(&bullet->vm0, g_bullet_types[props->type].script);
+    bullet->flags |= 0x10;
+    bullet->vm0.flags_hi = (bullet->vm0.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+    bullet->vm1.wipe();
+    bullet->vm1.flags_lo &= ~1;
+    if (g_bullet_types[props->type].unk_110 != 0)
+    {
+        bullet->vm1.flags_lo |= 1;
+        g_BulletManager->bullet_anm->set_vm_script(&bullet->vm1, g_bullet_types[props->type].unk_110);
+        bullet->vm1.flags_hi = (bullet->vm1.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+    }
+    switch (g_bullet_types[props->type].unk_10c)
+    {
+    case 0:
+        bullet->cancel_script = props->color * 2 + 4;
+        break;
+    case 1:
+        bullet->cancel_script = g_bullet_cancel_scripts[props->color];
+        break;
+    case 2:
+        bullet->cancel_script = -1;
+        bullet->flags |= 0x10;
+        break;
+    case 3:
+        bullet->cancel_script = 0x10;
+        break;
+    case 4:
+        bullet->cancel_script = 6;
+        break;
+    case 6:
+        bullet->cancel_script = g_bullet_types[bullet->sprite].sprites[props->color][3];
+        bullet->flags |= 0x10;
+        break;
+    case 7:
+        bullet->cancel_script = 0x104;
+        bullet->flags |= 0x10;
+        break;
+    case 8:
+        bullet->cancel_script = 0x107;
+        bullet->flags |= 0x10;
+        break;
+    case 9:
+        bullet->cancel_script = 0x10a;
+        bullet->flags |= 0x10;
+        break;
+    case 10:
+        bullet->cancel_script = 0x113;
+        bullet->flags |= 0x10;
+        break;
+    }
+    bullet->layer = g_bullet_types[props->type].unk_108;
+    bullet->bounce_sound = props->shot_transform_sfx;
+    bullet->unk_c58 = 5;
+    bullet->hitbox_diameter = bullet->hitbox_height = g_bullet_types[props->type].hitbox_radius;
+    bullet->unk_c6c = props->sfx_flags;
+    bullet->active_ex_flags = 0;
+    bullet->unk_c64 = 0;
+    bullet->unk_c60 = props->start_transform;
+    memcpy(bullet->et_ex, props->ex, sizeof(bullet->et_ex));
+    if (props->ex[props->start_transform].type == 2)
+    {
+        if ((i16)props->ex[bullet->unk_c60].a != 1)
+        {
+            bullet->vm0.interrupt_out_of_line((i16)props->ex[bullet->unk_c60].a + 7);
+        }
+        bullet->state = 2;
+        bullet->pos -= bullet->velocity * 4.0f;
+        bullet->unk_c60++;
+    }
+    else
+    {
+        vm->interrupt(2);
+    }
+    bullet->run_ex();
+    vm->run();
+    if (bullet->vm1.flags_lo & 1)
+    {
+        bullet->vm1.run();
+    }
+    return 0;
+}
+
+// TODO: about half the code differs: ours addresses et_ex by index instead of through an ex pointer kept in esi, hoists constants, and speculatively devirtualizes the inlined lasers' initialize calls.
+// Starts the et_ex transforms from unk_c60 on, until one has to wait: an
+// empty slot, a slot-0 transform while others still run, or a transform of
+// a kind already running. Angle arguments of -999990 keep the bullet's
+// angle and 999990 or more aim at the player.
+// FUNCTION: TH16 0x413860
+void Bullet::run_ex()
+{
+    while (unk_c60 < 0x12)
+    {
+        i32 index = unk_c60;
+        BulletEx *ex = et_ex;
+        ex += index;
+        u32 type = ex->type;
+        if (type == 0)
+        {
+            return;
+        }
+        if (ex->slot == 0 && (active_ex_flags & ~0x100))
+        {
+            return;
+        }
+        if (type & active_ex_flags)
+        {
+            return;
+        }
+        switch (type)
+        {
+        case 2:
+            vm0.interrupt_out_of_line((i16)ex->a + 7);
+            state = 2;
+            pos -= velocity * 4.0f;
+            break;
+        case 1:
+            active_ex_flags |= 1;
+            ex_state[0].timer.set_value(0);
+            ex_state[0].floats[7] = 0.0f;
+            break;
+        case 4:
+        {
+            active_ex_flags |= 4;
+            ex_state[1].floats[0] = ex->r;
+            ZunAngle angle = ex->s <= -999990.0f
+                                 ? angle_ref()
+                                 : ZunAngle(ex->s >= 999990.0f ? g_Player->angle_to_player(&pos) + ex->m : ex->s);
+            ex_state[1].floats[1] = angle.value;
+            ex_state[1].timer.set_value(0);
+            ex_state[1].ints[0] = ex->a;
+            bullet_sincosmul((Float3 *)&ex_state[1].floats[5], ex_state[1].floats[1], ex_state[1].floats[0]);
+        play_sound:
+            if (unk_c60 != 0 && bounce_sound >= 0)
+            {
+                g_SoundManager.play_sound_centered(bounce_sound, 0);
+            }
+            break;
+        }
+        case 8:
+            active_ex_flags |= 8;
+            ex_state[2].floats[0] = ex->r;
+            ex_state[2].floats[1] = ex->s;
+            ex_state[2].timer.set_value(0);
+            ex_state[2].ints[0] = ex->a;
+            goto play_sound;
+        case 0x10:
+        {
+            active_ex_flags |= 0x10;
+            ex_state[3].floats[0] = ex->s > -999990.0f ? ex->s : speed;
+            f32 r = ex->r;
+            ZunAngle angle;
+            if (r <= -999990.0f)
+            {
+                angle = angle_ref();
+            }
+            else
+            {
+                angle = ZunAngle(r >= 9999990.0f  ? ex_state[12].floats[1]
+                                 : r >= 999990.0f ? g_Player->angle_to_player(&pos) + ex->m
+                                                  : r);
+            }
+            switch (ex->c)
+            {
+            case 0:
+            case 1:
+            case 4:
+                ex_state[3].floats[1] = angle.value;
+                break;
+            case 2:
+                ex_state[3].floats[1] =
+                    normalize_angle(g_Player->angle_to_player((D3DXVECTOR3 *)&ex_state[12].floats[2]) + angle.value);
+                break;
+            case 3:
+                ex_state[3].floats[1] = normalize_angle(ex_state[12].floats[1] + angle.value);
+                break;
+            case 5:
+            case 6:
+                ex_state[3].floats[1] = g_replay_safe_rng.randf_neg_1_to_1() * ex->r;
+                break;
+            case 7:
+                ex_state[3].floats[1] =
+                    (ex->r <= -999990.0f ? angle_ref()
+                                         : ZunAngle(ex->r >= 990.0f ? g_Player->angle_to_player(&pos) : ex->r))
+                        .value;
+                ex_state[3].floats[0] = speed + g_replay_safe_rng.randf_neg_1_to_1() * ex->s;
+                break;
+            }
+            ex_state[3].timer.set_value(0);
+            ex_state[3].ints[0] = ex->a;
+            ex_state[3].ints[1] = ex->b;
+            ex_state[3].ints[2] = 0;
+            ex_state[3].ints[3] = ex->c;
+            ex_state[3].ints[4] = ex->d;
+            break;
+        }
+        case 0x40:
+            active_ex_flags |= 0x40;
+            ex_state[4].floats[0] = ex->r;
+            if (ex->b & 0x20)
+            {
+                ex_state[4].floats[2] = ex->s;
+                ex_state[4].floats[3] = ex->m;
+            }
+            else
+            {
+                ex_state[4].floats[2] = 384.0f;
+                ex_state[4].floats[3] = 448.0f;
+            }
+            ex_state[4].ints[1] = ex->a;
+            ex_state[4].ints[0] = 0;
+            ex_state[4].ints[3] = ex->b;
+            break;
+        case 0x80:
+            ex_invuln_remaining_frames = ex->a;
+            break;
+        case 0x100:
+            active_ex_flags |= 0x100;
+            ex_state[11].timer.set(ex->a);
+            ex_state[11].ints[0] = ex->b;
+            unk_c60++;
+            continue;
+        case 0x800:
+            g_SoundManager.play_sound_at_position(ex->a, pos.x);
+            unk_c60++;
+            continue;
+        case 0x400:
+            if (ex->a == 1)
+            {
+                cancel_script = -1;
+            }
+            cancel(0);
+            break;
+        case 0x200:
+            sprite = ex->a;
+            color = ex->b & 0x7fff;
+            hitbox_diameter = hitbox_height = g_bullet_types[ex->a].hitbox_radius;
+            layer = g_bullet_types[sprite].unk_108;
+            vm0.wipe();
+            vm0.index_of_sprite_mapping_func = 1;
+            vm0.associated_game_entity = this;
+            g_BulletManager->bullet_anm->set_vm_script(&vm0, g_bullet_types[ex->a].script);
+            flags |= 0x10;
+            vm0.flags_hi = (vm0.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+            vm1.wipe();
+            vm1.flags_lo &= ~1;
+            if (g_bullet_types[ex->a].unk_110 != 0)
+            {
+                vm1.flags_lo |= 1;
+                g_BulletManager->bullet_anm->set_vm_script(&vm1, g_bullet_types[ex->a].unk_110);
+                vm1.flags_hi = (vm1.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+            }
+            switch (g_bullet_types[sprite].unk_10c)
+            {
+            case 0:
+                cancel_script = color * 2 + 4;
+                break;
+            case 1:
+                cancel_script = g_bullet_cancel_scripts[color];
+                break;
+            case 2:
+                cancel_script = -1;
+                flags |= 0x10;
+                break;
+            case 3:
+                cancel_script = 0x10;
+                break;
+            case 4:
+                cancel_script = 6;
+                break;
+            case 5:
+                cancel_script = 0xc;
+                break;
+            case 6:
+                cancel_script = g_bullet_types[sprite].sprites[color][3];
+                flags |= 0x10;
+                break;
+            case 7:
+                cancel_script = 0x104;
+                flags |= 0x10;
+                break;
+            case 8:
+                cancel_script = 0x107;
+                flags |= 0x10;
+                break;
+            case 9:
+                cancel_script = 0x10a;
+                flags |= 0x10;
+                break;
+            case 10:
+                cancel_script = 0x113;
+                flags |= 0x10;
+                break;
+            }
+            if (ex->b & 0x8000)
+            {
+                anm_vm_interrupt_2(&vm0);
+            }
+            break;
+        case 0x1000:
+            active_ex_flags |= 0x1000;
+            ex_state[6].ints[1] = ex->a;
+            ex_state[6].ints[0] = 0;
+            ex_state[6].ints[2] = ex->b;
+            break;
+        case 0x8000:
+            unk_c4c = ex->a;
+            unk_c60 = index + 1;
+            continue;
+        case 0x2000:
+        {
+            EnemyBulletShooter props;
+            props.pos = pos;
+            *(u16 *)&props.aim_type = ex->a;
+            props.start_transform = ex->b;
+            props.count = ex->c;
+            props.layers = ex->d;
+            if (ex->r <= -999990.0f)
+            {
+                props.ang_aim = angle;
+            }
+            else
+            {
+                props.ang_aim = wrap_angle(ex->r >= 999990.0f ? g_Player->angle_to_player(&pos) : ex->r);
+            }
+            props.ang_bullet_dist = ex->s;
+            props.spd1 = ex->m <= -999990.0f ? speed : ex->m;
+            props.spd2 = ex->n;
+            unk_c60 = index + 1;
+            props.type = ex[1].a;
+            i32 cancel_after = ex[1].c;
+            props.color = ex[1].b;
+            props.sfx_flags = 0;
+            memcpy(props.ex, et_ex, sizeof(props.ex));
+            g_BulletManager->shoot_bullets(&props);
+            unk_c60++;
+            if (cancel_after != 0)
+            {
+                cancel(0);
+            }
+            continue;
+        }
+        case 0x10000:
+            if (ex->b <= 0)
+            {
+                unk_c60 = ex->a;
+                continue;
+            }
+            if (unk_c64 == 0)
+            {
+                unk_c64 = ex->b;
+                unk_c60 = ex->a;
+                continue;
+            }
+            if (unk_c64 == 1)
+            {
+                unk_c64 = 0;
+                break;
+            }
+            unk_c64--;
+            unk_c60 = ex->a;
+            continue;
+        case 0x80000:
+            active_ex_flags |= 0x80000;
+            bullet_sincosmul((Float3 *)&ex_state[9].floats[5], ex->r, ex->s);
+            ex_state[9].floats[7] = 0.0f;
+            ex_state[9].floats[1] = ex->r;
+            ex_state[9].floats[0] = ex->s;
+            ex_state[9].ints[0] = ex->a;
+            ex_state[9].timer.set_value(0);
+            break;
+        case 0x40000:
+            if (ex->r >= 990.0f)
+            {
+                f32 offset = ex->r - 999.0f;
+                angle_ref() = add_normalize_angle(g_Player->angle_to_player(&pos), offset);
+            }
+            else if (ex->r >= -990.0f)
+            {
+                angle_ref() = ex->r;
+            }
+            if (ex->s >= -990.0f)
+            {
+                speed = ex->s;
+            }
+            bullet_sincosmul(&velocity, angle, speed);
+            unk_c60++;
+            continue;
+        case 0x20000:
+        {
+            active_ex_flags |= 0x20000;
+            D3DXVECTOR3 *target = (D3DXVECTOR3 *)&ex_state[8].floats[5];
+            target->x = ex->r;
+            target->y = ex->s;
+            if (ex->b & 0x100)
+            {
+                target->x += pos.x;
+                target->y += pos.y;
+                target->z += pos.z;
+            }
+            ex_state[8].floats[0] = speed;
+            target->z = 0.0f;
+            ex_state[8].ints[0] = ex->a;
+            ex_state[8].ints[1] = (u8)ex->b;
+            ex_state[8].timer.reset_inline();
+            ex_move_i.initial = pos;
+            ex_move_i.goal = *target;
+            ex_move_i.bezier_1 = g_zero_vec;
+            ex_move_i.bezier_2 = g_zero_vec;
+            ex_move_i.end_time = ex->a;
+            ex_move_i.method = (u8)ex->b;
+            ex_move_i.reset_timer();
+            break;
+        }
+        case 0x100000:
+            if (ex->a == 2)
+            {
+                ((AnmVmFlagsLoBits *)&vm0.flags_lo)->blend_mode = 2;
+            }
+            else if (ex->a == 1)
+            {
+                ((AnmVmFlagsLoBits *)&vm0.flags_lo)->blend_mode = 1;
+            }
+            else
+            {
+                ((AnmVmFlagsLoBits *)&vm0.flags_lo)->blend_mode = 0;
+            }
+            unk_c60++;
+            continue;
+        case 0x400000:
+            active_ex_flags |= 0x400000;
+            scale_i.initial = ex->r;
+            scale_i.goal = ex->s;
+            scale_i.bezier_1 = 0.0f;
+            scale_i.bezier_2 = 0.0f;
+            scale_i.end_time = ex->a;
+            scale_i.method = ex->b;
+            scale_i.reset();
+            flags |= BULLET_FLAG_SCALED;
+            unk_c60++;
+            continue;
+        case 0x200000:
+            active_ex_flags |= 0x200000;
+            ex_state[10].floats[0] = (ex->r - speed) / (f32)ex->a;
+            if (ex->s <= -999990.0f)
+            {
+                ex_state[10].floats[1] = angle;
+            }
+            else
+            {
+                ex_state[10].floats[1] =
+                    wrap_angle(ex->s >= 999990.0f ? g_Player->angle_to_player(&pos) + ex->m : ex->s);
+            }
+            ex_state[10].timer.reset_inline();
+            ex_state[10].ints[0] = ex->a;
+            bullet_sincosmul((Float3 *)&ex_state[10].floats[5], ex_state[10].floats[1], ex_state[10].floats[0]);
+            goto play_sound;
+        case 0x800000:
+            *(D3DXVECTOR3 *)&ex_state[12].floats[2] = pos;
+            ex_state[12].floats[1] = angle;
+            ex_state[12].floats[0] = speed;
+            unk_c60++;
+            continue;
+        case 0x4000000:
+            if (ex->a <= 0)
+            {
+                unk_c60 = index + 1;
+                continue;
+            }
+            active_ex_flags |= 0x4000000;
+            ex_state[13].timer.set_value(ex->a);
+            break;
+        case 0x2000000:
+            layer = ex->a;
+            unk_c60 = index + 1;
+            continue;
+        case 0x1000000:
+        {
+            EnemyCreateParams params;
+            memset(&params, 0, sizeof(params));
+            params.pos = pos;
+            params.ecl_int_vars[0] = ex->a;
+            params.ecl_int_vars[1] = ex->b;
+            params.ecl_int_vars[2] = ex->c;
+            params.ecl_int_vars[3] = ex->d;
+            params.life = 10000;
+            params.score_reward = 0;
+            params.item_drop = 0;
+            memcpy(params.ecl_float_vars, &ex->r, 4 * sizeof(f32));
+            g_EnemyManager->allocate_new_enemy(ex->string, &params, 0);
+            break;
+        }
+        case 0x8000000:
+            if (ex->a == 0)
+            {
+                LaserLineInner params;
+                memcpy(params.ex, et_ex, sizeof(params.ex));
+                params.start_pos = pos;
+                params.type = ex->b;
+                params.color = ex->c;
+                u32 cancel_after = ex->d;
+                params.ang_aim =
+                    (ex->r <= -999990.0f ? angle_ref()
+                                         : ZunAngle(ex->r >= 999990.0f ? g_Player->angle_to_player(&pos) : ex->r))
+                        .value;
+                params.speed = ex->s <= -999990.0f ? speed : ex->s;
+                params.flags |= 1;
+                params.laser_new_arg_1 = ex->m;
+                params.laser_new_arg_2 = ex->n;
+                unk_c60++;
+                params.laser_new_arg_3 = ex[1].r;
+                params.laser_new_arg_4 = ex[1].s;
+                params.distance = ex[1].m;
+                params.shot_sfx = ex[1].a;
+                params.shot_transform_sfx = ex[1].b;
+                *(i32 *)params.unk_30 = ex[1].c;
+                LaserManager *mgr = g_LaserManager;
+                if (mgr->list_length < 0x200)
+                {
+                    mgr->last_id++;
+                    if (mgr->last_id < 0x10000)
+                    {
+                        mgr->last_id = 0x10000;
+                    }
+                    LaserDataInf *laser = new LaserLineInf();
+                    laser->id = mgr->last_id;
+                    mgr->append(laser);
+                    laser->initialize(&params);
+                }
+                unk_c60++;
+                if (cancel_after != 0)
+                {
+                    cancel(0);
+                }
+                continue;
+            }
+            else if (ex->a == 1)
+            {
+                LaserInfiniteInner params;
+                memcpy(params.ex, et_ex, sizeof(params.ex));
+                params.start_pos = pos;
+                u32 d = ex->d;
+                params.flags = (d & 0xfd) | 2;
+                params.type = ex->b;
+                params.color = ex->c;
+                *(i32 *)params.unk_50 = (u8)(d >> 8);
+                params.ang_aim =
+                    (ex->r <= -999990.0f ? angle_ref()
+                                         : ZunAngle(ex->r >= 999990.0f ? g_Player->angle_to_player(&pos) : ex->r))
+                        .value;
+                params.speed = ex->s <= -999990.0f ? speed : ex->s;
+                params.laser_new_arg_1 = ex->m;
+                params.laser_new_arg_2 = ex->n;
+                unk_c60++;
+                params.unk_30 = ex[1].a;
+                params.unk_34 = ex[1].b;
+                params.unk_38 = ex[1].c;
+                params.unk_3c = ex[1].d;
+                params.laser_new_arg_4 = ex[1].r;
+                params.distance = ex[1].s;
+                params.shot_sfx = 0x12;
+                params.shot_transform_sfx = -1;
+                LaserManager *mgr = g_LaserManager;
+                if (mgr->list_length < 0x200)
+                {
+                    mgr->last_id++;
+                    if (mgr->last_id < 0x10000)
+                    {
+                        mgr->last_id = 0x10000;
+                    }
+                    LaserDataInf *laser = new LaserInfiniteInf();
+                    laser->id = mgr->last_id;
+                    mgr->append(laser);
+                    laser->initialize(&params);
+                }
+                unk_c60++;
+                if (d & 0x10000)
+                {
+                    cancel(0);
+                }
+                continue;
+            }
+            continue;
+        case 0x80000000:
+            if (ex->a <= 0)
+            {
+                unk_c60 = index + 1;
+                continue;
+            }
+            active_ex_flags |= 0x80000000;
+            ex_state[5].timer.set_value(ex->a);
+            break;
+        case 0x20000000:
+        {
+            f32 size = ex->r;
+            if (0.0f > size)
+            {
+                size = g_bullet_types[sprite].hitbox_radius;
+            }
+            hitbox_diameter = size;
+            hitbox_height = size;
+            break;
+        }
+        }
+        unk_c60++;
     }
 }
 

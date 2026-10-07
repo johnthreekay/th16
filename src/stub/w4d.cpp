@@ -3,11 +3,6 @@
 #include "../BulletManager.h"
 #include "../Gui.h"
 
-// STUB: TH16 0x413860
-i32 Bullet::run_ex()
-{
-    return 0;
-}
 
 // STUB: TH16 0x426d70
 void Gui::sub_426d70()

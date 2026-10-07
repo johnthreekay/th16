@@ -85,10 +85,12 @@ struct Bullet
     // Script of bullet.anm played where the bullet is cancelled (none if
     // negative).
     i32 cancel_script;
+    // Index of the next et_ex transform to start.
     i32 unk_c60;
-    u8 unk_c64[0xc68 - 0xc64];
+    i32 unk_c64;
     u32 active_ex_flags;
-    u8 unk_c6c[0xc72 - 0xc6c];
+    u32 unk_c6c;
+    u8 unk_c70[0xc72 - 0xc70];
     u16 state;
     u8 unk_c74[0xc78 - 0xc74];
     // Next bullet drawn in the same layer.
@@ -105,7 +107,8 @@ struct Bullet
     f32 scale;
     ZunTimer timer_1420;
     ZunTimer timer_1434;
-    u8 unk_1448[4];
+    // Set to 60 when the bullet is shot.
+    i32 unk_1448;
     // Time since the bullet appeared.
     ZunTimer timer_144c;
     ZunTimer timer_1460;
@@ -123,7 +126,7 @@ struct Bullet
     // 0x412670. Frees the bullet: back to the free list, off the tick list.
     void sub_412670();
     // 0x413860. Starts the et_ex transforms that are due.
-    i32 run_ex();
+    void run_ex();
     // 0x4162d0. Keeps the bullet going while it is off screen and still
     // heading back towards it, for a number of frames at most.
     i32 step_ex_08();
