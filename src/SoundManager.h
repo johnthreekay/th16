@@ -139,6 +139,14 @@ struct CSoundManager
     struct IDirectSound8 *m_pDS;
 
     ~CSoundManager();
+    // 0x470320 and 0x470680: the sample's CreateStreaming, adapted to read
+    // a thbgm.fmt track from thbgm.dat or from memory. The file name, the
+    // creation flags and the notification count are constant at every call
+    // site and LTCG folded them.
+    HRESULT create_streaming(BgmStream **out, const char *name, DWORD flags, GUID guid, DWORD notify_count,
+                             DWORD notify_size, HANDLE event, ThBgmFormat *format);
+    HRESULT create_streaming_from_memory(BgmStream **out, u8 *data, i32 size, ThBgmFormat *format, DWORD flags,
+                                         GUID guid, DWORD notify_count, DWORD notify_size, HANDLE event);
 };
 
 // What the sound threads should do (SoundManager::thread_state).
@@ -205,6 +213,14 @@ struct SoundManager
     // Frees everything initialize created. Reaches the manager through
     // g_SoundManager; LTCG dropped this.
     HARNESS_CALLED i32 release();
+    // Creates the BGM stream on a thbgm.dat track. The path is always
+    // "thbgm.dat"; LTCG folded it.
+    HARNESS_CALLED i32 open_bgm(const char *path);
+    // Reads a track into one of the preload slots (only with the preload
+    // option, flags_2c & 0x10), and starts streaming from such a slot.
+    // Reach the manager through g_SoundManager; LTCG dropped this.
+    HARNESS_CALLED i32 preload_bgm(i32 slot, const char *name);
+    HARNESS_CALLED i32 play_preloaded_bgm(i32 slot);
 
     // 0x45d510
     i32 initialize(HWND window);
@@ -229,7 +245,7 @@ struct SoundManager
     void stop_sound(i32 id);
     // Points the BGM stream at another track. Reaches the manager through
     // g_SoundManager; LTCG dropped this.
-    i32 select_bgm(const char *path);
+    HARNESS_CALLED i32 select_bgm(const char *path);
 
     // Members that do not use this; LTCG dropped it.
     static i32 update_sound_thread();

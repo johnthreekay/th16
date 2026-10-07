@@ -34,6 +34,17 @@ void harness_w3e_draw_text(RECT *rect, i32 x, i32 size, D3DCOLOR color, D3DCOLOR
     draw_text(rect + 1, x, size + 1, shadow, color, text, texture, font + 1, spacing * 2, spacing);
 }
 
+// Like LoadingThread::thread_start (0x43aefa), and the BGM code of the
+// stages and menus.
+i32 harness_w3e_bgm(i32 slot, const char *name, SoundManager *other)
+{
+    // open_bgm uses this; a second object keeps LTCG from folding it.
+    g_SoundManager.open_bgm("thbgm.dat");
+    other->open_bgm("thbgm.dat");
+    return g_SoundManager.preload_bgm(slot, name) + g_SoundManager.preload_bgm(slot + 1, "x") +
+           g_SoundManager.play_preloaded_bgm(slot) + g_SoundManager.play_preloaded_bgm(2);
+}
+
 // Like WinMain's shutdown (0x459902).
 void harness_w3e_sound_release()
 {

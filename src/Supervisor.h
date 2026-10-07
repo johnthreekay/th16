@@ -22,7 +22,11 @@ struct Config
     // Analog stick dead zones (DirectInput axis units).
     i16 deadzone_x;
     i16 deadzone_y;
-    u8 unk_20[0x23 - 0x20];
+    // 0xff: not chosen yet (the device setup then picks 32-bit color).
+    u8 color_mode;
+    // 0 turns the BGM off.
+    u8 bgm_mode;
+    u8 unk_22;
     // Window size option; 0, 1, 2 pick ascii.anm, ascii_960.anm,
     // ascii_1280.anm.
     u8 window_size;
@@ -52,7 +56,10 @@ struct Supervisor
     u8 unk_10[0x10];
     IDirectInputDevice8A *keyboard;
     IDirectInputDevice8A *joystick;
-    u8 unk_28[0xdc - 0x28];
+    u8 unk_28[0x58 - 0x28];
+    // Passed to the BGM streaming thread, which ignores it.
+    void *unk_58;
+    u8 unk_5c[0xdc - 0x5c];
     // The full-window viewport, set by screen effects before they draw.
     D3DVIEWPORT9 viewport_dc;
     // What the device was created with (BackBufferFormat picks the
