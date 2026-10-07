@@ -21,6 +21,22 @@
 #include "Spellcard.h"
 #include "ZunMath.h"
 
+// Scripts of the character's pl0X.anm that the bombs start: the main VM
+// (anm_id) and the secondary one, Reimu's orbs, and the beam pieces under
+// Marisa's main VM.
+enum
+{
+    REIMU_BOMB_ORB_SCRIPT = 15,
+    REIMU_BOMB_SECONDARY_SCRIPT = 23,
+    CIRNO_BOMB_SCRIPT = 10,
+    CIRNO_BOMB_SECONDARY_SCRIPT = 13,
+    AYA_BOMB_SCRIPT = 14,
+    AYA_BOMB_SECONDARY_SCRIPT = 19,
+    MARISA_BOMB_SCRIPT = 17,
+    MARISA_BOMB_SECONDARY_SCRIPT = 25,
+    MARISA_BOMB_BEAM_SCRIPT = 24,
+};
+
 // The copy of ZunMath.h's sincosmul in Cirno's bomb's object file (TH16
 // keeps one per object file). A static of its own so that it can be
 // annotated.
@@ -88,7 +104,7 @@ i32 BombAyaAInf::begin()
     speed = player->inner.attempted_delta_pos_subpixel.x * (1.0f / 128.0f) * 0.05f;
     g_SoundManager.play_sound_centered(30, 0);
 
-    anm_id = player->anm_file->create_vm(14, &pos, 0.0f, -1, 0);
+    anm_id = player->anm_file->create_vm(AYA_BOMB_SCRIPT, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm(anm_id);
     if (vm != NULL)
     {
@@ -96,7 +112,7 @@ i32 BombAyaAInf::begin()
         vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
     }
     AnmLoaded *anm = g_Player->anm_file;
-    anm_id_secondary = anm->create_vm(19, &pos_2, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(AYA_BOMB_SECONDARY_SCRIPT, &pos_2, 0.0f, -1, 0);
     spellcard_on_bomb();
     g_Player->inner.iframes = 120;
     g_EnemyManager->inner.bomb_count++;
@@ -146,9 +162,9 @@ i32 BombCirnoAInf::begin()
     angle = -ZUN_PI / 2;
     g_SoundManager.play_sound_centered(30, 0);
 
-    anm_id = player->anm_file->create_vm(10, &pos, 0.0f, -1, 0);
+    anm_id = player->anm_file->create_vm(CIRNO_BOMB_SCRIPT, &pos, 0.0f, -1, 0);
     AnmLoaded *anm = g_Player->anm_file;
-    anm_id_secondary = anm->create_vm(13, &pos, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(CIRNO_BOMB_SECONDARY_SCRIPT, &pos, 0.0f, -1, 0);
     spellcard_on_bomb();
     g_Player->inner.iframes = 120;
     g_EnemyManager->inner.bomb_count++;
@@ -214,13 +230,13 @@ i32 BombMarisaAInf::begin()
     angle = -ZUN_PI / 2;
     g_SoundManager.play_sound_centered(49, 0);
 
-    anm_id = player->anm_file->create_vm(17, &pos, 0.0f, -1, 0);
+    anm_id = player->anm_file->create_vm(MARISA_BOMB_SCRIPT, &pos, 0.0f, -1, 0);
     spellcard_on_bomb();
     g_Player->inner.iframes = 120;
     g_EnemyManager->inner.bomb_count++;
     ScreenEffect::create_inline(SCREEN_EFFECT_SHAKE_WITH_RAMP, 3, 60, 240, 30, 0);
     AnmLoaded *anm = g_Player->anm_file;
-    anm_id_secondary = anm->create_vm(25, &pos, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(MARISA_BOMB_SECONDARY_SCRIPT, &pos, 0.0f, -1, 0);
     g_Player->inner.flags |= PLAYER_FLAG_NO_SHOOTING;
     return 0;
 }
@@ -314,7 +330,7 @@ i32 BombReimuAInf::begin()
     reimu_orbs = (BombReimuAOrbs *)malloc(sizeof(BombReimuAOrbs));
     memset(reimu_orbs, 0, sizeof(BombReimuAOrbs));
     AnmLoaded *anm = g_Player->anm_file;
-    anm_id_secondary = anm->create_vm(23, &pos, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(REIMU_BOMB_SECONDARY_SCRIPT, &pos, 0.0f, -1, 0);
     return 0;
 }
 
@@ -330,8 +346,8 @@ i32 BombAyaAInf::cancel_bullets()
     return 0;
 }
 
-// Every beam VM (script 24) under the bomb's VM cancels bullets and lasers
-// in its rectangle.
+// Every beam VM (MARISA_BOMB_BEAM_SCRIPT) under the bomb's VM cancels
+// bullets and lasers in its rectangle.
 // TODO: the original realigns its frame (and esp, -8), reads the parent's
 // world_pos from its stack slot and keeps the loop unrotated.
 // FUNCTION: TH16 0x40fe80
@@ -343,7 +359,7 @@ i32 BombMarisaAInf::cancel_bullets()
         {
             return 0;
         }
-        AnmVm *vm = get_vm_or_clear(anm_id)->search_children(0x18, i);
+        AnmVm *vm = get_vm_or_clear(anm_id)->search_children(MARISA_BOMB_BEAM_SCRIPT, i);
         if (vm == NULL)
         {
             return 0;
@@ -581,7 +597,7 @@ void BombReimuAOrb::start(i32 index, D3DXVECTOR3 *pos)
 {
     start_pos = *pos;
     AnmLoaded *anm = g_Player->anm_file;
-    anm_id = anm->create_vm(0xf, &this->pos, 0.0f, -1, 0);
+    anm_id = anm->create_vm(REIMU_BOMB_ORB_SCRIPT, &this->pos, 0.0f, -1, 0);
     active = 1;
     timer.reset();
     this->index = index;

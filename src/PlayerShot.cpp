@@ -16,6 +16,16 @@
 #include "Rng.h"
 #include "SoundManager.h"
 
+// Scripts of the player's ANM files: the sparks along Marisa's laser (in
+// pl0X.anm and pl0Xsub.anm), and where a main shot type's bullet scripts
+// start in pl0X.anm (ShtShooter::anm_script counts from there).
+enum
+{
+    LASER_SPARK_SCRIPT = 8,
+    SEASON_LASER_SPARK_SCRIPT = 2,
+    SHOT_SCRIPT_BASE = 5,
+};
+
 i32 __fastcall sht_on_init_homing(PlayerBullet *bullet);
 i32 __fastcall sht_on_init_laser(PlayerBullet *bullet);
 i32 __fastcall sht_on_init_sideways(PlayerBullet *bullet);
@@ -674,11 +684,11 @@ i32 __fastcall sht_on_hit_laser(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_s
         AnmId id;
         if (!(bullet->shooter_ref & SHOOTER_REF_SEASON_MASK))
         {
-            id = g_Player->anm_file->create_vm(8, &end, 0.0f, -1, 0);
+            id = g_Player->anm_file->create_vm(LASER_SPARK_SCRIPT, &end, 0.0f, -1, 0);
         }
         else
         {
-            id = g_Player->subseason_anm_file->create_vm(2, &end, 0.0f, -1, 0);
+            id = g_Player->subseason_anm_file->create_vm(SEASON_LASER_SPARK_SCRIPT, &end, 0.0f, -1, 0);
         }
         i32 index = g_EffectManager->next_index();
         if (index != -1)
@@ -768,9 +778,8 @@ i32 PlayerBullet::create(i32 shooter_ref, i32 time, PlayerInner *inner)
     pos.pos.y += shooter->offset_from_option.y - pos.velocity.y;
     if (!(shooter_ref & SHOOTER_REF_SEASON_MASK))
     {
-        // The character's shot scripts start at 5 in pl0X.anm.
         AnmLoaded *anm = g_Player->anm_file;
-        anm_id = anm->create_effect(shooter->anm_script + 5, -1, NULL);
+        anm_id = anm->create_effect(shooter->anm_script + SHOT_SCRIPT_BASE, -1, NULL);
     }
     else
     {

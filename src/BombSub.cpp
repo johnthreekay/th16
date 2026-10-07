@@ -15,6 +15,16 @@
 #include "SoundManager.h"
 #include "ZunMath.h"
 
+// Scripts of the subseason's pl0Xsub.anm: the inner circle and the outer
+// ring (winter has its own).
+enum
+{
+    RELEASE_SCRIPT = 3,
+    RELEASE_RING_SCRIPT = 4,
+    WINTER_RELEASE_SCRIPT = 20,
+    WINTER_RELEASE_RING_SCRIPT = 21,
+};
+
 // Per season level: how long the release lasts and how far it reaches
 // (ExpHP's names; "fall" is autumn).
 
@@ -52,14 +62,14 @@ i32 BombAllSubInf::begin()
     angle = -ZUN_PI / 2;
     g_SoundManager.play_sound_centered(74, 0);
 
-    anm_id = player->subseason_anm_file->create_vm(3, &pos, 0.0f, -1, 0);
+    anm_id = player->subseason_anm_file->create_vm(RELEASE_SCRIPT, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm_or_clear(anm_id);
     vm->float_vars[0] = g_release_radius_doyou[g_Globals.season_level()];
     vm->float_vars[1] = g_release_radius_2_doyou[g_Globals.season_level()];
     vm->int_vars[3] = g_release_duration_doyou[g_Globals.season_level()];
 
     AnmLoaded *anm = g_Player->subseason_anm_file;
-    anm_id_secondary = anm->create_vm(4, &pos, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(RELEASE_RING_SCRIPT, &pos, 0.0f, -1, 0);
     vm = get_vm_or_clear(anm_id_secondary);
     vm->float_vars[0] = g_release_radius_doyou[g_Globals.season_level()] + 8.0f;
     vm->float_vars[1] = g_release_radius_2_doyou[g_Globals.season_level()] + 8.0f;
@@ -127,14 +137,14 @@ i32 BombAyaSubInf::begin()
     angle = -ZUN_PI / 2;
     g_SoundManager.play_sound_centered(74, 0);
 
-    anm_id = player->subseason_anm_file->create_vm(3, &pos, 0.0f, -1, 0);
+    anm_id = player->subseason_anm_file->create_vm(RELEASE_SCRIPT, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm_or_clear(anm_id);
     vm->float_vars[0] = g_release_radius_fall[g_Globals.season_level()];
     vm->float_vars[1] = g_release_radius_2_fall[g_Globals.season_level()];
     vm->int_vars[3] = g_release_duration_fall[g_Globals.season_level()];
 
     AnmLoaded *anm = g_Player->subseason_anm_file;
-    anm_id_secondary = anm->create_vm(4, &pos, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(RELEASE_RING_SCRIPT, &pos, 0.0f, -1, 0);
     vm = get_vm_or_clear(anm_id_secondary);
     vm->float_vars[0] = g_release_radius_fall[g_Globals.season_level()] + 8.0f;
     vm->float_vars[1] = g_release_radius_2_fall[g_Globals.season_level()] + 8.0f;
@@ -209,14 +219,14 @@ i32 BombCirnoSubInf::begin()
     angle = -ZUN_PI / 2;
     g_SoundManager.play_sound_centered(74, 0);
 
-    anm_id = player->subseason_anm_file->create_vm(3, &pos, 0.0f, -1, 0);
+    anm_id = player->subseason_anm_file->create_vm(RELEASE_SCRIPT, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm_or_clear(anm_id);
     vm->float_vars[0] = g_release_radius_summer[g_Globals.season_level()];
     vm->float_vars[1] = g_release_radius_summer[g_Globals.season_level()];
     vm->int_vars[3] = g_release_duration_summer[g_Globals.season_level()];
 
     AnmLoaded *anm = g_Player->subseason_anm_file;
-    anm_id_secondary = anm->create_vm(4, &pos, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(RELEASE_RING_SCRIPT, &pos, 0.0f, -1, 0);
     vm = get_vm_or_clear(anm_id_secondary);
     vm->float_vars[0] = g_release_radius_summer[g_Globals.season_level()] + 8.0f;
     vm->float_vars[1] = g_release_radius_summer[g_Globals.season_level()] + 8.0f;
@@ -283,14 +293,14 @@ i32 BombMarisaSubInf::begin()
     angle = -ZUN_PI / 2;
     g_SoundManager.play_sound_centered(74, 0);
 
-    anm_id = player->subseason_anm_file->create_vm(20, &pos, 0.0f, -1, 0);
+    anm_id = player->subseason_anm_file->create_vm(WINTER_RELEASE_SCRIPT, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm_or_clear(anm_id);
     vm->float_vars[0] = g_release_radius_winter[g_Globals.season_level()];
     vm->float_vars[1] = g_release_radius_winter[g_Globals.season_level()];
     vm->int_vars[3] = g_release_duration_winter[g_Globals.season_level()];
 
     AnmLoaded *anm = g_Player->subseason_anm_file;
-    anm_id_secondary = anm->create_vm(21, &pos, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(WINTER_RELEASE_RING_SCRIPT, &pos, 0.0f, -1, 0);
     vm = get_vm_or_clear(anm_id_secondary);
     vm->float_vars[0] = g_release_radius_winter[g_Globals.season_level()] +
                         g_release_radius_winter[g_Globals.season_level()] * 0.2f;
@@ -361,14 +371,14 @@ i32 BombReimuSubInf::begin()
     angle = -ZUN_PI / 2;
     g_SoundManager.play_sound_centered(74, 0);
 
-    anm_id = player->subseason_anm_file->create_vm(3, &pos, 0.0f, -1, 0);
+    anm_id = player->subseason_anm_file->create_vm(RELEASE_SCRIPT, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm_or_clear(anm_id);
     vm->float_vars[0] = g_release_radius_spring[g_Globals.season_level()];
     vm->float_vars[1] = g_release_radius_spring[g_Globals.season_level()];
     vm->int_vars[3] = g_release_duration_spring[g_Globals.season_level()];
 
     AnmLoaded *anm = g_Player->subseason_anm_file;
-    anm_id_secondary = anm->create_vm(4, &pos, 0.0f, -1, 0);
+    anm_id_secondary = anm->create_vm(RELEASE_RING_SCRIPT, &pos, 0.0f, -1, 0);
     vm = get_vm_or_clear(anm_id_secondary);
     vm->float_vars[0] = g_release_radius_spring[g_Globals.season_level()] + 16.0f;
     vm->float_vars[1] = g_release_radius_spring[g_Globals.season_level()] + 16.0f;
