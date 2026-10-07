@@ -8,7 +8,21 @@
 #include "decomp.h"
 #include "types.h"
 
+// How many effects EffectManager can track at once.
 #define EFFECT_COUNT 0x400
+
+// Rows of g_effect_table: the effects create_effect can start.
+enum EffectId
+{
+    // The masked effect (anm_masked_effect_*): the main menu's transitions.
+    EFFECT_MASKED = 0,
+    // Children flying in to the VM (anm_gather_effect_*).
+    EFFECT_GATHER = 1,
+    // A jagged line growing from pos: blue and additive on layer 15, or gray
+    // on layer 19 (used by a bomb).
+    EFFECT_JAGGED_LINE_BLUE = 2,
+    EFFECT_JAGGED_LINE_GRAY = 3,
+};
 
 // A row of the table EffectManager::create_effect reads (ExpHP:
 // zTableAnm508Data): which script to start and the callbacks the VM gets.

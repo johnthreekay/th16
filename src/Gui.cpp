@@ -1448,10 +1448,10 @@ GuiMsgVm::GuiMsgVm(void *script)
     get_vm_or_clear(text_line_2)->flags_hi |= 0x1000;
     get_vm_or_clear(furigana_1)->flags_hi |= 0x1000;
     get_vm_or_clear(furigana_2)->flags_hi |= 0x1000;
-    get_vm_or_clear(text_line_1)->index_of_on_draw = 5;
-    get_vm_or_clear(text_line_2)->index_of_on_draw = 5;
-    get_vm_or_clear(furigana_1)->index_of_on_draw = 5;
-    get_vm_or_clear(furigana_2)->index_of_on_draw = 5;
+    get_vm_or_clear(text_line_1)->index_of_on_draw = ANM_ON_DRAW_TEXTBOX;
+    get_vm_or_clear(text_line_2)->index_of_on_draw = ANM_ON_DRAW_TEXTBOX;
+    get_vm_or_clear(furigana_1)->index_of_on_draw = ANM_ON_DRAW_TEXTBOX;
+    get_vm_or_clear(furigana_2)->index_of_on_draw = ANM_ON_DRAW_TEXTBOX;
     next_text_line = 0;
     unk_198 = 0;
     unk_1a0 = 0;

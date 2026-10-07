@@ -39,7 +39,7 @@ Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
     vm->flags_lo &= ~(0x1f << ANM_VM_RENDER_MODE_SHIFT);
     main_vm = id;
     vm = get_vm_or_clear(main_vm);
-    vm->index_of_on_draw = 4;
+    vm->index_of_on_draw = ANM_ON_DRAW_FOG;
     vm->associated_game_entity = this;
     for (i32 i = 0; i < vm_count - 1; i++)
     {

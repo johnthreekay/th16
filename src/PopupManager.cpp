@@ -36,7 +36,8 @@ int PopupManager::initialize()
     on_draw_func = f;
 
     ascii_anm->init_vm_with_sprite(&vm, 0x103);
-    vm.flags_hi = (vm.flags_hi & ~(ANM_VM_ORIGIN_GAME | ANM_VM_RESOLUTION_HALF_SCALED_4)) | ANM_VM_ORIGIN_HUD | ANM_VM_RESOLUTION_SCALED_3;
+    vm.flags_hi = (vm.flags_hi & ~(ANM_VM_ORIGIN_GAME | ANM_VM_RESOLUTION_HALF_SCALED_4)) | ANM_VM_ORIGIN_HUD |
+                  ANM_VM_RESOLUTION_SCALED_3;
     return 0;
 }
 

@@ -626,7 +626,7 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
     bullet->timer_1434.reset();
     AnmVm *vm = &bullet->vm0;
     vm->wipe();
-    bullet->vm0.index_of_sprite_mapping_func = 1;
+    bullet->vm0.index_of_sprite_mapping_func = ANM_SPRITE_MAPPING_BULLET;
     bullet->vm0.associated_game_entity = bullet;
     bullet_anm->set_vm_script(&bullet->vm0, g_bullet_types[props->type].script);
     bullet->flags |= 0x10;
@@ -866,7 +866,7 @@ void Bullet::run_ex()
             hitbox_diameter = hitbox_height = g_bullet_types[ex->a].hitbox_radius;
             layer = g_bullet_types[sprite].unk_108;
             vm0.wipe();
-            vm0.index_of_sprite_mapping_func = 1;
+            vm0.index_of_sprite_mapping_func = ANM_SPRITE_MAPPING_BULLET;
             vm0.associated_game_entity = this;
             g_BulletManager->bullet_anm->set_vm_script(&vm0, g_bullet_types[ex->a].script);
             flags |= 0x10;

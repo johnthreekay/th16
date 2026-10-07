@@ -484,7 +484,7 @@ static inline void anm_rgb(AnmRgb *c, i32 r, i32 g, i32 b)
 
 // 0x469e20. Sets up render mode 10 (ANM instruction 302): extra data and
 // the on_tick and on_draw callbacks 4 and 6.
-int __fastcall anm_effect_4_init(AnmVm *vm);
+int __fastcall anm_fan_init(AnmVm *vm);
 
 // The interpreter proper: runs the instructions due by the current time,
 // then steps everything that changes on its own. 1 once the VM should be
@@ -500,8 +500,8 @@ __forceinline i32 AnmVm::run_script()
     time_in_script++;
     if (pending_interrupt == 0)
     {
-        if ((flags_hi & (ANM_VM_FREEZES_WITH_WORLD | ANM_VM_FREEZES_AFTER_FIRST_RUN)) == ANM_VM_FREEZES_WITH_WORLD && g_GameThread != NULL &&
-            g_GameThread->flags.flag_1)
+        if ((flags_hi & (ANM_VM_FREEZES_WITH_WORLD | ANM_VM_FREEZES_AFTER_FIRST_RUN)) == ANM_VM_FREEZES_WITH_WORLD &&
+            g_GameThread != NULL && g_GameThread->flags.flag_1)
         {
             return 0;
         }
@@ -873,7 +873,8 @@ __forceinline i32 AnmVm::run_script()
             break;
         case ANM_OP_SCRIPT_NEW_POS:
         {
-            AnmId id = g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, ANM_CREATE_WORLD_BACK);
+            AnmId id = g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this,
+                                                                                         ANM_CREATE_WORLD_BACK);
             AnmVm *child = id.find_or_clear();
             child->pos_2.x = ANM_FLOAT(1);
             child->pos_2.y = ANM_FLOAT(2);
@@ -1206,7 +1207,7 @@ __forceinline i32 AnmVm::run_script()
             ANM_FLAGS_LO->render_mode = ins->args[0].i;
             if (ANM_FLAGS_LO->render_mode == ANM_RENDER_FAN)
             {
-                anm_effect_4_init(this);
+                anm_fan_init(this);
             }
             break;
         case ANM_OP_POS_FROM_ENTITY:

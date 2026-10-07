@@ -125,7 +125,8 @@ i32 BombAyaAInf::on_tick()
     effect_pos.y = g_replay_safe_rng.randf_0_to_1() * 448.0f;
     effect_pos.z = 0.0f;
     EffectManager *effects = g_EffectManager;
-    AnmVm *effect = g_EffectManager->get_tracked_vm(effects->create_tracked_inline(3, &effect_pos));
+    AnmVm *effect =
+        g_EffectManager->get_tracked_vm(effects->create_tracked_inline(EFFECT_JAGGED_LINE_GRAY, &effect_pos));
     effect->flags_lo &= ~0x1c0;
     effect->flags_lo |= 0x20;
     method_10();
@@ -180,7 +181,8 @@ i32 BombCirnoAInf::on_tick()
         effect_pos.z = 0.0f;
         Float3 *center = &pos;
         effect_pos += *center;
-        AnmVm *effect = g_EffectManager->get_tracked_vm(g_EffectManager->create_tracked(3, &effect_pos, 0));
+        AnmVm *effect = g_EffectManager->get_tracked_vm(
+            g_EffectManager->create_tracked(EFFECT_JAGGED_LINE_GRAY, &effect_pos, 0));
         effect->flags_lo &= ~0x1c0;
         effect->flags_lo |= 0x20;
     }
@@ -190,7 +192,8 @@ i32 BombCirnoAInf::on_tick()
         effect_pos.x = g_replay_safe_rng.randf_neg_1_to_1() * 192.0f;
         effect_pos.y = g_replay_safe_rng.randf_0_to_1() * 448.0f;
         effect_pos.z = 0.0f;
-        AnmVm *effect = g_EffectManager->get_tracked_vm(g_EffectManager->create_tracked(3, &effect_pos, 0));
+        AnmVm *effect = g_EffectManager->get_tracked_vm(
+            g_EffectManager->create_tracked(EFFECT_JAGGED_LINE_GRAY, &effect_pos, 0));
         effect->flags_lo &= ~0x1c0;
         effect->flags_lo |= 0x20;
     }

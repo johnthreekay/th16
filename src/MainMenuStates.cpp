@@ -743,7 +743,7 @@ i32 TitleInf::do_subseason_select()
             }
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
             AnmId id;
-            id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+            id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
             g_Supervisor.config.unk_0 = id.id;
             AnmManager::interrupt_tree(id, 7);
         }
@@ -953,7 +953,7 @@ i32 TitleInf::do_practice_stage_select()
         {
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
             AnmId id;
-            id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+            id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
             g_Supervisor.config.unk_0 = id.id;
             AnmManager::interrupt_tree(id, 7);
         }
@@ -1588,7 +1588,7 @@ i32 TitleInf::do_replay_menu()
         if (time_in_state.current == 2)
         {
             AnmId id;
-            id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+            id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
             g_Supervisor.config.unk_0 = id.id;
             AnmManager::interrupt_tree(id, 7);
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
@@ -2964,7 +2964,7 @@ i32 TitleInf::do_spell_practice_subseason()
         {
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
             AnmId id;
-            id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+            id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
             g_Supervisor.config.unk_0 = id.id;
             AnmManager::interrupt_tree(id, 7);
         }
@@ -3078,7 +3078,7 @@ i32 TitleInf::do_spell_practice_difficulty()
             {
                 g_AsciiManager->show_now_loading(480.0f, 392.0f);
                 AnmId id;
-                id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+                id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
                 g_Supervisor.config.unk_0 = id.id;
                 AnmManager::interrupt_tree(id, 7);
             }

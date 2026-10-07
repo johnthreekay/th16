@@ -393,7 +393,7 @@ static __forceinline void anm_mask_draw(AnmMaskVertex *vertices)
     g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
     g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
     g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-    g_AnmManager->last_blend_mode = 10;
+    g_AnmManager->last_blend_mode = ANM_BLEND_FORCE_RESET;
     g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_SRCALPHA);
     g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ONE);
     g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
@@ -472,7 +472,7 @@ static void __fastcall fan_sincosmul(Float3 *dst, f32 angle, f32 radius)
 // around the VM, moved by on_tick 4 and drawn by on_draw 6.
 // TODO: the original keeps the angle in xmm4 and the radius speed in memory, storing the speed after the random call.
 // FUNCTION: TH16 0x469e20
-int __fastcall anm_effect_4_init(AnmVm *vm)
+int __fastcall anm_fan_init(AnmVm *vm)
 {
     if (vm->extra_data != NULL)
     {
@@ -481,8 +481,8 @@ int __fastcall anm_effect_4_init(AnmVm *vm)
         vm->extra_data_size = 0;
     }
     vm->alloc_extra_data(sizeof(AnmFanData));
-    vm->index_of_on_tick = 4;
-    vm->index_of_on_draw = 6;
+    vm->index_of_on_tick = ANM_ON_TICK_FAN;
+    vm->index_of_on_draw = ANM_ON_DRAW_FAN;
     AnmFanData *data = (AnmFanData *)vm->extra_data;
     data->uv_speed = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);
     data->unk_4a8 = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);

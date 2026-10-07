@@ -249,7 +249,8 @@ EndingChildF0::EndingChildF0(void *script)
 i32 ending_load_anm()
 {
     EndingChildF0 *child = g_Ending->child;
-    child->anms[child->anm_index] = AnmManager::preload_anm(child->anm_index + ANM_SLOT_ENDING_FIRST, child->anm_filename);
+    child->anms[child->anm_index] =
+        AnmManager::preload_anm(child->anm_index + ANM_SLOT_ENDING_FIRST, child->anm_filename);
     child->flags &= ~ENDING_CHILD_WAITING;
     g_AsciiManager->hide_now_loading_inline();
     return 0;

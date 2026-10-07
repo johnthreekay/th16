@@ -1948,7 +1948,7 @@ i32 LaserInfiniteInf::initialize(void *params)
     bullet_color = inner.color;
     AnmVm *vm = &vm_950;
     vm->wipe();
-    vm_950.index_of_sprite_mapping_func = 2;
+    vm_950.index_of_sprite_mapping_func = ANM_SPRITE_MAPPING_LASER_LINE;
     vm_950.associated_game_entity = this;
     g_LaserManager->bullet_anm->set_vm_script(vm, g_bullet_types[bullet_type].script);
     vm->interrupt(2);
@@ -2039,7 +2039,7 @@ i32 LaserCurveInf::initialize(void *params)
     }
     else
     {
-        vm_92c.index_of_sprite_mapping_func = 3;
+        vm_92c.index_of_sprite_mapping_func = ANM_SPRITE_MAPPING_LASER_CURVE;
         vm_92c.associated_game_entity = this;
         g_LaserManager->bullet_anm->set_vm_script(vm, bullet_type + 0x8e);
     }
@@ -3036,7 +3036,7 @@ i32 LaserLineInf::initialize(void *params)
     bullet_color = inner.bullet_color;
     AnmVm *vm = &vm_92c;
     vm->wipe();
-    vm_92c.index_of_sprite_mapping_func = 2;
+    vm_92c.index_of_sprite_mapping_func = ANM_SPRITE_MAPPING_LASER_LINE;
     vm_92c.associated_game_entity = this;
     g_LaserManager->bullet_anm->set_vm_script(vm, g_bullet_types[bullet_type].script);
     vm->interrupt(2);

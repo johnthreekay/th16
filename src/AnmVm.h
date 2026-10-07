@@ -193,6 +193,9 @@ enum AnmBlendMode
     ANM_BLEND_MIN = 8,
     // max(src, dst)
     ANM_BLEND_MAX = 9,
+    // Not a blend mode: stored by code that changes the blend state itself,
+    // so that the next sprite sets its own again.
+    ANM_BLEND_FORCE_RESET = 10,
 };
 
 // ANM render modes (flags_lo bits 25-29, instruction 302 and the drawing
@@ -221,7 +224,7 @@ enum AnmRenderMode
     ANM_RENDER_3D = 8,
     // texCircle (600): a textured ring strip from the VM's extra data.
     ANM_RENDER_TEX_CIRCLE = 9,
-    // A fan of random radii around the VM (anm_effect_4_init).
+    // A fan of random radii around the VM (anm_fan_init).
     ANM_RENDER_FAN = 10,
     // A triangle fan from the VM's extra data.
     ANM_RENDER_TRIANGLE_FAN = 11,
@@ -587,6 +590,39 @@ enum AnmVar
 
 struct AnmVm;
 
+// Indices into the callback tables below (AnmVm::index_of_*), 0 for none.
+// The three EffectManager effect kinds use the same index in every table.
+enum AnmCallbackIndex
+{
+    ANM_CALLBACK_NONE = 0,
+    // Effect 0: anm_masked_effect_* and anm_on_draw_masked.
+    ANM_CALLBACK_MASKED_EFFECT = 1,
+    // Effect 1: anm_gather_effect_*.
+    ANM_CALLBACK_GATHER_EFFECT = 2,
+    // Effects 2 and 3: anm_jagged_line_*.
+    ANM_CALLBACK_JAGGED_LINE = 3,
+    // on_tick: render mode 10's fan (anm_on_tick_fan).
+    ANM_ON_TICK_FAN = 4,
+    // on_draw: the stage fog's main VM (Fog.cpp).
+    ANM_ON_DRAW_FOG = 4,
+    // on_draw: dialogue text boxes (Gui::textbox_on_draw).
+    ANM_ON_DRAW_TEXTBOX = 5,
+    // on_draw: render mode 10's fan (anm_on_draw_fan).
+    ANM_ON_DRAW_FAN = 6,
+};
+
+// g_anm_sprite_mapping_funcs entries (AnmVm::index_of_sprite_mapping_func).
+enum AnmSpriteMapping
+{
+    ANM_SPRITE_MAPPING_NONE = 0,
+    // bullet_map_sprite: the bullet's type and color.
+    ANM_SPRITE_MAPPING_BULLET = 1,
+    // LaserLineInf::on_sprite_set.
+    ANM_SPRITE_MAPPING_LASER_LINE = 2,
+    // LaserCurveInf::on_sprite_set.
+    ANM_SPRITE_MAPPING_LASER_CURVE = 3,
+};
+
 // Script callbacks, selected per VM by the index_of_* fields.
 typedef i32(__fastcall *AnmVmSwitchFunc)(AnmVm *vm, i32 interrupt);
 extern AnmVmSwitchFunc g_anm_on_switch_funcs[4];
@@ -789,7 +825,7 @@ struct AnmVm
         }
         return result;
     }
-    // 0x45f980. Nonzero once the script has ended (anm_effect_1_on_tick
+    // 0x45f980. Nonzero once the script has ended (anm_masked_effect_on_tick
     // counts on it).
     i32 run();
     // run without the game speed handling around it; inlined into run.
