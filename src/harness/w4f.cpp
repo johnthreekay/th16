@@ -1,5 +1,6 @@
 // Stand-in callers for wave 4 range F (0x450000-0x4748e0) functions whose
 // shape depends on code that is not decompiled yet.
+#include "../AnmManager.h"
 #include "../MainMenu.h"
 
 extern i32 g_spell_practice_last_stage;
@@ -14,4 +15,12 @@ i32 harness_w4f_practice_last(i32 stage)
     g_practice_last_stage = stage;
     return g_spell_practice_last_stage + g_spell_practice_last_row + g_spell_practice_last_index +
            g_practice_last_stage;
+}
+
+// AnmManager::draw_vm (0x468b1d) draws circle outlines for render mode 18,
+// with this in ecx (the second object keeps LTCG from folding it).
+i32 harness_w4f_circle(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 radius)
+{
+    return g_AnmManager->draw_circle_outline(x, y, radius, vm->rotation.z, vm->int_vars[0], vm->color_1.d3d) +
+           other->draw_circle_outline(x, y, radius, vm->rotation.z, vm->int_vars[0], vm->color_1.d3d);
 }
