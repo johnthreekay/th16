@@ -140,7 +140,7 @@ class LaserLineInf : public LaserDataInf
     LaserLineInf();
 
     virtual void get_point(f32 distance, Float3 *out);
-    virtual void run_ex();
+    DECOMP_NOINLINE virtual void run_ex();
     virtual i32 initialize(void *params);
     virtual i32 on_tick();
     virtual i32 on_draw();

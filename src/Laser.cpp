@@ -4,6 +4,7 @@
 #include "AnmManager.h"
 #include "CriticalSections.h"
 #include "EffectManager.h"
+#include "Enemy.h"
 #include "GameErrorContext.h"
 #include "GameThread.h"
 #include "Globals.h"
@@ -2031,4 +2032,175 @@ i32 LaserCurveInf::on_tick()
     vm_f28.run();
     timer_40.tick();
     return 0;
+}
+
+// Runs the laser's pending et_ex instructions: each one starts an et_ex
+// step (ex_flags and its ex_state), or acts at once (sounds, bullets, the
+// sprite, blend mode, jumps).
+// TODO: the shooter fields after pos are written through raw offsets; register allocation and the case layout differ.
+// FUNCTION: TH16 0x431fe0
+DECOMP_NOINLINE void LaserLineInf::run_ex()
+{
+    while (ex_index < 0x12)
+    {
+        BulletEx *ex = &inner.ex[ex_index];
+        if (ex->type == 0)
+        {
+            return;
+        }
+        if (ex->slot == 0 && ex_flags != 0)
+        {
+            return;
+        }
+        switch (ex->type)
+        {
+        case 1:
+            ex_flags |= 1;
+            ex_state[0].timer.set_value(0);
+            ex_state[0].floats[7] = 0.0f;
+            break;
+        case 4:
+            ex_flags |= 4;
+            ex_state[1].floats[0] = ex->r;
+            if (-990.0f >= ex->s)
+            {
+                ex_state[1].floats[1] = angle;
+            }
+            else if (ex->s >= 990.0f)
+            {
+                ex_state[1].floats[1] = g_Player->angle_to_player(&position);
+            }
+            else
+            {
+                ex_state[1].floats[1] = ex->s;
+            }
+            ex_state[1].timer.set_value(0);
+            ex_state[1].ints[0] = ex->a;
+            laser_sincosmul((Float3 *)&ex_state[1].floats[5], ex_state[1].floats[1], ex_state[1].floats[0]);
+            if (ex_index != 0 && inner.shot_transform_sfx >= 0)
+            {
+                g_SoundManager.play_sound_centered(inner.shot_transform_sfx, 0);
+            }
+            break;
+        case 8:
+            ex_flags |= 8;
+            ex_state[2].floats[0] = ex->r;
+            ex_state[2].floats[1] = ex->s;
+            ex_state[2].timer.set_value(0);
+            ex_state[2].ints[0] = ex->a;
+            if (ex_index != 0 && inner.shot_transform_sfx >= 0)
+            {
+                g_SoundManager.play_sound_centered(inner.shot_transform_sfx, 0);
+            }
+            break;
+        case 0x10:
+            ex_flags |= ex->type;
+            ex_state[3].floats[1] = ex->r;
+            ex_state[3].floats[0] = ex->s > -999.0f ? ex->s : length;
+            ex_state[3].timer.set_value(0);
+            ex_state[3].ints[0] = ex->a;
+            ex_state[3].ints[1] = ex->b;
+            ex_state[3].ints[2] = 0;
+            ex_state[3].ints[3] = ex->c;
+            break;
+        case 0x40:
+            if (ex->a > 0)
+            {
+                ex_flags |= ex->type;
+                if (ex->r >= 0.0f)
+                {
+                    ex_state[4].floats[0] = ex->r;
+                }
+                else
+                {
+                    ex_state[4].floats[0] = length;
+                }
+                ex->a--;
+                ex_state[4].ints[1] = ex->a;
+                ex_state[4].ints[0] = 0;
+                ex_state[4].ints[2] = ex->b;
+            }
+            break;
+        case 0x80:
+            countdown_5c8 = ex->a;
+            break;
+        case 0x100:
+            timer_5b4.set_inline(ex->a);
+            ex_index++;
+            continue;
+        case 0x200:
+        {
+            AnmVm *vm = &vm_92c;
+            g_BulletManager->bullet_anm->copy_vm(vm, g_bullet_types[ex->a].script + ex->b);
+            vm->unk_5b0 = NULL;
+            vm->parent = NULL;
+            vm->run();
+            break;
+        }
+        case 0x400:
+            state = 3;
+            break;
+        case 0x800:
+            g_SoundManager.play_sound_at_position(ex->a, position.x);
+            ex_index++;
+            continue;
+        case 0x1000:
+            ex_flags |= ex->type;
+            ex_state[6].timer.set_inline(ex->a);
+            break;
+        case 0x2000:
+        {
+            EnemyBulletShooter shooter;
+            laser_sincosmul(&shooter.pos, angle, unk_70);
+            i32 a = ex->a;
+            shooter.pos.x += position.x;
+            shooter.pos.z = 0.0f;
+            shooter.aim_type = (a >> 24) & 0x7f;
+            shooter.type = (a >> 16) & 0xff;
+            shooter.pos.y += position.y;
+            shooter.color = (a >> 8) & 0xff;
+            f32 *angles = (f32 *)shooter.unk_14;
+            angles[2] = ex->r;
+            angles[3] = ex->s;
+            shooter.start_transform = a & 0xff;
+            ex_index++;
+            shooter.count = ex->b;
+            shooter.layers = ex[1].a;
+            angles[0] = ex[1].r;
+            shooter.sfx_flags = ex[1].b;
+            angles[1] = ex[1].s;
+            memcpy(shooter.unk_14 + 0x14, inner.ex, sizeof(inner.ex));
+            g_BulletManager->shoot_bullets(&shooter);
+            ex_index++;
+            if (a < 0)
+            {
+                cancel(0, 0);
+            }
+            break;
+        }
+        case 0x8000:
+            id = ex->a;
+            ex_index++;
+            continue;
+        case 0x10000:
+            ex_index = ex->a;
+            continue;
+        case 0x100000:
+            if (ex->a != 0)
+            {
+                vm_92c.flags_lo = vm_92c.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+            }
+            else
+            {
+                vm_92c.flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
+            }
+            ex_index++;
+            continue;
+        case 0x80000000:
+            ex_flags |= ex->type;
+            ex_state[5].timer.set_inline(ex->a);
+            break;
+        }
+        ex_index++;
+    }
 }

@@ -28,13 +28,6 @@ i32 LaserLineInf::initialize(void *params)
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x431fe0
-void LaserLineInf::run_ex()
-{
-    unit5_placeholder(this);
-}
-
 
 // Placeholder (not decompiled yet).
 // STUB: TH16 0x434010
