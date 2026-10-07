@@ -801,3 +801,11 @@ void Gui::start_dialogue(i32 script)
         msg->script_num = script;
     }
 }
+
+// TODO: the original realigns the frame (and esp, -8) and has 4 more bytes of it.
+// FUNCTION: TH16 0x426780
+void Gui::create_vm_110()
+{
+    Gui *gui = g_Gui;
+    gui->id_110 = gui->front_anm->create_vm_inline(0x3c, NULL, 0.0f, -1);
+}

@@ -43,11 +43,6 @@ void __stdcall BulletManager::clear_all(i32 unused)
 {
 }
 
-// STUB: TH16 0x41d900
-void EnemyManager::kill_all()
-{
-}
-
 // STUB: TH16 0x43f350
 void pause_menu_43f350()
 {

@@ -64,7 +64,7 @@ HARNESS_CALLED void PosVel::set_ellipse_angle(f32 angle)
 // TODO: same as create_vm: the original frame has 4 more bytes and saves
 // esi before taking the critical section.
 // FUNCTION: TH16 0x426160
-AnmId AnmLoaded::create_vm_front(i32 script, i32 layer, i32 unused)
+HARNESS_CALLED AnmId AnmLoaded::create_vm_front(i32 script, i32 layer, i32 unused)
 {
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;

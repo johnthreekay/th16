@@ -5,11 +5,6 @@
 #include "../Input.h"
 
 
-// STUB: TH16 0x41d1e0
-int EnemyInf::on_tick()
-{
-    return 0;
-}
 
 // STUB: TH16 0x474530
 int SptResourceInf::load_ecl_data(void *data)

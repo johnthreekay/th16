@@ -43,19 +43,3 @@ i32 Bullet::sub_4124b0(i32 arg)
     return 0;
 }
 
-// STUB: TH16 0x4191f0
-i32 Ending::initialize()
-{
-    return 0;
-}
-
-// STUB: TH16 0x4190b0
-EndingChildF0::~EndingChildF0()
-{
-}
-
-// STUB: TH16 0x4199f0
-i32 EndingChildF0::run()
-{
-    return 0;
-}

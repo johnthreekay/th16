@@ -27,15 +27,3 @@ int unit8b_placeholder_sink(void *object, int value)
 // GLOBAL: TH16 0x491b50
 AnmVmCopyFunc g_anm_on_copy_funcs[2];
 
-// STUB: TH16 0x425d80
-template <> __declspec(noinline) void ZunList<void>::append(ZunList<void> *node)
-{
-    insert_after(node);
-}
-
-// MSVC treats the specialization as inline (the template defines append in
-// the class) and only emits it where it is used.
-void unit8b_use_append(ZunList<void> *list, ZunList<void> *node)
-{
-    list->append(node);
-}

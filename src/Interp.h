@@ -40,6 +40,9 @@ struct InterpFloat2
 
     void reset_timer();
     D3DXVECTOR2 step();
+    // 0x425570. A second copy of step that the enemies' radial distance
+    // interpolators use (ExpHP: InterpRadialDist::step).
+    D3DXVECTOR2 step_radial_dist();
 };
 
 struct InterpFloat3
@@ -114,13 +117,24 @@ struct InterpStrange1
     D3DXVECTOR3 bezier_2;
     ZunTimer time;
     i32 end_time;
-    i32 method_for_1d;
-    u32 move_curve_mode;
-    u32 unk_5c;
+    // With flag_1d bit 0, each axis interpolates on its own with these
+    // three methods (x, y, z); otherwise method_for_3d applies to all.
+    union
+    {
+        struct
+        {
+            i32 method_for_1d;
+            u32 move_curve_mode;
+            u32 unk_5c;
+        };
+        i32 methods_1d[3];
+    };
     i32 method_for_3d;
     i32 flag_1d;
 
     void reset_timer();
+    // 0x4258b0
+    D3DXVECTOR3 step();
 };
 
 // Easing curves of ANM/ECL interpolation (the "mode" of an interpolator).

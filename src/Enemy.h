@@ -105,6 +105,32 @@ struct EnemyInterrupt
     char sub_for_set_timeout[0x40];
 };
 
+// The bitfields of EnemyData::flags_low that code assigns (rather than
+// sets or clears); the assignments compile to xor/and/xor.
+struct EnemyFlagsLow
+{
+    u32 unk_0 : 2;
+    // Stays alive off screen horizontally / vertically.
+    u32 no_offscreen_delete_x : 1;
+    u32 no_offscreen_delete_y : 1;
+    u32 unk_4 : 12;
+    // Has been on screen; leaving it then deletes the enemy.
+    u32 was_on_screen : 1;
+    u32 unk_17 : 2;
+    u32 mirrored : 1;
+    // Switches anm_ids[0] between the left, right and still scripts.
+    u32 directional_anm : 1;
+    u32 unk_21 : 3;
+    // Set while a time interrupt is running (check_time_interrupts).
+    u32 flag_1000000 : 1;
+    u32 unk_25 : 1;
+    u32 flag_4000000 : 1;
+    u32 unk_27 : 3;
+    // Life of 1000 or more.
+    u32 flag_40000000 : 1;
+    u32 unk_31 : 1;
+};
+
 // An enemy's state, embedded in EnemyInf (ExpHP: zEnemyData).
 struct EnemyData
 {
@@ -153,7 +179,7 @@ struct EnemyData
     EnemyLife life;
     EnemyDrop drops;
     i32 unk_3fe0;
-    u32 death_sound;
+    i32 death_sound;
     i32 death_anm_script;
     i32 death_anm_index;
     i32 unk_3ff0;
@@ -182,6 +208,26 @@ struct EnemyData
     i32 unk_452c;
 
     EnemyData();
+    // 0x41d2e0. One frame: interpolators, ECL, movement, fog and the
+    // attached VMs. Nonzero once the enemy is gone.
+    int on_tick();
+    // 0x41bb50, 0x41c330, 0x41cbd0: on_tick's steps.
+    int step_interpolators();
+    int step_logic();
+    void update_fog();
+    // 0x41c1f0. Moves final_pos to abs_pos + rel_pos, then keeps it inside
+    // the movement limit.
+    void update_final_pos();
+    // ECL instructions.
+    // 0x423260. anmSetSprite(slot, script): replaces the VM in a slot.
+    int ecl_anm_set_sprite();
+    // 0x423050. The enmCreate family.
+    int ecl_enm_create();
+    // 0x4233a0. The anm instructions that change a VM of the enemy
+    // (rotation, scale, colors, alpha, position, layer, blend mode).
+    void ecl_anm_vm_instr();
+    // 0x41dcb0. The enemy-specific ECL instructions (300 and up).
+    int ecl_run_over_300();
     i32 get_int_arg(int index);
     i32 *get_int_arg_ptr(int index);
     f32 get_float_arg(int index);
@@ -190,6 +236,10 @@ struct EnemyData
 
 // Damage hooks ECL can install (EnemyData::func_from_ecl_flag_ext_dmg).
 typedef int(__fastcall *EnemyExtDamageFunc)(EnemyData *enemy, int damage);
+
+// Per-frame hooks ECL can install (EnemyData::func_from_ecl_func_set); a
+// nonzero result ends the enemy's tick.
+typedef int(__fastcall *EnemyFuncSetFunc)(EnemyData *enemy);
 
 // VTABLE: TH16 0x4921a8
 // An enemy: an ECL VM plus its state (ExpHP: zEnemy). The name is ZUN's,
@@ -205,6 +255,12 @@ class EnemyInf : public SptInf
 
     EnemyInf(const char *sub_name);
     int on_tick();
+    // 0x41d520. Death effects, drops and the set_death subroutine; always 1.
+    int die();
+    // 0x424f00 and 0x425010. The subroutine to switch to once the life or
+    // time of the next interrupt is reached, NULL until then.
+    const char *check_life_interrupts();
+    const char *check_time_interrupts();
     void set_interrupt(int index, int time, const char *sub);
     void set_timeout(int index, const char *sub);
     virtual int run_over_300();

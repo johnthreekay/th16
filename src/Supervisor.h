@@ -77,7 +77,8 @@ struct Supervisor
     i32 gamemode_to_switch_to;
     i32 gamemode_prev;
     i32 unk_6fc;
-    // Copied into each stage's replay snapshot (RpyGamestate::flag_290).
+    // Copied into each stage's replay snapshot (RpyGamestate::flag_290) and
+    // read by ECL variable -9927.
     i32 unk_700;
     u8 unk_704[0x728 - 0x704];
     // text.anm: dialogue text and furigana lines.

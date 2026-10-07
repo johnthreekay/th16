@@ -232,7 +232,7 @@ i32 Item::spawn_effect()
 // TODO: the original reserves 8 bytes of unused locals and saves esi up
 // front; ours shrink-wraps the push of esi into the normal-item branch.
 // FUNCTION: TH16 0x430960
-Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f32 angle, f32 speed, i32 unk_6,
+HARNESS_CALLED Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f32 angle, f32 speed, i32 unk_6,
                               i32 force_autocollect)
 {
     ItemManager *mgr = g_ItemManager;

@@ -36,6 +36,23 @@ struct EnemyManagerInner
 struct EnemyManager;
 extern EnemyManager *g_EnemyManager;
 
+// What a new enemy starts with (ECL's enmCreate arguments and the creating
+// enemy's variables).
+struct EnemyCreateParams
+{
+    Float3 pos;
+    i32 score_reward;
+    i32 item_drop;
+    i32 life;
+    // Mirrored: flips x movement (EnemyData::flags_low 0x80000).
+    i32 mirrored;
+    // EnemyData::flags_low 0x4000000.
+    i32 flag_4000000;
+    i32 ecl_int_vars[4];
+    f32 ecl_float_vars[8];
+    i32 parent_enemy_id;
+};
+
 // Owns every enemy (ExpHP: zEnemyManager).
 struct EnemyManager
 {
@@ -69,7 +86,8 @@ struct EnemyManager
     static HARNESS_CALLED EnemyManager *create(const char *ecl_filename);
     int initialize(const char *ecl_filename);
     void destroy_all();
-    int get_enemy_count();
+    // Uses g_EnemyManager; LTCG dropped this.
+    HARNESS_CALLED int get_enemy_count();
     HARNESS_CALLED void set_boss_id(int index, EnemyInf *enemy);
     HARNESS_CALLED void set_boss_bit(int value);
     HARNESS_CALLED void remove_from_active_list(EnemyInf *enemy);
@@ -77,10 +95,17 @@ struct EnemyManager
     static int __fastcall on_tick_callback(EnemyManager *mgr);
     static int __fastcall on_draw_callback(EnemyManager *mgr);
     // Uses g_EnemyManager; callers pass no this.
-    EnemyInf *get_boss(i32 i);
+    HARNESS_CALLED EnemyInf *get_boss(i32 i);
+    // 0x41aa70. Creates an enemy running the named subroutine and adds it
+    // to the active list. unused is 0 everywhere.
+    EnemyInf *allocate_new_enemy(const char *sub_name, EnemyCreateParams *params, i32 unused);
     // 0x41d900. Kills every enemy; reaches the manager through
     // g_EnemyManager.
     static void kill_all();
+    // 0x41da30. kill_all for the enemies whose unk_278 is value.
+    static void __stdcall kill_all_with_unk_278(i32 value);
+    // 0x41db70. kill_all, skipping the set_death subroutines.
+    static void kill_all_no_set_death();
     BOOL is_enemy_alive(int id);
     EnemyInf *find_enemy_by_id(int id);
     HARNESS_CALLED struct EnemyRef find_closest(D3DXVECTOR3 *pos, f32 max_dist);

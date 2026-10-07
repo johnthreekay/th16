@@ -94,5 +94,7 @@ HARNESS_CALLED f32 zun_floorf(f32 x)
 // FUNCTION: TH16 0x4052a0
 HARNESS_CALLED f32 zun_atan2f(f32 y, f32 x)
 {
-    return atan2f(y, x);
+    // atan2f's body: with enough callers in view LTCG stops inlining the
+    // UCRT inline here.
+    return (f32)atan2(y, x);
 }

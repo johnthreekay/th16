@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "AnmVm.h"
+#include "CriticalSections.h"
 #include "Thread.h"
 #include "ZunMath.h"
 #include "decomp.h"
@@ -113,6 +114,8 @@ struct AnmLoaded
     // 0x40e5c0. Creates a VM running the script at pos (entity_pos), with
     // the given z rotation, on the given layer unless negative.
     HARNESS_CALLED AnmId create_vm(i32 script, Float3 *pos, f32 rotation, i32 layer, i32 unused);
+    // create_vm's body, for the callers LTCG inlined it into (0x426780).
+    __forceinline AnmId create_vm_inline(i32 script, Float3 *pos, f32 rotation, i32 layer);
     // 0x406380. Creates a VM running the script at the origin, on the given
     // layer unless negative; also stores the VM in *out if out is not NULL.
     AnmId create_effect(i32 script, i32 layer, AnmVm **out);
@@ -120,7 +123,8 @@ struct AnmLoaded
     AnmId create_ui_effect(i32 script, i32 unused, AnmVm **out);
     // 0x426160. Like create_vm at the origin, but inserted at the front of
     // the world list.
-    AnmId create_vm_front(i32 script, i32 layer, i32 unused);
+    // Every caller passes 0 for unused, which LTCG folded.
+    HARNESS_CALLED AnmId create_vm_front(i32 script, i32 layer, i32 unused);
     // 0x46ed60. A child of parent; mode bits 1 and 2 pick the list (see
     // AnmVm::mode_of_create_child).
     AnmId create_managed_child(i32 script, AnmVm *parent, i32 mode);
@@ -328,8 +332,9 @@ struct AnmManager
         AnmVm *vm = get_vm_with_id(id);
         if (vm != NULL && !(vm->flags_hi & ANM_VM_FLAG_HI_4000000))
         {
-            vm->flags_hi = vm->flags_hi & ~ANM_VM_FLAG_HI_40 | ANM_VM_DELETE_PENDING;
-            for (ZunList<AnmVm> *node = vm->list_of_children.next; node != NULL; node = node->next)
+            vm->mark_for_deletion();
+            ZunList<AnmVm> *node = &vm->list_of_children;
+            while ((node = node->next) != NULL)
             {
                 mark_tree_for_delete(node->entry);
             }
@@ -352,6 +357,10 @@ struct AnmManager
     // 0x46f130. Like interrupt_tree, also running each VM once.
     DECOMP_NOINLINE static void __stdcall interrupt_tree_and_run(AnmId id, i32 interrupt);
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *path);
+    // 0x46d990. Renders printf-style text into the VM's texture (the
+    // ending and dialogue lines). Variadic, so __cdecl with this pushed
+    // first.
+    void draw_text(AnmVm *vm, D3DCOLOR color, i32 unk_10, i32 font, i32 x, i32 y, const char *fmt, ...);
     // 0x46cf80. Loads a file into a slot without waiting for its textures.
     AnmLoaded *do_preload_anm(i32 slot, const char *path);
     // 0x46d1c0. Creates the textures of the next entry, or the prototype
@@ -461,8 +470,8 @@ struct AnmManager
     static int __fastcall on_draw_50_layer_41(AnmManager *mgr);
     static int __fastcall on_draw_53_layer_42(AnmManager *mgr);
 
-    // 0x46d720. unload_anm as LTCG kept it out of line for one caller (an
-    // ECL instruction).
+    // 0x46d720. unload_anm as LTCG kept it out of line (an ECL instruction
+    // and the ending, which checks for a negative slot itself).
     void unload_anm_out_of_line(i32 slot);
     // 0x46c8b0. Loads an image file in memory into the top level of an
     // existing texture. The last three arguments are the same at every call
@@ -486,6 +495,39 @@ struct AnmManager
 };
 
 extern AnmManager *g_AnmManager;
+
+__forceinline AnmId AnmLoaded::create_vm_inline(i32 script, Float3 *pos, f32 rotation, i32 layer)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    vm_count++;
+    AnmVm *vm = g_AnmManager->allocate_vm();
+    copy_vm(vm, script);
+    vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+    if (layer >= 0)
+    {
+        vm->layer = layer;
+        if (layer <= 23)
+        {
+            vm->flags_hi &= ~ANM_VM_LAYER_UI;
+            vm->flags_hi |= ANM_VM_LAYER_SET;
+        }
+    }
+    if (pos == NULL)
+    {
+        vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    }
+    else
+    {
+        vm->entity_pos = *pos;
+    }
+    vm->rotation.z = rotation;
+    vm->run();
+    vm->mode_of_create_child = 0;
+    AnmId id;
+    id = g_AnmManager->insert_in_world_list_back(vm);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return id;
+}
 
 // The quad being built by the draw functions.
 extern RenderVertex144 g_sprite_temp_buffer[4];

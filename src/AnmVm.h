@@ -112,6 +112,15 @@ enum AnmVmFlagsHi
     ANM_VM_FLAG_HI_4000000 = 1 << 26,
 };
 
+// The bitfields of AnmVm::flags_lo that code assigns (ECL's anmBlendMode);
+// the assignment compiles to xor/and/xor.
+struct AnmVmFlagsLoBits
+{
+    u32 unk_0 : 5;
+    u32 blend_mode : 4;
+    u32 unk_9 : 23;
+};
+
 // Variable numbers in ANM script arguments (names after ExpHP's truth).
 enum AnmVar
 {
@@ -293,6 +302,8 @@ struct AnmVm
     void fade_alpha2(i32 end_time, i32 method, u8 goal);
     // 0x425f10
     void fade_rgb1(i32 end_time, i32 method, ZunColor *goal);
+    // 0x4173f0. Starts moving pos from initial to goal.
+    void set_pos_time(i32 end_time, i32 method, Float3 *initial, Float3 *goal);
     // 0x426020. LTCG passes x in xmm3.
     HARNESS_CALLED void scale_to(i32 end_time, i32 method, f32 x, f32 y);
     // 0x406a70. Scales a position by the screen scale and applies the
