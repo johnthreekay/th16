@@ -377,7 +377,7 @@ void ScreenEffect::initialize(i32 mode, i32 arg_18, i32 arg_1c, i32 arg_20, i32 
 // A ScreenEffect nothing uses besides its static constructor and
 // destructor.
 // GLOBAL: TH16 0x4d9dd0
-ScreenEffect g_screen_effect("initialize ScreenInf\n");
+ScreenEffect g_screen_effect = ScreenEffect("initialize ScreenInf\n");
 // SYNTHETIC: TH16 0x401170
 // ??__Eg_screen_effect@@YAXXZ
 // SYNTHETIC: TH16 0x48acd0
