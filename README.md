@@ -541,6 +541,30 @@ decompiled code the surroundings it had in the original:
   assignment decides which gets the callee-saved register: in
   convert_texture's 32-bit loop clearing b first puts b in ebx and the
   count in esi like the original.
+- Early vs late realignment (wave 6, GameThread/Gui/Item ticks): a caller
+  whose realignment LTCG knows before its callees are compiled (IL-level
+  double math such as a `(double)` printf argument or an inlined atan2, or
+  a direct call to a function that needs alignment, even one that realigns
+  itself like Player::angle_to_player or CStreamingSound::seek) hands
+  known alignment to its callees: they get padded frames and lose
+  shrink-wrapping (Stage::start_std_vms, Item::init_anm,
+  AsciiInf::create_number all lost their matches this way). The original
+  has the same callers realigning without that effect, so its decision
+  came later. Not reproduced: the affected callers keep that double math
+  in small DECOMP_NOINLINE helpers (seek_bgm_to_stage_time,
+  item_angle_to_player, draw_percentage) until it is understood. Moving
+  them out also costs matches that depend on the early alignment
+  (Item::collect_full_power, the GameThread stage restart helpers).
+  Bisecting by commenting out parts of the caller finds the culprit in a
+  few builds.
+- A call to zun_fabsf from Gui::on_tick_body (no EH frame, no cookie, no
+  realignment) is enough to make LTCG stop inlining fabs into zun_fabsf;
+  the HUD inlines fabsf for now.
+- A memory-resident D3DXVECTOR3 local built from a non-constant value
+  gets a /GS cookie (and the caller then realigns through ebx); one built
+  from all zeros does not. Separate float locals avoid it (Gui::on_tick_body),
+  but Gui::sub_426d70 keeps the cookie where the original copies the
+  struct from memory.
 
 ### Compiler-generated and CRT functions
 

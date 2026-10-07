@@ -52,9 +52,3 @@ void harness_timer_sub(ZunTimer *a, ZunTimer *b)
     *b -= 0x77;
 }
 
-// Like ItemManager's on_tick body (0x42fe19), which collects PIV items with
-// a value from a table indexed by item type.
-void harness_item_collect_piv(Item *item, f32 *values, i32 type)
-{
-    item->collect_piv(values[type]);
-}

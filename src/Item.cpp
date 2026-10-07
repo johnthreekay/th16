@@ -1,13 +1,18 @@
+#include <math.h>
 #include <string.h>
 
 #include "GameThread.h"
 #include "Globals.h"
 #include "Item.h"
 
+#include "Bomb.h"
 #include "BulletManager.h"
 #include "EffectManager.h"
+#include "Gui.h"
+#include "Input.h"
 #include "Player.h"
 #include "PopupManager.h"
+#include "Rng.h"
 #include "SoundManager.h"
 #include "ZunList.h"
 
@@ -22,6 +27,7 @@ const i32 g_item_anm_scripts[17][2] = {
 };
 
 i32 unit5_placeholder(void *object);
+i32 get_piv_rounded();
 
 // This file's copy of ZunMath.h's sincosmul, which TH16 keeps once per
 // object file. A static of its own so that it can be annotated.
@@ -100,11 +106,341 @@ ItemManager *ItemManager::create()
     return mgr;
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x42f4e0
-DECOMP_NOINLINE i32 ItemManager::on_tick_body()
+// GLOBAL: TH16 0x4917e0
+// The PIV value of the bullet cancel items (types 9 to 14).
+static const f32 g_cancel_item_piv[6] = {5.0f, 10.0f, 20.0f, 30.0f, 40.0f, 50.0f};
+
+// Player::angle_to_player as LTCG inlined it into on_tick_body's state 4.
+static __forceinline f32 angle_to_player_inline(Float3 *pos)
 {
-    return unit5_placeholder(this);
+    f32 dy = g_Player->inner.pos.y - pos->y;
+    f32 dx = g_Player->inner.pos.x - pos->x;
+    if (dy == 0.0f && dx == 0.0f)
+    {
+        return ZUN_PI / 2;
+    }
+    return (f32)atan2((double)dy, (double)dx);
+}
+
+// The original calls Player::angle_to_player in state 5 and has it inlined
+// in state 4. Either form makes LTCG realign on_tick_body early enough to
+// give Item::init_anm (0x430c90) a padded frame in our build, so both go
+// through these out-of-line helpers until that is understood.
+static DECOMP_NOINLINE f32 item_angle_to_player(Float3 *pos)
+{
+    return g_Player->angle_to_player(pos);
+}
+
+static DECOMP_NOINLINE f32 item_angle_to_player_4(Float3 *pos)
+{
+    return angle_to_player_inline(pos);
+}
+
+// Whether an item has left the bottom or a side of the play area.
+static __forceinline i32 item_offscreen(Item *item)
+{
+    return item->position.y > 472.0f || fabsf(item->position.x) >= 200.0f;
+}
+
+// Moves every item: delayed spawns (state 6), falling items (1), cancel
+// items rising before they fall (2), season items (3), items flying to the
+// player (4: auto-collected, 5: attracted), then collection, attraction and
+// the sprite VMs.
+// TODO: the original realigns its frame (and esp, -8); register allocation and the order of the position updates differ.
+// FUNCTION: TH16 0x42f4e0
+i32 ItemManager::on_tick_body()
+{
+    Player *player = g_Player;
+    Item *item = inner.items;
+    unk_1c972e4 = 0;
+    num_items_onscreen = 0;
+    for (i32 i = 0; i < 0x1258; i++, item++)
+    {
+        if (item->state == 0)
+        {
+            continue;
+        }
+        if (item->state == 6)
+        {
+            if (--item->intangibility_frames >= 0)
+            {
+                continue;
+            }
+            item->init_anm();
+            player = g_Player;
+            continue;
+        }
+        if (item->state == 1)
+        {
+            goto state_1;
+        }
+        if (item->state == 2)
+        {
+            item->position += item->velocity * g_game_speed;
+            item->velocity.y += g_game_speed * 0.03f;
+            if (item->velocity.y >= 0.0f)
+            {
+                item->speed_towards_player = player->sht_file->grazebox_radius;
+                if (item->item_type != 16)
+                {
+                    goto start_autocollect;
+                }
+                item->state = 1;
+                goto state_1;
+            }
+            if (item_offscreen(item))
+            {
+                // release(), inlined here.
+                ItemList *head = item->node.head;
+                item->state = 0;
+                item->release_to(head);
+                continue;
+            }
+            goto collect;
+        }
+        if (item->state == 3)
+        {
+            item->position += item->velocity * g_game_speed;
+            item->velocity.y += g_game_speed * 0.03f;
+            item->speed -= 0.03f;
+            item_sincosmul(&item->velocity, item->angle, item->speed);
+            if ((g_MainBomb->in_use == 1 && g_MainBomb->timer.current < 60) ||
+                (g_SubseasonBomb->in_use == 1 && g_SubseasonBomb->timer.current < 10000))
+            {
+                item->force_autocollect = 1;
+            }
+            if (item->speed <= 0.0f)
+            {
+                player = g_Player;
+                item->velocity.x = 0.0f;
+                item->velocity.z = 0.0f;
+                item->velocity.y = 0.0f;
+                item->speed = 0.0f;
+                item->angle = ZUN_PI / 2;
+                item->speed_towards_player = player->sht_file->grazebox_radius;
+                item->state = item->force_autocollect != 0 ? 4 : 1;
+                goto state_1;
+            }
+            if (!item_offscreen(item))
+            {
+                player = g_Player;
+                goto collect;
+            }
+            item->release();
+            player = g_Player;
+            continue;
+        }
+        if (item->state == 4)
+        {
+            goto state_4;
+        }
+        if (item->state != 5)
+        {
+            goto collect;
+        }
+        if ((player->inner.state != 2 && player->inner.state != 4 && (f32)item_collect_line() > player->inner.pos.y) ||
+            (g_MainBomb->in_use == 1 && g_MainBomb->timer.current < 60) || g_SubseasonBomb->is_active_before(10000) ||
+            g_Gui->msg != NULL)
+        {
+            goto autocollect;
+        }
+        item_sincosmul(&item->velocity, item_angle_to_player(&item->position), item->speed_towards_player);
+        item->position += item->velocity * g_game_speed;
+        if (item->speed_towards_player < 12.0f)
+        {
+            item->speed_towards_player += 0.2f;
+        }
+        player = g_Player;
+        if (player->inner.state == 4)
+        {
+            item->state = 1;
+            item->velocity.x = 0.0f;
+            item->velocity.y = 0.0f;
+        }
+        goto collect;
+
+    state_1:
+        if (item->intangibility_frames > 0)
+        {
+            if (--item->intangibility_frames > 0)
+            {
+                continue;
+            }
+            item->spawn_effect();
+            player = g_Player;
+            continue;
+        }
+        if ((player->inner.state != 2 && player->inner.state != 4 && (f32)item_collect_line() > player->inner.pos.y) ||
+            (g_MainBomb->in_use == 1 && g_MainBomb->timer.current < 60) ||
+            (g_SubseasonBomb->in_use == 1 && g_SubseasonBomb->timer.current < 10000) || g_Gui->msg != NULL)
+        {
+            goto autocollect;
+        }
+        item->position += item->velocity * g_game_speed * inner.slowdown;
+        item->velocity.y += g_game_speed * 0.03f * inner.slowdown;
+        if (item->time.current >= 32)
+        {
+            if (inner.slowdown < 1.0f)
+            {
+                item->vm.pos = Float3(g_replay_unsafe_rng.randf_neg_1_to_1(), g_replay_unsafe_rng.randf_neg_1_to_1(), 0.0f);
+                item->vm.color_1.g = 0xa0;
+                item->vm.color_1.r = 0xff;
+            }
+            else
+            {
+                item->vm.color_1.g = 0xff;
+                item->vm.color_1.r = 0xff;
+            }
+            item->vm.color_1.a = 0xff;
+            item->vm.color_1.b = 0xff;
+            player = g_Player;
+        }
+        if (item->velocity.y >= 0.0f)
+        {
+            item->velocity.x = 0.0f;
+        }
+        if (item->velocity.y > 2.0f)
+        {
+            item->velocity.y = 2.0f;
+        }
+        if (item_offscreen(item))
+        {
+            item->release();
+            continue;
+        }
+        goto collect;
+
+    autocollect:
+        item->speed_towards_player = player->sht_file->grazebox_radius;
+    start_autocollect:
+        item->state = 4;
+    state_4:
+        if (item->item_type != 9 && item->item_type != 10 && item->item_type != 11 && item->item_type != 12 &&
+            item->item_type != 13 && item->item_type != 14)
+        {
+            g_Globals.unk_dc = 8;
+        }
+        item_sincosmul(&item->velocity, item_angle_to_player_4(&item->position), item->speed_towards_player);
+        item->position += item->velocity * g_game_speed;
+        if (item->speed_towards_player < 12.0f)
+        {
+            item->speed_towards_player += 0.2f;
+        }
+        player = g_Player;
+        if (player->inner.state == 4)
+        {
+            item->state = 1;
+            item->velocity.x = 0.0f;
+            item->velocity.y = 0.0f;
+        }
+
+    collect:
+        if (player->inner.state != 2)
+        {
+            Float3 half(0.0f, 0.0f, 0.0f);
+            if (player->item_collect_box.min_pos.x <= item->position.x + half.x &&
+                player->item_collect_box.min_pos.y <= item->position.y + half.y &&
+                item->position.x <= player->item_collect_box.max_pos.x &&
+                item->position.y <= player->item_collect_box.max_pos.y)
+            {
+                switch (item->item_type)
+                {
+                case 8:
+                    item->collect_full_power();
+                    break;
+                case 1:
+                    item->collect_power();
+                    break;
+                case 3:
+                    item->collect_big_power();
+                    break;
+                case 2:
+                    item->collect_point();
+                    break;
+                case 5:
+                    if (g_Globals.collect_extend(0))
+                    {
+                        g_SoundManager.play_sound_centered(0x11, 0);
+                        g_Gui->sub_42bcf0(0, 4);
+                    }
+                    break;
+                case 6:
+                    g_Globals.collect_bomb_fragment(0);
+                    break;
+                case 7:
+                    g_Globals.collect_bomb(0);
+                    break;
+                case 9:
+                case 10:
+                case 11:
+                case 12:
+                case 13:
+                case 14:
+                {
+                    f32 value = g_cancel_item_piv[item->item_type - 9];
+                    item->collect_piv(value);
+                    g_SubseasonBomb->release_bonus += value;
+                    g_Globals.add_to_score(get_piv_rounded() / 100 * 10);
+                    break;
+                }
+                case 16:
+                    if (g_Globals.collect_season_item(0))
+                    {
+                        g_Player->inner.repopulate_options();
+                        g_PopupManager->generate_small_score_popup(&item->position, -1, 0xffffff40);
+                        g_SoundManager.play_sound_at_position(0x3f, item->position.x);
+                    }
+                    g_Globals.add_to_score(10);
+                    Gui::update_season_gauge();
+                    break;
+                default:
+                    goto collected;
+                }
+                player = g_Player;
+            collected:
+                g_SoundManager.play_sound_at_position(0x25, item->position.x);
+                item->release();
+                continue;
+            }
+            if (item->state != 5 && item->state != 4 && item->state != 3)
+            {
+                u32 focused = g_InputState.input & INPUT_FOCUS;
+                if ((focused && player->item_attract_box_focused.min_pos.x <= item->position.x + half.x &&
+                     player->item_attract_box_focused.min_pos.y <= item->position.y + half.y &&
+                     item->position.x <= player->item_attract_box_focused.max_pos.x &&
+                     item->position.y <= player->item_attract_box_focused.max_pos.y) ||
+                    (!focused && player->item_attract_box_unfocused.min_pos.x <= item->position.x + half.x &&
+                     player->item_attract_box_unfocused.min_pos.y <= item->position.y + half.y &&
+                     item->position.x <= player->item_attract_box_unfocused.max_pos.x &&
+                     item->position.y <= player->item_attract_box_unfocused.max_pos.y))
+                {
+                    if (item->item_type != 9 && item->item_type != 10 && item->item_type != 11 &&
+                        item->item_type != 12 && item->item_type != 13 && item->item_type != 14)
+                    {
+                        item->state = 5;
+                        item->speed_towards_player = player->sht_file->grazebox_radius / 3.0f;
+                    }
+                }
+            }
+        }
+        if (item->vm.flags_lo & ANM_VM_VISIBLE)
+        {
+            item->vm.run();
+            player = g_Player;
+        }
+        if (item->vm_2.flags_lo & ANM_VM_VISIBLE)
+        {
+            item->vm_2.run();
+            player = g_Player;
+        }
+        item->time.tick();
+        num_items_onscreen++;
+    }
+    if (inner.slowdown < 1.0f)
+    {
+        inner.slowdown += 0.1f;
+    }
+    return 1;
 }
 
 // FUNCTION: TH16 0x4308f0

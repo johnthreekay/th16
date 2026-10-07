@@ -3,6 +3,7 @@
 #include "AnmManager.h"
 #include "AsciiManager.h"
 #include "Bomb.h"
+#include "FpsCounter.h"
 #include "BulletManager.h"
 #include "EffectManager.h"
 #include "EnemyManager.h"
@@ -32,6 +33,13 @@ double g_play_time_runtime;
 double LTCG_VECTORCALL get_runtime();
 
 i32 unit5_placeholder(void *object);
+
+extern i32 g_unk_4c0f40;
+extern i32 g_continues_remaining;
+extern i32 g_unk_4a5bf8;
+
+// g_Globals' flag word at 0x45c as a whole (flags_lo_45c, game_mode, ...).
+#define GLOBALS_FLAGS_45C (*(u32 *)((u8 *)&g_Globals + 0x45c))
 
 // FUNCTION: TH16 0x42d1f0
 void GameThread::thread_start_callback()
@@ -95,17 +103,326 @@ void ConfigData::set_defaults()
     set_defaults_inline();
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x42cb60
-DECOMP_NOINLINE void GameThread::thread_start()
+// GLOBAL: TH16 0x492278
+// Credits per difficulty.
+static const i32 g_continues_per_difficulty[6] = {5, 5, 5, 5, 0, 0};
+
+// GLOBAL: TH16 0x492290
+// The maximum point item value per difficulty, divided by 100.
+static const i32 g_max_piv_per_difficulty[6] = {500000, 500000, 500000, 500000, 500000, 1000000};
+
+// GLOBAL: TH16 0x4922a8
+// The starting point item value per difficulty, divided by 100.
+static const i32 g_initial_piv_per_difficulty[6] = {10000, 10000, 10000, 10000, 10000, 100000};
+
+// The game thread: waits for the loading screen, sets up a new game (or
+// the next stage) and creates the game objects. 0 on success; -1 (with the
+// thread flagged as failed) if something could not be created.
+// FUNCTION: TH16 0x42cb60
+i32 GameThread::thread_start()
 {
-    unit5_placeholder(g_GameThread);
+    GameThread *thread = g_GameThread;
+    *(u32 *)&thread->flags |= 4;
+    __asm finit;
+    while (g_AnmManager->screen_copies[0].anm_slot >= 0)
+    {
+        if (g_Supervisor.flags & 0x180)
+        {
+            goto fail;
+        }
+        Sleep(1);
+    }
+    if (g_Supervisor.unk_700 == 0)
+    {
+        Sleep(60);
+    }
+    g_Supervisor.vm_1bc->interrupt(2);
+    g_Supervisor.vm_1bc->run();
+    g_game_speed = 1.0f;
+    *(u32 *)&g_GameThread->flags &= ~0x4000;
+    g_Globals.time_in_stage = 0;
+    g_Globals.time_in_chapter = 0;
+    if (g_GameThread->replay_mode == 0)
+    {
+        g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
+            .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
+            .unlocked = 1;
+    }
+    if (g_Supervisor.unk_700 != 0)
+    {
+        if (g_Globals.stage_num == 7)
+        {
+            if (g_Globals.difficulty < 4)
+            {
+                g_Globals.difficulty = 4;
+            }
+        }
+        if (g_Globals.game_mode == 2)
+        {
+            g_Globals.hiscore = g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
+                                    .spells[g_Globals.spell_id]
+                                    .practice_score;
+            g_Globals.hiscore_continues = 0;
+        }
+        else if (g_Globals.game_mode != 0)
+        {
+            g_Globals.hiscore = g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
+                                    .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
+                                    .score;
+            g_Globals.hiscore_continues = 0;
+        }
+        else
+        {
+            ScorefileScore *best =
+                &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].scores[g_Globals.difficulty][0];
+            g_Globals.hiscore = best->score;
+            g_Globals.hiscore_continues = best->continues;
+        }
+        if (!(g_Globals.flags_lo_45c & 8))
+        {
+            g_Globals.continues_used = 0;
+        }
+        g_Globals.graze = 0;
+        g_Globals.score = 0;
+        g_Globals.reset_for_new_game();
+        g_Globals.initial_piv = g_initial_piv_per_difficulty[g_Globals.difficulty] * 100;
+        g_Globals.max_piv = g_max_piv_per_difficulty[g_Globals.difficulty] * 100;
+        g_Globals.piv = (f32)g_Globals.initial_piv / 100.0f * 100.0f;
+        g_continues_remaining = g_continues_per_difficulty[g_Globals.difficulty];
+        if (g_Globals.game_mode == 2)
+        {
+            g_Globals.lives = 0;
+            g_Globals.bombs = 0;
+            if (g_Gui != NULL)
+            {
+                g_Gui->update_bombs(0, g_Globals.bomb_fragments);
+            }
+        }
+        else if (g_Globals.game_mode == 0)
+        {
+            g_Globals.lives = 2;
+        }
+        else if (g_unk_4a5bf8 == 0)
+        {
+            g_Globals.lives = 9;
+        }
+        else
+        {
+            g_Globals.lives = g_unk_4a5bf8 - 1;
+        }
+        if (Player::create() == NULL)
+        {
+            goto fail;
+        }
+        if (g_Globals.game_mode == 2)
+        {
+            i32 power = g_Globals.power_per_level * 4;
+            if (power > g_Globals.max_power)
+            {
+                g_Globals.power = g_Globals.max_power;
+            }
+            else
+            {
+                g_Globals.power = power < g_Globals.power_per_level ? g_Globals.power_per_level : power;
+            }
+            g_Globals.season_power = 390;
+            if (g_Globals.max_season_power < 390)
+            {
+                g_Globals.season_power = g_Globals.max_season_power;
+            }
+        }
+        else if (g_Globals.stage_num <= 1)
+        {
+            g_Globals.power = g_Globals.power_per_level > g_Globals.max_power ? g_Globals.max_power
+                                                                               : g_Globals.power_per_level;
+            g_Globals.season_power = 0;
+            if (g_Globals.max_season_power < 0)
+            {
+                g_Globals.season_power = g_Globals.max_season_power;
+            }
+        }
+        else if (g_Globals.stage_num == 7)
+        {
+            i32 power = g_Globals.power_per_level * 4;
+            if (power > g_Globals.max_power)
+            {
+                g_Globals.power = g_Globals.max_power;
+            }
+            else
+            {
+                g_Globals.power = power < g_Globals.power_per_level ? g_Globals.power_per_level : power;
+            }
+            g_Globals.season_power = 0;
+            if (g_Globals.max_season_power < 0)
+            {
+                g_Globals.season_power = g_Globals.max_season_power;
+            }
+        }
+        else
+        {
+            i32 power = g_Globals.power_per_level * 4;
+            if (power > g_Globals.max_power)
+            {
+                g_Globals.power = g_Globals.max_power;
+            }
+            else
+            {
+                g_Globals.power = power < g_Globals.power_per_level ? g_Globals.power_per_level : power;
+            }
+            g_Globals.season_power = 0;
+            if (g_Globals.max_season_power < 0)
+            {
+                g_Globals.season_power = g_Globals.max_season_power;
+            }
+        }
+        g_Player->inner.repopulate_options();
+        GLOBALS_FLAGS_45C &= ~4;
+        if (thread->replay_mode == 0)
+        {
+            i32 *play_count = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].play_count;
+            if (*play_count < 9999999)
+            {
+                (*play_count)++;
+            }
+        }
+    }
+    else if (g_Globals.score > (u32)g_Globals.hiscore)
+    {
+        g_Globals.hiscore = g_Globals.score;
+    }
+
+    {
+        UpdateFunc *f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_callback);
+        f->flags &= ~UPDATE_FUNC_ACTIVE;
+        f->arg = thread;
+        g_UpdateFuncRegistry->register_on_tick(f, 0xf);
+        thread->on_tick = f;
+        f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_draw_callback);
+        f->flags &= ~UPDATE_FUNC_ACTIVE;
+        f->arg = thread;
+        g_UpdateFuncRegistry->register_on_draw(f, 2);
+        thread->on_draw = f;
+    }
+    memcpy(&thread->config, (u8 *)&g_Supervisor.config + 4, sizeof(ConfigData));
+    thread->unk_20 = g_stage_data->stage_num;
+    if (!(g_Globals.flags_lo_45c & 2))
+    {
+        if (ReplayManager::create(thread->replay_mode) == NULL)
+        {
+            goto fail;
+        }
+        if (Stage::create(g_stage_data->std_filename) == NULL)
+        {
+            goto fail;
+        }
+        if (Gui::create() == NULL)
+        {
+            goto fail;
+        }
+        if (BulletManager::create() == NULL)
+        {
+            goto fail;
+        }
+        if (ItemManager::create() == NULL)
+        {
+            goto fail;
+        }
+        if (LaserManager::create() == NULL)
+        {
+            goto fail;
+        }
+        if (PauseMenu::create() == NULL)
+        {
+            goto fail;
+        }
+        if (PopupManager::create() == NULL)
+        {
+            goto fail;
+        }
+    }
+    else
+    {
+        g_ReplayManager->start_stage();
+        g_Gui->load_stage_files();
+        if (Stage::create(g_stage_data->std_filename) == NULL)
+        {
+            goto fail;
+        }
+    }
+    if (!(g_Globals.flags_lo_45c & 9))
+    {
+        if (EnemyManager::create(g_stage_data->ecl_filename) == NULL)
+        {
+            goto fail;
+        }
+    }
+    else
+    {
+        g_EnemyManager->reset_for_stage(0);
+    }
+    if (BombInf::create() == NULL)
+    {
+        goto fail;
+    }
+    if (Spellcard::create() == NULL)
+    {
+        goto fail;
+    }
+    if (!(GLOBALS_FLAGS_45C & 0x40))
+    {
+        if (g_Globals.game_mode != 2)
+        {
+            g_Supervisor.stop_bgm();
+        }
+        g_Supervisor.play_bgm_wav(0, g_stage_data->music_names[0]);
+        g_Supervisor.play_bgm_wav(1, g_stage_data->music_names[1]);
+    }
+    g_FpsCounter->total_actual = 0.0;
+    g_FpsCounter->total_expected = 0.0;
+    thread->time_in_stage.set_value(0);
+    (&g_Globals.unk_204)[g_Globals.stage_num] = 0;
+    g_Globals.unk_224 = 0;
+    while (g_SoundManager.bgm_commands[0].command != 0)
+    {
+        Sleep(16);
+    }
+    thread->unk_90 = 60;
+    g_Supervisor.sub_43c630();
+    *(u32 *)&thread->flags &= ~4;
+    GLOBALS_FLAGS_45C &= ~0xb;
+    g_Supervisor.thread.should_run = FALSE;
+    g_Supervisor.thread.stop_requested = TRUE;
+    g_unk_4c0f40 = 0;
+    g_draw_hook_4a6eec = NULL;
+    g_draw_hook_4a6ee8 = NULL;
+    anm_vm_interrupt_2(g_Supervisor.vm_1bc);
+    anm_vm_interrupt_2(g_Supervisor.vm_1c0);
+    anm_vm_interrupt_2(g_Supervisor.vm_1c4);
+    anm_vm_interrupt_2(g_Supervisor.vm_1c8);
+    if (g_GameThread->replay_mode == 0)
+    {
+        g_play_time_runtime = get_runtime();
+    }
+    thread->enable_update_funcs();
+    return 0;
+
+fail:
+    *(u32 *)&thread->flags |= 8;
+    g_Supervisor.sub_43c6a0();
+    g_Supervisor.thread.should_run = FALSE;
+    g_Supervisor.thread.stop_requested = TRUE;
+    if (thread->on_tick != NULL)
+    {
+        thread->on_tick->flags |= UPDATE_FUNC_ACTIVE;
+    }
+    if (thread->on_draw != NULL)
+    {
+        thread->on_draw->flags |= UPDATE_FUNC_ACTIVE;
+    }
+    return -1;
 }
 
-extern i32 g_unk_4c0f40;
 
-// g_Globals' flag word at 0x45c as a whole (flags_lo_45c, game_mode, ...).
-#define GLOBALS_FLAGS_45C (*(u32 *)((u8 *)&g_Globals + 0x45c))
 
 // Ends a game: saves the score file, shows "now loading" for what comes
 // next, and deletes the game objects (keeping the stage, GUI and player
@@ -232,21 +549,20 @@ DECOMP_NOINLINE GameThread::~GameThread()
     g_Supervisor.background_color = (GLOBALS_FLAGS_45C & 1) ? 0 : 0xff000000;
 }
 
-// Placeholder: the decompiled body below is parked. With it, LTCG sees a
-// call to sub_42dc50 and Stage::start_std_vms (0x40add0, sub_42dc50's
-// callee) stops matching (edi is saved in the prologue instead of after the
-// loop guard). Its best version (80.6%) is kept under #if 0.
-// STUB: TH16 0x42d7b0
-DECOMP_NOINLINE i32 GameThread::on_tick_body()
+// The original seeks inline in on_tick_body. With the double math there,
+// LTCG realigns on_tick_body early enough to hand the alignment down to
+// sub_42dc50's callees, and Stage::start_std_vms (0x40add0) loses its
+// shrink-wrapped edi; kept out of line until that is understood.
+static DECOMP_NOINLINE void seek_bgm_to_stage_time()
 {
-    return unit5_placeholder(this);
+    ((CStreamingSound *)g_SoundManager.bgm_stream)->seek(g_Globals.time_in_stage / 60.0);
 }
 
-#if 0
 // One frame of a game: the ending fade, the stage restart and intro
 // timing, the demo's end, the music restart after a pause and the timers.
 // TODO: the original keeps the return 3 epilogue at the top and a second null test around the inlined delete of g_Stage2.
-DECOMP_NOINLINE i32 GameThread::on_tick_body()
+// FUNCTION: TH16 0x42d7b0
+HARNESS_CALLED i32 GameThread::on_tick_body()
 {
     if (*(u32 *)&flags & 0x4000)
     {
@@ -349,7 +665,7 @@ DECOMP_NOINLINE i32 GameThread::on_tick_body()
             }
             if (g_Globals.chapter < 0x2b)
             {
-                ((CStreamingSound *)g_SoundManager.bgm_stream)->seek(g_Globals.time_in_stage / 60.0);
+                seek_bgm_to_stage_time();
             }
             *(u32 *)&flags &= ~0x10000;
             unk_8c = 0;
@@ -368,7 +684,6 @@ DECOMP_NOINLINE i32 GameThread::on_tick_body()
     time_in_stage++;
     return 1;
 }
-#endif
 
 // FUNCTION: TH16 0x418420
 void GameThread::enable_update_funcs()
@@ -506,7 +821,7 @@ static __forceinline void restart_stage_objects()
 // more bytes of locals, and folds allocate_new_enemy's unused argument
 // (push ecx).
 // FUNCTION: TH16 0x42dc50
-i32 GameThread::sub_42dc50()
+HARNESS_CALLED i32 GameThread::sub_42dc50()
 {
     g_Gui->sub_42c1b0();
     if (flags.flag_3)

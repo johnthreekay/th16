@@ -128,11 +128,19 @@ struct GuiBossLifeMarker
 
 struct GuiBossBar
 {
-    u8 unk_0[0x10];
+    // The fraction of the bar shown, catching up with fill.
+    f32 shown;
+    // The boss's life as a fraction of its maximum.
+    f32 fill;
+    i32 life;
+    u8 unk_0[0x10 - 0xc];
     GuiBossLifeMarker life_markers[4];
     AnmId ids[7];
+    // Whether ids hold the bar's VMs.
     i32 unk_4c;
-    u8 unk_50[4];
+    // Whether the bar is faded out for the player standing close to the
+    // boss.
+    i32 unk_50;
 
     GuiBossBar()
     {
@@ -169,9 +177,20 @@ struct Gui
     AnmId id_110;
     // Whether the season gauge shows a level (update_season_gauge).
     i32 season_gauge_has_level;
-    u8 unk_118[0x11c - 0x118];
+    // Like season_gauge_has_level, for the gauge on_tick_body updates.
+    i32 unk_118;
     AnmId ids_11c[5];
-    u8 unk_130[0x14c - 0x130];
+    // Shown by on_draw_2_body with the count-down below.
+    i32 unk_130;
+    // A count-down shown after a notice (on_tick_body): unk_144 is added
+    // to unk_140 once per step of unk_134; unk_138 and unk_13c are the
+    // final values.
+    f32 unk_134;
+    f32 unk_138;
+    i32 unk_13c;
+    i32 unk_140;
+    i32 unk_144;
+    i32 unk_148;
     // Set by sub_42bcf0's notices.
     i32 unk_14c;
     AnmId id_150;
@@ -187,7 +206,8 @@ struct Gui
     u8 unk_18c[0x1ac - 0x18c];
     u32 flags_1ac;
     ZunTimer timer_1b0;
-    u8 unk_1c4[0x1c8 - 0x1c4];
+    // How long the notice flags 0x1800 of flags_1ac last.
+    i32 unk_1c4;
     // The dialogue being shown, if any.
     GuiMsgVm *msg;
     // This stage's dialogue file.
@@ -216,8 +236,8 @@ struct Gui
     static i32 __fastcall on_tick_callback(Gui *self);
     static i32 __fastcall on_draw_1_callback(Gui *self);
     static i32 __fastcall on_draw_2_callback(Gui *self);
-    i32 on_tick_body();
-    i32 on_draw_2_body();
+    DECOMP_NOINLINE i32 on_tick_body();
+    DECOMP_NOINLINE i32 on_draw_2_body();
 
     void update_lives(i32 lives, u32 fragments);
     // 0x42c390
@@ -256,6 +276,12 @@ struct Gui
         boss_bars[boss].life_markers[index].color = color;
     }
 };
+
+static_assert(sizeof(GuiBossBar) == 0x54, "GuiBossBar size");
+static_assert(offsetof(Gui, unk_134) == 0x134, "Gui layout");
+static_assert(offsetof(Gui, unk_1c4) == 0x1c4, "Gui layout");
+static_assert(offsetof(Gui, boss_bars) == 0x1dc, "Gui layout");
+static_assert(offsetof(Gui, front_anm) == 0x2d8, "Gui layout");
 
 extern Gui *g_Gui;
 // The dialogue file kept loaded across a stage restart.

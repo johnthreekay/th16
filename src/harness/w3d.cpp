@@ -29,12 +29,6 @@ i32 harness_w3d_replay_end_stage(i32 stage)
     return g_ReplayManager->set_end_stage(stage);
 }
 
-// GameThread::thread_start (0x42d027).
-void harness_w3d_replay_start_stage()
-{
-    g_ReplayManager->start_stage();
-}
-
 // GameThread's stage setup (0x42dd2d, 0x42df45).
 void harness_w3d_replay_begin_stage()
 {

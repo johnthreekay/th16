@@ -1404,7 +1404,7 @@ HARNESS_CALLED i32 Supervisor::play_bgm(i32 arg, i32 track)
 }
 
 // FUNCTION: TH16 0x43c440
-i32 Supervisor::stop_bgm()
+HARNESS_CALLED i32 Supervisor::stop_bgm()
 {
     if (g_Supervisor.config.flags_2c & 0x10)
     {

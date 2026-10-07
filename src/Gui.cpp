@@ -3,7 +3,9 @@
 
 #include "AnmManager.h"
 #include "AsciiManager.h"
+#include "Bomb.h"
 #include "BulletManager.h"
+#include "Enemy.h"
 #include "EnemyManager.h"
 #include "GameThread.h"
 #include "Input.h"
@@ -1391,7 +1393,7 @@ void __fastcall anm_vm_interrupt_2(AnmVm *vm)
 // TODO: same frame difference as create_vm (4 more bytes, esi saved
 // before the critical section).
 // FUNCTION: TH16 0x42c920
-AnmId AnmLoaded::create_ui_effect(i32 script, i32 unused, AnmVm **out)
+HARNESS_CALLED AnmId AnmLoaded::create_ui_effect(i32 script, i32 unused, AnmVm **out)
 {
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;
@@ -1542,10 +1544,895 @@ void Gui::start_dialogue(i32 script)
     }
 }
 
+// AnmLoaded::create_effect as LTCG inlined it into sub_426d70.
+static __forceinline AnmId create_effect_inline(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    anm->vm_count++;
+    AnmVm *vm = g_AnmManager->allocate_vm();
+    if (out != NULL)
+    {
+        *out = vm;
+    }
+    anm->copy_vm(vm, script);
+    vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+    if (layer >= 0)
+    {
+        vm->layer = layer;
+        if (layer <= 23)
+        {
+            vm->flags_hi &= ~ANM_VM_LAYER_UI;
+            vm->flags_hi |= ANM_VM_LAYER_SET;
+        }
+    }
+    vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    vm->rotation.z = 0.0f;
+    vm->run();
+    vm->mode_of_create_child = 0;
+    AnmId id;
+    id = g_AnmManager->insert_in_world_list_back(vm);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return id;
+}
+
+// AnmManager::interrupt_tree as LTCG inlined it into sub_426d70.
+static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
+{
+    AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+    if (vm == NULL)
+    {
+        return;
+    }
+    vm->interrupt(interrupt);
+    for (ZunList<AnmVm> *node = vm->list_of_children.next; node != NULL; node = node->next)
+    {
+        node->entry->interrupt(interrupt);
+    }
+}
+
+//// Sets the HUD up for a stage: the life and bomb counters, the spell VMs,
+// the stage logo, the demo and difficulty markers and the season gauge.
+// TODO: ours gets a /GS cookie for pos (see README) and realigns through ebx; the original realigns plainly.
+// FUNCTION: TH16 0x426d70
+void Gui::sub_426d70()
+{
+    Gui *gui = g_Gui;
+    if (gui->on_tick != NULL)
+    {
+        gui->on_tick->flags |= UPDATE_FUNC_ACTIVE;
+    }
+    if (gui->on_draw_1 != NULL)
+    {
+        gui->on_draw_1->flags |= UPDATE_FUNC_ACTIVE;
+    }
+    if (gui->on_draw_2 != NULL)
+    {
+        gui->on_draw_2->flags |= UPDATE_FUNC_ACTIVE;
+    }
+    if (gui->id_150.id == 0)
+    {
+        gui->id_150 = gui->front_anm->create_ui_vm_at_origin(0, 0);
+    }
+    if (gui->life_counter_vms[0] == NULL)
+    {
+        for (u32 i = 0; i < 8; i++)
+        {
+            gui->life_counter_ids[i] = gui->front_anm->create_ui_effect(i + 0x1e, 0, &gui->life_counter_vms[i]);
+        }
+        for (u32 i = 0; i < 8; i++)
+        {
+            gui->bomb_counter_ids[i] = gui->front_anm->create_ui_effect(i + 0x26, 0, &gui->bomb_counter_vms[i]);
+        }
+        for (i32 i = 0; i < 2; i++)
+        {
+            (&gui->id_4c)[i] = create_effect_inline(g_AsciiManager->ascii_anm, i + 2, -1, &(&gui->vm_94)[i]);
+            (&gui->vm_94)[i]->clear_flag_lo_2_tree_inline();
+            (&gui->vm_94)[i]->flags_hi &= ~ANM_VM_LAYER_KIND_MASK;
+        }
+    }
+    gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
+    gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
+    if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & 1) && g_Globals.game_mode != 2)
+    {
+        create_effect_inline(gui->stage_logo_anm, 1, -1, NULL);
+    }
+    if (g_Globals.flags_hi_45c & 1)
+    {
+        create_effect_inline(gui->front_anm, 0x77, -1, NULL);
+    }
+    if (gui->id_9c.id == 0)
+    {
+        gui->id_9c = create_effect_inline(gui->front_anm, 0x70, -1, NULL);
+    }
+    if (g_Globals.stage_num == 1 && g_GameThread->replay_mode == 0 && g_Globals.continues_used == 0)
+    {
+        AnmId id = create_effect_inline(gui->front_anm, 0x45, -1, NULL);
+        Float3 pos(0.0f, g_Globals.character == 3 ? 148 : 128, 0.0f);
+        AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+        if (vm != NULL)
+        {
+            vm->entity_pos = pos;
+        }
+    }
+    if (g_Supervisor.unk_700 != 0)
+    {
+        gui->id_104 = create_effect_inline(gui->front_anm, g_Globals.difficulty + 0x51, -1, NULL);
+        AnmManager::interrupt_tree(gui->id_104, 3);
+    }
+    gui->difficulty_id = create_effect_inline(gui->front_anm, g_Globals.difficulty + 0x57, -1, NULL);
+    interrupt_tree_inline(gui->id_104, 3);
+    gui->boss_star_count = 0;
+    for (i32 i = 0; i < 3; i++)
+    {
+        gui->boss_bars[i].unk_4c = 0;
+    }
+    if (g_Supervisor.unk_700 != 0)
+    {
+        gui->unk_118 = 0;
+        gui->season_gauge_id = create_effect_inline(gui->front_anm, 0x71, -1, NULL);
+        AnmManager *anm = g_AnmManager;
+        AnmVm *vm = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, 0x75));
+        if (vm != NULL)
+        {
+            anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, g_Globals.subseason + 0x52);
+        }
+    }
+    update_season_gauge();
+    if (gui->id_110.id != 0)
+    {
+        AnmManager::interrupt_tree(gui->id_110, 1);
+        gui->id_110.id = 0;
+    }
+}
+
 // TODO: the original realigns the frame (and esp, -8) and has 4 more bytes of it.
 // FUNCTION: TH16 0x426780
 void Gui::create_vm_110()
 {
     Gui *gui = g_Gui;
     gui->id_110 = gui->front_anm->create_vm_inline(0x3c, NULL, 0.0f, -1);
+}
+
+// EnemyManager::get_boss as LTCG inlined it into Gui::on_tick_body: the
+// boss with that index, NULL without one (and, like get_boss, the last
+// enemy of the list if the id is not found).
+static __forceinline EnemyInf *get_boss_inline(EnemyManager *enemies, i32 i)
+{
+    EnemyInf *e = NULL;
+    i32 id = enemies->inner.boss_ids[i];
+    if (!id)
+    {
+        return NULL;
+    }
+    for (EnemyList *node = enemies->active_enemy_list_head; node != NULL; node = node->next)
+    {
+        e = node->entry;
+        if (e->enemy_id == id)
+        {
+            return e;
+        }
+    }
+    return e;
+}
+
+// Deletes the seven VMs of a boss life bar.
+static __forceinline void delete_boss_bar_vms(GuiBossBar *bar)
+{
+    if (bar->unk_4c)
+    {
+        AnmManager *anm = g_AnmManager;
+        for (i32 j = 0; j < 7; j++)
+        {
+            anm->delete_vm_inline(bar->ids[j]);
+            bar->ids[j].id = 0;
+        }
+        bar->unk_4c = 0;
+    }
+}
+
+// The HUD's frame: notices and their count-down, the season gauge moving
+// out of the player's way, the boss's spell card counter, life bars and
+// stars, the dialogue, the boss marker at the bottom and the subseason
+// gauge.
+// TODO: written for behaviour; register allocation and block order are not matched yet.
+// FUNCTION: TH16 0x427cf0
+i32 Gui::on_tick_body()
+{
+    if (flags_1ac & 0x100)
+    {
+        timer_1b0.tick_in_place();
+    }
+    if (flags_1ac & 0x1800)
+    {
+        timer_1b0.tick();
+        if ((flags_1ac & 0x1800) == 0x800 && timer_1b0.current >= 90)
+        {
+            if (unk_134 > 0.0f)
+            {
+                if (timer_1b0.current % 4 == 0)
+                {
+                    g_SoundManager.play_sound_centered(0x27, 0);
+                }
+                unk_134 -= 1.0f;
+                unk_140 += unk_144;
+            }
+            else
+            {
+                if (timer_1b0.current != 90)
+                {
+                    g_SoundManager.play_sound_centered(0x2f, 0);
+                }
+                unk_134 = unk_138;
+                unk_140 = unk_13c;
+                unk_144 = 0;
+                flags_1ac = flags_1ac & ~0x800 | 0x1000;
+            }
+        }
+        if (timer_1b0.current >= unk_1c4)
+        {
+            sub_42c4f0();
+            flags_1ac &= ~0x1800;
+        }
+    }
+    if (unk_14c != 0 && g_AnmManager->get_vm_with_id(ids_11c[3]) == NULL)
+    {
+        ids_11c[3].id = 0;
+        unk_14c = 0;
+    }
+    Player *player = g_Player;
+    if (!(flags_1ac & 1))
+    {
+        if (player != NULL && player->inner.pos.y > 400.0f && -64.0f > player->inner.pos.x)
+        {
+            AnmManager::interrupt_tree(season_gauge_id, 5);
+            flags_1ac |= 1;
+        }
+    }
+    else if (player != NULL && (384.0f > player->inner.pos.y || player->inner.pos.x > -64.0f))
+    {
+        AnmManager::interrupt_tree(season_gauge_id, 4);
+        flags_1ac &= ~1;
+    }
+
+    // The boss's spell card counter.
+    EnemyManager *enemies = g_EnemyManager;
+    if (enemies != NULL && unk_1d0 >= 0 && enemies->get_boss(0) != NULL && !enemies->inner.boss_bit && msg == NULL &&
+        !(*(u32 *)&g_GameThread->flags & 0x10000))
+    {
+        vm_94->set_flag_lo_2_tree();
+        vm_98->set_flag_lo_2_tree();
+        u32 shown = flags_1ac & 0x600;
+        if (shown == 0)
+        {
+            if ((!(g_Spellcard->flags & 0x100) && 128.0f > g_Player->inner.pos.y) ||
+                ((g_Spellcard->flags & 0x100) && g_Player->inner.pos.y > 320.0f))
+            {
+                flags_1ac = flags_1ac & ~0x400 | 0x200;
+                anm_vm_interrupt_5(vm_94);
+                anm_vm_interrupt_5(vm_98);
+            }
+        }
+        else if (shown == 0x200)
+        {
+            if ((!(g_Spellcard->flags & 0x100) && 160.0f > g_Player->inner.pos.y) ||
+                ((g_Spellcard->flags & 0x100) && g_Player->inner.pos.y > 288.0f))
+            {
+                anm_vm_interrupt_4(vm_94);
+                anm_vm_interrupt_4(vm_98);
+                flags_1ac &= ~0x600;
+            }
+        }
+        else
+        {
+            if (g_Spellcard->flags & 1)
+            {
+                anm_vm_interrupt_2_run(vm_94);
+                anm_vm_interrupt_2_run(vm_98);
+            }
+            else
+            {
+                anm_vm_interrupt_3_run(vm_94);
+                anm_vm_interrupt_3_run(vm_98);
+            }
+            anm_vm_interrupt_4_run(vm_94);
+            anm_vm_interrupt_4_run(vm_98);
+            flags_1ac &= ~0x600;
+        }
+        if (unk_1d0 < unk_1d8)
+        {
+            if (unk_1d0 < 2)
+            {
+                vm_94->interrupt_out_of_line(9);
+                vm_98->interrupt_out_of_line(9);
+                g_SoundManager.play_sound_centered(0xc, 0);
+            }
+            else if (unk_1d0 < 5)
+            {
+                vm_94->interrupt_out_of_line(8);
+                vm_98->interrupt_out_of_line(8);
+                g_SoundManager.play_sound_centered(0xb, 0);
+            }
+        }
+        else if (unk_1d0 > unk_1d8)
+        {
+            vm_94->interrupt_out_of_line(7);
+            vm_98->interrupt_out_of_line(7);
+        }
+        if (unk_1d0 != unk_1d8)
+        {
+            vm_94->set_sprite(unk_1d0 / 10 + 0xef);
+            vm_98->set_sprite(unk_1d0 % 10 + 0xef);
+        }
+        unk_1d8 = unk_1d0;
+    }
+    else
+    {
+        vm_94->clear_flag_lo_2_tree_inline();
+        vm_98->clear_flag_lo_2_tree_inline();
+        flags_1ac = flags_1ac & ~0x200 | 0x400;
+    }
+
+    // The life bars of the two bosses.
+    if (g_EnemyManager != NULL && !g_EnemyManager->inner.boss_bit)
+    {
+        for (i32 i = 0; i < 2; i++)
+        {
+            GuiBossBar *bar = &boss_bars[i];
+            EnemyInf *boss = get_boss_inline(g_EnemyManager, i);
+            if (boss == NULL)
+            {
+                bar->shown = 0.0f;
+                bar->life_markers[0].position = 0.0f;
+                bar->life_markers[1].position = 0.0f;
+                bar->life_markers[2].position = 0.0f;
+                bar->life_markers[3].position = 0.0f;
+                delete_boss_bar_vms(bar);
+                if (i == 0)
+                {
+                    g_AnmManager->delete_vm(boss_id_d8);
+                    boss_id_d8.id = 0;
+                }
+                continue;
+            }
+            if (boss->enemy.life.current >= 100000 || (boss->enemy.flags_low & 0x31) ||
+                boss->enemy.set_invuln.current > 0 || msg != NULL)
+            {
+                delete_boss_bar_vms(bar);
+                continue;
+            }
+            bar->life = boss->enemy.life.current;
+            f32 fill = (f32)boss->enemy.life.current / (f32)boss->enemy.life.maximum;
+            bar->fill = fill;
+            if (fill > bar->shown)
+            {
+                bar->shown += 0.025f;
+            }
+            if (bar->shown > fill)
+            {
+                bar->shown = fill;
+            }
+            if (bar->unk_4c == 0)
+            {
+                bar->ids[0] = front_anm->create_effect(0xf4, -1, NULL);
+                bar->ids[1] = front_anm->create_effect(0xf5, -1, NULL);
+                bar->ids[2] = front_anm->create_effect(0xf6, -1, NULL);
+                bar->ids[3] = front_anm->create_effect(0xf7, -1, NULL);
+                bar->ids[4] = front_anm->create_effect(0xf7, -1, NULL);
+                bar->ids[5] = front_anm->create_effect(0xf7, -1, NULL);
+                bar->ids[6] = front_anm->create_effect(0xf7, -1, NULL);
+                bar->unk_4c = 1;
+            }
+            show_boss_marker();
+            AnmVm *vm = get_vm_or_clear(bar->ids[0]);
+            vm->rotation.x = bar->shown * -ZUN_2PI;
+            vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
+            // Separate floats: a Float3 local gets a /GS cookie in our
+            // build (see README).
+            f32 pos_x = boss->enemy.final_pos.pos.x * 2.0f;
+            f32 pos_y = boss->enemy.final_pos.pos.y * 2.0f;
+            f32 pos_z = boss->enemy.final_pos.pos.z;
+            vm->entity_pos.x = pos_x;
+            vm->entity_pos.y = pos_y;
+            vm->entity_pos.z = pos_z;
+            vm = get_vm_or_clear(bar->ids[1]);
+            vm->entity_pos.x = pos_x;
+            vm->entity_pos.y = pos_y;
+            vm->entity_pos.z = pos_z;
+            vm = get_vm_or_clear(bar->ids[2]);
+            vm->entity_pos.x = pos_x;
+            vm->entity_pos.y = pos_y;
+            vm->entity_pos.z = pos_z;
+            f32 marker_z = 0.0f;
+            for (i32 j = 0; j < 4; j++)
+            {
+                AnmVm *marker = get_vm_or_clear(bar->ids[3 + j]);
+                if (bar->life_markers[j].position != 0.0f && bar->life_markers[j].position < bar->shown)
+                {
+                    marker->set_flag_lo_2_tree_inline();
+                    f32 angle = normalize_angle(-ZUN_PI - bar->life_markers[j].position * ZUN_2PI);
+                    marker->flags_lo |= ANM_VM_ROTATION_CHANGED;
+                    marker->rotation.z = angle;
+                    f32 s = zun_sinf(angle);
+                    f32 c = zun_cosf(angle);
+                    marker_z += pos_z;
+                    marker->entity_pos.x = c * 0.0f - s * 112.0f + pos_x;
+                    marker->entity_pos.y = c * 112.0f + s * 0.0f + pos_y;
+                    marker->entity_pos.z = marker_z;
+                }
+                else
+                {
+                    marker->clear_flag_lo_2_tree_inline();
+                }
+            }
+            if (bar->unk_50 != 0)
+            {
+                EnemyInf *b = g_EnemyManager->get_boss(i);
+                f32 dx = b->enemy.final_pos.pos.x - g_Player->inner.pos.x;
+                f32 dy = b->enemy.final_pos.pos.y - g_Player->inner.pos.y;
+                if (dx * dx + dy * dy >= 9216.0f)
+                {
+                    for (i32 j = 0; j < 7; j++)
+                    {
+                        AnmManager::interrupt_tree(bar->ids[j], 2);
+                    }
+                    bar->unk_50 = 0;
+                }
+            }
+            else
+            {
+                EnemyInf *b = g_EnemyManager->get_boss(i);
+                f32 dy = b->enemy.final_pos.pos.y - g_Player->inner.pos.y;
+                f32 dx = b->enemy.final_pos.pos.x - g_Player->inner.pos.x;
+                if (6400.0f > dx * dx + dy * dy)
+                {
+                    for (i32 j = 0; j < 7; j++)
+                    {
+                        AnmManager::interrupt_tree(bar->ids[j], 3);
+                    }
+                    bar->unk_50 = 1;
+                }
+            }
+        }
+    }
+
+    // The boss's remaining spell card stars (boss_star_ids runs into
+    // id_100).
+    AnmId *stars = boss_star_ids;
+    for (u32 i = 0; i < 10; i++)
+    {
+        if ((i32)i < boss_star_count)
+        {
+            if (stars[i].id == 0)
+            {
+                stars[i] = front_anm->create_effect(i + 0x46, -1, NULL);
+            }
+        }
+        else if (stars[i].id != 0)
+        {
+            AnmManager::interrupt_tree(stars[i], 1);
+            stars[i].id = 0;
+        }
+    }
+
+    if (msg != NULL)
+    {
+        if (msg->run() != 0)
+        {
+            delete msg;
+            msg = NULL;
+        }
+        else
+        {
+            msg->timer_4.tick_in_place();
+        }
+    }
+
+    // The boss's position marker at the bottom of the screen, fading out
+    // near the player.
+    if (g_EnemyManager != NULL)
+    {
+        EnemyInf *boss = get_boss_inline(g_EnemyManager, 0);
+        if (boss != NULL && !((boss->enemy.flags_low >> 5) & 1) && !(boss->enemy.flags_low & 1))
+        {
+            AnmVm *vm = get_vm_or_clear(id_9c);
+            vm->set_flag_lo_2_tree_inline();
+            u32 level = flags_1ac & 6;
+            if (g_Spellcard->flags & 1)
+            {
+                if (level == 0)
+                {
+                    if (boss->enemy.life.remaining_for_cur_attack < 2000)
+                    {
+                        vm->interrupt_out_of_line(7);
+                        flags_1ac = flags_1ac & ~4 | 2;
+                    }
+                }
+                else if (level == 2)
+                {
+                    if (boss->enemy.life.remaining_for_cur_attack < 1000)
+                    {
+                        vm->interrupt_out_of_line(8);
+                        flags_1ac = flags_1ac & ~2 | 4;
+                    }
+                }
+                else if (level == 4)
+                {
+                    if (boss->enemy.life.remaining_for_cur_attack < 400)
+                    {
+                        vm->interrupt_out_of_line(9);
+                        flags_1ac |= 6;
+                    }
+                }
+                else if (level == 6)
+                {
+                    if (boss->enemy.life.remaining_for_cur_attack > 400)
+                    {
+                        vm->interrupt_out_of_line(10);
+                        flags_1ac &= ~6;
+                    }
+                }
+            }
+            else if (level == 0)
+            {
+                if (boss->enemy.life.remaining_for_cur_attack < 700)
+                {
+                    vm->interrupt_out_of_line(7);
+                    flags_1ac = flags_1ac & ~4 | 2;
+                }
+            }
+            else if (level == 2)
+            {
+                if (boss->enemy.life.remaining_for_cur_attack < 400)
+                {
+                    vm->interrupt_out_of_line(8);
+                    flags_1ac = flags_1ac & ~2 | 4;
+                }
+            }
+            else if (level == 4)
+            {
+                if (boss->enemy.life.remaining_for_cur_attack < 200)
+                {
+                    vm->interrupt_out_of_line(9);
+                    flags_1ac |= 6;
+                }
+            }
+            else if (level == 6)
+            {
+                if (boss->enemy.life.remaining_for_cur_attack > 200)
+                {
+                    vm->interrupt_out_of_line(10);
+                    flags_1ac &= ~6;
+                }
+            }
+            vm->entity_pos.y = 960.0f;
+            vm->entity_pos.x = (boss->enemy.final_pos.pos.x + 32.0f + 192.0f) * 2.0f;
+            // The original calls zun_fabsf here; that call makes LTCG stop
+            // inlining fabs into zun_fabsf (0x405240) in our build.
+            f32 distance = fabsf(boss->enemy.final_pos.pos.x - g_Player->inner.pos.x);
+            if (distance >= 64.0f)
+            {
+                vm->color_1.a = 0xff;
+            }
+            else
+            {
+                vm->color_1.a = (i32)(distance * 191.0f * (1.0f / 64.0f)) + 0x40;
+            }
+            if (-192.0f > boss->enemy.final_pos.pos.x || boss->enemy.final_pos.pos.x > 192.0f)
+            {
+                vm->color_1.a = 0;
+            }
+        }
+        else
+        {
+            AnmVm *vm = g_AnmManager->get_vm_with_id(id_9c);
+            if (vm != NULL)
+            {
+                vm->clear_flag_lo_2_tree_inline();
+            }
+        }
+    }
+
+    // The subseason gauge lights up while a release is possible.
+    if (g_SubseasonBomb != NULL && g_SubseasonBomb->can_activate())
+    {
+        if (unk_118 == 0)
+        {
+            AnmManager::interrupt_tree_and_run(find_child_id_of(g_AnmManager, season_gauge_id, 0x76), 2);
+        }
+        unk_118 = 1;
+    }
+    else
+    {
+        if (unk_118 == 1)
+        {
+            AnmManager::interrupt_tree_and_run(find_child_id_of(g_AnmManager, season_gauge_id, 0x76), 3);
+        }
+        unk_118 = 0;
+    }
+    time_in_stage.tick();
+    return 1;
+}
+
+// The original formats the percentage inline. The double argument makes
+// LTCG realign on_draw_2_body early enough to pad the frame of
+// AsciiInf::create_number (0x4082b0) in our build; kept out of line until
+// that is understood.
+static DECOMP_NOINLINE void draw_percentage(Float3 *pos, f32 percentage)
+{
+    g_AsciiManager->create_stringf(pos, "%3.1f%%", (double)percentage);
+}
+
+// The HUD's text: the stage clear bonus, the spell card bonus count-down,
+// the spell card timers, the score, hiscore, next extend, bombs, power,
+// PIV and graze, the boss's spell counter and the season level.
+// TODO: written for behaviour; the original aligns its frame to 64 bytes, and register allocation and the text-setting store order are not matched yet.
+// FUNCTION: TH16 0x428e70
+i32 Gui::on_draw_2_body()
+{
+    Float3 pos;
+    AsciiInf *ascii;
+    if (g_AnmManager->get_vm_with_id(ids_11c[1]) == NULL)
+    {
+        ids_11c[1].id = 0;
+    }
+    else
+    {
+        pos = Float3(224.0f, 200.0f, 0.0f);
+        AnmVm *vm = get_vm_or_clear(ids_11c[1]);
+        ascii = g_AsciiManager;
+        ascii->color.a = vm->color_1.a;
+        ascii->group = 2;
+        ascii->font_id = 4;
+        ascii->align_h = 0;
+        ascii->align_v = 0;
+        ascii->create_number(&pos, stage_clear_bonus);
+        ascii = g_AsciiManager;
+        ascii->color.a = 0xff;
+        ascii->font_id = 0;
+        ascii->group = 0;
+        ascii->align_h = 1;
+        ascii->align_v = 1;
+    }
+    if (g_AnmManager->get_vm_with_id(ids_11c[4]) == NULL)
+    {
+        ids_11c[4].id = 0;
+    }
+    else
+    {
+        AnmVm *vm = g_AnmManager->get_vm_with_id(ids_11c[4]);
+        if (vm != NULL && (vm->flags_lo >> 1) & 1)
+        {
+            pos = Float3(300.0f, 226.0f, 0.0f);
+            vm = get_vm_or_clear(ids_11c[4]);
+            ascii = g_AsciiManager;
+            ascii->color.a = vm->color_1.a;
+            ascii->group = 2;
+            ascii->font_id = 2;
+            ascii->align_h = 2;
+            ascii->align_v = 0;
+            ascii->create_stringf(&pos, "%d", unk_130);
+            pos.x = 308.0f;
+            pos.y = 246.0f;
+            draw_percentage(&pos, unk_134);
+            pos.x = 300.0f;
+            pos.y = 266.0f;
+            g_AsciiManager->create_stringf(&pos, "%3d", unk_148);
+            pos.y = 286.0f;
+            g_AsciiManager->create_stringf(&pos, "%6d", unk_140);
+            pos.y = 296.0f;
+            ascii = g_AsciiManager;
+            ascii->color.d3d = 0xff8080ff;
+            ascii->create_stringf(&pos, "  +%d", unk_140 / 50000 * 10);
+            ascii = g_AsciiManager;
+            ascii->color.a = 0xff;
+            ascii->font_id = 0;
+            ascii->group = 0;
+            ascii->align_h = 1;
+            ascii->align_v = 1;
+            ascii->color.d3d = 0xffffffff;
+        }
+    }
+    ascii = g_AsciiManager;
+    if (unk_14c != 0)
+    {
+        pos = Float3(224.0f, 144.0f, 0.0f);
+        AnmVm *vm = g_AnmManager->get_vm_with_id(ids_11c[3]);
+        if (vm == NULL)
+        {
+            ids_11c[3].id = 0;
+        }
+        if (g_Spellcard == NULL)
+        {
+            unk_14c = 0;
+            g_AnmManager->delete_vm(ids_11c[3]);
+            ids_11c[3].id = 0;
+        }
+        else if (vm == NULL)
+        {
+            unk_14c = 0;
+        }
+        else
+        {
+            ascii->color.a = vm->color_1.a;
+            ascii->group = 2;
+            ascii->font_id = 4;
+            i32 seconds = g_Spellcard->unk_90 / 60;
+            ascii->create_stringf(&pos, "%3d.", seconds >= 1000 ? 999 : seconds);
+            pos.x = 268.0f;
+            pos.y = 150.0f;
+            ascii = g_AsciiManager;
+            ascii->scale.x = 0.6f;
+            ascii->scale.y = 0.6f;
+            i32 frames = g_Spellcard->unk_90;
+            ascii->create_stringf(&pos, "%.2ds", frames % 60 * 100 / 60);
+            ascii = g_AsciiManager;
+            pos.x = 224.0f;
+            pos.y = 160.0f;
+            ascii->color.d3d = 0xff808080;
+            ascii->color.a = vm->color_1.a;
+            ascii->scale.x = 1.0f;
+            ascii->scale.y = 1.0f;
+            i32 time_seconds;
+            i32 time_hundredths;
+            g_Spellcard->decode_time_code(&time_seconds, &time_hundredths);
+            ascii->create_stringf(&pos, "%3d.", time_seconds);
+            ascii = g_AsciiManager;
+            pos.x = 268.0f;
+            pos.y = 166.0f;
+            ascii->scale.x = 0.6f;
+            ascii->scale.y = 0.6f;
+            ascii->create_stringf(&pos, "%.2ds", time_hundredths);
+            ascii = g_AsciiManager;
+            ascii->color.a = 0xff;
+            ascii->scale.x = 1.0f;
+            ascii->scale.y = 1.0f;
+            ascii->font_id = 0;
+            ascii->group = 0;
+            ascii->color.d3d = 0xffffffff;
+        }
+    }
+
+    // Hiscore and score.
+    ascii->color.d3d = 0xff808080;
+    ascii->font_id = 4;
+    pos = Float3(620.0f, 42.0f, 0.0f);
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->align_h = 2;
+    ascii->align_v = 1;
+    ascii->create_number_with_digit(&pos, g_Globals.hiscore, g_Globals.hiscore_continues);
+    ascii = g_AsciiManager;
+    pos.y = 64.0f;
+    ascii->color.d3d = 0xffffffff;
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->create_number_with_digit(&pos, current_score, g_Globals.continues_used);
+
+    // The next extend.
+    ascii = g_AsciiManager;
+    ascii->align_h = 1;
+    ascii->align_v = 1;
+    ascii->color.d3d = 0xff80c0f0;
+    ascii->align_h = 2;
+    ascii->align_v = 1;
+    pos = Float3(618.0f, 118.0f, 0.0f);
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->scale.x = 0.6f;
+    ascii->scale.y = 0.6f;
+    if ((u32)get_score_extend_quota() < 900000000)
+    {
+        g_AsciiManager->create_number(&pos, get_score_extend_quota() * 10);
+    }
+
+    // Bomb fragments.
+    ascii = g_AsciiManager;
+    ascii->color.d3d = 0xffffffff;
+    ascii->align_h = 1;
+    ascii->align_v = 1;
+    pos = Float3(576.0f, 158.0f, 0.0f);
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->scale.x = 0.6f;
+    ascii->scale.y = 0.6f;
+    ascii->create_stringf(&pos, "%3d", g_Globals.bomb_fragments);
+    pos.x = 597.0f;
+    g_AsciiManager->create_stringf(&pos, "/%d", 5);
+
+    // Power.
+    ascii = g_AsciiManager;
+    pos = Float3(540.0f, 182.0f, 0.0f);
+    ascii->color.d3d = 0xffff8030;
+    ascii->scale.x = 1.0f;
+    ascii->scale.y = 1.0f;
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->create_stringf(&pos, "%d.", g_Globals.power / g_Globals.power_per_level);
+    ascii = g_AsciiManager;
+    pos.x = 560.0f;
+    pos.y += 7.0f;
+    ascii->scale.x = 0.6f;
+    ascii->scale.y = 0.6f;
+    ascii->create_stringf(&pos, "%.2d", g_Globals.power % g_Globals.power_per_level * 100 / g_Globals.power_per_level);
+    ascii = g_AsciiManager;
+    pos.x = 574.0f;
+    pos.y -= 7.0f;
+    ascii->scale.x = 1.0f;
+    ascii->scale.y = 1.0f;
+    ascii->create_stringf(&pos, "/%d.", g_Globals.max_power / g_Globals.power_per_level);
+    ascii = g_AsciiManager;
+    pos.x = 606.0f;
+    pos.y += 7.0f;
+    ascii->scale.x = 0.6f;
+    ascii->scale.y = 0.6f;
+    ascii->create_stringf(&pos, "00");
+
+    // PIV and graze.
+    ascii = g_AsciiManager;
+    ascii->color.d3d = 0xff40c0ff;
+    ascii->scale.x = 1.0f;
+    ascii->scale.y = 1.0f;
+    ascii->align_h = 2;
+    ascii->align_v = 1;
+    pos = Float3(620.0f, 204.0f, 0.0f);
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    i32 piv = g_Globals.piv / 100;
+    ascii->create_number(&pos, piv - piv % 10);
+    ascii = g_AsciiManager;
+    ascii->color.d3d = 0xffffffff;
+    pos.y = 226.0f;
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->create_number(&pos, g_Globals.graze);
+    ascii = g_AsciiManager;
+    ascii->color.d3d = 0xffffffff;
+    ascii->align_h = 1;
+    ascii->align_v = 1;
+    ascii->scale.x = 1.0f;
+    ascii->scale.y = 1.0f;
+    ascii->color.a = 0xff;
+    ascii->font_id = 0;
+    ascii->group = 0;
+
+    // The boss's spell card counter next to vm_94.
+    if (g_EnemyManager != NULL && unk_1d0 >= 0 && g_EnemyManager->get_boss(0) != NULL &&
+        !g_EnemyManager->inner.boss_bit && msg == NULL && !(*(u32 *)&g_GameThread->flags & 0x10000))
+    {
+        AnmVm *vm = vm_94;
+        f32 x = vm->pos.x + 16.0f;
+        f32 y = vm->pos.y - 7.0f;
+        pos = Float3(x, y, 0.0f);
+        ascii->color = vm->color_1;
+        ascii->font_id = 4;
+        ascii->group = 2;
+        ascii->create_stringf(&pos, ".");
+        ascii = g_AsciiManager;
+        pos.x = x + 8.0f;
+        pos.y = y + 6.0f;
+        ascii->scale.x = 0.6f;
+        ascii->scale.y = 0.6f;
+        ascii->create_stringf(&pos, "%.2d", unk_1d4);
+        ascii = g_AsciiManager;
+        ascii->scale.x = 1.0f;
+        ascii->scale.y = 1.0f;
+        ascii->color.d3d = 0xffffffff;
+        ascii->group = 0;
+        ascii->font_id = 0;
+    }
+
+    // The season level.
+    D3DCOLOR level_colors[7] = {0x60606060, 0xa0b0b080, 0xb0b8b880, 0xc0c0c080, 0xd0d0d080, 0xe0e0e080, 0xffffff30};
+    pos = Float3(-132.0f, 446.0f, 0.0f);
+    ascii->color.d3d = level_colors[g_Globals.season_level()];
+    if (flags_1ac & 1)
+    {
+        ascii->color.a = 0x40;
+    }
+    ascii->group = 1;
+    ascii->font_id = 2;
+    ascii->align_h = 0;
+    ascii->align_v = 2;
+    ascii->create_number(&pos, g_Globals.season_level());
+    ascii = g_AsciiManager;
+    ascii->color.d3d = 0xffffffff;
+    ascii->color.a = 0xff;
+    ascii->font_id = 0;
+    ascii->group = 0;
+    ascii->align_h = 1;
+    ascii->align_v = 1;
+    return 1;
 }
