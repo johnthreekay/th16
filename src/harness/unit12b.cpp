@@ -54,9 +54,9 @@ i32 harness_collision(f32 *a, f32 *b, f32 angle, f32 r)
            collision_test_circle_rect(b[0], b[1], a[0], a[1], r, b[2], a[2], angle);
 }
 
-// Most callers of the out-of-line sinf/cosf (PosVel, the ANM code, ...)
-// do not align their stack frames, so the copies realign their own.
+// An unaligned caller of zun_atan2f, like most of its callers in the
+// original, so it realigns its own frame.
 f32 harness_sin_cos(f32 x)
 {
-    return zun_sinf(x) + zun_cosf(x) + zun_floorf(x) + zun_atan2f(x, x + 1.0f);
+    return zun_atan2f(x, x + 1.0f);
 }

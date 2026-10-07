@@ -78,14 +78,28 @@ static void __fastcall sincosmul(Float3 *dst, f32 angle, f32 radius)
 // code calls. Unit 1 had it as Float3::from_polar.
 void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius);
 
-// The UCRT's inline sinf and cosf as LTCG kept them out of line for some
-// callers (0x405510, 0x4054f0), taking and returning xmm0. A DECOMP_NOINLINE
-// redeclaration of sinf does not stop our build from inlining it, so the
-// callers that the original has calling these copies use these instead.
-HARNESS_CALLED f32 zun_sinf(f32 x);
-HARNESS_CALLED f32 zun_cosf(f32 x);
-// The same for floorf (0x405260) and atan2f (0x4052a0).
-HARNESS_CALLED f32 zun_floorf(f32 x);
+// Small inline helpers around the UCRT's inline sinf, cosf and floorf. The
+// functions at 0x405510, 0x4054f0 and 0x405260 are not ZUN's: they are
+// LTCG's out-of-line copies of the UCRT inlines (_sinf, _cosf, _floorf, see
+// CrtInline.cpp). In LTCG's call graph each helper is a node of its own,
+// which the double stack alignment pass reaches, so LTCG keeps the UCRT
+// body out of line there; the helper itself is then inlined into every
+// caller, which is left calling the copy, as in the original. A large
+// function that calls sinf directly inlines it and realigns its frame
+// instead (README).
+inline f32 zun_sinf(f32 x)
+{
+    return sinf(x);
+}
+inline f32 zun_cosf(f32 x)
+{
+    return cosf(x);
+}
+inline f32 zun_floorf(f32 x)
+{
+    return floorf(x);
+}
+// atan2f (0x4052a0) is still an out-of-line wrapper.
 // And fabsf (0x405240), which ECL and the HUD call.
 HARNESS_CALLED f32 zun_fabsf(f32 x);
 HARNESS_CALLED f32 zun_atan2f(f32 y, f32 x);

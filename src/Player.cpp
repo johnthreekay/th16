@@ -316,8 +316,10 @@ void Player::die()
     anm_file->copy_vm_and_run(&vm, 0);
 }
 
-// TODO: the original keeps a stack slot (push ecx) around the call instead
-// of tail-jumping to on_tick_body.
+// The push ecx/pop ecx around the call (rather than a tail jump) pads the
+// frame for 8-byte stack alignment: LTCG knows this callback is entered
+// aligned, because Player::initialize registers it and Player::create's
+// caller, GameThread::thread_start, realigns its frame.
 // FUNCTION: TH16 0x443720
 i32 __fastcall Player::on_tick_callback(Player *player)
 {
@@ -505,7 +507,7 @@ Player::~Player()
 }
 
 // FUNCTION: TH16 0x441c60
-Player *Player::create()
+HARNESS_CALLED Player *Player::create()
 {
     Player *player = new Player;
     if (player->initialize() != 0)
@@ -1437,7 +1439,7 @@ static __forceinline void stop_sound_inline(i32 id)
     g_SoundManager.queued_counts[i] = -1;
 }
 
-// TODO: functionally complete; frame and register allocation differ. Its body links Player::create's unrealigned EH state to PosVel::step, which costs zun_sinf/zun_cosf/zun_floorf their inlined math (README).
+// TODO: functionally complete; block order and register allocation differ.
 // FUNCTION: TH16 0x442560
 i32 Player::on_tick_body()
 {

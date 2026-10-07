@@ -81,6 +81,10 @@ void harness_w3d_player(i32 create)
 {
     if (create)
     {
+        // GameThread::thread_start realigns its frame (and esp, -8), which
+        // gives Player::create and the code it registers (on_tick_callback)
+        // known stack alignment; the double stands in for that.
+        volatile double d = create;
         Player::create();
     }
     else if (g_Player != NULL)

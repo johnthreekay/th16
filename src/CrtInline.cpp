@@ -3,6 +3,15 @@
 // object file uses it. They are annotated by linker symbol because their
 // definitions live in the SDK headers, not here.
 
+// LIBRARY: TH16 0x405260 SYMBOL
+// _floorf
+
+// LIBRARY: TH16 0x4054f0 SYMBOL
+// _cosf
+
+// LIBRARY: TH16 0x405510 SYMBOL
+// _sinf
+
 // LIBRARY: TH16 0x405530 SYMBOL
 // ___local_stdio_printf_options
 

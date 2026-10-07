@@ -988,14 +988,11 @@ void Stage::interrupt_vms(i32 n)
 }
 
 // The stage script (STD) and the camera rocking patterns. The rocking code
-// calls the out-of-line sinf and cosf (0x405510, 0x4054f0). Written as
-// zun_sinf/zun_cosf calls, the extra call sites make LTCG turn those two
-// into thunks to a separate out-of-line sinf/cosf, so it uses sinf/cosf,
-// which LTCG then keeps out of line here.
+// calls the out-of-line sinf and cosf (0x405510, 0x4054f0), which LTCG
+// keeps out of line here (this function has an EH frame).
 // TODO: the original realigns its frame (and esp, -8 with an ebx frame),
 // which moves every stack slot; its callees that realign (AnmVm::run) are
-// stubs here. Its sinf/cosf calls go to 0x405510/0x4054f0 rather than to
-// our separate out-of-line copies.
+// stubs here.
 // FUNCTION: TH16 0x40b3b0
 i32 StageInner::run_std()
 {

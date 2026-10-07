@@ -3,11 +3,8 @@
 #include "PosVel.h"
 #include "Supervisor.h"
 
-// LTCG inlines these CRT header functions at some call sites and not at
-// others; in this file the original calls them.
-DECOMP_NOINLINE float __CRTDECL floorf(float);
-DECOMP_NOINLINE float __CRTDECL sinf(float);
-DECOMP_NOINLINE float __CRTDECL cosf(float);
+// LTCG inlines this CRT header function at some call sites and not at
+// others; in this file the original calls it.
 DECOMP_NOINLINE float __CRTDECL atan2f(float, float);
 
 // FUNCTION: TH16 0x402ff0
