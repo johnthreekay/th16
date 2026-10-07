@@ -22,6 +22,8 @@
 extern u32 g_hardware_input_repeat;
 extern u32 g_hardware_input_pressed;
 i32 __stdcall input_pressed_or_repeating(u32 mask);
+extern i32 g_spell_practice_last_stage;
+extern i32 g_practice_last_stage;
 
 static_assert(offsetof(TitleInf, menu_5cec) == 0x5cec, "TitleInf::menu_5cec");
 static_assert(offsetof(TitleInf, spell_stage) == 0x5dc4, "TitleInf::spell_stage");
@@ -385,6 +387,125 @@ i32 TitleInf::do_manual()
         break;
     }
     return 0;
+}
+
+// Spell practice: picking the stage. Coming back from a game goes straight
+// on to the spell card list of the last stage.
+// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// FUNCTION: TH16 0x4553d0
+i32 TitleInf::do_spell_practice_stage_select()
+{
+    switch (substate)
+    {
+    case 0:
+        if (anm_id_73c.id == 0)
+        {
+            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+        }
+        menu.num_choices = 7;
+        if (get_vm_or_clear(anm_ids[0x11c]) == NULL)
+        {
+            anm_ids[0x11c] = title_anm->create_effect(0x11c, -1, NULL);
+        }
+        if (get_vm_or_clear(anm_ids[0xd7]) == NULL)
+        {
+            anm_ids[0xd7] = title_anm->create_effect(0xd7, -1, NULL);
+        }
+        set_substate(1);
+        if (g_spell_practice_last_stage >= 0)
+        {
+            menu.set_cursor(g_spell_practice_last_stage);
+            g_spell_practice_last_stage = -1;
+            menu_5cec.wraps = 1;
+            menu_5cec.num_choices = 4;
+            menu_5cec.set_cursor(g_Globals.character + g_Globals.subshot);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 3);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xd7], (i16)(menu.next_selection + 7));
+            AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 6);
+            AnmManager::interrupt_tree_and_run(anm_ids[0x11c], 3);
+            AnmManager::interrupt_tree(anm_ids[0x11c], (i16)(menu_5cec.next_selection + 7));
+            AnmManager::interrupt_tree(anm_ids[0x71], 1);
+            anm_ids[0x71].id = 0;
+            set_state(18);
+            spell_stage = menu.next_selection;
+            menu.push();
+            menu.set_cursor(0);
+            return 1;
+        }
+        anm_ids[0x71] = title_anm->create_effect(0x71, -1, NULL);
+    case 1:
+        if (time_in_state.current > 10)
+        {
+            set_substate(2);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 3);
+            AnmManager::interrupt_tree(anm_ids[0xd7], (i16)(menu.next_selection + 7));
+            AnmManager::interrupt_tree_and_run(anm_ids[0x11c], 3);
+            AnmManager::interrupt_tree(anm_ids[0x11c], (i16)(menu_5cec.next_selection + 7));
+            return 1;
+        }
+        break;
+    case 2:
+        menu.current_selection = menu.next_selection;
+        if (input_pressed_or_repeating(INPUT_UP))
+        {
+            menu.move_cursor(-1);
+        }
+        if (input_pressed_or_repeating(INPUT_DOWN))
+        {
+            menu.move_cursor(1);
+        }
+        if (menu.current_selection != menu.next_selection)
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 3);
+            AnmManager::interrupt_tree(anm_ids[0xd7], (i16)(menu.next_selection + 7));
+        }
+        do_spell_practice_character();
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            set_substate(4);
+            g_SoundManager.play_sound_centered(9, 0);
+            g_practice_last_stage = menu.next_selection;
+            return 1;
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            AnmManager::interrupt_tree(anm_ids[0xd7], 6);
+            set_substate(3);
+            g_SoundManager.play_sound_centered(7, 0);
+            g_practice_last_stage = menu.next_selection;
+            return 1;
+        }
+        break;
+    case 3:
+        if (time_in_state.current >= 20)
+        {
+            AnmManager::interrupt_tree(anm_ids[0x71], 1);
+            anm_ids[0x71].id = 0;
+            set_state(18);
+            spell_stage = menu.next_selection;
+            menu.push();
+            menu.set_cursor(0);
+            return 1;
+        }
+        break;
+    case 4:
+        if (time_in_state.current >= 6)
+        {
+            AnmManager::interrupt_tree(anm_ids[0x71], 1);
+            anm_ids[0x71].id = 0;
+            AnmManager::interrupt_tree(anm_ids[0xd7], 1);
+            anm_ids[0xd7].id = 0;
+            AnmManager::interrupt_tree(anm_ids[0x11c], 1);
+            anm_ids[0x11c].id = 0;
+            set_state(1);
+            menu.pop();
+            AnmManager::interrupt_tree(anm_id_73c, 1);
+            anm_id_73c.id = 0;
+        }
+        break;
+    }
+    return 1;
 }
 
 // Spell practice: picking the character, which reloads the spell list.
