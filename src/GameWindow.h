@@ -171,7 +171,13 @@ extern DECOMP_ALIGN16 GameWindow g_GameWindow;
 // pacing_mode and the pacing table (0x4d9d90), as code outside the window
 // methods addresses them. 16-byte aligned like g_GameWindow (0x20b0 is a
 // multiple of 16), so the compiler may use aligned SSE stores.
+#ifdef TH16_PORT
+// In the portable build GameWindow's pointer fields can be wider, so
+// pacing_mode is not necessarily 16-byte aligned: no alignment here.
+struct FramePacingTable
+#else
 struct DECOMP_ALIGN16 FramePacingTable
+#endif
 {
     i32 mode;
     struct
