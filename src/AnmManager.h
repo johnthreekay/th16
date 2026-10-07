@@ -447,8 +447,10 @@ struct AnmManager
     // VMs once all are done.
     static AnmLoaded *__stdcall load_next_entry(AnmLoaded *anm);
     // 0x46d3b0. Creates the texture, sprites and script table of one entry.
-    static i32 __stdcall setup_entry(AnmLoaded *anm, i32 index, i32 first_sprite, i32 first_script,
-                                     AnmRawEntry *entry);
+    // A member that ignores this, kept alive by load_next_entry rather than
+    // /INCLUDE so that it inherits load_next_entry's stack alignment.
+    HARNESS_CALLED i32 setup_entry(AnmLoaded *anm, i32 index, i32 first_sprite, i32 first_script,
+                                   AnmRawEntry *entry);
     // Texture creation for setup_entry. They return the bytes the texture
     // takes (0 for render targets), or a negative value on failure.
     // 0x46cd80. A render target ("@R" entries).
