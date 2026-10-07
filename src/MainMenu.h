@@ -35,7 +35,9 @@ class TitleInf : public TaskInf
     AnmId anm_ids_7d0[9];
     u8 unk_7f4[0x5a5c - 0x7f4];
     MenuHelper menu_5a5c;
-    u8 unk_5b34[0x5b50 - 0x5b34];
+    // The key config being edited: the button for each action.
+    i16 key_config[6];
+    u8 unk_5b40[0x5b50 - 0x5b40];
     ReplayManager *replays[100];
     // Allocated with malloc.
     void *unk_5ce0;
@@ -74,6 +76,12 @@ class TitleInf : public TaskInf
     void interrupt_child_and_run(i32 index, i32 script, i32 interrupt);
     // The id of the first descendant of anm_ids[index] running the script.
     AnmId find_child_id(i32 index, i32 script);
+
+    // 0x44ec60. Shows the key config's buttons.
+    void update_key_config_sprites();
+    // 0x44f710. Binds a button to an action, giving the action's old
+    // button to whichever other action had the new one.
+    void set_key(i32 action, i32 key);
 
     i32 on_tick();
     i32 on_draw();

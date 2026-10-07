@@ -9,6 +9,7 @@
 #include "LoadingThread.h"
 #include "ReplayManager.h"
 #include "Scorefile.h"
+#include "SoundManager.h"
 #include "Supervisor.h"
 
 static_assert(offsetof(TitleInf, state) == 0x18, "TitleInf::state");
@@ -233,6 +234,25 @@ i32 __fastcall TitleInf::on_tick_thunk(void *arg)
 i32 __fastcall TitleInf::on_draw_thunk(void *arg)
 {
     return ((TitleInf *)arg)->on_draw();
+}
+
+// FUNCTION: TH16 0x44f710
+void TitleInf::set_key(i32 action, i32 key)
+{
+    if (key_config[action] == key)
+    {
+        return;
+    }
+    for (i32 i = 0; i < 6; i++)
+    {
+        if (i != action && key_config[i] == key)
+        {
+            key_config[i] = key_config[action];
+        }
+    }
+    key_config[action] = key;
+    update_key_config_sprites();
+    g_SoundManager.play_sound_centered(7, 0);
 }
 
 // FUNCTION: TH16 0x44a800
