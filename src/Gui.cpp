@@ -30,8 +30,6 @@ Gui *g_Gui;
 // GLOBAL: TH16 0x4a6dd0
 MsgFile *g_msg_file_cache;
 
-// TODO: inlined delete_vm loads the child list before storing the flags,
-// and the loop does not reuse this's register for the id pointer.
 // FUNCTION: TH16 0x4264a0
 GuiMsgVm::~GuiMsgVm()
 {
@@ -42,18 +40,12 @@ GuiMsgVm::~GuiMsgVm()
         anm->delete_vm_inline(enemy_faces[i]);
         enemy_faces[i].id = 0;
     }
-    anm->delete_vm_inline(id_54);
-    id_54.id = 0;
-    anm->delete_vm_inline(text_line_1);
-    text_line_1.id = 0;
-    anm->delete_vm_inline(text_line_2);
-    text_line_2.id = 0;
-    anm->delete_vm_inline(furigana_1);
-    furigana_1.id = 0;
-    anm->delete_vm_inline(furigana_2);
-    furigana_2.id = 0;
-    anm->delete_vm_inline(intro);
-    intro.id = 0;
+    delete_vm_inline_and_clear(id_54);
+    delete_vm_inline_and_clear(text_line_1);
+    delete_vm_inline_and_clear(text_line_2);
+    delete_vm_inline_and_clear(furigana_1);
+    delete_vm_inline_and_clear(furigana_2);
+    delete_vm_inline_and_clear(intro);
     anm->delete_vm_inline(textbox);
     textbox.id = 0;
 }
@@ -226,8 +218,6 @@ HARNESS_CALLED void Gui::release_msg()
     }
 }
 
-// TODO: inlined delete_vm loads the child list before storing the flags,
-// and some id clears are scheduled after the next push.
 // FUNCTION: TH16 0x427a20
 Gui::~Gui()
 {
@@ -244,10 +234,8 @@ Gui::~Gui()
         anm->delete_vm_inline(ids_a0[i]);
         ids_a0[i].id = 0;
     }
-    anm->delete_vm_inline(id_4c);
-    id_4c.id = 0;
-    anm->delete_vm_inline(id_50);
-    id_50.id = 0;
+    delete_vm_inline_and_clear(id_4c);
+    delete_vm_inline_and_clear(id_50);
     g_AnmManager->disable_vms_from_anm_file(front_anm);
     g_Gui = NULL;
 }
