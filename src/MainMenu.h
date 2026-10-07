@@ -82,6 +82,10 @@ class TitleInf : public TaskInf
     // 0x44f710. Binds a button to an action, giving the action's old
     // button to whichever other action had the new one.
     void set_key(i32 action, i32 key);
+    // 0x44f810. Moves the key config's highlight to the selected row.
+    void update_key_config_cursor();
+    // 0x44e930 (ExpHP: MainMenu::do_key_config). The key config screen.
+    i32 do_key_config();
 
     i32 on_tick();
     i32 on_draw();

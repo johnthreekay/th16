@@ -7,3 +7,8 @@
 void TitleInf::update_key_config_sprites()
 {
 }
+
+// STUB: TH16 0x44f810
+void TitleInf::update_key_config_cursor()
+{
+}

@@ -6,6 +6,7 @@
 #include "MainMenu.h"
 
 #include "GameErrorContext.h"
+#include "Input.h"
 #include "LoadingThread.h"
 #include "ReplayManager.h"
 #include "Scorefile.h"
@@ -234,6 +235,121 @@ i32 __fastcall TitleInf::on_tick_thunk(void *arg)
 i32 __fastcall TitleInf::on_draw_thunk(void *arg)
 {
     return ((TitleInf *)arg)->on_draw();
+}
+
+extern u32 g_hardware_input_repeat;
+extern u32 g_hardware_input_pressed;
+i32 __stdcall input_pressed_or_repeating(u32 mask);
+
+// TODO: the original realigns its frame to 8 bytes, and does not merge the two input tests into (pressed | repeat) & mask.
+// FUNCTION: TH16 0x44e930
+i32 TitleInf::do_key_config()
+{
+    switch (substate)
+    {
+    case 0:
+        menu.num_choices = 7;
+        menu.set_cursor(0);
+        anm_ids[2] = title_anm->create_effect(2, -1, NULL);
+        set_substate(1);
+        key_config[0] = g_pad_mapping[0];
+        key_config[1] = g_pad_mapping[1];
+        key_config[2] = g_pad_mapping[9];
+        key_config[3] = g_pad_mapping[2];
+        key_config[4] = g_pad_mapping[3];
+        update_key_config_sprites();
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            AnmManager::interrupt_tree_and_run(anm_ids[2], 3);
+            AnmManager::interrupt_tree(anm_ids[2], (i16)(menu.next_selection + 0x11));
+            update_key_config_cursor();
+            return 1;
+        }
+        break;
+    case 2:
+    {
+        menu.current_selection = menu.next_selection;
+        if (input_pressed_or_repeating(INPUT_UP))
+        {
+            menu.move_cursor(-1);
+        }
+        if (input_pressed_or_repeating(INPUT_DOWN))
+        {
+            menu.move_cursor(1);
+        }
+        if (menu.current_selection != menu.next_selection)
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            AnmManager::interrupt_tree_and_run(anm_ids[2], 3);
+            AnmManager::interrupt_tree(anm_ids[2], (i16)(menu.next_selection + 7));
+            update_key_config_cursor();
+        }
+        u8 *pad = get_controller_state();
+        for (i32 i = 0; i < 0x1f; i++)
+        {
+            if ((i8)pad[i] < 0)
+            {
+                if (menu.next_selection <= 4)
+                {
+                    set_key(menu.next_selection, i);
+                }
+                break;
+            }
+        }
+        if ((g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB)) && menu.next_selection == 6)
+        {
+            key_config[0] = g_pad_mapping[0];
+            key_config[1] = g_pad_mapping[1];
+            key_config[2] = g_pad_mapping[9];
+            key_config[3] = g_pad_mapping[2];
+            key_config[4] = g_pad_mapping[3];
+            update_key_config_sprites();
+        }
+        else
+        {
+            if (!(g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT)))
+            {
+                break;
+            }
+            switch (menu.next_selection)
+            {
+            case 5:
+                key_config[0] = g_pad_mapping[0];
+                key_config[1] = g_pad_mapping[1];
+                key_config[2] = g_pad_mapping[9];
+                key_config[3] = g_pad_mapping[2];
+                key_config[4] = g_pad_mapping[3];
+                update_key_config_sprites();
+                g_SoundManager.play_sound_centered(7, 0);
+                return 1;
+            case 6:
+                g_pad_mapping[0] = key_config[0];
+                g_pad_mapping[1] = key_config[1];
+                g_pad_mapping[9] = key_config[2];
+                g_pad_mapping[2] = key_config[3];
+                g_pad_mapping[3] = key_config[4];
+                memcpy(g_Supervisor.config.pad_mapping_copy, g_pad_mapping, sizeof(g_pad_mapping));
+                break;
+            default:
+                return 1;
+            }
+        }
+        g_SoundManager.play_sound_centered(9, 0);
+        AnmManager::interrupt_tree(anm_ids[2], 6);
+        set_substate(4);
+        return 1;
+    }
+    case 4:
+        if (time_in_state.current >= 10)
+        {
+            set_state(3);
+            menu.pop();
+        }
+        break;
+    }
+    return 1;
 }
 
 // FUNCTION: TH16 0x44f710
