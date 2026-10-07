@@ -338,59 +338,61 @@ void SoundManager::thread_load_sound_files(void *arg)
     }
 }
 
+// WinMain is the only caller; written against g_SoundManager, as LTCG
+// folded this into it.
 // FUNCTION: TH16 0x45d850
 HARNESS_CALLED i32 SoundManager::release()
 {
-    if (bgm_format != NULL)
+    if (g_SoundManager.bgm_format != NULL)
     {
-        free(bgm_format);
-        bgm_format = NULL;
+        free(g_SoundManager.bgm_format);
+        g_SoundManager.bgm_format = NULL;
     }
     for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
     {
-        if (sound_buffers[i].buffer != NULL)
+        if (g_SoundManager.sound_buffers[i].buffer != NULL)
         {
-            sound_buffers[i].buffer->Release();
-            sound_buffers[i].buffer = NULL;
+            g_SoundManager.sound_buffers[i].buffer->Release();
+            g_SoundManager.sound_buffers[i].buffer = NULL;
         }
     }
     for (i32 i = 0; i < SOUND_FILE_COUNT; i++)
     {
-        if (sound_file_data[i] != NULL)
+        if (g_SoundManager.sound_file_data[i] != NULL)
         {
-            free(sound_file_data[i]);
-            sound_file_data[i] = NULL;
+            free(g_SoundManager.sound_file_data[i]);
+            g_SoundManager.sound_file_data[i] = NULL;
         }
     }
-    if (manager == NULL)
+    if (g_SoundManager.manager == NULL)
     {
         return 0;
     }
-    KillTimer(game_window, 1);
-    stop_bgm();
-    dsound = NULL;
-    init_sound_buffer->Stop();
-    if (init_sound_buffer != NULL)
+    KillTimer(g_SoundManager.game_window, 1);
+    g_SoundManager.stop_bgm();
+    g_SoundManager.dsound = NULL;
+    g_SoundManager.init_sound_buffer->Stop();
+    if (g_SoundManager.init_sound_buffer != NULL)
     {
-        init_sound_buffer->Release();
-        init_sound_buffer = NULL;
+        g_SoundManager.init_sound_buffer->Release();
+        g_SoundManager.init_sound_buffer = NULL;
     }
-    if (bgm_stream != NULL)
+    if (g_SoundManager.bgm_stream != NULL)
     {
-        bgm_stream->destroy();
-        bgm_stream = NULL;
+        g_SoundManager.bgm_stream->destroy();
+        g_SoundManager.bgm_stream = NULL;
     }
-    if (manager != NULL)
+    if (g_SoundManager.manager != NULL)
     {
-        delete manager;
-        manager = NULL;
+        delete g_SoundManager.manager;
+        g_SoundManager.manager = NULL;
     }
     for (i32 i = 0; i < 0x10; i++)
     {
-        if (preload_data[i] != NULL)
+        if (g_SoundManager.preload_data[i] != NULL)
         {
-            free(preload_data[i]);
-            preload_data[i] = NULL;
+            free(g_SoundManager.preload_data[i]);
+            g_SoundManager.preload_data[i] = NULL;
         }
     }
     return 0;
