@@ -323,18 +323,11 @@ i32 BombMarisaAInf::method_10()
 {
     for (i32 i = 0;; i++)
     {
-        AnmManager *anm = g_AnmManager;
-        if (anm->get_vm_with_id(anm_id) == NULL)
+        if (get_vm_or_clear(anm_id) == NULL)
         {
-            anm_id.id = 0;
             return 0;
         }
-        AnmVm *parent = anm->get_vm_with_id(anm_id);
-        if (parent == NULL)
-        {
-            anm_id.id = 0;
-        }
-        AnmVm *vm = parent->search_children(0x18, i);
+        AnmVm *vm = get_vm_or_clear(anm_id)->search_children(0x18, i);
         if (vm == NULL)
         {
             return 0;
