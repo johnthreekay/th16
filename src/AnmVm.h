@@ -362,6 +362,10 @@ struct AnmVm
         pending_interrupt = n;
     }
 
+    // 0x4174d0. interrupt, as LTCG kept it out of line for most callers
+    // (bullets, the HUD, the music room).
+    DECOMP_NOINLINE void interrupt_out_of_line(i32 n);
+
     void mark_for_deletion()
     {
         flags_hi &= ~ANM_VM_FLAG_HI_40;

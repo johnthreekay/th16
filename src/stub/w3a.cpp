@@ -3,7 +3,11 @@
 // /GL: LTCG cannot see inside, so calls to them stay opaque like calls to
 // the real code.
 #include "../AnmManager.h"
+#include "../BulletManager.h"
 #include "../EffectManager.h"
+
+// GLOBAL: TH16 0x49f2e0
+BulletTypeData g_bullet_types[44];
 
 // The rows point at the effect kinds' init callbacks (0x4071a0, 0x405670,
 // 0x406510, 0x406930), not all decompiled yet. Here so LTCG cannot read the

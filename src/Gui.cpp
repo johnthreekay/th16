@@ -648,6 +648,28 @@ void __fastcall anm_vm_interrupt_5(AnmVm *vm)
     vm->interrupt(5);
 }
 
+// FUNCTION: TH16 0x4175d0
+HARNESS_CALLED void Gui::interrupt_spell_vms_2()
+{
+    AnmVm *vm = vm_94;
+    vm->interrupt(2);
+    vm->run();
+    vm = vm_98;
+    vm->interrupt(2);
+    vm->run();
+}
+
+// FUNCTION: TH16 0x417650
+HARNESS_CALLED void Gui::interrupt_spell_vms_3()
+{
+    AnmVm *vm = vm_94;
+    vm->interrupt(3);
+    vm->run();
+    vm = vm_98;
+    vm->interrupt(3);
+    vm->run();
+}
+
 // FUNCTION: TH16 0x4173c0
 void __fastcall anm_vm_interrupt_2(AnmVm *vm)
 {

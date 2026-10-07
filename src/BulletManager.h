@@ -105,6 +105,26 @@ struct Bullet
     i32 sub_4124b0(i32 arg);
 };
 
+// A row of the bullet type table (ExpHP: zBulletType, which gives it 0x118
+// bytes; the code steps 0x114).
+struct BulletTypeData
+{
+    i32 script;
+    // Sprite remaps of bullet.anm, indexed by sprite + color * 4. A
+    // negative first entry means none.
+    i32 sprites[0x40];
+    f32 unk_104;
+    i32 unk_108;
+    i32 unk_10c;
+    i32 unk_110;
+};
+
+extern BulletTypeData g_bullet_types[44];
+
+// 0x417140. The sprite mapping callback of bullet VMs: picks the sprite for
+// the bullet's type and color.
+int __fastcall bullet_map_sprite(AnmVm *vm, i32 sprite);
+
 // Owns every enemy bullet. ExpHP: zBulletManager.
 struct BulletManager
 {

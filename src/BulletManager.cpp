@@ -237,3 +237,14 @@ i32 BulletManager::on_tick_body()
     }
     return 1;
 }
+
+// FUNCTION: TH16 0x417140
+int __fastcall bullet_map_sprite(AnmVm *vm, i32 sprite)
+{
+    Bullet *bullet = (Bullet *)vm->associated_game_entity;
+    if (g_bullet_types[bullet->sprite].sprites[0] >= 0)
+    {
+        return g_bullet_types[bullet->sprite].sprites[sprite + bullet->color * 4];
+    }
+    return sprite;
+}

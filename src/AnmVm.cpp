@@ -192,3 +192,9 @@ void AnmVm::set_pos_bezier(i32 end_time, Float3 *initial, Float3 *bezier_1, Floa
     pos_i.bezier_2 = *bezier_2;
     pos_i.time.reset();
 }
+
+// FUNCTION: TH16 0x4174d0
+void AnmVm::interrupt_out_of_line(i32 n)
+{
+    interrupt(n);
+}
