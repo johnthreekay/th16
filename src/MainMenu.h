@@ -75,6 +75,22 @@ enum OptionsItem
     OPTIONS_ITEM_COUNT = 5,
 };
 
+// The key config screen's rows: the five actions a pad button can be
+// assigned to (TitleInf::key_config), then the two commands.
+enum KeyConfigItem
+{
+    KEY_CONFIG_SHOT = 0,
+    KEY_CONFIG_BOMB = 1,
+    KEY_CONFIG_RELEASE = 2,
+    KEY_CONFIG_FOCUS = 3,
+    KEY_CONFIG_PAUSE = 4,
+    // Back to the current assignments.
+    KEY_CONFIG_DEFAULT = 5,
+    // Save and leave.
+    KEY_CONFIG_QUIT = 6,
+    KEY_CONFIG_COUNT = 7,
+};
+
 // TitleInf::menu_flags.
 enum TitleMenuFlags
 {
@@ -144,7 +160,8 @@ class TitleInf : public TaskInf
     i32 score_not_ranked;
     // The name entry's character grid (91 characters, 13 to a row).
     MenuHelper name_entry_menu;
-    // The key config being edited: the button for each action.
+    // The key config being edited: the pad button for each
+    // KeyConfigItem action.
     i16 key_config[6];
     u8 unk_5b40[0x5b44 - 0x5b40];
     i32 unk_5b44;

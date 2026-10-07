@@ -549,15 +549,15 @@ i32 TitleInf::do_key_config()
     switch (substate)
     {
     case 0:
-        menu.num_choices = 7;
+        menu.num_choices = KEY_CONFIG_COUNT;
         menu.set_cursor(0);
         anm_ids[2] = title_anm->create_effect(2, -1, NULL);
         set_substate(1);
-        key_config[0] = g_pad_mapping[0];
-        key_config[1] = g_pad_mapping[1];
-        key_config[2] = g_pad_mapping[9];
-        key_config[3] = g_pad_mapping[2];
-        key_config[4] = g_pad_mapping[3];
+        key_config[KEY_CONFIG_SHOT] = g_pad_mapping[PAD_SHOT];
+        key_config[KEY_CONFIG_BOMB] = g_pad_mapping[PAD_BOMB];
+        key_config[KEY_CONFIG_RELEASE] = g_pad_mapping[PAD_RELEASE];
+        key_config[KEY_CONFIG_FOCUS] = g_pad_mapping[PAD_FOCUS];
+        key_config[KEY_CONFIG_PAUSE] = g_pad_mapping[PAD_PAUSE];
         update_key_config_sprites();
     case 1:
         if (time_in_state.current > 6)
@@ -592,20 +592,20 @@ i32 TitleInf::do_key_config()
         {
             if ((i8)pad[i] < 0)
             {
-                if (menu.next_selection <= 4)
+                if (menu.next_selection <= KEY_CONFIG_PAUSE)
                 {
                     set_key(menu.next_selection, i);
                 }
                 break;
             }
         }
-        if ((g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB)) && menu.next_selection == 6)
+        if ((g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB)) && menu.next_selection == KEY_CONFIG_QUIT)
         {
-            key_config[0] = g_pad_mapping[0];
-            key_config[1] = g_pad_mapping[1];
-            key_config[2] = g_pad_mapping[9];
-            key_config[3] = g_pad_mapping[2];
-            key_config[4] = g_pad_mapping[3];
+            key_config[KEY_CONFIG_SHOT] = g_pad_mapping[PAD_SHOT];
+            key_config[KEY_CONFIG_BOMB] = g_pad_mapping[PAD_BOMB];
+            key_config[KEY_CONFIG_RELEASE] = g_pad_mapping[PAD_RELEASE];
+            key_config[KEY_CONFIG_FOCUS] = g_pad_mapping[PAD_FOCUS];
+            key_config[KEY_CONFIG_PAUSE] = g_pad_mapping[PAD_PAUSE];
             update_key_config_sprites();
         }
         else
@@ -616,21 +616,21 @@ i32 TitleInf::do_key_config()
             }
             switch (menu.next_selection)
             {
-            case 5:
-                key_config[0] = g_pad_mapping[0];
-                key_config[1] = g_pad_mapping[1];
-                key_config[2] = g_pad_mapping[9];
-                key_config[3] = g_pad_mapping[2];
-                key_config[4] = g_pad_mapping[3];
+            case KEY_CONFIG_DEFAULT:
+                key_config[KEY_CONFIG_SHOT] = g_pad_mapping[PAD_SHOT];
+                key_config[KEY_CONFIG_BOMB] = g_pad_mapping[PAD_BOMB];
+                key_config[KEY_CONFIG_RELEASE] = g_pad_mapping[PAD_RELEASE];
+                key_config[KEY_CONFIG_FOCUS] = g_pad_mapping[PAD_FOCUS];
+                key_config[KEY_CONFIG_PAUSE] = g_pad_mapping[PAD_PAUSE];
                 update_key_config_sprites();
                 g_SoundManager.play_sound_centered(SE_OK00, 0);
                 return 1;
-            case 6:
-                g_pad_mapping[0] = key_config[0];
-                g_pad_mapping[1] = key_config[1];
-                g_pad_mapping[9] = key_config[2];
-                g_pad_mapping[2] = key_config[3];
-                g_pad_mapping[3] = key_config[4];
+            case KEY_CONFIG_QUIT:
+                g_pad_mapping[PAD_SHOT] = key_config[KEY_CONFIG_SHOT];
+                g_pad_mapping[PAD_BOMB] = key_config[KEY_CONFIG_BOMB];
+                g_pad_mapping[PAD_RELEASE] = key_config[KEY_CONFIG_RELEASE];
+                g_pad_mapping[PAD_FOCUS] = key_config[KEY_CONFIG_FOCUS];
+                g_pad_mapping[PAD_PAUSE] = key_config[KEY_CONFIG_PAUSE];
                 memcpy(g_Supervisor.config.pad_mapping, g_pad_mapping, sizeof(g_pad_mapping));
                 break;
             default:
@@ -658,26 +658,26 @@ i32 TitleInf::do_key_config()
 // FUNCTION: TH16 0x44ec60
 void TitleInf::update_key_config_sprites()
 {
-    set_child_sprite(get_child_vm(anm_ids[2], 0x3f), key_config[0] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x40), key_config[0] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x49), key_config[0] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4a), key_config[0] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x41), key_config[1] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x42), key_config[1] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4b), key_config[1] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4c), key_config[1] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x43), key_config[2] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x44), key_config[2] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4d), key_config[2] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4e), key_config[2] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x45), key_config[3] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x46), key_config[3] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4f), key_config[3] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x50), key_config[3] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x47), key_config[4] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x48), key_config[4] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x51), key_config[4] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x52), key_config[4] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x3f), key_config[KEY_CONFIG_SHOT] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x40), key_config[KEY_CONFIG_SHOT] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x49), key_config[KEY_CONFIG_SHOT] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4a), key_config[KEY_CONFIG_SHOT] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x41), key_config[KEY_CONFIG_BOMB] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x42), key_config[KEY_CONFIG_BOMB] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4b), key_config[KEY_CONFIG_BOMB] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4c), key_config[KEY_CONFIG_BOMB] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x43), key_config[KEY_CONFIG_RELEASE] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x44), key_config[KEY_CONFIG_RELEASE] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4d), key_config[KEY_CONFIG_RELEASE] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4e), key_config[KEY_CONFIG_RELEASE] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x45), key_config[KEY_CONFIG_FOCUS] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x46), key_config[KEY_CONFIG_FOCUS] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4f), key_config[KEY_CONFIG_FOCUS] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x50), key_config[KEY_CONFIG_FOCUS] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x47), key_config[KEY_CONFIG_PAUSE] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x48), key_config[KEY_CONFIG_PAUSE] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x51), key_config[KEY_CONFIG_PAUSE] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x52), key_config[KEY_CONFIG_PAUSE] % 10 + 0x2a);
 }
 
 // FUNCTION: TH16 0x44f710

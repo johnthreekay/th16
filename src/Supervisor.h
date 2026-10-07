@@ -494,8 +494,19 @@ inline HRESULT Supervisor::disable_d3d_fog_inline()
     return 0;
 }
 
-// Pad button numbers for each game button, -1 if unassigned. Index meaning
-// (from read_joypad): 0 shot, 1 bomb, 2 -> 0x8, 3 -> 0x100, 9 -> 0x800.
+// The game buttons a pad button can be assigned to: indices into
+// g_pad_mapping.
+enum PadButton
+{
+    PAD_SHOT = 0,
+    PAD_BOMB = 1,
+    PAD_FOCUS = 2,
+    PAD_PAUSE = 3,
+    // The season release.
+    PAD_RELEASE = 9,
+};
+
+// The pad button number for each PadButton, -1 if unassigned.
 extern i16 g_pad_mapping[10];
 
 // Screen geometry, rescaled for the chosen window size. Names and notes from

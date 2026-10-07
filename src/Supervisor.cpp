@@ -114,25 +114,25 @@ HARNESS_CALLED u32 Supervisor::read_joypad(u32 input)
         {
             return input;
         }
-        if (g_pad_mapping[0] >= 0)
+        if (g_pad_mapping[PAD_SHOT] >= 0)
         {
-            input |= (info.dwButtons & (1 << g_pad_mapping[0])) ? INPUT_SHOT : 0;
+            input |= (info.dwButtons & (1 << g_pad_mapping[PAD_SHOT])) ? INPUT_SHOT : 0;
         }
-        if (g_pad_mapping[1] >= 0)
+        if (g_pad_mapping[PAD_BOMB] >= 0)
         {
-            input |= (info.dwButtons & (1 << g_pad_mapping[1])) ? INPUT_BOMB : 0;
+            input |= (info.dwButtons & (1 << g_pad_mapping[PAD_BOMB])) ? INPUT_BOMB : 0;
         }
-        if (g_pad_mapping[3] >= 0)
+        if (g_pad_mapping[PAD_PAUSE] >= 0)
         {
-            input |= (info.dwButtons & (1 << g_pad_mapping[3])) ? INPUT_MENU : 0;
+            input |= (info.dwButtons & (1 << g_pad_mapping[PAD_PAUSE])) ? INPUT_MENU : 0;
         }
-        if (g_pad_mapping[2] >= 0)
+        if (g_pad_mapping[PAD_FOCUS] >= 0)
         {
-            input |= (info.dwButtons & (1 << g_pad_mapping[2])) ? INPUT_FOCUS : 0;
+            input |= (info.dwButtons & (1 << g_pad_mapping[PAD_FOCUS])) ? INPUT_FOCUS : 0;
         }
-        if (g_pad_mapping[9] >= 0)
+        if (g_pad_mapping[PAD_RELEASE] >= 0)
         {
-            input |= (info.dwButtons & (1 << g_pad_mapping[9])) ? INPUT_RELEASE : 0;
+            input |= (info.dwButtons & (1 << g_pad_mapping[PAD_RELEASE])) ? INPUT_RELEASE : 0;
         }
         u32 center_x = (g_joypad_caps.wXmin + g_joypad_caps.wXmax) / 2;
         u32 margin_x = (g_joypad_caps.wXmax - g_joypad_caps.wXmin) / 4;
@@ -161,25 +161,25 @@ HARNESS_CALLED u32 Supervisor::read_joypad(u32 input)
     {
         return input;
     }
-    if (g_pad_mapping[0] >= 0)
+    if (g_pad_mapping[PAD_SHOT] >= 0)
     {
-        input |= (js.rgbButtons[g_pad_mapping[0]] & 0x80) ? INPUT_SHOT : 0;
+        input |= (js.rgbButtons[g_pad_mapping[PAD_SHOT]] & 0x80) ? INPUT_SHOT : 0;
     }
-    if (g_pad_mapping[1] >= 0)
+    if (g_pad_mapping[PAD_BOMB] >= 0)
     {
-        input |= (js.rgbButtons[g_pad_mapping[1]] & 0x80) ? INPUT_BOMB : 0;
+        input |= (js.rgbButtons[g_pad_mapping[PAD_BOMB]] & 0x80) ? INPUT_BOMB : 0;
     }
-    if (g_pad_mapping[3] >= 0)
+    if (g_pad_mapping[PAD_PAUSE] >= 0)
     {
-        input |= (js.rgbButtons[g_pad_mapping[3]] & 0x80) ? INPUT_MENU : 0;
+        input |= (js.rgbButtons[g_pad_mapping[PAD_PAUSE]] & 0x80) ? INPUT_MENU : 0;
     }
-    if (g_pad_mapping[2] >= 0)
+    if (g_pad_mapping[PAD_FOCUS] >= 0)
     {
-        input |= (js.rgbButtons[g_pad_mapping[2]] & 0x80) ? INPUT_FOCUS : 0;
+        input |= (js.rgbButtons[g_pad_mapping[PAD_FOCUS]] & 0x80) ? INPUT_FOCUS : 0;
     }
-    if (g_pad_mapping[9] >= 0)
+    if (g_pad_mapping[PAD_RELEASE] >= 0)
     {
-        input |= (js.rgbButtons[g_pad_mapping[9]] & 0x80) ? INPUT_RELEASE : 0;
+        input |= (js.rgbButtons[g_pad_mapping[PAD_RELEASE]] & 0x80) ? INPUT_RELEASE : 0;
     }
     return input | ((js.lX < -g_Supervisor.config.deadzone_x) ? INPUT_LEFT : 0) |
            ((js.lY < -g_Supervisor.config.deadzone_y) ? INPUT_UP : 0) |
