@@ -149,3 +149,5 @@ class TitleInf : public TaskInf
 };
 
 extern TitleInf *g_MainMenu;
+// The difficulty names as the menus and the replay info show them.
+extern const char *const g_difficulty_names[6];

@@ -113,7 +113,9 @@ struct RpyFileHeader
 {
     u32 magic;
     u16 version;
-    u8 unk_6[0x10 - 0x6];
+    u8 unk_6[0xc - 0x6];
+    // Of the whole file (header plus compressed data).
+    u32 file_size;
     u32 unk_10;
     u8 unk_14[0x1c - 0x14];
     // Of the encrypted, compressed data after the header.

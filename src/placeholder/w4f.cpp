@@ -12,8 +12,3 @@ DECOMP_NOINLINE void TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32
     w4f_placeholder_sink(this, w4f_placeholder_sink(ids, stage + row + unused));
 }
 
-// STUB: TH16 0x448400
-HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 unused, i32 unk_4)
-{
-    return w4f_placeholder_sink((void *)path, w4f_placeholder_sink((void *)name, unused + unk_4));
-}

@@ -18,6 +18,8 @@
 #include "FpsCounter.h"
 #include "Supervisor.h"
 #include "AsciiManager.h"
+#include "CriticalSections.h"
+#include "MainMenu.h"
 
 // GLOBAL: TH16 0x4a6f08
 ReplayManager *g_ReplayManager;
@@ -635,5 +637,209 @@ int ReplayManager::initialize(i32 mode, const char *filename)
     {
         return -1;
     }
+    return 0;
+}
+
+extern const char *g_chara_names_short[4];
+
+extern HANDLE g_file;
+
+// file_close as LTCG inlined it.
+static __forceinline void file_close_inline()
+{
+    if (g_file != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(g_file);
+        LEAVE_CS(CS_FILE);
+    }
+}
+
+// Writes to the file file_create opened, giving the file up on a short
+// write.
+static __forceinline void write_to_file(const void *data, DWORD size)
+{
+    DWORD written;
+    if (g_file != INVALID_HANDLE_VALUE)
+    {
+        WriteFile(g_file, data, size, &written, NULL);
+        if (size != written)
+        {
+            CloseHandle(g_file);
+            LEAVE_CS(CS_FILE);
+        }
+    }
+}
+
+// Pads a USER section to a multiple of 4 bytes and stores its size.
+static __forceinline i32 finish_user_section(u8 *section, char *end)
+{
+    if ((end - (char *)section) % 4 != 0)
+    {
+        end += 4 - (end - (char *)section) % 4;
+    }
+    i32 size = end - (char *)section;
+    *(i32 *)(section + 4) = size;
+    return size;
+}
+
+// FUNCTION: TH16 0x448400
+HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 unused, i32 unk_4)
+{
+    ReplayManager *replay = g_ReplayManager;
+    i32 first_stage = 0;
+    i32 last_stage = 0;
+    strcpy(replay->info->name, name);
+    for (i32 i = strlen(name); i < 8; i++)
+    {
+        replay->info->name[i] = ' ';
+    }
+    if (!(replay->unk_218 & 1) && unk_4 != 0)
+    {
+        RpyChunk *chunk = replay->currently_recording_chunk->entry;
+        chunk->next_input_write_pos->input = 0xffff;
+        chunk->next_input_write_pos->input_rising = 0xffff;
+        chunk->next_input_write_pos->input_falling = 0xffff;
+        chunk->next_input_write_pos++;
+        if ((u8 *)chunk->next_input_write_pos - (u8 *)chunk >= (i32)sizeof(chunk->input))
+        {
+            replay->currently_recording_chunk = replay->new_chunk(replay->stage_num);
+        }
+    }
+    char full_path[0x100];
+    sprintf(full_path, "replay/%s", path);
+    i32 num_stages = 0;
+    i32 size = sizeof(RpyInfo);
+    for (i32 i = 0; i < 8; i++)
+    {
+        RpyGamestate *gamestate = (RpyGamestate *)replay->stage_gamestate_snapshots[i];
+        if (gamestate == NULL)
+        {
+            continue;
+        }
+        if (first_stage == 0)
+        {
+            first_stage = i;
+        }
+        last_stage = i;
+        if (!(replay->unk_218 & 1))
+        {
+            gamestate->data_size = 0;
+        }
+        size += sizeof(RpyGamestate);
+        for (ZunList<RpyChunk> *node = replay->recorded_chunks_by_stage[i].next; node != NULL; node = node->next)
+        {
+            RpyChunk *chunk = node->entry;
+            size += ((u8 *)chunk->next_input_write_pos - (u8 *)chunk) / 6 * 6 + chunk->next_fps_count_write_pos -
+                    chunk->fps_counts;
+            if (!(replay->unk_218 & 1))
+            {
+                gamestate->data_size += ((u8 *)chunk->next_input_write_pos - (u8 *)chunk) / 6 * 6 +
+                                        chunk->next_fps_count_write_pos - chunk->fps_counts;
+                gamestate->num_frames += ((u8 *)node->entry->next_input_write_pos - (u8 *)node->entry) / 6;
+            }
+        }
+        num_stages++;
+    }
+    replay->info->num_stages = num_stages;
+    replay->info->score = g_Globals.score;
+    replay->info->slowdown = 100.0f - (f32)(g_FpsCounter->total_actual / g_FpsCounter->total_expected) * 100.0f;
+    u8 *data = (u8 *)malloc(size);
+    memcpy(data, replay->info, sizeof(RpyInfo));
+    i32 offset = sizeof(RpyInfo);
+    for (i32 i = 0; i < 8; i++)
+    {
+        RpyGamestate *gamestate = (RpyGamestate *)replay->stage_gamestate_snapshots[i];
+        if (gamestate == NULL)
+        {
+            continue;
+        }
+        memcpy(data + offset, gamestate, sizeof(RpyGamestate));
+        offset += sizeof(RpyGamestate);
+        ZunList<RpyChunk> *node;
+        for (node = replay->recorded_chunks_by_stage[i].next; node != NULL; node = node->next)
+        {
+            RpyChunk *chunk = node->entry;
+            memcpy(data + offset, chunk, ((u8 *)chunk->next_input_write_pos - (u8 *)chunk) / 6 * 6);
+            offset += ((u8 *)chunk->next_input_write_pos - (u8 *)chunk) / 6 * 6;
+        }
+        for (node = replay->recorded_chunks_by_stage[i].next; node != NULL; node = node->next)
+        {
+            RpyChunk *chunk = node->entry;
+            memcpy(data + offset, chunk->fps_counts, chunk->next_fps_count_write_pos - chunk->fps_counts);
+            offset += chunk->next_fps_count_write_pos - chunk->fps_counts;
+        }
+    }
+    i32 compressed_size;
+    u8 *compressed = lzss_compress(data, offset, &compressed_size);
+    free(data);
+    zun_encrypt(compressed, compressed_size, 0x7d, 0x3a, 0x100, compressed_size);
+    zun_encrypt(compressed, compressed_size, 0x5c, 0xe1, 0x400, compressed_size);
+    RpyFileHeader *header = (RpyFileHeader *)replay->rpy_file;
+    header->size = offset;
+    header->compressed_size = compressed_size;
+    header->file_size = header->compressed_size + sizeof(RpyHeader);
+    _chdir(g_GameWindow.save_dir);
+    file_create(full_path);
+    write_to_file(replay->rpy_file, sizeof(RpyHeader));
+    write_to_file(compressed, compressed_size);
+    if (compressed != NULL)
+    {
+        free(compressed);
+    }
+    u8 *user = (u8 *)malloc(0xffff);
+    memset(user, 0, 0xffff);
+    *(u32 *)user = 0x52455355;
+    user[8] = 0;
+    char *text = (char *)user + 0xc;
+    text += sprintf(text, "%s \x83\x8a\x83v\x83\x8c\x83" "C\x83t\x83@\x83" "C\x83\x8b\x8f\xee\x95\xf1\r\n",
+                    "\x93\x8c\x95\xfb\x93V\x8b\xf3\xe0\xf6");
+    text += sprintf(text, "Version %s\r\n", "1.00a");
+    text += sprintf(text, "Name %s\r\n", replay->info->name);
+    struct tm *date = _localtime64(&replay->info->timestamp);
+    text += sprintf(text, "Date %.2d/%.2d/%.2d %.2d:%.2d\r\n", date->tm_year % 100, date->tm_mon + 1, date->tm_mday,
+                    date->tm_hour, date->tm_min);
+    text += sprintf(text, "Chara %s\r\n", g_chara_names_short[replay->info->character + replay->info->subshot]);
+    text += sprintf(text, "Rank %s\r\n", g_difficulty_names[replay->info->difficulty]);
+    if (replay->info->stage > 7)
+    {
+        if (first_stage == 7)
+        {
+            text += sprintf(text, "Extra Stage Clear\r\n");
+        }
+        else
+        {
+            text += sprintf(text, "Stage All Clear\r\n");
+        }
+    }
+    else if (first_stage == last_stage)
+    {
+        if (first_stage == 7)
+        {
+            text += sprintf(text, "Extra Stage\r\n");
+        }
+        else
+        {
+            text += sprintf(text, "Stage %d\r\n", first_stage);
+        }
+    }
+    else
+    {
+        text += sprintf(text, "Stage %d \x81` %d\r\n", first_stage, last_stage);
+    }
+    text += sprintf(text, "Score %d\r\n", replay->info->score);
+    text += sprintf(text, "Slow Rate %2.2f\r\n", replay->info->slowdown) + 1;
+    i32 user_size = finish_user_section(user, text);
+    write_to_file(user, user_size);
+    memset(user, 0, 0xffff);
+    *(u32 *)user = 0x52455355;
+    user[8] = 1;
+    text = (char *)user + 0xc;
+    text += sprintf(text, "\x83R\x83\x81\x83\x93\x83g\x82\xf0\x8f\x91\x82\xaf\x82\xdc\x82\xb7") + 1;
+    user_size = finish_user_section(user, text);
+    write_to_file(user, user_size);
+    free(user);
+    file_close_inline();
+    _chdir(g_GameWindow.exe_dir);
+    replay->unk_218 |= 1;
     return 0;
 }
