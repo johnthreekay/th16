@@ -291,7 +291,7 @@ i32 TitleInf::do_options()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[1], 3);
             AnmManager::interrupt_tree(anm_ids[1], (i16)(menu.next_selection + 7));
             update_options_cursor();
@@ -300,7 +300,7 @@ i32 TitleInf::do_options()
         {
             if (menu.next_selection != 4)
             {
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 menu.set_cursor(4);
                 AnmManager::interrupt_tree_and_run(anm_ids[1], 3);
                 AnmManager::interrupt_tree(anm_ids[1], (i16)(menu.next_selection + 7));
@@ -311,7 +311,7 @@ i32 TitleInf::do_options()
         }
         if (menu.next_selection == 1 && time_in_state.ticked_on_multiple_of(60))
         {
-            g_SoundManager.play_sound_centered(2, 0);
+            g_SoundManager.play_sound_centered(SE_PLDEAD00, 0);
         }
         if (input_pressed_or_repeating(INPUT_LEFT))
         {
@@ -367,7 +367,7 @@ i32 TitleInf::do_options()
             {
             case 2:
                 AnmManager::interrupt_tree(anm_ids[1], 6);
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 set_substate(4);
                 return 1;
             case 3:
@@ -375,12 +375,12 @@ i32 TitleInf::do_options()
                 g_Supervisor.config.se_volume = 80;
                 g_Supervisor.config.unk_28 = 0;
                 update_options_sprites();
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 return 1;
             case 4:
             leave:
                 AnmManager::interrupt_tree(anm_ids[1], 6);
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 set_substate(4);
                 return 1;
             }
@@ -464,7 +464,7 @@ void TitleInf::update_options_cursor()
 void TitleInf::update_options_sprites()
 {
     g_SoundManager.bgm_volume = g_Supervisor.config.bgm_volume;
-    g_SoundManager.modify_bgm(8, 0, "SetVol");
+    g_SoundManager.modify_bgm(BGM_RESET_VOLUME, 0, "SetVol");
     g_SoundManager.se_volume = g_Supervisor.config.se_volume;
     if (g_SoundManager.se_volume != 0)
     {
@@ -573,7 +573,7 @@ i32 TitleInf::do_key_config()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[2], 3);
             AnmManager::interrupt_tree(anm_ids[2], (i16)(menu.next_selection + 7));
             update_key_config_cursor();
@@ -614,7 +614,7 @@ i32 TitleInf::do_key_config()
                 key_config[3] = g_pad_mapping[2];
                 key_config[4] = g_pad_mapping[3];
                 update_key_config_sprites();
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 return 1;
             case 6:
                 g_pad_mapping[0] = key_config[0];
@@ -628,7 +628,7 @@ i32 TitleInf::do_key_config()
                 return 1;
             }
         }
-        g_SoundManager.play_sound_centered(9, 0);
+        g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
         AnmManager::interrupt_tree(anm_ids[2], 6);
         set_substate(4);
         return 1;
@@ -687,7 +687,7 @@ void TitleInf::set_key(i32 action, i32 key)
     }
     key_config[action] = key;
     update_key_config_sprites();
-    g_SoundManager.play_sound_centered(7, 0);
+    g_SoundManager.play_sound_centered(SE_OK00, 0);
 }
 
 // Rows above the cursor get interrupt 30, rows below it 31; the five
@@ -983,19 +983,19 @@ i32 TitleInf::on_tick()
         {
             if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
             {
-                g_SoundManager.modify_bgm(4, 0, "dummy");
+                g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
             }
             else
             {
-                g_SoundManager.modify_bgm(3, 0, "dummy");
+                g_SoundManager.modify_bgm(BGM_STOP, 0, "dummy");
             }
             g_SoundManager.bgm_name[0] = 0;
             g_Supervisor.play_bgm_wav(0, "th16_01");
             if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
             {
-                g_SoundManager.modify_bgm(4, 0, "dummy");
+                g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
             }
-            g_SoundManager.modify_bgm(2, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_PLAY, 0, "dummy");
             g_Scorefile->bgm_unlocked[0] = 1;
             flags_5ce8 &= ~1;
             unk_5ce4 = 0;
@@ -1294,7 +1294,7 @@ i32 TitleInf::do_title_screen()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[0], 3);
             AnmManager::interrupt_tree(anm_ids[0], (i16)(menu.next_selection + 7));
             i32 i;
@@ -1318,11 +1318,11 @@ i32 TitleInf::do_title_screen()
         {
             if (menu.next_selection == 9)
             {
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 set_substate(4);
                 return 1;
             }
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             menu.set_cursor(9);
             AnmManager::interrupt_tree_and_run(anm_ids[0], 3);
             AnmManager::interrupt_tree(anm_ids[0], (i16)(menu.next_selection + 7));
@@ -1346,18 +1346,18 @@ i32 TitleInf::do_title_screen()
             case 5:
             case 6:
             case 8:
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 AnmManager::interrupt_tree(anm_ids[0x65], 1);
                 anm_ids[0x65].id = 0;
                 AnmManager::interrupt_tree(anm_ids_7d0[8], 1);
                 set_substate(4);
                 return 1;
             case 7:
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 set_substate(4);
                 return 1;
             case 9:
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 set_substate(4);
                 return 1;
             }

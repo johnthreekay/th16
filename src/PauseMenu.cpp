@@ -445,10 +445,10 @@ void PauseMenu::open()
     }
     AnmManager::interrupt_tree(anm_id_1e4, 3);
     SoundManager::pause_sounds();
-    g_SoundManager.play_sound_centered(0xe, 0);
+    g_SoundManager.play_sound_centered(SE_PAUSE, 0);
     if (g_Globals.game_mode != 2)
     {
-        g_SoundManager.modify_bgm(6, 0, "Pause");
+        g_SoundManager.modify_bgm(BGM_PAUSE, 0, "Pause");
     }
     while (SoundManager::update_sound_thread() != 0)
     {
@@ -580,7 +580,7 @@ void replay_ended_43f240()
     menu->anm_id_1e4 = menu->front_anm->create_ui_vm_at_origin(0x9f, 0);
     AnmManager::interrupt_tree(menu->anm_id_1e4, 3);
     SoundManager::pause_sounds();
-    g_SoundManager.modify_bgm(6, 0, "Pause");
+    g_SoundManager.modify_bgm(BGM_PAUSE, 0, "Pause");
     menu->saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
     menu->saved_global_4d9d90 = g_frame_pacing.mode;
@@ -603,10 +603,10 @@ void pause_menu_43f350()
     menu->set_unk_1f4_inline(2);
     g_GameThread->flags.flag_4 = 1;
     SoundManager::pause_sounds();
-    g_SoundManager.play_sound_centered(0xe, 0);
+    g_SoundManager.play_sound_centered(SE_PAUSE, 0);
     if (g_Globals.game_mode != 2)
     {
-        g_SoundManager.modify_bgm(6, 0, "Pause");
+        g_SoundManager.modify_bgm(BGM_PAUSE, 0, "Pause");
     }
     while (SoundManager::update_sound_thread() != 0)
     {
@@ -620,9 +620,9 @@ void pause_menu_43f350()
         g_Supervisor.play_bgm_wav(0, "th128_08");
         if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
-            g_SoundManager.modify_bgm(4, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
         }
-        g_SoundManager.modify_bgm(2, 0, "dummy");
+        g_SoundManager.modify_bgm(BGM_PLAY, 0, "dummy");
         g_Scorefile->bgm_unlocked[0] = 1;
     }
     menu->unk_1fc = 0;
@@ -807,11 +807,11 @@ void PauseMenu::tick_open()
         if (menu_selection_moved(&menu_34))
         {
             AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 7));
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
         {
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             switch (menu_34.next_selection)
             {
             case 0:
@@ -874,7 +874,7 @@ void PauseMenu::tick_open()
         {
             if (g_hardware_input_pressed & INPUT_R)
             {
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 AnmManager::interrupt_tree(anm_id_1e4.search_children(0x84, 0), 6);
                 AnmManager::interrupt_tree(anm_id_1e8, 1);
                 menu_34.set_cursor(4);
@@ -887,7 +887,7 @@ void PauseMenu::tick_open()
         }
         if (g_hardware_input_pressed & INPUT_Q)
         {
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             AnmManager::interrupt_tree(anm_id_1e4.search_children(0x81, 0), 6);
             menu_34.set_cursor(1);
             set_unk_1f4(16);
@@ -928,7 +928,7 @@ void PauseMenu::tick_open()
         if (menu_selection_moved(&menu_34))
         {
             AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 15));
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
         {
@@ -944,18 +944,18 @@ void PauseMenu::tick_open()
                 {
                     set_unk_1f4(8);
                 }
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 break;
             case 1:
                 AnmManager::interrupt_tree(anm_id_1e4.search_children(0x9b, 0), 6);
                 set_unk_1f4(8);
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 break;
             }
         }
         if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
         {
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             switch (menu_34.next_selection)
             {
             case 0:
@@ -1064,7 +1064,7 @@ void PauseMenu::tick_open()
         }
         if (menu_selection_moved(&menu))
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
         {
@@ -1109,7 +1109,7 @@ void PauseMenu::tick_open()
                 }
                 name_cursor--;
                 name[name_cursor] = ' ';
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 return;
             }
             else if (choice == 0x5a)
@@ -1118,17 +1118,17 @@ void PauseMenu::tick_open()
                 {
                     flags_3ec &= ~2;
                     flags_3ec |= 1;
-                    g_SoundManager.play_sound_centered(0x11, 0);
+                    g_SoundManager.play_sound_centered(SE_EXTEND, 0);
                     sprintf(path, "th16_%.2d.rpy", menu_34.next_selection + 1);
                     ReplayManager::destroy(replays[menu_34.next_selection]);
                     g_ReplayManager->save(path, name, 0, 1);
                     replays[menu_34.next_selection] = ReplayManager::create_from_file(path);
                     set_unk_1f4(11);
                     strcpy(g_Scorefile->last_replay_name, name);
-                    g_SoundManager.play_sound_centered(7, 0);
+                    g_SoundManager.play_sound_centered(SE_OK00, 0);
                     return;
                 }
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 strcpy(((ScorefileData *)g_Scorefile)
                            ->charas[g_Globals.subshot + g_Globals.character]
                            .scores[g_Globals.difficulty][menu_34.next_selection]
@@ -1171,12 +1171,12 @@ void PauseMenu::tick_open()
                 AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 7));
                 return;
             }
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             return;
         }
         if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
         {
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             if (name_cursor == 0)
             {
                 if (unk_1f4 == 12)
@@ -1210,7 +1210,7 @@ void PauseMenu::tick_open()
         }
         if (menu_selection_moved(&menu_34))
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
         {
@@ -1243,7 +1243,7 @@ void PauseMenu::tick_open()
                 }
             }
             name_cursor = i;
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             return;
         }
         if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
@@ -1262,7 +1262,7 @@ void PauseMenu::tick_open()
             {
                 set_unk_1f4(16);
                 menu_34.set_cursor(1);
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 return;
             }
             set_unk_1f4(6);
@@ -1272,7 +1272,7 @@ void PauseMenu::tick_open()
                 menu_34.disable(0);
                 menu_34.disable(3);
             }
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             return;
         }
         break;
@@ -1316,7 +1316,7 @@ void PauseMenu::tick_open()
             if (state == 1)
             {
                 SoundManager::resume_sounds();
-                g_SoundManager.modify_bgm(7, 0, "UnPause");
+                g_SoundManager.modify_bgm(BGM_UNPAUSE, 0, "UnPause");
             }
             else if (state == 2)
             {
@@ -1361,7 +1361,7 @@ void PauseMenu::tick_open()
                     g_continues_remaining--;
                     g_GameThread->flags.flag_4 = 0;
                     SoundManager::resume_sounds();
-                    g_SoundManager.modify_bgm(2, -1, saved_bgm_name);
+                    g_SoundManager.modify_bgm(BGM_PLAY, -1, saved_bgm_name);
                     while (SoundManager::update_sound_thread() != 0)
                     {
                     }

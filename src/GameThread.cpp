@@ -397,7 +397,7 @@ i32 GameThread::thread_start()
     thread->time_in_stage.set_value(0);
     (&g_Globals.unk_204)[g_Globals.stage_num] = 0;
     g_Globals.unk_224 = 0;
-    while (g_SoundManager.bgm_commands[0].command != 0)
+    while (g_SoundManager.bgm_commands[0].command != BGM_NONE)
     {
         Sleep(16);
     }
@@ -554,11 +554,11 @@ DECOMP_NOINLINE GameThread::~GameThread()
     {
         if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
-            g_SoundManager.modify_bgm(4, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
         }
         else
         {
-            g_SoundManager.modify_bgm(3, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_STOP, 0, "dummy");
         }
         g_SoundManager.bgm_name[0] = '\0';
     }
@@ -883,7 +883,7 @@ i32 GameThread::sub_42dee0()
         restart_stage_objects();
         if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
-            g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
         }
         else
         {
@@ -892,7 +892,7 @@ i32 GameThread::sub_42dee0()
         i32 music = g_stage_data->music_ids[0];
         if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
-            g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
         }
         g_SoundManager.modify_bgm(BGM_PLAY, 0, "dummy");
         g_Scorefile->bgm_unlocked[music] = 1;

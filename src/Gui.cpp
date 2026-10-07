@@ -1504,7 +1504,7 @@ void Gui::start_dialogue(i32 script)
         i32 track = stage->music_ids[boss];
         if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
-            g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
         }
         g_SoundManager.modify_bgm(BGM_PLAY, boss, "dummy");
         g_Scorefile->bgm_unlocked[track] = 1;

@@ -164,12 +164,12 @@ i32 TitleInf::do_replay_save()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
             set_substate(4);
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
         }
         else if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
@@ -189,7 +189,7 @@ i32 TitleInf::do_replay_save()
             {
             }
             replay_name_cursor = len;
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             set_substate(3);
         }
         break;
@@ -229,7 +229,7 @@ i32 TitleInf::do_replay_save()
         }
         if (menu_selection_moved(&menu_5a5c))
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
@@ -277,7 +277,7 @@ i32 TitleInf::do_replay_save()
             }
             else if (choice == 90)
             {
-                g_SoundManager.play_sound_centered(17, 0);
+                g_SoundManager.play_sound_centered(SE_EXTEND, 0);
                 sprintf(path, "th16_%.2d.rpy", menu.next_selection + 1);
                 ReplayManager::destroy(replays[menu.next_selection]);
                 g_ReplayManager->save(path, replay_name, 0, 0);
@@ -285,7 +285,7 @@ i32 TitleInf::do_replay_save()
                 strcpy(g_Scorefile->last_replay_name, replay_name);
                 set_substate(2);
             }
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
@@ -294,7 +294,7 @@ i32 TitleInf::do_replay_save()
                 set_substate(2);
                 break;
             }
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             replay_name_cursor--;
             replay_name[replay_name_cursor] = ' ';
         }
@@ -404,7 +404,7 @@ i32 TitleInf::do_difficulty_select()
             }
             if (menu.current_selection != menu.next_selection)
             {
-                g_SoundManager.play_sound_centered(10, 0);
+                g_SoundManager.play_sound_centered(SE_SELECT00, 0);
                 AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
                 AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 7));
             }
@@ -412,7 +412,7 @@ i32 TitleInf::do_difficulty_select()
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
             set_substate(4);
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             interrupt_and_clear(script);
             return 1;
         }
@@ -428,7 +428,7 @@ i32 TitleInf::do_difficulty_select()
                 AnmManager::interrupt_tree(find_child_id(script, 0x78), 2);
             }
             set_substate(3);
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             return 1;
         }
         break;
@@ -585,7 +585,7 @@ i32 TitleInf::do_character_select()
         {
             AnmManager::interrupt_tree(anm_ids[0x5c], 1);
             anm_ids[0x5c].id = 0;
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 25));
             menu.move_cursor(-1);
             AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 13));
@@ -594,7 +594,7 @@ i32 TitleInf::do_character_select()
         {
             AnmManager::interrupt_tree(anm_ids[0x5c], 1);
             anm_ids[0x5c].id = 0;
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 19));
             menu.move_cursor(1);
             AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 7));
@@ -602,7 +602,7 @@ i32 TitleInf::do_character_select()
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
             set_substate(4);
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             return 1;
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
@@ -611,7 +611,7 @@ i32 TitleInf::do_character_select()
             AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x88), 6);
             AnmManager::interrupt_tree(find_child_id(script, 0x58), 6);
             AnmManager::interrupt_tree(find_child_id(script, 0x59), 6);
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             set_substate(3);
             return 1;
         }
@@ -703,14 +703,14 @@ i32 TitleInf::do_subseason_select()
         {
             if (input_pressed_or_repeating(INPUT_LEFT))
             {
-                g_SoundManager.play_sound_centered(10, 0);
+                g_SoundManager.play_sound_centered(SE_SELECT00, 0);
                 AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 25));
                 menu.move_cursor(-1);
                 AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 13));
             }
             if (input_pressed_or_repeating(INPUT_RIGHT))
             {
-                g_SoundManager.play_sound_centered(10, 0);
+                g_SoundManager.play_sound_centered(SE_SELECT00, 0);
                 AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 19));
                 menu.move_cursor(1);
                 AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 7));
@@ -719,14 +719,14 @@ i32 TitleInf::do_subseason_select()
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
             set_substate(4);
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             return 1;
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             set_substate(3);
-            g_SoundManager.play_sound_centered(50, 0);
+            g_SoundManager.play_sound_centered(SE_BOON00, 0);
             if (g_Globals.game_mode == 0)
             {
                 g_Supervisor.fade_out_bgm(0.05f);
@@ -843,12 +843,12 @@ i32 TitleInf::do_practice_stage_select()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
             set_substate(4);
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             g_practice_last_stage = menu.next_selection;
             return 1;
         }
@@ -858,12 +858,12 @@ i32 TitleInf::do_practice_stage_select()
                      .practices[g_Globals.difficulty][menu.next_selection]
                      .unlocked)
             {
-                g_SoundManager.play_sound_centered(16, 0);
+                g_SoundManager.play_sound_centered(SE_INVALID, 0);
                 return 1;
             }
             set_substate(3);
-            g_SoundManager.play_sound_centered(7, 0);
-            g_SoundManager.play_sound_centered(50, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
+            g_SoundManager.play_sound_centered(SE_BOON00, 0);
             g_practice_last_stage = menu.next_selection;
             g_unk_4a5bf8 = 0;
             if (get_keyboard_state(g_practice_keys) == 0)
@@ -1060,7 +1060,7 @@ i32 TitleInf::do_player_data()
         }
         if (menu_selection_moved(&menu_fc))
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             interrupt_and_clear(menu_fc.current_selection + 0xaf);
             create_effect(menu_fc.next_selection + 0xaf);
             if (menu_1d4.next_selection > 0)
@@ -1082,7 +1082,7 @@ i32 TitleInf::do_player_data()
         }
         if (menu_selection_moved(&menu))
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             interrupt_and_clear(menu.current_selection + 0xa7);
             create_effect(menu.next_selection + 0xa7);
             if (menu_1d4.next_selection > 0)
@@ -1111,7 +1111,7 @@ i32 TitleInf::do_player_data()
             {
                 draw_spell_card_page();
             }
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
         }
         if (menu_fc.next_selection == 4 && menu.next_selection == 3)
         {
@@ -1167,7 +1167,7 @@ i32 TitleInf::do_player_data()
             if (g_cheat_progress >= 9)
             {
                 g_Scorefile->unlock_all();
-                g_SoundManager.play_sound_centered(17, 0);
+                g_SoundManager.play_sound_centered(SE_EXTEND, 0);
                 g_cheat_progress = 0;
             }
             else if ((i8)g_cheat_keys_pressed[g_cheat_code[g_cheat_progress]] < 0)
@@ -1198,7 +1198,7 @@ i32 TitleInf::do_player_data()
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
             set_substate(3);
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             interrupt_and_clear(menu_fc.next_selection + 0xaf);
             interrupt_and_clear(menu.next_selection + 0xa7);
             interrupt_and_clear(0xb7);
@@ -1506,16 +1506,16 @@ i32 TitleInf::do_replay_menu()
         }
         if (menu_selection_moved(&menu_1d4))
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (menu_selection_moved(&menu))
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
             set_substate(5);
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             flags_5ce8 |= 4;
             return 1;
         }
@@ -1528,7 +1528,7 @@ i32 TitleInf::do_replay_menu()
             set_substate(4);
             replay_slot = menu_1d4.next_selection * 25 + menu.next_selection;
             menu.push();
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             menu.num_choices = 7;
             menu.set_cursor(0);
             for (i32 i = 0; i < 7; i++)
@@ -1561,7 +1561,7 @@ i32 TitleInf::do_replay_menu()
             }
             if (menu_selection_moved(&menu))
             {
-                g_SoundManager.play_sound_centered(10, 0);
+                g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             }
             if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
             {
@@ -1569,7 +1569,7 @@ i32 TitleInf::do_replay_menu()
                 menu.num_choices = 25;
                 menu.num_disabled = 0;
                 set_substate(2);
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 return 1;
             }
             if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
@@ -1578,7 +1578,7 @@ i32 TitleInf::do_replay_menu()
                 replay_stage = menu.next_selection;
                 set_substate(3);
                 flags_5ce8 |= 4;
-                g_SoundManager.play_sound_centered(50, 0);
+                g_SoundManager.play_sound_centered(SE_BOON00, 0);
                 g_Supervisor.fade_out_bgm(0.05f);
                 return 1;
             }
@@ -1961,7 +1961,7 @@ i32 TitleInf::do_score_name_entry()
             }
             if (menu_selection_moved(&menu_5a5c))
             {
-                g_SoundManager.play_sound_centered(10, 0);
+                g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             }
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
@@ -2025,7 +2025,7 @@ i32 TitleInf::do_score_name_entry()
             {
                 set_substate(3);
             }
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
@@ -2035,13 +2035,13 @@ i32 TitleInf::do_score_name_entry()
                 {
                     break;
                 }
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 replay_name_cursor--;
                 replay_name[replay_name_cursor] = ' ';
                 return 1;
             }
             set_substate(3);
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             return 1;
         }
         break;
@@ -2494,7 +2494,7 @@ i32 TitleInf::do_music_room()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             if (menu.next_selection < music_scroll)
             {
                 music_scroll = menu.next_selection;
@@ -2554,11 +2554,11 @@ i32 TitleInf::do_music_room()
             {
                 if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
                 {
-                    g_SoundManager.modify_bgm(4, 0, "dummy");
+                    g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
                 }
                 else
                 {
-                    g_SoundManager.modify_bgm(3, 0, "dummy");
+                    g_SoundManager.modify_bgm(BGM_STOP, 0, "dummy");
                 }
                 music_warning = 1;
                 return 0;
@@ -2566,9 +2566,9 @@ i32 TitleInf::do_music_room()
             g_Supervisor.play_bgm_wav(0, music_filenames[menu.next_selection]);
             if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
             {
-                g_SoundManager.modify_bgm(4, 0, "dummy");
+                g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
             }
-            g_SoundManager.modify_bgm(2, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_PLAY, 0, "dummy");
             g_Scorefile->bgm_unlocked[0] = 1;
             music_warning = 0;
             return 0;
@@ -2590,7 +2590,7 @@ i32 TitleInf::do_music_room()
             {
                 AnmManager::interrupt_tree(anm_ids_7d0[i], 1);
             }
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             substate = 3;
             time_in_state.reset();
             return 0;
@@ -2679,7 +2679,7 @@ i32 TitleInf::do_spell_practice_stage_select()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 3);
             AnmManager::interrupt_tree(anm_ids[0xd7], (i16)(menu.next_selection + 7));
         }
@@ -2687,7 +2687,7 @@ i32 TitleInf::do_spell_practice_stage_select()
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
             set_substate(4);
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             g_practice_last_stage = menu.next_selection;
             return 1;
         }
@@ -2695,7 +2695,7 @@ i32 TitleInf::do_spell_practice_stage_select()
         {
             AnmManager::interrupt_tree(anm_ids[0xd7], 6);
             set_substate(3);
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             g_practice_last_stage = menu.next_selection;
             return 1;
         }
@@ -2739,7 +2739,7 @@ i32 TitleInf::do_spell_practice_character()
     character_menu->current_selection = character_menu->next_selection;
     if (input_pressed_or_repeating(INPUT_LEFT))
     {
-        g_SoundManager.play_sound_centered(10, 0);
+        g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         AnmManager::interrupt_tree_and_run(anm_ids[0x11c], (i16)(character_menu->next_selection + 25));
         character_menu->move_cursor(-1);
         AnmManager::interrupt_tree_and_run(anm_ids[0x11c], (i16)(character_menu->next_selection + 13));
@@ -2756,7 +2756,7 @@ i32 TitleInf::do_spell_practice_character()
     }
     if (input_pressed_or_repeating(INPUT_RIGHT))
     {
-        g_SoundManager.play_sound_centered(10, 0);
+        g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         AnmManager::interrupt_tree_and_run(anm_ids[0x11c], (i16)(character_menu->next_selection + 19));
         character_menu->move_cursor(1);
         AnmManager::interrupt_tree_and_run(anm_ids[0x11c], (i16)(character_menu->next_selection + 7));
@@ -2829,7 +2829,7 @@ i32 TitleInf::do_spell_practice_row()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd8], 3);
             AnmManager::interrupt_tree(anm_ids[0xd8], (i16)(menu.next_selection + 7));
             load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
@@ -2838,19 +2838,19 @@ i32 TitleInf::do_spell_practice_row()
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
             set_substate(4);
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
         }
         else if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
             if (!spell_practice_row_seen(spell_stage, menu.next_selection))
             {
-                g_SoundManager.play_sound_centered(16, 0);
+                g_SoundManager.play_sound_centered(SE_INVALID, 0);
             }
             else
             {
                 AnmManager::interrupt_tree(anm_ids[0xd8], 6);
                 set_substate(3);
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
             }
         }
         break;
@@ -2938,7 +2938,7 @@ i32 TitleInf::do_spell_practice_subseason()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd9], 3);
             AnmManager::interrupt_tree(anm_ids[0xd9], (i16)(menu.next_selection + 7));
         }
@@ -2946,16 +2946,16 @@ i32 TitleInf::do_spell_practice_subseason()
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
             set_substate(4);
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             return 1;
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
             AnmManager::interrupt_tree(anm_ids[0xd9], 6);
             set_substate(3);
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             g_Supervisor.fade_out_bgm(0.05f);
-            g_SoundManager.play_sound_centered(50, 0);
+            g_SoundManager.play_sound_centered(SE_BOON00, 0);
             return 1;
         }
         break;
@@ -3048,25 +3048,25 @@ i32 TitleInf::do_spell_practice_difficulty()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             highlight_spell_row(menu.next_selection);
         }
         do_spell_practice_character();
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
             set_substate(4);
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             return 1;
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
             AnmManager::interrupt_tree(anm_ids_740[menu.next_selection], 6);
             set_substate(3);
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             if (spell_stage == 6)
             {
                 g_Supervisor.fade_out_bgm(0.05f);
-                g_SoundManager.play_sound_centered(50, 0);
+                g_SoundManager.play_sound_centered(SE_BOON00, 0);
                 return 1;
             }
         }

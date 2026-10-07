@@ -1037,7 +1037,7 @@ int Supervisor::teardown_everything()
         anm->vertex_buffer->Release();
         anm->vertex_buffer = NULL;
     }
-    g_SoundManager.modify_bgm(4, 0, "dummy");
+    g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
     g_TextHelper.release_buffer();
     DeleteObject(g_font_904);
     DeleteObject(g_font_90c);
@@ -1387,7 +1387,7 @@ HARNESS_CALLED i32 Supervisor::play_bgm_wav(i32 arg, const char *name)
 
     strcpy(path, name);
     append_wav_extension(path);
-    g_SoundManager.modify_bgm(BGM_PLAY_WAV, arg, path);
+    g_SoundManager.modify_bgm(BGM_LOAD, arg, path);
     return 1;
 }
 
@@ -1396,7 +1396,7 @@ HARNESS_CALLED i32 Supervisor::play_bgm(i32 arg, i32 track)
 {
     if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
     {
-        g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+        g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
     }
     g_SoundManager.modify_bgm(BGM_PLAY, arg, "dummy");
     g_Scorefile->bgm_unlocked[track] = 1;
@@ -1408,7 +1408,7 @@ HARNESS_CALLED i32 Supervisor::stop_bgm()
 {
     if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
     {
-        g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+        g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
     }
     else
     {
