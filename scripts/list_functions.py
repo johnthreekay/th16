@@ -5,7 +5,8 @@ Function starts are direct call targets plus code that follows int3
 padding (so functions only reached through pointers are included, but a
 few jump targets may show up too). Names come from ExpHP's th-re-data when
 TH_RE_DATA points at a checkout. Functions already decompiled in src/ are
-marked "done"; ones with only a placeholder are marked "stub".
+marked "done"; ones with only a placeholder are marked "stub"; CRT code
+that sigscan located (build/lib.csv) is marked "lib".
 
 Usage: list_functions.py 0x409490 0x411860
 """
@@ -59,6 +60,13 @@ def main():
             else:
                 status[addr] = "done"
 
+    # CRT code that sigscan located (build/lib.csv) needs no source.
+    lib = ROOT / "build/lib.csv"
+    if lib.exists():
+        for line in lib.read_text().splitlines():
+            parts = line.split("|")
+            if len(parts) == 3 and parts[2] == "library" and parts[0].startswith("0x"):
+                status.setdefault(int(parts[0], 16), "lib ")
     ordered = sorted(a for a in starts if start <= a < start + len(code))
     for k, a in enumerate(ordered):
         if not lo <= a < hi:
