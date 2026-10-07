@@ -377,6 +377,18 @@ decompiled code the surroundings it had in the original:
   Scorefile, after two buffer pointers: ScorefileData/ScorefileChara/
   ScorefileStatus are the true view, ScorefileCharacter the shifted one.
 
+- An EH frame in a function that does not realign its frame stops LTCG from
+  inlining the UCRT math (cosf, sinf, fabsf, floorf, atan2f) into everything
+  it calls, several calls down (PosVel::step). One tiny EH function is
+  enough; an EH caller that realigns through the ebx frame does not do it.
+  The earlier zun_sinf/zun_cosf "call count" and zun_atan2f observations
+  are probably this effect.
+- A caller that realigns its frame gives its callees known alignment: they
+  get padded frames and lose edi shrink-wrapping, even with other callers.
+  Whether a function realigns is decided over the whole function, not per
+  local. ecl_run_over_300 keeps five cases in noinline helpers so it stays
+  below the threshold until its `new Fog` EH frame can be restored.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
