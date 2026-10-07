@@ -417,8 +417,6 @@ HARNESS_CALLED i32 BulletManager::cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3D
     return 0;
 }
 
-// TODO: the original frame has 4 more (unused) bytes and saves edi up
-// front instead of around the mode 5 branch.
 // FUNCTION: TH16 0x416a00
 HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
 {
@@ -444,7 +442,7 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
         }
         if (!(g_Spellcard->flags & 1))
         {
-            g_ItemManager->spawn_item(10, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f,
+            g_ItemManager->spawn_item(10, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f,
                                       2.2f, 0, 0);
         }
     }
@@ -452,19 +450,19 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
     {
         if (mgr->bomb_cancel_count_multiple_of(3))
         {
-            g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f,
+            g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f,
                                       2.2f, 0, 1);
         }
         g_BulletManager->bullet_count_canceled_by_bombs++;
     }
     else if (mode == 4)
     {
-        g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f, 2.2f,
+        g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f, 2.2f,
                                   0, 1);
         if (g_SubseasonBomb->in_use == 1)
         {
             g_ItemManager->spawn_item(g_SubseasonBomb->season_level + 8, pos, 0,
-                                      g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f, 2.2f, 0, 0);
+                                      g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f, 2.2f, 0, 0);
         }
     }
 }

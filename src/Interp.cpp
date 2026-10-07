@@ -10,7 +10,9 @@ static inline f32 ease_in_back(f32 x, f32 a)
            (1.0f - a * a / ((1.0f - a) * (1.0f - a)));
 }
 
-// TODO: register allocation differs in most curves; ours shares the 0.5f constant across branches.
+// TODO: (reccmp 83%) the two-branch curves assign x and return it once, which the original's
+// registers show; left: the in-out-2 else branch (original keeps 2.0f in xmm1 and moves the
+// result into xmm3) and out-in-sine (original result in xmm1, 0.5f loaded once in the else).
 // FUNCTION: TH16 0x4033f0
 HARNESS_CALLED f32 interp_common_methods(i32 mode, f32 time, f32 end_time)
 {
@@ -37,44 +39,68 @@ HARNESS_CALLED f32 interp_common_methods(i32 mode, f32 time, f32 end_time)
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return x * x * 0.5f;
+            x = x * x;
         }
-        return (2.0f - (2.0f - x) * (2.0f - x)) * 0.5f;
+        else
+        {
+            x = 2.0f - (2.0f - x) * (2.0f - x);
+        }
+        return x * 0.5f;
     case INTERP_EASE_OUT_IN_2:
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return 0.5f - (1.0f - x) * (1.0f - x) * 0.5f;
+            x = 0.5f - (1.0f - x) * (1.0f - x) * 0.5f;
         }
-        return (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        else
+        {
+            x = (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        }
+        return x;
     case INTERP_EASE_IN_OUT_3:
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return x * x * x * 0.5f;
+            x = x * x * x;
         }
-        return (2.0f - (2.0f - x) * (2.0f - x) * (2.0f - x)) * 0.5f;
+        else
+        {
+            x = 2.0f - (2.0f - x) * (2.0f - x) * (2.0f - x);
+        }
+        return x * 0.5f;
     case INTERP_EASE_OUT_IN_3:
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return 0.5f - (1.0f - x) * (1.0f - x) * (1.0f - x) * 0.5f;
+            x = 0.5f - (1.0f - x) * (1.0f - x) * (1.0f - x) * 0.5f;
         }
-        return (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        else
+        {
+            x = (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        }
+        return x;
     case INTERP_EASE_IN_OUT_4:
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return x * x * x * x * 0.5f;
+            x = x * x * x * x;
         }
-        return (2.0f - (2.0f - x) * (2.0f - x) * (2.0f - x) * (2.0f - x)) * 0.5f;
+        else
+        {
+            x = 2.0f - (2.0f - x) * (2.0f - x) * (2.0f - x) * (2.0f - x);
+        }
+        return x * 0.5f;
     case INTERP_EASE_OUT_IN_4:
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return 0.5f - (1.0f - x) * (1.0f - x) * (1.0f - x) * (1.0f - x) * 0.5f;
+            x = 0.5f - (1.0f - x) * (1.0f - x) * (1.0f - x) * (1.0f - x) * 0.5f;
         }
-        return (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        else
+        {
+            x = (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        }
+        return x;
     case INTERP_FORCE_INITIAL:
         return 0.0f;
     case INTERP_FORCE_FINAL:
@@ -94,9 +120,13 @@ HARNESS_CALLED f32 interp_common_methods(i32 mode, f32 time, f32 end_time)
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return (1.0f - sinf(x * ZUN_PI * 0.5f + ZUN_PI / 2)) * 0.5f;
+            x = (1.0f - sinf(x * ZUN_PI * 0.5f + ZUN_PI / 2)) * 0.5f;
         }
-        return sinf((x - 1.0f) * ZUN_PI * 0.5f) * 0.5f + 0.5f;
+        else
+        {
+            x = sinf((x - 1.0f) * ZUN_PI * 0.5f) * 0.5f + 0.5f;
+        }
+        return x;
     case INTERP_EASE_IN_BACK_A:
         return ease_in_back(x, 0.25f);
     case INTERP_EASE_IN_BACK_B:

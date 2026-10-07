@@ -49,8 +49,8 @@ EnemyData::EnemyData()
 {
 }
 
-// TODO: the memset arguments for drops are pushed a few stores later in the original, and
-// next_enemy_id is read twice. The latter changed once set_boss_id got its harness caller.
+// TODO: drops.reset()'s memset arguments (push 0, lea esi, push esi) are scheduled a few
+// stores later in the original; ours pushes them right after push 0x50.
 // FUNCTION: TH16 0x41b580
 EnemyInf::EnemyInf(const char *sub_name)
 {
