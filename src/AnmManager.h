@@ -183,6 +183,11 @@ struct AnmFastVm
     u8 unk_60d[3];
     // Index in the pool; the low 13 bits of the VM's id.
     i32 fast_id;
+
+    // 0x46b770 and 0x46b790, which AnmManager's constructor and destructor
+    // pass to the vector constructor and destructor iterators.
+    AnmFastVm();
+    ~AnmFastVm();
 };
 
 // Vertex formats of the batched sprites and primitives (ExpHP:
@@ -284,6 +289,9 @@ struct AnmManager
     i32 render_sprite_2d(AnmVm *vm, i32 unk);
     // Render mode 5.
     void draw_vm__mode_5(AnmVm *vm);
+    // 0x468350. Draws vertex_count vertices (a triangle fan, in screen
+    // space) with the VM's texture and blending.
+    i32 draw_vm__mode_11(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count);
     // 0x46efa0
     AnmVm *get_vm_with_id(AnmId id);
     // 0x46f1c0. Marks the VM and its children for deletion. Reaches the
@@ -421,6 +429,14 @@ struct AnmManager
     static int __fastcall on_draw_4e_layer_40(AnmManager *mgr);
     static int __fastcall on_draw_50_layer_41(AnmManager *mgr);
     static int __fastcall on_draw_53_layer_42(AnmManager *mgr);
+
+    // 0x46d720. unload_anm as LTCG kept it out of line for one caller (an
+    // ECL instruction).
+    void unload_anm_out_of_line(i32 slot);
+    // 0x46c8b0. Loads an image file in memory into the top level of an
+    // existing texture. The last three arguments are the same at every call
+    // site; LTCG folded them. Does not use this.
+    HARNESS_CALLED i32 reload_texture(AnmLoadedD3D *d3d, void *data, u32 size, i32 unk_3, i32 unk_4, i32 unk_5);
 
     // Frees the ANM file in a slot, if one is loaded there.
     void unload_anm(i32 slot)

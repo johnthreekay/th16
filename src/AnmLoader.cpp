@@ -156,6 +156,17 @@ i32 AnmLoaded::load_entry(i32 index, AnmRawEntry *entry)
     return 1;
 }
 
+// FUNCTION: TH16 0x46d720
+void AnmManager::unload_anm_out_of_line(i32 slot)
+{
+    if (slot < sizeof(loaded_anms) / sizeof(loaded_anms[0]) && loaded_anms[slot] != NULL)
+    {
+        loaded_anms[slot]->release();
+        delete loaded_anms[slot];
+        loaded_anms[slot] = NULL;
+    }
+}
+
 // GLOBAL: TH16 0x491b90
 i32 g_anm_format_bpp[9] = {4, 4, 2, 2, 3, 2, 2, 1, 1};
 
@@ -245,6 +256,23 @@ i32 __stdcall AnmManager::load_texture_from_file(AnmLoadedD3D *d3d, i32 format, 
     convert_texture(d3d->texture);
     d3d->bytes_per_pixel = g_anm_format_bpp[format];
     return d3d->bytes_per_pixel * width * height;
+}
+
+// TODO: the original keeps d3d, data and size in ebx/edi/esi and loads the texture before the stores.
+// FUNCTION: TH16 0x46c8b0
+HARNESS_CALLED i32 AnmManager::reload_texture(AnmLoadedD3D *d3d, void *data, u32 size, i32 unk_3, i32 unk_4,
+                                              i32 unk_5)
+{
+    IDirect3DSurface9 *surface = NULL;
+
+    d3d->flags &= ~1;
+    d3d->src_data_size = size;
+    d3d->texture->GetSurfaceLevel(0, &surface);
+    D3DXLoadSurfaceFromFileInMemory(surface, NULL, NULL, data, size, NULL, D3DX_FILTER_NONE, 0, NULL);
+    surface->Release();
+    convert_texture(d3d->texture);
+    d3d->bytes_per_pixel = 4;
+    return 0;
 }
 
 // TODO: the original keeps raw and format in stack slots and width/height in edi/ebx; register allocation differs.

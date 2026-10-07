@@ -942,6 +942,12 @@ AnmManager::~AnmManager()
     }
 }
 
-// The compiler-generated AnmFastVm::~AnmFastVm (0x46b790) and
-// AnmFastVm::AnmFastVm (0x46b770) cannot be annotated yet: build.py only
-// supports scalar deleting destructors as SYNTHETIC.
+// FUNCTION: TH16 0x46b770
+AnmFastVm::AnmFastVm()
+{
+}
+
+// FUNCTION: TH16 0x46b790
+AnmFastVm::~AnmFastVm()
+{
+}
