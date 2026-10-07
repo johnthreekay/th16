@@ -225,11 +225,23 @@ struct LaserCurveNode
     LaserCurveNode *prev;
     f32 unk_8;
     f32 unk_c;
-    u8 unk_10[0x3c - 0x10];
+    // 0: straight at angle/speed, 1: velocity (or turning, see 0x438370),
+    // 2: speed and angle change by speed_delta/angle_delta.
+    i32 mode;
+    Float3 velocity;
+    u8 unk_20[0x2c - 0x20];
+    f32 angle;
+    f32 speed;
+    f32 speed_delta;
+    f32 angle_delta;
 
     LaserCurveNode()
     {
     }
+
+    // 0x438370. Steps a point of the curve back by one frame of this node's
+    // motion (t is the node time, its fraction the part of the frame).
+    void step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle, f32 t);
 };
 
 // Parameters of a curvy laser. Layout from ExpHP (zLaserCurveInner); his

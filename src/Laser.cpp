@@ -1614,3 +1614,71 @@ i32 LaserBeamInf::initialize(void *params)
     vm_928.flags_lo = vm_928.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
     return 0;
 }
+
+// TODO: register allocation and the order of the vector temporaries differ (the original builds them with unpcklps).
+// FUNCTION: TH16 0x438370
+void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle,
+                               f32 t)
+{
+    switch (mode)
+    {
+    case 0:
+        *out_pos = *pos - velocity * this->speed;
+        *out_speed = this->speed;
+        *out_angle = this->angle;
+        break;
+    case 1:
+        if (-990.0f > angle_delta)
+        {
+            f32 dt = speed - speed_delta;
+            *out_pos = *pos - velocity * dt;
+            *out_speed = this->speed - speed_delta;
+            *out_angle = angle;
+        }
+        else
+        {
+            Float3 a;
+            Float3 b;
+            a.z = 0.0f;
+            b.z = 0.0f;
+            laser_sincosmul(&a, angle, -speed);
+            laser_sincosmul(&b, angle_delta, -speed_delta);
+            Float3 sum = b + a;
+            *out_pos = *pos + sum;
+            *out_speed = (f32)sqrt(sum.x * sum.x + sum.y * sum.y);
+            *out_angle = atan2(sum.y, sum.x);
+        }
+        break;
+    case 2:
+    {
+        Float3 d;
+        d.z = 0.0f;
+        laser_sincosmul(&d, angle, speed);
+        f32 whole = (f32)floor(t);
+        *out_pos = *pos - d * (t - whole);
+        *out_speed = speed - speed_delta;
+        i32 i = 0;
+        f32 a = angle - angle_delta;
+        while (a > ZUN_PI)
+        {
+            a -= ZUN_2PI;
+            if (i++ > 32)
+            {
+                break;
+            }
+        }
+        while (a < -ZUN_PI)
+        {
+            a += ZUN_2PI;
+            if (i++ > 32)
+            {
+                break;
+            }
+        }
+        *out_angle = a;
+        laser_sincosmul(&d, a, *out_speed);
+        *out_pos = *out_pos - d * (1.0f - t + whole);
+        break;
+    }
+    }
+}
