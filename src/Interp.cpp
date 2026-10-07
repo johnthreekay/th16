@@ -537,8 +537,7 @@ D3DXVECTOR3 InterpStrange1::step()
     return current;
 }
 
-// TODO: the timer tick (tick_mixed) adds current_f and the speed the other way round and stores
-// current_f before current on the unscaled path, and one lea swaps its operands.
+// TODO: the timer tick: with tick() the stores match, but the result goes to the speed's xmm1 (the original loads current_f into xmm0, see README); method 17's bezier_2 + goal gets x or y/z operand order right, never both; one lea swaps its operands.
 // FUNCTION: TH16 0x464590
 HARNESS_CALLED Int3 InterpInt3::step()
 {

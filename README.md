@@ -804,6 +804,43 @@ decompiled code the surroundings it had in the original:
     `return 1` merges with the on_wait `return 1`; the fallthrough form keeps
     case 1 right and case 2 wrong.
 
+- Sweep round 2, list B:
+  - Padded frames (`push ecx`, or a `sub esp` 4 bytes bigger than the
+    locals need) in a function whose callers are aligned come from a callee
+    that wants 8-byte alignment. A dead double in that callee (marked
+    HARNESS_CALLED, all callers real) reproduces it: InterpAngle::step
+    matched with one in ZunAngle::operator*, its only callee nobody else
+    calls. The callee must not itself show signs of known alignment in the
+    original: a dead double in GuiMsgVm::show matched leave_state_1 but
+    cost show its edi shrink-wrapping.
+  - AnmVm::run is that callee for interrupt_child_and_run, set_vm_script
+    and the LaserLineInf/LaserInfiniteInf initializes (which realign in the
+    original): its double math sits in the `__forceinline` run_script, a
+    helper node of its own, so ours never counts as wanting alignment. A
+    dead double in a HARNESS_CALLED run matches both initializes but loses
+    nine others (start_std_vms, the Gui interrupt_spell_vms_2/3, Spellcard::end,
+    Item::init_anm, the TitleInf cursor updates, ...), whose callers would
+    need known alignment as well. Making run, set_vm_script, get_runtime or
+    leave_state_1 HARNESS_CALLED alone changes nothing.
+  - AnmVm::step_interpolators matched once HARNESS_CALLED (with the
+    InterpAngle, InterpInt3 and InterpFloat2 steps): /INCLUDE'd, it
+    realigned for InterpFloat2::step's D3DXVECTOR2.
+  - quickdiff MATCHes that reccmp reports below 100% can be real
+    differences hidden by "call targets count as equal": the player data
+    screen called `__alldiv` where the original calls `__aulldiv` (the play
+    time is an `unsigned __int64`). sigscan.py adds a CRT helper to lib.csv
+    only once our build calls it.
+  - Library data (dinput8.lib's c_dfDIKeyboard and c_dfDIJoystick2) can
+    carry a `// GLOBAL:` annotation on an `extern "C"` redeclaration;
+    reccmp then names both sides the same.
+  - Data from one object file is not laid out in definition order (both
+    orders put the anchor tables before g_sound_effect_table), so the
+    original's adjacency of g_anchor_corners_x after the sound table could
+    not be reproduced for SoundManager::initialize's end pointer.
+  - A struct local copy-initialized inside a block (`ZunAngle tmp =
+    initial;` in a branch) gets a stack slot that function-scope locals do
+    not; the original's InterpAngle::step code needs the block form.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
