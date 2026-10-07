@@ -264,9 +264,9 @@ i32 BulletManager::on_tick_body()
     {
         if (g_GameThread == NULL || !g_GameThread->flags.flag_10)
         {
-            if (b->flags & BULLET_FLAG_100 && ((b->state == BULLET_STATE_2 && b->timer_144c.current >= 8) || b->state == BULLET_STATE_1))
+            if (b->flags & BULLET_FLAG_FROZEN && ((b->state == BULLET_STATE_SPAWNING && b->state_time.current >= 8) || b->state == BULLET_STATE_ACTIVE))
             {
-                b->sub_4124b0(1);
+                b->check_player_collision(1);
             }
             else if (b->on_tick() != 0)
             {
@@ -287,7 +287,7 @@ i32 BulletManager::on_tick_body()
             b->next_in_layer = NULL;
         }
         bullet_count++;
-        b->timer_144c.tick();
+        b->state_time.tick();
     }
     return 1;
 }
@@ -304,7 +304,7 @@ int __fastcall bullet_map_sprite(AnmVm *vm, i32 sprite)
 }
 
 static_assert(offsetof(Bullet, cancel_script) == 0xc5c, "Bullet layout");
-static_assert(offsetof(Bullet, timer_144c) == 0x144c, "Bullet layout");
+static_assert(offsetof(Bullet, state_time) == 0x144c, "Bullet layout");
 static_assert(offsetof(BulletManager, anm_ids) == 0x13ffc8c, "BulletManager layout");
 static_assert(offsetof(BulletManager, unk_cancel_counter) == 0x1403b14, "BulletManager layout");
 
@@ -329,8 +329,8 @@ static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
     }
     D3DXVECTOR3 delta = bullet->velocity * g_game_speed * 0.5f;
     bullet->pos += delta;
-    bullet->state = 4;
-    bullet->timer_144c.reset();
+    bullet->state = BULLET_STATE_CANCELLED;
+    bullet->state_time.reset();
     return 0;
 }
 
@@ -348,7 +348,7 @@ HARNESS_CALLED void BulletManager::clear_all(i32 unused)
     Bullet *bullet = g_BulletManager->bullets;
     for (i32 i = 0; i < BULLET_COUNT; i++, bullet++)
     {
-        if (bullet->state != BULLET_STATE_FREE && bullet->state != 3)
+        if (bullet->state != BULLET_STATE_FREE && bullet->state != BULLET_STATE_HIT)
         {
             cancel_bullet(bullet, 0);
         }
@@ -372,7 +372,7 @@ HARNESS_CALLED i32 BulletManager::cancel_radius(D3DXVECTOR3 *pos, f32 radius, i3
     Bullet *bullet = g_BulletManager->iter_first();
     while (bullet != NULL)
     {
-        if (bullet->state == BULLET_STATE_2 || bullet->state == BULLET_STATE_1)
+        if (bullet->state == BULLET_STATE_SPAWNING || bullet->state == BULLET_STATE_ACTIVE)
         {
             if (bullet_in_circle(bullet, pos, radius))
             {
@@ -390,7 +390,7 @@ HARNESS_CALLED i32 BulletManager::cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 ra
 {
     for (Bullet *bullet = g_BulletManager->iter_first(); bullet != NULL; bullet = g_BulletManager->iter_advance())
     {
-        if ((bullet->state == BULLET_STATE_2 || bullet->state == BULLET_STATE_1) &&
+        if ((bullet->state == BULLET_STATE_SPAWNING || bullet->state == BULLET_STATE_ACTIVE) &&
             bullet->ex_invuln_remaining_frames == 0)
         {
             if (bullet_in_circle(bullet, pos, radius))
@@ -408,7 +408,7 @@ HARNESS_CALLED i32 BulletManager::cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3D
     Bullet *bullet = bullets;
     for (i32 i = 0; i < BULLET_COUNT; i++, bullet++)
     {
-        if ((bullet->state == BULLET_STATE_2 || bullet->state == BULLET_STATE_1) &&
+        if ((bullet->state == BULLET_STATE_SPAWNING || bullet->state == BULLET_STATE_ACTIVE) &&
             bullet->ex_invuln_remaining_frames == 0)
         {
             f32 radius = bullet->scale * bullet->hitbox_diameter;
@@ -599,10 +599,10 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
         bullet->pos.y += offset.y;
     }
     bullet->pos.z = 0.1f;
-    bullet->flags |= 1;
-    bullet->state = 1;
-    bullet->timer_144c.reset();
-    bullet->timer_1460.reset();
+    bullet->flags |= BULLET_FLAG_ALIVE;
+    bullet->state = BULLET_STATE_ACTIVE;
+    bullet->state_time.reset();
+    bullet->time_alive.reset();
     bullet->ex_invuln_remaining_frames = 0;
     bullet->scale = 1.0f;
     bullet->scale_i.end_time = 0;
@@ -611,7 +611,7 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
         if (et_protect_range > (bullet->pos.x - g_Player->inner.pos.x) * (bullet->pos.x - g_Player->inner.pos.x) +
                                    (bullet->pos.y - g_Player->inner.pos.y) * (bullet->pos.y - g_Player->inner.pos.y))
         {
-            bullet->sub_412670();
+            bullet->release();
             return -1;
         }
     }
@@ -620,7 +620,7 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
     bullet->color = props->color;
     bullet->sprite = props->type;
     bullet->unk_c7c = 0;
-    bullet->flags = (bullet->flags & ~0xc) | 2;
+    bullet->flags = (bullet->flags & ~(BULLET_FLAG_GRAZED | BULLET_FLAG_DELETE)) | BULLET_FLAG_HITBOX;
     bullet->unk_1448 = 60;
     bullet->timer_1420.reset();
     bullet->timer_1434.reset();
@@ -629,7 +629,7 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
     bullet->vm0.index_of_sprite_mapping_func = 1;
     bullet->vm0.associated_game_entity = bullet;
     bullet_anm->set_vm_script(&bullet->vm0, g_bullet_types[props->type].script);
-    bullet->flags |= 0x10;
+    bullet->flags |= BULLET_FLAG_ROUND_HITBOX;
     bullet->vm0.flags_hi = (bullet->vm0.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
     bullet->vm1.wipe();
     bullet->vm1.flags_lo &= ~1;
@@ -649,7 +649,7 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
         break;
     case 2:
         bullet->cancel_script = -1;
-        bullet->flags |= 0x10;
+        bullet->flags |= BULLET_FLAG_ROUND_HITBOX;
         break;
     case 3:
         bullet->cancel_script = 0x10;
@@ -659,43 +659,43 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
         break;
     case 6:
         bullet->cancel_script = g_bullet_types[bullet->sprite].sprites[props->color][3];
-        bullet->flags |= 0x10;
+        bullet->flags |= BULLET_FLAG_ROUND_HITBOX;
         break;
     case 7:
         bullet->cancel_script = 0x104;
-        bullet->flags |= 0x10;
+        bullet->flags |= BULLET_FLAG_ROUND_HITBOX;
         break;
     case 8:
         bullet->cancel_script = 0x107;
-        bullet->flags |= 0x10;
+        bullet->flags |= BULLET_FLAG_ROUND_HITBOX;
         break;
     case 9:
         bullet->cancel_script = 0x10a;
-        bullet->flags |= 0x10;
+        bullet->flags |= BULLET_FLAG_ROUND_HITBOX;
         break;
     case 10:
         bullet->cancel_script = 0x113;
-        bullet->flags |= 0x10;
+        bullet->flags |= BULLET_FLAG_ROUND_HITBOX;
         break;
     }
     bullet->layer = g_bullet_types[props->type].unk_108;
     bullet->bounce_sound = props->shot_transform_sfx;
-    bullet->unk_c58 = 5;
+    bullet->offscreen_grace = 5;
     bullet->hitbox_diameter = bullet->hitbox_height = g_bullet_types[props->type].hitbox_radius;
-    bullet->unk_c6c = props->sfx_flags;
+    bullet->sfx_flags = props->sfx_flags;
     bullet->active_ex_flags = 0;
-    bullet->unk_c64 = 0;
-    bullet->unk_c60 = props->start_transform;
+    bullet->ex_loop_count = 0;
+    bullet->ex_index = props->start_transform;
     memcpy(bullet->et_ex, props->ex, sizeof(bullet->et_ex));
-    if (props->ex[props->start_transform].type == 2)
+    if (props->ex[props->start_transform].type == BULLET_EX_ANIM)
     {
-        if ((i16)props->ex[bullet->unk_c60].a != 1)
+        if ((i16)props->ex[bullet->ex_index].a != 1)
         {
-            bullet->vm0.interrupt_out_of_line((i16)props->ex[bullet->unk_c60].a + 7);
+            bullet->vm0.interrupt_out_of_line((i16)props->ex[bullet->ex_index].a + 7);
         }
-        bullet->state = 2;
+        bullet->state = BULLET_STATE_SPAWNING;
         bullet->pos -= bullet->velocity * 4.0f;
-        bullet->unk_c60++;
+        bullet->ex_index++;
     }
     else
     {
@@ -711,16 +711,16 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
 }
 
 // TODO: about half the code differs: ours addresses et_ex by index instead of through an ex pointer kept in esi, hoists constants, and speculatively devirtualizes the inlined lasers' initialize calls.
-// Starts the et_ex transforms from unk_c60 on, until one has to wait: an
+// Starts the et_ex transforms from ex_index on, until one has to wait: an
 // empty slot, a slot-0 transform while others still run, or a transform of
 // a kind already running. Angle arguments of -999990 keep the bullet's
 // angle and 999990 or more aim at the player.
 // FUNCTION: TH16 0x413860
 void Bullet::run_ex()
 {
-    while (unk_c60 < 0x12)
+    while (ex_index < 0x12)
     {
-        i32 index = unk_c60;
+        i32 index = ex_index;
         BulletEx *ex = et_ex;
         ex += index;
         u32 type = ex->type;
@@ -728,7 +728,7 @@ void Bullet::run_ex()
         {
             return;
         }
-        if (ex->slot == 0 && (active_ex_flags & ~0x100))
+        if (ex->slot == 0 && (active_ex_flags & ~BULLET_EX_OFFSCREEN))
         {
             return;
         }
@@ -738,19 +738,19 @@ void Bullet::run_ex()
         }
         switch (type)
         {
-        case 2:
+        case BULLET_EX_ANIM:
             vm0.interrupt_out_of_line((i16)ex->a + 7);
-            state = 2;
+            state = BULLET_STATE_SPAWNING;
             pos -= velocity * 4.0f;
             break;
-        case 1:
-            active_ex_flags |= 1;
+        case BULLET_EX_SPEEDUP:
+            active_ex_flags |= BULLET_EX_SPEEDUP;
             ex_state[0].timer.set_value(0);
             ex_state[0].floats[7] = 0.0f;
             break;
-        case 4:
+        case BULLET_EX_ACCEL:
         {
-            active_ex_flags |= 4;
+            active_ex_flags |= BULLET_EX_ACCEL;
             ex_state[1].floats[0] = ex->r;
             ZunAngle angle = ex->s <= -999990.0f
                                  ? angle_ref()
@@ -760,22 +760,22 @@ void Bullet::run_ex()
             ex_state[1].ints[0] = ex->a;
             bullet_sincosmul((Float3 *)&ex_state[1].floats[5], ex_state[1].floats[1], ex_state[1].floats[0]);
         play_sound:
-            if (unk_c60 != 0 && bounce_sound >= 0)
+            if (ex_index != 0 && bounce_sound >= 0)
             {
                 g_SoundManager.play_sound_centered(bounce_sound, 0);
             }
             break;
         }
-        case 8:
-            active_ex_flags |= 8;
+        case BULLET_EX_ANGLE_ACCEL:
+            active_ex_flags |= BULLET_EX_ANGLE_ACCEL;
             ex_state[2].floats[0] = ex->r;
             ex_state[2].floats[1] = ex->s;
             ex_state[2].timer.set_value(0);
             ex_state[2].ints[0] = ex->a;
             goto play_sound;
-        case 0x10:
+        case BULLET_EX_ANGLE:
         {
-            active_ex_flags |= 0x10;
+            active_ex_flags |= BULLET_EX_ANGLE;
             ex_state[3].floats[0] = ex->s > -999990.0f ? ex->s : speed;
             f32 r = ex->r;
             ZunAngle angle;
@@ -823,8 +823,8 @@ void Bullet::run_ex()
             ex_state[3].ints[4] = ex->d;
             break;
         }
-        case 0x40:
-            active_ex_flags |= 0x40;
+        case BULLET_EX_BOUNCE:
+            active_ex_flags |= BULLET_EX_BOUNCE;
             ex_state[4].floats[0] = ex->r;
             if (ex->b & 0x20)
             {
@@ -840,27 +840,27 @@ void Bullet::run_ex()
             ex_state[4].ints[0] = 0;
             ex_state[4].ints[3] = ex->b;
             break;
-        case 0x80:
+        case BULLET_EX_INVULN:
             ex_invuln_remaining_frames = ex->a;
             break;
-        case 0x100:
-            active_ex_flags |= 0x100;
+        case BULLET_EX_OFFSCREEN:
+            active_ex_flags |= BULLET_EX_OFFSCREEN;
             ex_state[11].timer.set(ex->a);
             ex_state[11].ints[0] = ex->b;
-            unk_c60++;
+            ex_index++;
             continue;
-        case 0x800:
+        case BULLET_EX_PLAY_SOUND:
             g_SoundManager.play_sound_at_position(ex->a, pos.x);
-            unk_c60++;
+            ex_index++;
             continue;
-        case 0x400:
+        case BULLET_EX_DELETE:
             if (ex->a == 1)
             {
                 cancel_script = -1;
             }
             cancel(0);
             break;
-        case 0x200:
+        case BULLET_EX_SET_SPRITE:
             sprite = ex->a;
             color = ex->b & 0x7fff;
             hitbox_diameter = hitbox_height = g_bullet_types[ex->a].hitbox_radius;
@@ -869,7 +869,7 @@ void Bullet::run_ex()
             vm0.index_of_sprite_mapping_func = 1;
             vm0.associated_game_entity = this;
             g_BulletManager->bullet_anm->set_vm_script(&vm0, g_bullet_types[ex->a].script);
-            flags |= 0x10;
+            flags |= BULLET_FLAG_ROUND_HITBOX;
             vm0.flags_hi = (vm0.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
             vm1.wipe();
             vm1.flags_lo &= ~1;
@@ -889,7 +889,7 @@ void Bullet::run_ex()
                 break;
             case 2:
                 cancel_script = -1;
-                flags |= 0x10;
+                flags |= BULLET_FLAG_ROUND_HITBOX;
                 break;
             case 3:
                 cancel_script = 0x10;
@@ -902,23 +902,23 @@ void Bullet::run_ex()
                 break;
             case 6:
                 cancel_script = g_bullet_types[sprite].sprites[color][3];
-                flags |= 0x10;
+                flags |= BULLET_FLAG_ROUND_HITBOX;
                 break;
             case 7:
                 cancel_script = 0x104;
-                flags |= 0x10;
+                flags |= BULLET_FLAG_ROUND_HITBOX;
                 break;
             case 8:
                 cancel_script = 0x107;
-                flags |= 0x10;
+                flags |= BULLET_FLAG_ROUND_HITBOX;
                 break;
             case 9:
                 cancel_script = 0x10a;
-                flags |= 0x10;
+                flags |= BULLET_FLAG_ROUND_HITBOX;
                 break;
             case 10:
                 cancel_script = 0x113;
-                flags |= 0x10;
+                flags |= BULLET_FLAG_ROUND_HITBOX;
                 break;
             }
             if (ex->b & 0x8000)
@@ -926,17 +926,17 @@ void Bullet::run_ex()
                 anm_vm_interrupt_2(&vm0);
             }
             break;
-        case 0x1000:
-            active_ex_flags |= 0x1000;
+        case BULLET_EX_WRAP:
+            active_ex_flags |= BULLET_EX_WRAP;
             ex_state[6].ints[1] = ex->a;
             ex_state[6].ints[0] = 0;
             ex_state[6].ints[2] = ex->b;
             break;
-        case 0x8000:
-            unk_c4c = ex->a;
-            unk_c60 = index + 1;
+        case BULLET_EX_TAG:
+            ex_tag = ex->a;
+            ex_index = index + 1;
             continue;
-        case 0x2000:
+        case BULLET_EX_SHOOT:
         {
             EnemyBulletShooter props;
             props.pos = pos;
@@ -955,42 +955,42 @@ void Bullet::run_ex()
             props.ang_bullet_dist = ex->s;
             props.spd1 = ex->m <= -999990.0f ? speed : ex->m;
             props.spd2 = ex->n;
-            unk_c60 = index + 1;
+            ex_index = index + 1;
             props.type = ex[1].a;
             i32 cancel_after = ex[1].c;
             props.color = ex[1].b;
             props.sfx_flags = 0;
             memcpy(props.ex, et_ex, sizeof(props.ex));
             g_BulletManager->shoot_bullets(&props);
-            unk_c60++;
+            ex_index++;
             if (cancel_after != 0)
             {
                 cancel(0);
             }
             continue;
         }
-        case 0x10000:
+        case BULLET_EX_LOOP:
             if (ex->b <= 0)
             {
-                unk_c60 = ex->a;
+                ex_index = ex->a;
                 continue;
             }
-            if (unk_c64 == 0)
+            if (ex_loop_count == 0)
             {
-                unk_c64 = ex->b;
-                unk_c60 = ex->a;
+                ex_loop_count = ex->b;
+                ex_index = ex->a;
                 continue;
             }
-            if (unk_c64 == 1)
+            if (ex_loop_count == 1)
             {
-                unk_c64 = 0;
+                ex_loop_count = 0;
                 break;
             }
-            unk_c64--;
-            unk_c60 = ex->a;
+            ex_loop_count--;
+            ex_index = ex->a;
             continue;
-        case 0x80000:
-            active_ex_flags |= 0x80000;
+        case BULLET_EX_VELADD:
+            active_ex_flags |= BULLET_EX_VELADD;
             bullet_sincosmul((Float3 *)&ex_state[9].floats[5], ex->r, ex->s);
             ex_state[9].floats[7] = 0.0f;
             ex_state[9].floats[1] = ex->r;
@@ -998,7 +998,7 @@ void Bullet::run_ex()
             ex_state[9].ints[0] = ex->a;
             ex_state[9].timer.set_value(0);
             break;
-        case 0x40000:
+        case BULLET_EX_VEL:
             if (ex->r >= 990.0f)
             {
                 f32 offset = ex->r - 999.0f;
@@ -1013,11 +1013,11 @@ void Bullet::run_ex()
                 speed = ex->s;
             }
             bullet_sincosmul(&velocity, angle, speed);
-            unk_c60++;
+            ex_index++;
             continue;
-        case 0x20000:
+        case BULLET_EX_MOVE:
         {
-            active_ex_flags |= 0x20000;
+            active_ex_flags |= BULLET_EX_MOVE;
             D3DXVECTOR3 *target = (D3DXVECTOR3 *)&ex_state[8].floats[5];
             target->x = ex->r;
             target->y = ex->s;
@@ -1041,7 +1041,7 @@ void Bullet::run_ex()
             ex_move_i.reset_timer();
             break;
         }
-        case 0x100000:
+        case BULLET_EX_BLEND:
             if (ex->a == 2)
             {
                 ((AnmVmFlagsLoBits *)&vm0.flags_lo)->blend_mode = 2;
@@ -1054,10 +1054,10 @@ void Bullet::run_ex()
             {
                 ((AnmVmFlagsLoBits *)&vm0.flags_lo)->blend_mode = 0;
             }
-            unk_c60++;
+            ex_index++;
             continue;
-        case 0x400000:
-            active_ex_flags |= 0x400000;
+        case BULLET_EX_SIZE:
+            active_ex_flags |= BULLET_EX_SIZE;
             scale_i.initial = ex->r;
             scale_i.goal = ex->s;
             scale_i.bezier_1 = 0.0f;
@@ -1066,10 +1066,10 @@ void Bullet::run_ex()
             scale_i.method = ex->b;
             scale_i.reset();
             flags |= BULLET_FLAG_SCALED;
-            unk_c60++;
+            ex_index++;
             continue;
-        case 0x200000:
-            active_ex_flags |= 0x200000;
+        case BULLET_EX_VELTIME:
+            active_ex_flags |= BULLET_EX_VELTIME;
             ex_state[10].floats[0] = (ex->r - speed) / (f32)ex->a;
             if (ex->s <= -999990.0f)
             {
@@ -1084,26 +1084,26 @@ void Bullet::run_ex()
             ex_state[10].ints[0] = ex->a;
             bullet_sincosmul((Float3 *)&ex_state[10].floats[5], ex_state[10].floats[1], ex_state[10].floats[0]);
             goto play_sound;
-        case 0x800000:
+        case BULLET_EX_SAVE:
             *(D3DXVECTOR3 *)&ex_state[12].floats[2] = pos;
             ex_state[12].floats[1] = angle;
             ex_state[12].floats[0] = speed;
-            unk_c60++;
+            ex_index++;
             continue;
-        case 0x4000000:
+        case BULLET_EX_DELAY:
             if (ex->a <= 0)
             {
-                unk_c60 = index + 1;
+                ex_index = index + 1;
                 continue;
             }
-            active_ex_flags |= 0x4000000;
+            active_ex_flags |= BULLET_EX_DELAY;
             ex_state[13].timer.set_value(ex->a);
             break;
-        case 0x2000000:
+        case BULLET_EX_LAYER:
             layer = ex->a;
-            unk_c60 = index + 1;
+            ex_index = index + 1;
             continue;
-        case 0x1000000:
+        case BULLET_EX_ENEMY:
         {
             EnemyCreateParams params;
             memset(&params, 0, sizeof(params));
@@ -1119,7 +1119,7 @@ void Bullet::run_ex()
             g_EnemyManager->allocate_new_enemy(ex->string, &params, 0);
             break;
         }
-        case 0x8000000:
+        case BULLET_EX_LASER:
             if (ex->a == 0)
             {
                 LaserLineInner params;
@@ -1136,7 +1136,7 @@ void Bullet::run_ex()
                 params.flags |= 1;
                 params.laser_new_arg_1 = ex->m;
                 params.laser_new_arg_2 = ex->n;
-                unk_c60++;
+                ex_index++;
                 params.laser_new_arg_3 = ex[1].r;
                 params.laser_new_arg_4 = ex[1].s;
                 params.distance = ex[1].m;
@@ -1156,7 +1156,7 @@ void Bullet::run_ex()
                     mgr->append(laser);
                     laser->initialize(&params);
                 }
-                unk_c60++;
+                ex_index++;
                 if (cancel_after != 0)
                 {
                     cancel(0);
@@ -1180,7 +1180,7 @@ void Bullet::run_ex()
                 params.speed = ex->s <= -999990.0f ? speed : ex->s;
                 params.laser_new_arg_1 = ex->m;
                 params.laser_new_arg_2 = ex->n;
-                unk_c60++;
+                ex_index++;
                 params.unk_30 = ex[1].a;
                 params.unk_34 = ex[1].b;
                 params.unk_38 = ex[1].c;
@@ -1202,7 +1202,7 @@ void Bullet::run_ex()
                     mgr->append(laser);
                     laser->initialize(&params);
                 }
-                unk_c60++;
+                ex_index++;
                 if (d & 0x10000)
                 {
                     cancel(0);
@@ -1210,16 +1210,16 @@ void Bullet::run_ex()
                 continue;
             }
             continue;
-        case 0x80000000:
+        case BULLET_EX_WAIT:
             if (ex->a <= 0)
             {
-                unk_c60 = index + 1;
+                ex_index = index + 1;
                 continue;
             }
-            active_ex_flags |= 0x80000000;
+            active_ex_flags |= BULLET_EX_WAIT;
             ex_state[5].timer.set_value(ex->a);
             break;
-        case 0x20000000:
+        case BULLET_EX_HITBOX:
         {
             f32 size = ex->r;
             if (0.0f > size)
@@ -1231,7 +1231,7 @@ void Bullet::run_ex()
             break;
         }
         }
-        unk_c60++;
+        ex_index++;
     }
 }
 
@@ -1281,7 +1281,7 @@ i32 Bullet::step_ex_00()
         ex_state[0].timer.tick_mixed();
         return 0;
     }
-    active_ex_flags ^= 1;
+    active_ex_flags ^= BULLET_EX_SPEEDUP;
     return 1;
 }
 
@@ -1437,7 +1437,7 @@ i32 Bullet::step_ex_06()
         }
         if (ex_state[4].ints[0] >= ex_state[4].ints[1])
         {
-            active_ex_flags &= ~0x40;
+            active_ex_flags &= ~BULLET_EX_BOUNCE;
             return 1;
         }
     }
@@ -1449,6 +1449,7 @@ i32 Bullet::step_ex_19()
 {
     if (ex_state[9].timer.current >= ex_state[9].ints[0])
     {
+        // Clears SPEEDUP and ANGLE_ACCEL, not VELADD (as in the original).
         active_ex_flags &= 0xfffffff6;
         return 1;
     }
@@ -1469,7 +1470,7 @@ i32 Bullet::step_ex_03()
 {
     if (ex_state[2].timer.current >= ex_state[2].ints[0])
     {
-        active_ex_flags &= ~8;
+        active_ex_flags &= ~BULLET_EX_ANGLE_ACCEL;
         return 1;
     }
     add_angle_twice(&angle_ref(), ex_state[2].floats[1] * g_game_speed);
@@ -1514,7 +1515,7 @@ i32 Bullet::step_ex_04()
         if (ex_state[3].ints[2] >= ex_state[3].ints[1])
         {
             bullet_sincosmul(&velocity, angle, new_speed);
-            active_ex_flags &= ~0x10;
+            active_ex_flags &= ~BULLET_EX_ANGLE;
             return 1;
         }
     }
@@ -1532,7 +1533,7 @@ i32 Bullet::step_ex_02()
 {
     if (ex_state[1].timer.current >= ex_state[1].ints[0])
     {
-        active_ex_flags &= ~4;
+        active_ex_flags &= ~BULLET_EX_ACCEL;
         return 1;
     }
     speed += ex_state[1].floats[0] * g_game_speed;
@@ -1551,7 +1552,7 @@ i32 Bullet::step_ex_21()
 {
     if (ex_state[10].timer.current >= ex_state[10].ints[0])
     {
-        active_ex_flags &= ~0x200000;
+        active_ex_flags &= ~BULLET_EX_VELTIME;
         return 1;
     }
     speed += ex_state[10].floats[0] * g_game_speed;
@@ -1614,7 +1615,7 @@ i32 Bullet::step_ex_12()
         }
         if (ex_state[6].ints[0] >= ex_state[6].ints[1])
         {
-            active_ex_flags ^= 0x1000;
+            active_ex_flags ^= BULLET_EX_WRAP;
             return 1;
         }
     }
@@ -1629,7 +1630,7 @@ i32 Bullet::step_ex_17()
     if (ex_state[8].timer.current >= ex_state[8].ints[0])
     {
         pos = *(D3DXVECTOR3 *)&ex_state[8].floats[5];
-        active_ex_flags &= ~0x20000;
+        active_ex_flags &= ~BULLET_EX_MOVE;
         speed = ex_state[8].floats[0];
         bullet_sincosmul(&velocity, angle, speed);
         velocity.z = 0.0f;
@@ -1653,18 +1654,18 @@ i32 Bullet::step_ex_17()
 // TODO: the original saves ebx and edi in the prologue, keeps
 // cancel_script in ecx and the manager in eax, and puts goal 4 bytes lower.
 // FUNCTION: TH16 0x4124b0
-i32 Bullet::sub_4124b0(i32 graze_only)
+i32 Bullet::check_player_collision(i32 graze_only)
 {
     vm0.flags_lo &= ~0x60000;
     vm0.pos = g_zero_vec;
-    if ((flags & 2) && hitbox_diameter > 0.0f)
+    if ((flags & BULLET_FLAG_HITBOX) && hitbox_diameter > 0.0f)
     {
         Float3 *hitbox = (Float3 *)&hitbox_diameter;
         Float3 *p = &pos;
         i32 result;
         if (!(flags & BULLET_FLAG_SCALED))
         {
-            if (!(flags & 0x10))
+            if (!(flags & BULLET_FLAG_ROUND_HITBOX))
             {
                 result = g_Player->check_hit_rect(p, hitbox, graze_only);
             }
@@ -1673,7 +1674,7 @@ i32 Bullet::sub_4124b0(i32 graze_only)
                 result = g_Player->check_hit_circle(p, hitbox_diameter, graze_only);
             }
         }
-        else if (!(flags & 0x10))
+        else if (!(flags & BULLET_FLAG_ROUND_HITBOX))
         {
             D3DXVECTOR3 size;
             size.x = (*hitbox)[0] * scale;
@@ -1688,7 +1689,7 @@ i32 Bullet::sub_4124b0(i32 graze_only)
         {
             if (ex_invuln_remaining_frames == 0)
             {
-                state = 3;
+                state = BULLET_STATE_HIT;
                 vm0.interrupt_out_of_line(result);
                 if (vm1.flags_lo & 1)
                 {
@@ -1703,10 +1704,10 @@ i32 Bullet::sub_4124b0(i32 graze_only)
                 }
             }
         }
-        else if (result == 2 && !(flags & 4))
+        else if (result == 2 && !(flags & BULLET_FLAG_GRAZED))
         {
             g_Player->do_graze(p);
-            flags |= 4;
+            flags |= BULLET_FLAG_GRAZED;
         }
         return result;
     }
@@ -1714,20 +1715,20 @@ i32 Bullet::sub_4124b0(i32 graze_only)
 }
 
 // FUNCTION: TH16 0x412670
-void Bullet::sub_412670()
+void Bullet::release()
 {
     if (state == BULLET_STATE_FREE)
     {
         return;
     }
     state = BULLET_STATE_FREE;
-    timer_144c.reset();
-    timer_1460.reset();
+    state_time.reset();
+    time_alive.reset();
     timer_1420.reset();
     timer_1434.reset();
-    flags &= ~0x341;
+    flags &= ~(BULLET_FLAG_ALIVE | BULLET_FLAG_SCALED | BULLET_FLAG_FROZEN | BULLET_FLAG_NO_DRAW);
     unk_c7c = 0;
-    unk_c4c = 0;
+    ex_tag = 0;
     g_BulletManager->freelist_head.insert_after(&freelist_node);
     tick_list_node.unlink_inline();
 }
@@ -1737,19 +1738,19 @@ void Bullet::sub_412670()
 // FUNCTION: TH16 0x411e70
 i32 Bullet::on_tick()
 {
-    timer_1460.tick();
-    if (flags & 8)
+    time_alive.tick();
+    if (flags & BULLET_FLAG_DELETE)
     {
     die:
-        sub_412670();
+        release();
         return -1;
     }
-    if (active_ex_flags & 0x400000)
+    if (active_ex_flags & BULLET_EX_SIZE)
     {
         scale = scale_i.step();
         if (scale_i.end_time == 0)
         {
-            active_ex_flags &= ~0x400000;
+            active_ex_flags &= ~BULLET_EX_SIZE;
             if (scale == 1.0f)
             {
                 flags &= ~BULLET_FLAG_SCALED;
@@ -1758,9 +1759,9 @@ i32 Bullet::on_tick()
     }
     switch (state)
     {
-    case 2:
+    case BULLET_STATE_SPAWNING:
         pos = pos + velocity * g_game_speed * 0.5f;
-        if (timer_144c.current >= 8 && sub_4124b0(0) == 1)
+        if (state_time.current >= 8 && check_player_collision(0) == 1)
         {
             break;
         }
@@ -1768,11 +1769,11 @@ i32 Bullet::on_tick()
         {
             break;
         }
-        state = 1;
-    case 1:
+        state = BULLET_STATE_ACTIVE;
+    case BULLET_STATE_ACTIVE:
         do
         {
-            if (!(active_ex_flags & 0x4000000))
+            if (!(active_ex_flags & BULLET_EX_DELAY))
             {
                 run_ex();
             }
@@ -1781,47 +1782,47 @@ i32 Bullet::on_tick()
                 break;
             }
             i32 done = 0;
-            if (active_ex_flags & 1)
+            if (active_ex_flags & BULLET_EX_SPEEDUP)
             {
                 done = step_ex_00();
             }
-            if (active_ex_flags & 4)
+            if (active_ex_flags & BULLET_EX_ACCEL)
             {
                 done += step_ex_02();
             }
-            if (active_ex_flags & 0x200000)
+            if (active_ex_flags & BULLET_EX_VELTIME)
             {
                 done += step_ex_21();
             }
-            if (active_ex_flags & 8)
+            if (active_ex_flags & BULLET_EX_ANGLE_ACCEL)
             {
                 done += step_ex_03();
             }
-            if (active_ex_flags & 0x10)
+            if (active_ex_flags & BULLET_EX_ANGLE)
             {
                 done += step_ex_04();
             }
-            if (active_ex_flags & 0x40)
+            if (active_ex_flags & BULLET_EX_BOUNCE)
             {
                 done += step_ex_06();
             }
-            if (active_ex_flags & 0x20000)
+            if (active_ex_flags & BULLET_EX_MOVE)
             {
                 done += step_ex_17();
             }
-            if (active_ex_flags & 0x80000)
+            if (active_ex_flags & BULLET_EX_VELADD)
             {
                 done += step_ex_19();
             }
-            if (active_ex_flags & 0x100)
+            if (active_ex_flags & BULLET_EX_OFFSCREEN)
             {
                 done += step_ex_08();
             }
-            if (active_ex_flags & 0x80000000)
+            if (active_ex_flags & BULLET_EX_WAIT)
             {
                 if (ex_state[5].timer.current <= 0)
                 {
-                    active_ex_flags ^= 0x80000000;
+                    active_ex_flags ^= BULLET_EX_WAIT;
                     done++;
                 }
                 else
@@ -1829,12 +1830,12 @@ i32 Bullet::on_tick()
                     ex_state[5].timer--;
                 }
             }
-            if (active_ex_flags & 0x4000000)
+            if (active_ex_flags & BULLET_EX_DELAY)
             {
                 if (ex_state[13].timer.current <= 0)
                 {
                     flags &= ~BULLET_FLAG_NO_DRAW;
-                    active_ex_flags ^= 0x4000000;
+                    active_ex_flags ^= BULLET_EX_DELAY;
                     done++;
                 }
                 else
@@ -1855,18 +1856,18 @@ i32 Bullet::on_tick()
         if (!(flags & BULLET_FLAG_NO_DRAW))
         {
             pos += velocity * g_game_speed;
-            sub_4124b0(0);
+            check_player_collision(0);
         }
         break;
-    case 3:
+    case BULLET_STATE_HIT:
         pos = pos + velocity * g_game_speed * 0.5f;
         break;
-    case 5:
-        if (timer_144c.current < 3)
+    case BULLET_STATE_5:
+        if (state_time.current < 3)
         {
             break;
         }
-        if (timer_144c.current == 3)
+        if (state_time.current == 3)
         {
             vm0.interrupt_out_of_line(1);
             if (cancel_script >= 0)
@@ -1881,11 +1882,11 @@ i32 Bullet::on_tick()
     }
     if (vm_sprite(&vm0) != NULL)
     {
-        if (active_ex_flags & 0x1000)
+        if (active_ex_flags & BULLET_EX_WRAP)
         {
             step_ex_12();
         }
-        if (!(active_ex_flags & 0x100) && unk_c58 < 1)
+        if (!(active_ex_flags & BULLET_EX_OFFSCREEN) && offscreen_grace < 1)
         {
             if (outside_range(pos.x, vm_sprite(&vm0)->sprite_width * scale, -192.0f, 192.0f) ||
                 outside_range(pos.y, vm_sprite(&vm0)->sprite_height * scale, -64.0f, 480.0f))
@@ -1898,9 +1899,9 @@ i32 Bullet::on_tick()
     {
         ex_invuln_remaining_frames--;
     }
-    if (unk_c58 > 0)
+    if (offscreen_grace > 0)
     {
-        unk_c58--;
+        offscreen_grace--;
     }
     if (!(flags & BULLET_FLAG_NO_DRAW) && vm0.run())
     {
@@ -1982,13 +1983,13 @@ i32 Bullet::step_ex_08()
         }
         if (-998.0f > best_left || -998.0f > best_right)
         {
-            active_ex_flags ^= 0x100;
+            active_ex_flags ^= BULLET_EX_OFFSCREEN;
             return 1;
         }
     }
     if (ex_state[11].timer.current <= 0)
     {
-        active_ex_flags ^= 0x100;
+        active_ex_flags ^= BULLET_EX_OFFSCREEN;
         return 1;
     }
     return 0;

@@ -467,14 +467,14 @@ int __fastcall ecl_funcset_cancel_near_player(EnemyData *enemy)
     Bullet *b = mgr->iter_first();
     while (b != NULL)
     {
-        if (b->unk_c4c == 1)
+        if (b->ex_tag == 1)
         {
             f32 dy = g_Player->inner.pos.y - b->pos.y;
             f32 dx = g_Player->inner.pos.x - b->pos.x;
             if (enemy->ecl_float_vars[0] * enemy->ecl_float_vars[0] > dx * dx + dy * dy)
             {
-                b->unk_c60 = 8;
-                b->unk_c4c = 2;
+                b->ex_index = 8;
+                b->ex_tag = 2;
                 b->active_ex_flags = 0;
             }
         }
