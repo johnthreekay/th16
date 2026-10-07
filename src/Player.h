@@ -73,7 +73,9 @@ struct PlayerBullet
     i32 shooter_ref;
     // Index of its damage source plus one, 0 for none.
     i32 damage_source_index;
-    u8 unk_b4[0xc0 - 0xb4];
+    // Where the bullet heads (the 0x4470f0 shot: the enemy it lined up
+    // with).
+    Float3 target_pos;
 
     struct PlayerDamageSource *damage_source();
     // 0x444e10. Fires the shooter ref names from this (free) bullet; 0 on

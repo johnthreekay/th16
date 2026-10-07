@@ -193,6 +193,59 @@ i32 __fastcall sht_on_init_4470e0(PlayerBullet *bullet)
     return 0;
 }
 
+// Waits for an enemy in the same row, then stops and flies at it
+// sideways.
+// TODO: ours gets a /GS cookie for pos and merges the flags_low & 1 test into the 0xc000021 one.
+// FUNCTION: TH16 0x4470f0
+i32 __fastcall sht_on_tick_4470f0(PlayerBullet *bullet)
+{
+    if (bullet->state == 2)
+    {
+        return 0;
+    }
+    if (!(bullet->flags & 0x3c))
+    {
+        EnemyManager *mgr = g_EnemyManager;
+        if (mgr == NULL)
+        {
+            bullet->unk_90 = 0;
+        }
+        else if (bullet->unk_90 == 0)
+        {
+            mgr->unk_15c = mgr->active_enemy_list_head;
+            EnemyInf *enemy = mgr->unk_15c->entry;
+            Float3 pos = bullet->pos.pos;
+            while (enemy != NULL)
+            {
+                if (!(enemy->enemy.flags_low & 1) && !(enemy->enemy.flags_low & 0xc000021) &&
+                    pos.y >= enemy->enemy.final_pos.pos.y - 16.0f && enemy->enemy.final_pos.pos.y + 16.0f >= pos.y &&
+                    (enemy->enemy.final_pos.pos.x - 16.0f >= pos.x || pos.x >= enemy->enemy.final_pos.pos.x + 16.0f))
+                {
+                    bullet->flags = (bullet->flags & ~0x38) | 4;
+                    AnmManager::interrupt_tree(bullet->anm_id, 2);
+                    bullet->timer_20.set_value(0);
+                    bullet->pos.speed = 0.0f;
+                    bullet->target_pos = enemy->enemy.final_pos.pos;
+                    break;
+                }
+                mgr->unk_15c = mgr->unk_15c->next;
+                enemy = mgr->unk_15c != NULL ? mgr->unk_15c->entry : NULL;
+            }
+        }
+    }
+    if ((bullet->flags & 0x3c) == 4)
+    {
+        if (bullet->timer_20.current == 4)
+        {
+            bullet->pos.set_angle(bullet->pos.pos.x > bullet->target_pos.x ? -ZUN_PI : 0.0f);
+            bullet->pos.speed = 14.0f;
+            bullet->flags = (bullet->flags & ~0x34) | 8;
+        }
+        bullet->timer_20++;
+    }
+    return 0;
+}
+
 // FUNCTION: TH16 0x447450
 i32 __fastcall sht_on_init_447450(PlayerBullet *bullet)
 {
