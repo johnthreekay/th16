@@ -62,55 +62,94 @@ struct ConfigData
     }
 };
 
+// GameThread::flags. Some are written as bitfields and some through the
+// GameThreadFlagMask masks of the whole word, as in the original.
 struct GameThreadFlags
 {
+    // Never set in TH16: the game objects freeze, as while loading.
     u32 flag_0 : 1;
-    // Lasers tick with the game speed forced to 0.
+    // Never set in TH16: enemies, lasers and the game's ANM VMs freeze
+    // (lasers tick with the game speed forced to 0).
     u32 flag_1 : 1;
-    // Paused (also set while the stage loads): items and lasers neither
-    // tick nor draw, and replays stop recording.
-    u32 paused : 1;
-    u32 flag_3 : 1;
-    // Excludes the current second from FpsCounter's totals.
-    u32 flag_4 : 1;
+    // The thread is setting the game up (from create until thread_start is
+    // done): items and lasers neither tick nor draw, and replays stop
+    // recording.
+    u32 loading : 1;
+    // thread_start failed: the game goes back to the title.
+    u32 failed : 1;
+    // The pause menu (or the game over or replay end menu) is open: the
+    // current second does not count in FpsCounter's totals.
+    u32 in_menu : 1;
+    // Never set in TH16; like in_menu, they stop the game.
     u32 flag_5 : 1;
     u32 flag_6 : 1;
-    // Cleared by FpsCounter once a second.
-    u32 flag_7 : 1;
+    // on_tick ran while loading; FpsCounter clears it once a second.
+    u32 ticked_while_loading : 1;
     u32 flag_8 : 2;
+    // Never set in TH16: enemies, items and lasers freeze, and bullets are
+    // not cancelled.
     u32 flag_10 : 1;
-    // Set while the stage restarts after its intro (sub_42dc50/sub_42dee0).
-    u32 flag_11 : 1;
-    u32 flag_12 : 4;
-    // Keeps the pause key from opening the pause menu.
-    u32 flag_16 : 1;
+    // begin_stage started a crossfade from the previous stage's background;
+    // finish_stage_transition resets the game objects after it.
+    u32 stage_transition : 1;
+    u32 flag_12 : 2;
+    // The last stage was cleared: the ending fade runs (fade_timer).
+    u32 game_cleared : 1;
+    u32 flag_15 : 1;
+    // The stage music is restarting (waiting music_restart_delay frames,
+    // then seeking to the stage time); keeps the pause key from opening the
+    // pause menu. Nothing in TH16 sets it.
+    u32 music_restart : 1;
     u32 flag_17 : 15;
 };
 
-// Runs a game in progress. Layout from ExpHP's th-re-data (zGameThread),
-// except that the settings start at 0x24, not 0x20.
+// The GameThreadFlags bits as masks of the whole word.
+enum GameThreadFlagMask
+{
+    GAME_THREAD_LOADING = 1 << 2,
+    GAME_THREAD_FAILED = 1 << 3,
+    GAME_THREAD_IN_MENU = 1 << 4,
+    GAME_THREAD_FLAG_5 = 1 << 5,
+    GAME_THREAD_FLAG_6 = 1 << 6,
+    GAME_THREAD_TICKED_WHILE_LOADING = 1 << 7,
+    GAME_THREAD_GAME_CLEARED = 1 << 14,
+    GAME_THREAD_MUSIC_RESTART = 1 << 16,
+};
+
+// Runs a game in progress: sets it up on a worker thread, then each frame
+// handles the stage start, the ending fade, the demo's end and the timers.
+// Layout from ExpHP's th-re-data (zGameThread), except that the settings
+// start at 0x24, not 0x20.
 struct GameThread
 {
     u32 unk_0;
     UpdateFunc *on_tick;
     UpdateFunc *on_draw;
     ZunTimer time_in_stage;
-    u32 unk_20;
+    // The stage table's stage number when the thread started.
+    u32 start_stage_num;
+    // The settings the game runs with (a copy of the Supervisor's, or the
+    // replay's).
     ConfigData config;
     GameThreadFlags flags;
-    // Frames since the music restart flag (0x10000) was set, and how many
-    // to wait.
-    i32 unk_8c;
-    i32 unk_90;
+    // Frames since the music restart began, and how many to wait (60).
+    i32 music_restart_time;
+    i32 music_restart_delay;
+    // Zeroed by the constructor (before its memset); not otherwise used.
     i32 unk_94;
     u8 unk_98[0xa8 - 0x98];
+    // Set by ECL along with Globals::chapter.
     i32 chapter;
+    // 0: playing, otherwise watching a replay.
     i32 replay_mode;
+    // Frames since the last stage was cleared (game_cleared).
     i32 fade_timer;
 
     GameThread();
     ~GameThread();
 
+    // Starts a game: the setup runs in thread_start on the Supervisor's
+    // worker thread.
     HARNESS_CALLED static GameThread *create(i32 replay_mode);
     static void destroy();
     static i32 thread_start();
@@ -122,13 +161,15 @@ struct GameThread
     static i32 __fastcall on_draw_callback(GameThread *thread);
     // Adds the time since the last call to the scorefile's play time.
     static void update_play_time();
-    // 0x42dc50. Restarts the stage after its intro: 1 once the game
-    // should switch modes, otherwise resets the game objects (or leaves
-    // that to sub_42dee0 when there is a second stage).
-    HARNESS_CALLED i32 sub_42dc50();
-    // 0x42dee0. Finishes a stage restart that sub_42dc50 began: resets the
-    // game objects, reactivates every manager and restarts the music.
-    i32 sub_42dee0();
+    // 0x42dc50. Starts the stage on its first frame: 1 if the thread failed
+    // (back to the title); otherwise starts the background and resets the
+    // game objects, or, coming from a previous stage, crossfades from its
+    // background and leaves the reset to finish_stage_transition.
+    HARNESS_CALLED i32 begin_stage();
+    // 0x42dee0. 30 frames in, finishes a stage transition that begin_stage
+    // started: resets the game objects, reactivates every manager and
+    // starts the stage music.
+    i32 finish_stage_transition();
 };
 
 extern GameThread *g_GameThread;

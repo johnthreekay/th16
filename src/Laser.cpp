@@ -364,7 +364,7 @@ i32 LaserManager::on_tick_body()
 // FUNCTION: TH16 0x4316b0
 i32 __fastcall LaserManager::on_tick_callback(LaserManager *mgr)
 {
-    if (g_GameThread->flags.flag_0 | g_GameThread->flags.paused)
+    if (g_GameThread->flags.flag_0 | g_GameThread->flags.loading)
     {
         return 1;
     }
@@ -386,7 +386,7 @@ i32 __fastcall LaserManager::on_tick_callback(LaserManager *mgr)
 // FUNCTION: TH16 0x431720
 i32 __fastcall LaserManager::on_draw_callback(LaserManager *mgr)
 {
-    if (g_GameThread->flags.paused)
+    if (g_GameThread->flags.loading)
     {
         return 1;
     }

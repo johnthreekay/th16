@@ -36,7 +36,7 @@ void harness_gui_msg_textbox(GuiMsgVm *msg, i32 kind, f32 x, f32 y, f32 width)
 }
 
 // Like the HUD code at 0x42dc6c.
-void harness_gui_sub_42c1b0()
+void harness_gui_hide_stage_clear_bonus()
 {
-    g_Gui->sub_42c1b0();
+    g_Gui->hide_stage_clear_bonus();
 }

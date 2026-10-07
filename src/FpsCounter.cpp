@@ -43,7 +43,7 @@ HARNESS_CALLED int FpsCounter::update()
         }
         if (g_GameThread != NULL)
         {
-            if (!g_GameThread->flags.paused && !g_GameThread->flags.flag_4)
+            if (!g_GameThread->flags.loading && !g_GameThread->flags.in_menu)
             {
                 total_expected += 60.0;
                 if (fps > 57.0f)
@@ -55,7 +55,7 @@ HARNESS_CALLED int FpsCounter::update()
                     total_actual += fps;
                 }
             }
-            g_GameThread->flags.flag_7 = 0;
+            g_GameThread->flags.ticked_while_loading = 0;
         }
         frame_count = 0;
     }

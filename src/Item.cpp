@@ -361,7 +361,7 @@ i32 ItemManager::on_tick_body()
                     if (g_Globals.collect_extend(0))
                     {
                         g_SoundManager.play_sound_centered(0x11, 0);
-                        g_Gui->sub_42bcf0(0, 4);
+                        g_Gui->show_notice(0, GUI_NOTICE_EXTEND);
                     }
                     break;
                 case 6:
@@ -448,7 +448,7 @@ i32 __fastcall ItemManager::on_tick_callback(ItemManager *mgr)
 {
     if (g_GameThread != NULL)
     {
-        if (g_GameThread->flags.flag_0 | g_GameThread->flags.paused)
+        if (g_GameThread->flags.flag_0 | g_GameThread->flags.loading)
         {
             return 1;
         }
@@ -463,7 +463,7 @@ i32 __fastcall ItemManager::on_tick_callback(ItemManager *mgr)
 // FUNCTION: TH16 0x430920
 i32 __fastcall ItemManager::on_draw_1_callback(ItemManager *mgr)
 {
-    if (g_GameThread != NULL && g_GameThread->flags.paused)
+    if (g_GameThread != NULL && g_GameThread->flags.loading)
     {
         return 1;
     }
@@ -525,7 +525,7 @@ i32 ItemManager::on_draw_body(i32 layer)
 // FUNCTION: TH16 0x430940
 i32 __fastcall ItemManager::on_draw_2_callback(ItemManager *mgr)
 {
-    if (g_GameThread != NULL && g_GameThread->flags.paused)
+    if (g_GameThread != NULL && g_GameThread->flags.loading)
     {
         return 1;
     }
@@ -769,8 +769,8 @@ void Item::collect_power()
                 value = 10;
             }
             g_PopupManager->generate_small_score_popup(&position, value, 0xffffff00);
-            g_Globals.unk_d8++;
-            g_Globals.unk_d0 += value;
+            g_Globals.full_value_item_count++;
+            g_Globals.full_value_item_score += value;
             g_Globals.last_collect_pos = g_Player->inner.pos;
             g_PopupManager->generate_small_score_popup(&position, value, -1);
         }
@@ -801,8 +801,8 @@ void Item::collect_power()
     g_Globals.add_to_score(value);
     if ((f32)item_collect_line() >= player_y || state == 4)
     {
-        g_Globals.unk_d8++;
-        g_Globals.unk_d0 += value;
+        g_Globals.full_value_item_count++;
+        g_Globals.full_value_item_score += value;
         g_Globals.last_collect_pos = g_Player->inner.pos;
     }
 }
@@ -833,8 +833,8 @@ void Item::collect_big_power()
     g_Globals.add_to_score(value);
     if ((f32)item_collect_line() >= player_y || state == 4)
     {
-        g_Globals.unk_d8++;
-        g_Globals.unk_d0 += value;
+        g_Globals.full_value_item_count++;
+        g_Globals.full_value_item_score += value;
         g_Globals.last_collect_pos = g_Player->inner.pos;
     }
 }
@@ -857,8 +857,8 @@ void Item::collect_point()
             value = 10;
         }
         g_PopupManager->generate_small_score_popup(&position, value, 0xffffff00);
-        g_Globals.unk_d8++;
-        g_Globals.unk_d0 += value;
+        g_Globals.full_value_item_count++;
+        g_Globals.full_value_item_score += value;
         g_Globals.last_collect_pos = player->inner.pos;
     }
     else

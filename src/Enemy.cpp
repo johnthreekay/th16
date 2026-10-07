@@ -330,7 +330,7 @@ int __fastcall EnemyManager::on_tick_callback(EnemyManager *mgr)
     {
         return UPDATE_FUNC_CONTINUE;
     }
-    if (g_GameThread->flags.flag_0 | g_GameThread->flags.paused)
+    if (g_GameThread->flags.flag_0 | g_GameThread->flags.loading)
     {
         return UPDATE_FUNC_CONTINUE;
     }
@@ -1286,8 +1286,8 @@ const char *EnemyInf::check_time_interrupts()
                 seconds = 99;
                 hundredths = 99;
             }
-            g_Gui->unk_1d0 = seconds;
-            g_Gui->unk_1d4 = hundredths;
+            g_Gui->boss_timer_seconds = seconds;
+            g_Gui->boss_timer_hundredths = hundredths;
         }
         if (enemy.time_in_ecl.current < enemy.interrupts[i].time)
         {

@@ -1860,7 +1860,7 @@ int EnemyData::ecl_run_over_300()
         break;
     // dialogWait(): waits while dialogue runs and no enemy is expected.
     case 519:
-        if (g_Gui->msg != NULL && g_Gui->msg->unk_18c == 0)
+        if (g_Gui->msg != NULL && g_Gui->msg->ecl_resume_timer == 0)
         {
             return -1;
         }

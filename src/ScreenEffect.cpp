@@ -121,7 +121,7 @@ i32 __fastcall ScreenEffect::on_tick_fade_out(ScreenEffect *self)
     {
         return UPDATE_FUNC_CLEANUP;
     }
-    if (g_GameThread == NULL || !(g_GameThread->flags.flag_0 | g_GameThread->flags.paused))
+    if (g_GameThread == NULL || !(g_GameThread->flags.flag_0 | g_GameThread->flags.loading))
     {
         self->timer++;
     }
@@ -294,8 +294,8 @@ i32 __fastcall ScreenEffect::on_tick_shake_with_ramp(ScreenEffect *self)
     {
         return UPDATE_FUNC_CLEANUP;
     }
-    if (g_GameThread == NULL || (g_GameThread->flags.flag_0 | g_GameThread->flags.paused) ||
-        g_GameThread->flags.flag_1 || g_GameThread->flags.flag_4 || g_GameThread->flags.flag_5 ||
+    if (g_GameThread == NULL || (g_GameThread->flags.flag_0 | g_GameThread->flags.loading) ||
+        g_GameThread->flags.flag_1 || g_GameThread->flags.in_menu || g_GameThread->flags.flag_5 ||
         g_GameThread->flags.flag_6)
     {
         return UPDATE_FUNC_CONTINUE;

@@ -78,8 +78,8 @@ void harness_gui_spell_vms()
 {
     double aligned;
     w4b_opaque_double(&aligned);
-    g_Gui->interrupt_spell_vms_2();
-    g_Gui->interrupt_spell_vms_3();
+    g_Gui->boss_timer_on_spell_start();
+    g_Gui->boss_timer_on_spell_end();
     w4b_opaque_double(&aligned);
 }
 

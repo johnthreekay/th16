@@ -207,7 +207,7 @@ void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
             spell->attempts[practice]++;
         }
     }
-    g_Gui->interrupt_spell_vms_2();
+    g_Gui->boss_timer_on_spell_start();
     flags &= ~0x20;
     ticks = 1;
     flags &= ~0x40;
@@ -270,12 +270,12 @@ HARNESS_CALLED void Spellcard::end()
     flags &= ~1;
     delete_vm_and_clear(background_anm_id);
     flags &= ~0x20;
-    g_Gui->interrupt_spell_vms_3();
+    g_Gui->boss_timer_on_spell_end();
     delete_vm_and_clear(boss_anm_id);
     if (flags & 2)
     {
         g_Globals.add_to_score(bonus);
-        g_Gui->sub_42bcf0(bonus, 0);
+        g_Gui->show_notice(bonus, GUI_NOTICE_SPELL_BONUS);
         if (g_ReplayManager->mode != 1)
         {
             i32 practice = g_Globals.game_mode == 2;
@@ -294,7 +294,7 @@ HARNESS_CALLED void Spellcard::end()
     }
     else
     {
-        g_Gui->sub_42bcf0(0, 1);
+        g_Gui->show_notice(0, GUI_NOTICE_BONUS_FAILED);
     }
     if (flags & 0x80)
     {

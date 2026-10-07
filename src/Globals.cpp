@@ -44,9 +44,9 @@ void Globals::reset_for_new_game()
     bomb_fragments = 0;
     life_fragments = 0;
     next_score_extend_index = 0;
-    unk_d0 = 0;
+    full_value_item_score = 0;
     unk_d4 = 0;
-    unk_d8 = 0;
+    full_value_item_count = 0;
     unk_dc = 0;
     item_spawn_count = 0;
     reset_224();
@@ -64,7 +64,7 @@ i32 get_score_extend_quota()
 }
 
 // TODO: the original reserves an unused stack slot (push ecx) and saves esi
-// up front, probably stack alignment for Gui::sub_42bcf0 (see add_to_score).
+// up front, probably stack alignment for Gui::show_notice (see add_to_score).
 // FUNCTION: TH16 0x43ddf0
 i32 Globals::add_power(i32 amount)
 {
@@ -76,7 +76,7 @@ i32 Globals::add_power(i32 amount)
     if (power > max_power)
     {
         power = max_power;
-        g_Gui->sub_42bcf0(0, 2);
+        g_Gui->show_notice(0, GUI_NOTICE_FULL_POWER);
     }
     return (power - amount) / power_per_level != power / power_per_level;
 }
@@ -174,7 +174,7 @@ void Globals::collect_bomb_fragment(i32 unused)
 }
 
 // TODO: the original aligns its frame to 8 bytes (and esp, -8), which LTCG
-// adds for Gui::sub_42bcf0's sake; ours does not, so registers differ too.
+// adds for Gui::show_notice's sake; ours does not, so registers differ too.
 // FUNCTION: TH16 0x43e080
 HARNESS_CALLED void Globals::add_to_score(i32 amount)
 {
@@ -184,7 +184,7 @@ HARNESS_CALLED void Globals::add_to_score(i32 amount)
         if (g_Globals.collect_extend(0))
         {
             g_SoundManager.play_sound_centered(0x11, 0);
-            g_Gui->sub_42bcf0(0, 4);
+            g_Gui->show_notice(0, GUI_NOTICE_EXTEND);
         }
         g_Globals.next_score_extend_index++;
     }
