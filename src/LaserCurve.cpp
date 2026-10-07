@@ -161,12 +161,6 @@ i32 LaserCurveInf::check_graze_or_kill(i32 a)
 }
 
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x4392c0
-i32 LaserCurveInf::method_44()
-{
-    return unit5_placeholder(this);
-}
 
 // Counts down ex_state[11]'s timer; when it runs out, flips ex_flags bit
 // 0x100 and returns 1.
