@@ -34,9 +34,4 @@ void PauseMenu::tick_open()
 
 #include "../LoadingThread.h"
 
-// STUB: TH16 0x447760
-int ReplayManager::initialize(i32 mode, const char *filename)
-{
-    return 0;
-}
 

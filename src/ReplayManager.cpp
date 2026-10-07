@@ -519,3 +519,121 @@ int __fastcall ReplayManager::on_tick_playback_thunk(void *arg)
 {
     return ((ReplayManager *)arg)->on_tick_playback();
 }
+
+// The replay's on_tick/on_draw functions, as LTCG inlined create_func.
+static __forceinline UpdateFunc *new_replay_func(UpdateFuncCallback function, ReplayManager *replay)
+{
+    UpdateFunc *f = new UpdateFunc;
+    f->flags |= UPDATE_FUNC_HEAP_ALLOCATED;
+    f->function = function;
+    f->on_registration = NULL;
+    f->on_cleanup = NULL;
+    f->arg = replay;
+    f->flags &= ~UPDATE_FUNC_ACTIVE;
+    return f;
+}
+
+// FUNCTION: TH16 0x447760
+int ReplayManager::initialize(i32 mode, const char *filename)
+{
+    this->mode = mode;
+    if (mode == REPLAY_RECORDING)
+    {
+        g_ReplayManager = this;
+        free_chunks(g_Globals.stage_num);
+        currently_recording_chunk = new_chunk(g_Globals.stage_num);
+        RpyFileHeader *header = (RpyFileHeader *)new RpyHeader;
+        header->magic = 0x72363174;
+        header->version = 2;
+        header->unk_10 = 0x100;
+        rpy_file = header;
+        info = new RpyInfo;
+        stage_gamestate_snapshots[g_Globals.stage_num] = new RpyGamestate;
+        RpyGamestate *gamestate = (RpyGamestate *)stage_gamestate_snapshots[g_Globals.stage_num];
+        info->character = g_Globals.character;
+        info->subshot = g_Globals.subshot;
+        info->subseason = g_Globals.subseason;
+        info->difficulty = g_Globals.difficulty;
+        info->flag_practice = g_Globals.game_mode;
+        info->flag_spell_practice = g_Globals.game_mode == 2 ? 1 : 0;
+        info->spell_id = g_Globals.spell_id;
+        if (g_GameThread != NULL)
+        {
+            info->config = g_GameThread->config;
+        }
+        gamestate->stage = g_Globals.stage_num;
+        gamestate->rng_state = g_replay_safe_rng.seed;
+        g_replay_safe_rng.generation_count = 0;
+        gamestate->flag_290 = g_Supervisor.unk_700;
+        if (g_Supervisor.unk_700)
+        {
+            gamestate->player_pos_subpixel[0] = 0;
+            gamestate->player_pos_subpixel[1] = 0;
+        }
+        memcpy(gamestate->globals, &g_Globals, sizeof(gamestate->globals));
+        for (i32 i = 0; i < 0x14; i++)
+        {
+            gamestate->spell_time_codes[i] = i * 0xdeaddead;
+        }
+        info->continues_used = g_Globals.continues_used;
+        UpdateFunc *f = new_replay_func(on_tick_record_thunk, this);
+        g_UpdateFuncRegistry->register_on_tick(f, 0x10);
+        on_tick_func = f;
+        f = new_replay_func(on_tick_22, this);
+        g_UpdateFuncRegistry->register_on_tick(f, 0x22);
+        on_tick_22_func = f;
+        f = new_replay_func(on_draw_47, this);
+        g_UpdateFuncRegistry->register_on_draw(f, 0x47);
+        on_draw_func = f;
+        stage_num = g_Globals.stage_num;
+        current_tick_num_in_stage = -1;
+    }
+    else if (mode == REPLAY_PLAYBACK)
+    {
+        g_ReplayManager = this;
+        if (read_replay_file(filename) != 0)
+        {
+            return -1;
+        }
+        g_GameThread->config = info->config;
+        ReplayStageData *stage = &stages[g_Globals.stage_num];
+        stage->input_current = stage->input_begin;
+        stage->fps_counts_current = stage->fps_counts_begin;
+        stage->frame_current = -1;
+        RpyGamestate *gamestate = stage->gamestate_at_stage_begin;
+        g_Globals.character = info->character;
+        g_Globals.subshot = info->subshot;
+        g_Globals.subseason = info->subseason;
+        g_Globals.difficulty = info->difficulty;
+        g_replay_safe_rng.seed = gamestate->rng_state;
+        g_replay_safe_rng.generation_count = 0;
+        memcpy(&g_Globals, gamestate->globals, sizeof(gamestate->globals));
+        if (g_Globals.spell_id >= 0)
+        {
+            g_Globals.set_game_mode(2);
+        }
+        else
+        {
+            g_Globals.set_game_mode(0);
+        }
+        UpdateFunc *f = g_UpdateFuncRegistry->create_func(on_tick_playback_thunk);
+        f->flags &= ~UPDATE_FUNC_ACTIVE;
+        f->arg = this;
+        g_UpdateFuncRegistry->register_on_tick(f, 0x10);
+        on_tick_func = f;
+        f = new_replay_func(on_tick_22, this);
+        g_UpdateFuncRegistry->register_on_tick(f, 0x22);
+        on_tick_22_func = f;
+        f = g_UpdateFuncRegistry->create_func(on_draw_47);
+        f->flags &= ~UPDATE_FUNC_ACTIVE;
+        f->arg = this;
+        g_UpdateFuncRegistry->register_on_draw(f, 0x47);
+        on_draw_func = f;
+        stage_num = -1;
+    }
+    else if (mode == REPLAY_LOADED && read_replay_file(filename) != 0)
+    {
+        return -1;
+    }
+    return 0;
+}
