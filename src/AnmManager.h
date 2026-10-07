@@ -305,7 +305,7 @@ struct AnmManager
     // 0x46f720. The same for snapshots; hands out the snapshot's id.
     AnmVm *allocate_snapshot_vm(i32 *id);
     // 0x46f810. Copies the VM and its children into snapshots.
-    AnmId store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused);
+    HARNESS_CALLED AnmId store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused);
     // 0x46f8f0. Brings a stored snapshot back to life as a new VM tree.
     // Every caller goes through g_AnmManager (see the list inserts).
     HARNESS_CALLED AnmId restore_snapshot(AnmId id);
@@ -320,6 +320,39 @@ struct AnmManager
     HARNESS_CALLED AnmId insert_in_ui_list_front(AnmVm *vm);
     // get_vm_with_id for snapshots.
     HARNESS_CALLED AnmVm *get_snapshot_vm_with_id(AnmId id);
+    // 0x46fac0. Writes a snapshot VM and its children into a buffer, adding
+    // the bytes written to *size (replay and pause snapshots).
+    void serialize_vm_tree(void *buffer, AnmVm *vm, i32 *size);
+    // 0x46fc30. Reads a VM tree written by serialize_vm_tree back into
+    // snapshots, adding the bytes read to *size.
+    AnmId deserialize_vm_tree(void *buffer, AnmVm *parent, i32 *size);
+
+    // get_snapshot_vm_with_id as LTCG inlined it into the ANM callbacks.
+    AnmVm *get_snapshot_vm_with_id_inline(AnmId id)
+    {
+        if (id.id == 0)
+        {
+            return NULL;
+        }
+        AnmVm *vm = NULL;
+        i32 fast_id = id.id & 0x1fff;
+        if (fast_id == 0x1fff)
+        {
+            for (ZunList<AnmVm> *node = &snapshot_list_head; node != NULL; node = node->next)
+            {
+                if (node->entry->id.id == id.id)
+                {
+                    vm = node->entry;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            vm = &snapshot_fast_array[fast_id].vm;
+        }
+        return vm;
+    }
     // UpdateFunc callbacks that run the VMs of each list and rebuild the
     // per-layer draw lists.
     DECOMP_NOINLINE static i32 __fastcall tick_world(AnmManager *mgr);

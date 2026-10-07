@@ -821,7 +821,7 @@ AnmVm *AnmManager::allocate_snapshot_vm(i32 *id)
 }
 
 // FUNCTION: TH16 0x46f810
-AnmId AnmManager::store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused)
+HARNESS_CALLED AnmId AnmManager::store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused)
 {
     if (vm == NULL)
     {

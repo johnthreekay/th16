@@ -2,6 +2,7 @@
 // (0x401000-0x4190b0) uses but that are not decompiled yet. Compiled without
 // /GL: LTCG cannot see inside, so calls to them stay opaque like calls to
 // the real code.
+#include "../AnmManager.h"
 #include "../EffectManager.h"
 
 // The rows point at the effect kinds' init callbacks (0x4071a0, 0x405670,
@@ -9,3 +10,16 @@
 // values the way it would from a /GL definition.
 // GLOBAL: TH16 0x4a2250
 EffectData g_effect_table[4];
+
+// STUB: TH16 0x46fac0
+void AnmManager::serialize_vm_tree(void *buffer, AnmVm *vm, i32 *size)
+{
+    *size = 0;
+}
+
+// STUB: TH16 0x46fc30
+AnmId AnmManager::deserialize_vm_tree(void *buffer, AnmVm *parent, i32 *size)
+{
+    *size = 0;
+    return AnmId();
+}

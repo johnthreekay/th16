@@ -67,6 +67,93 @@ int __fastcall anm_effect_2_on_switch(AnmVm *vm, i32 n)
     return 0;
 }
 
+// A snapshot of the VM with the given id, 0 for none.
+static AnmId snapshot_of_vm_id(AnmId id)
+{
+    if (id.id == 0)
+    {
+        return id;
+    }
+    return g_AnmManager->store_snapshot_of_vm(g_AnmManager->get_vm_with_id(id), NULL, 0);
+}
+
+// Copies the child VMs along with the VM: into snapshots (mode 0) or back
+// out of them (mode 1).
+// FUNCTION: TH16 0x405fa0
+int __fastcall anm_effect_2_on_copy_2(AnmVm *vm, const AnmVm *other, i32 mode)
+{
+    AnmEffect2Data *dst = (AnmEffect2Data *)vm->ins_508_extra_data;
+    AnmEffect2Data *src = (AnmEffect2Data *)other->ins_508_extra_data;
+    if (mode == 0)
+    {
+        for (i32 i = 0; i < 200; i++)
+        {
+            dst->vm_ids[i] = snapshot_of_vm_id(src->vm_ids[i]);
+        }
+    }
+    else if (mode == 1)
+    {
+        for (i32 i = 0; i < 200; i++)
+        {
+            dst->vm_ids[i] = g_AnmManager->restore_snapshot(src->vm_ids[i]);
+        }
+    }
+    return 0;
+}
+
+// Saves the child VMs into the snapshot buffer after the VM's own data
+// (mode 0) or reads them back (mode 1). The copy of the extra data in the
+// buffer keeps only a flag per child.
+// TODO: the original advances the buffer register in place for the cursor
+// and clears child_size later in mode 1 (scheduling).
+// FUNCTION: TH16 0x406040
+int __fastcall anm_effect_2_on_copy_1(AnmVm *vm, u8 *buffer, i32 *size, i32 mode)
+{
+    AnmEffect2Data *data = (AnmEffect2Data *)vm->ins_508_extra_data;
+    *size += sizeof(AnmEffect2Data);
+    AnmEffect2Data *saved = (AnmEffect2Data *)buffer;
+    u8 *cursor = buffer + sizeof(AnmEffect2Data);
+    i32 child_size;
+    if (mode == 0)
+    {
+        for (i32 i = 0; i < 200; i++)
+        {
+            child_size = 0;
+            AnmVm *child = g_AnmManager->get_snapshot_vm_with_id_inline(data->vm_ids[i]);
+            if (child != NULL)
+            {
+                g_AnmManager->serialize_vm_tree(cursor, child, &child_size);
+                *size += child_size;
+                cursor += child_size;
+                saved->vm_ids[i].id = 0xff;
+            }
+            else
+            {
+                saved->vm_ids[i].id = 0;
+            }
+        }
+    }
+    else if (mode == 1)
+    {
+        for (i32 i = 0; i < 200; i++)
+        {
+            if (saved->vm_ids[i].id != 0)
+            {
+                child_size = 0;
+                AnmId id = g_AnmManager->deserialize_vm_tree(cursor, NULL, &child_size);
+                data->vm_ids[i] = id;
+                *size += child_size;
+                cursor += child_size;
+            }
+            else
+            {
+                data->vm_ids[i].id = 0;
+            }
+        }
+    }
+    return 0;
+}
+
 // FUNCTION: TH16 0x406910
 int __fastcall anm_effect_3_on_destroy(AnmVm *vm)
 {
