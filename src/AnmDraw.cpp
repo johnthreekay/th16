@@ -1025,53 +1025,54 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
     case 26:
     case 27: {
         f32 angle = vm->rotation.z;
-        Float2 size;
-        size.x = vm->sprite_size.x * vm->scale.x;
-        size.y = vm->sprite_size.y * vm->scale.y;
+        f32 width;
+        f32 height;
+        width = vm->sprite_size.x * vm->scale.x;
+        height = vm->sprite_size.y * vm->scale.y;
         Float3 pos;
         vm->get_own_transformed_pos(&pos);
         if (vm->unk_5b0 != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
         {
-            size.x = vm->unk_5b0->scale.x * size.x;
-            size.y = vm->unk_5b0->scale.y * size.y;
+            width = vm->unk_5b0->scale.x * width;
+            height = vm->unk_5b0->scale.y * height;
             angle = vm->unk_5b0->rotation.z + angle;
         }
         setup_render_state_for_vm(vm);
         if ((vm->flags_hi & ANM_VM_COORD_MODE_MASK) == 1 << 20)
         {
-            size.x = g_screen_coord_scale * size.x;
-            size.y = g_screen_coord_scale * size.y;
+            width = g_screen_coord_scale * width;
+            height = g_screen_coord_scale * height;
         }
         else if ((vm->flags_hi & ANM_VM_COORD_MODE_MASK) == 2 << 20)
         {
-            size.x = g_screen_coord_scale * 0.5f * size.x;
-            size.y = g_screen_coord_scale * 0.5f * size.y;
+            width = g_screen_coord_scale * 0.5f * width;
+            height = g_screen_coord_scale * 0.5f * height;
         }
         i32 anchor_x = (vm->flags_lo >> 21) & 3;
         i32 anchor_y = (vm->flags_lo >> 23) & 3;
         switch ((vm->flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
         {
         case 26:
-            draw_line(pos.x, pos.y, size.x, angle, vm->color_1.d3d,
+            draw_line(pos.x, pos.y, width, angle, vm->color_1.d3d,
                       (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d, anchor_x, 0);
             return 0;
         case 16:
-            draw_rect(pos.x, pos.y, size.x, size.y, angle, vm->color_1.d3d, vm->color_1.d3d, anchor_x, anchor_y);
+            draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d, anchor_x, anchor_y);
             return 0;
         case 27:
-            draw_rect_outline(pos.x, pos.y, size.x, size.y, angle, vm->color_1.d3d,
+            draw_rect_outline(pos.x, pos.y, width, height, angle, vm->color_1.d3d,
                               (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d,
                               anchor_x, anchor_y);
             return 0;
         case 20:
-            draw_rect(pos.x, pos.y, size.x, size.y, angle, vm->color_1.d3d, vm->color_2.d3d, anchor_x, anchor_y);
+            draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d, anchor_x, anchor_y);
             return 0;
         case 21:
-            draw_rect_bordered(pos.x, pos.y, size.x, size.y, angle, vm->color_1.d3d, vm->color_1.d3d, anchor_x,
+            draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d, anchor_x,
                                anchor_y);
             return 0;
         case 22:
-            draw_rect_bordered(pos.x, pos.y, size.x, size.y, angle, vm->color_1.d3d, vm->color_2.d3d, anchor_x,
+            draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d, anchor_x,
                                anchor_y);
             return 0;
         }
@@ -1080,39 +1081,40 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
     case 17:
     case 18:
     case 19: {
-        Float2 size;
-        size.x = vm->sprite_size.x * vm->scale.x;
-        size.y = vm->sprite_size.y * vm->scale.y;
+        f32 width;
+        f32 height;
+        width = vm->sprite_size.x * vm->scale.x;
+        height = vm->sprite_size.y * vm->scale.y;
         f32 angle = vm->rotation.z;
         Float3 pos;
         vm->get_own_transformed_pos(&pos);
         if (vm->unk_5b0 != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
         {
             angle = vm->unk_5b0->rotation.z + angle;
-            size.x *= vm->unk_5b0->scale.x;
-            size.y *= vm->unk_5b0->scale.y;
+            width *= vm->unk_5b0->scale.x;
+            height *= vm->unk_5b0->scale.y;
         }
         if ((vm->flags_hi & ANM_VM_COORD_MODE_MASK) == 1 << 20)
         {
-            size.x = g_screen_coord_scale * size.x;
-            size.y = g_screen_coord_scale * size.y;
+            width = g_screen_coord_scale * width;
+            height = g_screen_coord_scale * height;
         }
         else if ((vm->flags_hi & ANM_VM_COORD_MODE_MASK) == 2 << 20)
         {
-            size.x = g_screen_coord_scale * 0.5f * size.x;
-            size.y = g_screen_coord_scale * 0.5f * size.y;
+            width = g_screen_coord_scale * 0.5f * width;
+            height = g_screen_coord_scale * 0.5f * height;
         }
         setup_render_state_for_vm(vm);
         switch ((vm->flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
         {
         case 19:
-            draw_ring(pos.x, pos.y, size.x, size.y, angle, vm->int_vars[0], vm->color_1.d3d);
+            draw_ring(pos.x, pos.y, width, height, angle, vm->int_vars[0], vm->color_1.d3d);
             return 0;
         case 18:
-            draw_circle_outline(pos.x, pos.y, size.x, angle, vm->int_vars[0], vm->color_1.d3d);
+            draw_circle_outline(pos.x, pos.y, width, angle, vm->int_vars[0], vm->color_1.d3d);
             return 0;
         case 17:
-            draw_circle(pos.x, pos.y, size.x, angle, vm->int_vars[0], vm->color_1.d3d, vm->color_2.d3d);
+            draw_circle(pos.x, pos.y, width, angle, vm->int_vars[0], vm->color_1.d3d, vm->color_2.d3d);
             return 0;
         }
         break;

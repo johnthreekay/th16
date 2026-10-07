@@ -236,6 +236,13 @@ struct RenderVertexXyzDiffuseTex
     Float2 uv;
 };
 
+// Transformed vertices without a color (D3DFVF_XYZRHW | D3DFVF_TEX1).
+struct RenderVertexXyzrhwTex
+{
+    D3DXVECTOR4 pos;
+    Float2 uv;
+};
+
 // A request to copy part of the back buffer into the texture of a loaded
 // .anm entry (the pause menu's snapshot of the game screen; TH06:
 // AnmManager::RequestScreenshot). anm_slot < 0 marks a free entry.
@@ -328,8 +335,14 @@ struct AnmManager
     ZunColor unk_1c7fd88;
     i32 unk_1c7fd8c;
 
+    // 0x46a3a0. Clears everything, fills the VM pool's free list and
+    // registers the tick and per-layer draw callbacks.
+    AnmManager();
     // 0x46b7d0. Destroys every VM still alive.
     ~AnmManager();
+    // 0x46b900. Fills the vertex buffer with the unit quad for each of the
+    // nine anchorings (draw_vm__mode_8). Goes through g_AnmManager.
+    static void setup_vertex_buffer();
 
     // Never inlined in the original (over 100 call sites).
     DECOMP_NOINLINE void flush_sprites();
@@ -653,6 +666,10 @@ __forceinline AnmId AnmLoaded::create_vm_inline(i32 script, Float3 *pos, f32 rot
 
 // The quad being built by the draw functions.
 extern RenderVertex144 g_sprite_temp_buffer[4];
+// The unit quads AnmManager's constructor and setup_vertex_buffer fill in
+// (TH06: g_PrimitivesToDrawVertexBuf, g_PrimitivesToDrawUnknown).
+extern RenderVertexXyzrhwTex g_quad_vertices_4df4a8[4];
+extern RenderVertexXyzDiffuseTex g_quad_vertices_4df8a0[4];
 
 // Deletes the VM (if still alive) and forgets the id.
 inline void delete_vm_and_clear(AnmId &id)
