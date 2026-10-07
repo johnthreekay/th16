@@ -7,6 +7,27 @@ This repository contains no game code or data. You need your own copy of the
 game; `th16.exe` must have SHA-256
 `c11776019f083978e66027e7394dafb1fb9543afca986f28049a49417e341929`.
 
+## Status
+
+- Every function of the game is decompiled: reccmp reports 1222 of 1222
+  functions implemented, 945 of them byte-identical and 19 more that differ
+  only in instruction scheduling (94.00% overall similarity). The rest compile
+  to functionally equivalent code; each carries a one-line `// TODO:` saying
+  what still differs (mostly whole-program register allocation and stack
+  frame alignment, see "Things learned so far").
+- Every annotated global holds the original's data (`scripts/check_data.py`:
+  213 of 214 match; `g_Supervisor` differs only in defaults its initializer
+  clears at startup).
+- The source is readable: opcodes of the ECL, ANM, MSG and STD script
+  interpreters, game modes, sound effects, flags and file formats are named
+  enums, structs and functions carry doc comments, and ZUN's few inline
+  assembly helpers sit behind documented macros in `src/ZunAsm.h`. The
+  readability pass was checked with `scripts/check_unchanged.py`: no function's
+  generated code changed.
+- A portable build that runs on Linux (SDL2 and OpenGL, built with clang or
+  gcc, 32- or 64-bit) lives on the `port` branch; see its README and
+  `port/NOTES.md`. It needs your own game data files.
+
 ## Toolchain
 
 Everything about ZUN's build that we could recover from the executable:
