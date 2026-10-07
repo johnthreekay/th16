@@ -273,6 +273,355 @@ i32 TitleInf::do_replay_save()
     return 1;
 }
 
+// The difficulty last picked (Normal at first), where the menu starts.
+// GLOBAL: TH16 0x49f274
+i32 g_last_difficulty = DIFFICULTY_NORMAL;
+// The character last picked, where the character select starts.
+// GLOBAL: TH16 0x4a6f24
+i32 g_last_character;
+
+// Picking the difficulty, or confirming Extra.
+// TODO: the original realigns its frame (and esp, -8) and keeps g_Globals.difficulty in ecx from the entry for the num_choices test.
+// FUNCTION: TH16 0x44fe20
+i32 TitleInf::do_difficulty_select()
+{
+    i32 script = (g_Globals.difficulty >= DIFFICULTY_EXTRA) + 0x7e;
+    switch (substate)
+    {
+    case 0:
+        if (anm_id_73c.id == 0)
+        {
+            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+        }
+        menu.wraps = 0;
+        menu.num_choices = g_Globals.difficulty < DIFFICULTY_EXTRA ? 4 : 1;
+        AnmManager::interrupt_tree(anm_ids[script], 1);
+        anm_ids[script].id = 0;
+        anm_ids[script] = title_anm->create_effect(script, -1, NULL);
+        AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
+        AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 13));
+        if (g_unk_4a6f1c == 4)
+        {
+            menu.set_cursor(g_Globals.difficulty);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 7));
+            AnmManager::interrupt_tree_and_run(anm_ids[script], 6);
+            AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x74), 2);
+            goto confirm;
+        }
+        anm_ids[0x68] = title_anm->create_effect(0x68, -1, NULL);
+        set_substate(1);
+        if (g_Globals.difficulty < DIFFICULTY_EXTRA)
+        {
+            if (!g_Scorefile->all_cleared(DIFFICULTY_EASY))
+            {
+                find_child_id(script, 0x9e).clear_flag_lo_2_tree();
+            }
+            if (!g_Scorefile->all_cleared(DIFFICULTY_NORMAL))
+            {
+                find_child_id(script, 0x9f).clear_flag_lo_2_tree();
+            }
+            if (!g_Scorefile->all_cleared(DIFFICULTY_HARD))
+            {
+                find_child_id(script, 0xa0).clear_flag_lo_2_tree();
+            }
+            if (!g_Scorefile->all_cleared(DIFFICULTY_LUNATIC))
+            {
+                find_child_id(script, 0xa1).clear_flag_lo_2_tree();
+            }
+        }
+        else if (!g_Scorefile->all_cleared(DIFFICULTY_EXTRA))
+        {
+            find_child_id(script, 0xa2).clear_flag_lo_2_tree();
+        }
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        if (g_Globals.difficulty < DIFFICULTY_EXTRA)
+        {
+            menu.current_selection = menu.next_selection;
+            if (input_pressed_or_repeating(INPUT_UP) || input_pressed_or_repeating(INPUT_LEFT))
+            {
+                menu.move_cursor(-1);
+            }
+            if (input_pressed_or_repeating(INPUT_DOWN) || input_pressed_or_repeating(INPUT_RIGHT))
+            {
+                menu.move_cursor(1);
+            }
+            if (menu.current_selection != menu.next_selection)
+            {
+                g_SoundManager.play_sound_centered(10, 0);
+                AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
+                AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 7));
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            set_substate(4);
+            g_SoundManager.play_sound_centered(9, 0);
+            interrupt_and_clear(script);
+            return 1;
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            AnmManager::interrupt_tree(anm_ids[script], 6);
+            if (g_Globals.difficulty < DIFFICULTY_EXTRA)
+            {
+                AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x74), 2);
+            }
+            else
+            {
+                AnmManager::interrupt_tree(find_child_id(script, 0x78), 2);
+            }
+            set_substate(3);
+            g_SoundManager.play_sound_centered(7, 0);
+            return 1;
+        }
+        break;
+    case 3:
+        if (time_in_state.current >= 14)
+        {
+            AnmManager::interrupt_tree(anm_ids[0x68], 1);
+            anm_ids[0x68].id = 0;
+        confirm:
+            set_state(6);
+            if (g_Globals.difficulty < DIFFICULTY_EXTRA)
+            {
+                g_Globals.difficulty = menu.next_selection;
+                g_last_difficulty = g_Globals.difficulty;
+            }
+            menu.push();
+            menu.wraps = 1;
+            menu.num_choices = 4;
+            menu.set_cursor(g_last_character);
+            g_Globals.character = g_last_character;
+            return 1;
+        }
+        break;
+    case 4:
+        if (time_in_state.current >= 6)
+        {
+            AnmManager::interrupt_tree(anm_ids[0x68], 1);
+            anm_ids[0x68].id = 0;
+            if (g_Globals.game_mode != 0)
+            {
+                g_last_difficulty = menu.next_selection;
+                g_Globals.difficulty = g_last_difficulty;
+            }
+            else if (g_Globals.difficulty < DIFFICULTY_EXTRA)
+            {
+                set_state(1);
+                g_Globals.difficulty = menu.next_selection;
+                g_last_difficulty = menu.next_selection;
+                menu.pop();
+                return 1;
+            }
+            else
+            {
+                g_Globals.difficulty = g_last_difficulty;
+            }
+            set_state(1);
+            AnmManager::interrupt_tree(anm_id_73c, 1);
+            anm_id_73c.id = 0;
+            set_state(1);
+            menu.pop();
+        }
+        break;
+    }
+    return 1;
+}
+
+// input_pressed_or_repeating, inlined.
+static __forceinline i32 pressed_or_repeating_inline(u32 mask)
+{
+    if (g_hardware_input_pressed & mask)
+    {
+        return 1;
+    }
+    if (g_hardware_input_repeat & mask)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+// AnmId::clear_flag_lo_2_tree as LTCG inlined it here.
+static __forceinline void clear_flag_lo_2_tree_inline(AnmId id)
+{
+    AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+}
+
+// Picking the character. Extra only offers the characters that cleared the
+// main game; characters marked as cleared on this difficulty get a badge.
+// TODO: the original realigns its frame (and esp, -8), keeps the menu in edx and g_Scorefile in edi across has_cleared, and loads g_Scorefile before the difficulty.
+// FUNCTION: TH16 0x4502c0
+i32 TitleInf::do_character_select()
+{
+    i32 script = (g_Globals.difficulty == DIFFICULTY_EXTRA) * 2 + 0x96;
+    switch (substate)
+    {
+    case 0:
+    {
+        menu.num_choices = 4;
+        if (g_Globals.difficulty == DIFFICULTY_EXTRA)
+        {
+            if (!g_Scorefile->has_cleared(menu.next_selection))
+            {
+                for (i32 i = 0; i < 4; i++)
+                {
+                    if (g_Scorefile->has_cleared(i))
+                    {
+                        menu.set_cursor(i);
+                        break;
+                    }
+                }
+            }
+            for (i32 i = 0; i < 4; i++)
+            {
+                if (!g_Scorefile->has_cleared(i))
+                {
+                    menu.disable(i);
+                }
+            }
+        }
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x69]) == NULL)
+        {
+            anm_ids[0x69] = title_anm->create_effect(0x69, -1, NULL);
+        }
+        if (g_AnmManager->get_vm_with_id(anm_ids[script]) == NULL)
+        {
+            AnmManager::interrupt_tree(anm_ids[script], 1);
+            anm_ids[script].id = 0;
+            anm_ids[script] = title_anm->create_effect(script, -1, NULL);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
+        }
+        else
+        {
+            AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
+        }
+        AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 7));
+        set_substate(1);
+        if (g_Scorefile->characters[0].clears[g_Globals.difficulty] == 0)
+        {
+            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9a));
+        }
+        if (g_Scorefile->characters[1].clears[g_Globals.difficulty] == 0)
+        {
+            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9b));
+        }
+        if (g_Scorefile->characters[2].clears[g_Globals.difficulty] == 0)
+        {
+            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9c));
+        }
+        if (g_Scorefile->characters[3].clears[g_Globals.difficulty] == 0)
+        {
+            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9d));
+        }
+        if (g_unk_4a6f1c == 4)
+        {
+            menu.set_cursor(g_Globals.character);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 7));
+            AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x80), 6);
+            AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x88), 6);
+            AnmManager::interrupt_tree(find_child_id_inline(anm_ids[script], 0x58), 6);
+            AnmManager::interrupt_tree(find_child_id_inline(anm_ids[script], 0x59), 6);
+            goto confirm;
+        }
+    }
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        menu.current_selection = menu.next_selection;
+        if (pressed_or_repeating_inline(INPUT_LEFT))
+        {
+            AnmManager::interrupt_tree(anm_ids[0x5c], 1);
+            anm_ids[0x5c].id = 0;
+            g_SoundManager.play_sound_centered(10, 0);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 25));
+            menu.move_cursor(-1);
+            AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 13));
+        }
+        if (pressed_or_repeating_inline(INPUT_RIGHT))
+        {
+            AnmManager::interrupt_tree(anm_ids[0x5c], 1);
+            anm_ids[0x5c].id = 0;
+            g_SoundManager.play_sound_centered(10, 0);
+            AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 19));
+            menu.move_cursor(1);
+            AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 7));
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            set_substate(4);
+            g_SoundManager.play_sound_centered(9, 0);
+            return 1;
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x80), 6);
+            AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x88), 6);
+            AnmManager::interrupt_tree(find_child_id(script, 0x58), 6);
+            AnmManager::interrupt_tree(find_child_id(script, 0x59), 6);
+            g_SoundManager.play_sound_centered(7, 0);
+            set_substate(3);
+            return 1;
+        }
+        break;
+    case 3:
+        if (time_in_state.current >= 14)
+        {
+        confirm:
+            set_state(7);
+            g_Globals.character = menu.next_selection;
+            g_last_character = g_Globals.character;
+            // MenuHelper::push, clearing num_disabled last.
+            menu.stack_selection[menu.stack_depth] = menu.next_selection;
+            menu.stack_num_choices[menu.stack_depth] = menu.num_choices;
+            menu.stack_depth++;
+            if (menu.stack_depth >= 0x10)
+            {
+                menu.stack_depth = 0xf;
+            }
+            menu.num_disabled = 0;
+            menu.wraps = 1;
+            menu.num_choices = 5;
+            menu.set_cursor(g_Globals.character);
+            AnmManager::interrupt_tree(anm_ids[script], 6);
+            AnmManager::interrupt_tree(anm_ids[0x69], 1);
+            anm_ids[0x69].id = 0;
+            return 1;
+        }
+        break;
+    case 4:
+        if (time_in_state.current >= 6)
+        {
+            interrupt_and_clear(script);
+            AnmManager::interrupt_tree(anm_ids[0x69], 1);
+            anm_ids[0x69].id = 0;
+            set_state(5);
+            g_Globals.character = menu.next_selection;
+            menu.pop();
+            g_last_character = g_Globals.character;
+        }
+        break;
+    }
+    return 1;
+}
+
 // Stage names for the practice and replay menus, by stage number
 // (PauseMenu.cpp).
 extern const char *g_stage_names[10];

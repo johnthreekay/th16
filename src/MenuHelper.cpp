@@ -41,7 +41,7 @@ i32 MenuHelper::move_cursor(i32 delta)
 }
 
 // FUNCTION: TH16 0x402de0
-void MenuHelper::push()
+HARNESS_CALLED void MenuHelper::push()
 {
     stack_selection[stack_depth] = next_selection;
     stack_num_choices[stack_depth] = num_choices;
@@ -54,7 +54,7 @@ void MenuHelper::push()
 }
 
 // FUNCTION: TH16 0x402e20
-void MenuHelper::pop()
+HARNESS_CALLED void MenuHelper::pop()
 {
     stack_depth--;
     if (stack_depth < 0)

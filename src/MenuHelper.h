@@ -1,5 +1,6 @@
 #pragma once
 
+#include "decomp.h"
 #include "types.h"
 
 // Cursor state for a list menu, with a stack for submenus. Layout from
@@ -31,10 +32,12 @@ struct MenuHelper
     // 0x418720. Puts the cursor on a choice, clamped to the menu and moved
     // past disabled choices.
     i32 set_cursor(i32 selection);
-    // 0x402de0. Enters a submenu, saving the cursor.
-    void push();
+    // 0x402de0. Enters a submenu, saving the cursor. push and pop are not
+    // forced alive with /INCLUDE: with every caller visible LTCG knows they
+    // leave ecx alone, which callers rely on (do_difficulty_select).
+    HARNESS_CALLED void push();
     // 0x402e20. Back to the parent menu's cursor.
-    void pop();
+    HARNESS_CALLED void pop();
     // 0x440c00. Adds a choice the cursor skips, moving the cursor off it
     // (and off any other disabled choice) if needed.
     void disable(i32 choice);

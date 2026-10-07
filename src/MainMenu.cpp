@@ -396,57 +396,6 @@ i32 TitleInf::do_options()
     return 1;
 }
 
-// AnmVm::search_children with its first level inlined, as LTCG did for
-// some constant scripts.
-static __forceinline AnmVm *search_children_inline(AnmVm *vm, i32 script, i32 n)
-{
-    for (ZunList<AnmVm> *node = &vm->list_of_children; node != NULL; node = node->next)
-    {
-        AnmVm *child = node->entry;
-        if (child == NULL || child == vm)
-        {
-            continue;
-        }
-        if (child->unk_49c == script || script == -1)
-        {
-            if (n == 0)
-            {
-                return child;
-            }
-            n--;
-        }
-        if (child->list_of_children.next != NULL)
-        {
-            AnmVm *found = child->search_children(script, n);
-            if (found != NULL)
-            {
-                return found;
-            }
-        }
-        if (vm->unk_49c == -2 && node->next == NULL)
-        {
-            return node->entry;
-        }
-    }
-    return NULL;
-}
-
-// TitleInf::interrupt_child_and_run with search_children inlined.
-static __forceinline void interrupt_child_and_run_inline(AnmId &id, i32 script, i32 interrupt)
-{
-    AnmVm *vm;
-    if (get_vm_or_clear(id) == NULL)
-    {
-        vm = NULL;
-    }
-    else
-    {
-        vm = search_children_inline(get_vm_or_clear(id), script, 0);
-    }
-    vm->interrupt(interrupt);
-    vm->run();
-}
-
 // Rows above the cursor get interrupt 30, rows below it 31; the digits of
 // the two volumes follow their rows.
 // TODO: the original keeps g_AnmManager in esi/ebx across the lookups (get_vm_with_id is an opaque stub here), which changes the inlined searches' registers.
@@ -496,25 +445,6 @@ void TitleInf::update_options_cursor()
         interrupt_child_and_run(1, 0x2e, 0x1f);
         interrupt_child_and_run(1, 0x2f, 0x1f);
         interrupt_child_and_run(1, 0x30, 0x1f);
-    }
-}
-
-// The VM of the first descendant of anm_ids[index] running the script,
-// looked up again through its id.
-static __forceinline AnmVm *get_child_vm(AnmId &parent, i32 script)
-{
-    AnmVm *child = find_child_of(parent, script);
-    AnmId id;
-    id.id = child != NULL ? child->id.id : 0;
-    return g_AnmManager->get_vm_with_id(id);
-}
-
-// Points the VM at a sprite through the file it came from.
-static __forceinline void set_child_sprite(AnmVm *vm, i32 sprite)
-{
-    if (vm != NULL)
-    {
-        g_AnmManager->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, sprite);
     }
 }
 

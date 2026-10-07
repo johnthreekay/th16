@@ -124,6 +124,10 @@ class TitleInf : public TaskInf
     HARNESS_CALLED i32 on_draw__spell_practice_histories();
 
     // States of on_tick (ExpHP: do_*).
+    // 0x44fe20
+    i32 do_difficulty_select();
+    // 0x4502c0
+    i32 do_character_select();
     i32 do_subseason_select();
     i32 do_practice_stage_select();
     i32 do_manual();
@@ -149,3 +153,83 @@ class TitleInf : public TaskInf
 };
 
 extern TitleInf *g_MainMenu;
+
+// Helpers the menus inline.
+
+// AnmVm::search_children with its first level inlined, as LTCG did for
+// some constant scripts.
+__forceinline AnmVm *search_children_inline(AnmVm *vm, i32 script, i32 n)
+{
+    for (ZunList<AnmVm> *node = &vm->list_of_children; node != NULL; node = node->next)
+    {
+        AnmVm *child = node->entry;
+        if (child == NULL || child == vm)
+        {
+            continue;
+        }
+        if (child->unk_49c == script || script == -1)
+        {
+            if (n == 0)
+            {
+                return child;
+            }
+            n--;
+        }
+        if (child->list_of_children.next != NULL)
+        {
+            AnmVm *found = child->search_children(script, n);
+            if (found != NULL)
+            {
+                return found;
+            }
+        }
+        if (vm->unk_49c == -2 && node->next == NULL)
+        {
+            return node->entry;
+        }
+    }
+    return NULL;
+}
+
+// TitleInf::interrupt_child_and_run with search_children inlined.
+__forceinline void interrupt_child_and_run_inline(AnmId &id, i32 script, i32 interrupt)
+{
+    AnmVm *vm;
+    if (get_vm_or_clear(id) == NULL)
+    {
+        vm = NULL;
+    }
+    else
+    {
+        vm = search_children_inline(get_vm_or_clear(id), script, 0);
+    }
+    vm->interrupt(interrupt);
+    vm->run();
+}
+
+// TitleInf::find_child_id as LTCG inlined it into some menus (looking the
+// parent up twice).
+__forceinline AnmId find_child_id_inline(AnmId &parent, i32 script)
+{
+    AnmVm *child = find_child_of(parent, script);
+    AnmId id;
+    id.id = child != NULL ? child->id.id : 0;
+    return id;
+}
+
+// The VM of the first descendant of the parent running the script, looked
+// up again through its id.
+__forceinline AnmVm *get_child_vm(AnmId &parent, i32 script)
+{
+    return g_AnmManager->get_vm_with_id(find_child_id_inline(parent, script));
+}
+
+// Points the VM at a sprite through the file it came from.
+__forceinline void set_child_sprite(AnmVm *vm, i32 sprite)
+{
+    if (vm != NULL)
+    {
+        g_AnmManager->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, sprite);
+    }
+}
+
