@@ -98,6 +98,17 @@ class LaserDataInf
     }
 };
 
+// LaserDataInf's flag word (after next) with the bit curvy lasers add.
+struct LaserDataFlagBits
+{
+    u32 ticked : 1;
+    u32 pending_delete : 2;
+    u32 flag_3 : 1;
+    // Curvy lasers: the segments stay where they are (et_ex 0x10000000).
+    u32 segments_frozen : 1;
+    u32 rest : 27;
+};
+
 // Parameters of a straight laser. Layout from ExpHP (zLaserLineInner); his
 // field names say which BulletManager shooter field each one comes from.
 struct LaserLineInner
@@ -138,6 +149,14 @@ class LaserLineInf : public LaserDataInf
     AnmVm vm_1524;
 
     LaserLineInf();
+    // The constructor as clone has it inlined; the real one is
+    // DECOMP_NOINLINE for its other callers.
+    struct InlineCtor
+    {
+    };
+    __forceinline LaserLineInf(InlineCtor)
+    {
+    }
 
     virtual void get_point(f32 distance, Float3 *out);
     DECOMP_NOINLINE virtual void run_ex();
@@ -241,6 +260,24 @@ struct LaserCurveNode
     {
     }
 
+    // Copies field by field (a split-off laser copies the node list); the
+    // implicit copy would be one block move.
+    LaserCurveNode &operator=(const LaserCurveNode &other)
+    {
+        next = other.next;
+        prev = other.prev;
+        unk_8 = other.unk_8;
+        unk_c = other.unk_c;
+        mode = other.mode;
+        velocity = other.velocity;
+        start_pos = other.start_pos;
+        angle = other.angle;
+        speed = other.speed;
+        speed_delta = other.speed_delta;
+        angle_delta = other.angle_delta;
+        return *this;
+    }
+
     // 0x438370. Steps a point of the curve back by one frame of this node's
     // motion (t is the node time, its fraction the part of the frame).
     void step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle, f32 t);
@@ -305,7 +342,7 @@ class LaserCurveInf : public LaserDataInf
     LaserCurveInf();
 
     virtual void get_point(f32 distance, Float3 *out);
-    virtual void run_ex();
+    DECOMP_NOINLINE virtual void run_ex();
     virtual i32 initialize(void *params);
     virtual i32 on_tick();
     virtual i32 on_draw();
@@ -319,7 +356,7 @@ class LaserCurveInf : public LaserDataInf
     virtual i32 method_3c();
     virtual i32 method_40();
     virtual i32 method_44();
-    virtual i32 method_60();
+    DECOMP_NOINLINE virtual i32 method_60();
 
     HARNESS_CALLED LaserCurveNode *append_node(f32 value);
 
@@ -406,7 +443,10 @@ struct LaserManager
     Float3 cancel_pos;
     Float3 cancel_pos_2;
     AnmLoaded *bullet_anm;
-    u8 unk_608[8];
+    // Summed by the method_1c variants: 18 to 22 for each point of a laser
+    // inside their rectangle, by laser width. Nothing reads it.
+    i32 unk_608;
+    u8 unk_60c[4];
 
     LaserManager();
     ~LaserManager();

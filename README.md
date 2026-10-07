@@ -565,6 +565,46 @@ decompiled code the surroundings it had in the original:
   from all zeros does not. Separate float locals avoid it (Gui::on_tick_body),
   but Gui::sub_426d70 keeps the cookie where the original copies the
   struct from memory.
+- Wave 6 (lasers):
+  - normalize_angle as HARNESS_CALLED instead of DECOMP_NOINLINE (which
+    /INCLUDEs it) lets callers keep values in xmm3 across the call;
+    LaserInfiniteInf::check_graze_or_kill matched and nothing was lost.
+    Worth trying for other small /INCLUDE'd helpers with many callers.
+  - A constructor called at most sites but inlined at one (LaserLineInf:
+    ten calls, inlined in clone) gets DECOMP_NOINLINE plus a
+    `__forceinline` tag constructor (`LaserLineInf(InlineCtor)`) for the
+    inlined copy.
+  - allocate_new_laser is inlined into the wall bounce and the bomb
+    cancels (with LaserCurveInf's constructor inlined there):
+    `allocate_*_laser_inline` helpers. Inside allocate_new_laser, linking
+    the laser in every case (tail-merged) matches the register use.
+  - `tip += position` (D3DXVECTOR3::operator+=) and field-wise adds compile
+    differently: only the former stopped LaserLineInf::method_50 from
+    caching position in xmm registers (it matched).
+  - The et_ex switches compare the type unsigned (`ja`, a 0x80000000 case):
+    `switch ((u32)ex->type)` restores the jump table for 1..16.
+    EnemyBulletShooter::aim_type is written as a word.
+  - Loads the original hoists in front of an inner loop (the previous
+    segment's speed and angle, the out pointers) come out the same when
+    written as locals before the loop (curvy laser segment placement).
+  - A struct copy done member by member in the original (movq per Float3,
+    dwords for the rest) needs a field-wise operator= (LaserCurveNode).
+  - A search loop whose normal exit returns: write `goto found` in the
+    loop and `return` after it; `break` plus `if (i >= n)` re-tests n.
+  - The laser velocity steps add their vector with D3DXVec3Add
+    (`v = vel * g_game_speed; D3DXVec3Add(&unk_60, &unk_60, &v)`): its
+    stores through pointers give the original's add, store, add, store
+    order and reloads; `unk_60 += v` does not. Both method_3c matched.
+  - Open: the original loads g_game_speed once for three position
+    components (`position.x = v.x * g_game_speed + position.x` and so on);
+    ours reloads it after each store. Defining g_timer_speed_ptrs in a /GL
+    file instead of the stub did not change that, and neither did
+    D3DXVec3Scale/D3DXVec3Add (those load it once but add in a different
+    order).
+  - Operand order of a commutative add or multiply often does not follow
+    the source: swapping `a + b`, `a += b` or the timer tick's operands
+    gave identical code in several places (LaserCurveInf::initialize,
+    method_44, check_graze_or_kill); look for a different construct.
 
 ### Compiler-generated and CRT functions
 

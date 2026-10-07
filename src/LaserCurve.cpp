@@ -7,27 +7,6 @@
 #include "EffectManager.h"
 #include "Laser.h"
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x4370a0
-i32 LaserCurveInf::initialize(void *params)
-{
-    return unit5_placeholder(this);
-}
-
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x438cb0
-void LaserCurveInf::run_ex()
-{
-    unit5_placeholder(this);
-}
-
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x438750
-i32 LaserCurveInf::on_draw()
-{
-    return unit5_placeholder(this);
-}
-
 // FUNCTION: TH16 0x437760
 i32 LaserCurveInf::on_destroy()
 {
@@ -51,11 +30,23 @@ i32 LaserCurveInf::on_destroy()
     return 0;
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x439d60
-i32 LaserCurveInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
+// allocate_new_laser(LASER_CURVE, params) as LTCG inlined it into the bomb
+// cancel, constructor included.
+static __forceinline void allocate_curve_laser_inline(void *params)
 {
-    return unit5_placeholder(this);
+    LaserManager *mgr = g_LaserManager;
+    if (mgr->list_length < 0x200)
+    {
+        mgr->last_id++;
+        if (mgr->last_id < 0x10000)
+        {
+            mgr->last_id = 0x10000;
+        }
+        LaserDataInf *laser = new LaserCurveInf();
+        laser->id = mgr->last_id;
+        mgr->append(laser);
+        laser->initialize(params);
+    }
 }
 
 // Cancels the segments inside a bomb's rectangle (an effect and items on
@@ -175,7 +166,7 @@ i32 LaserCurveInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 re
                 params.shot_sfx = -1;
                 params.source_nodes = &nodes;
                 params.source_time = timer_40.current_f - (f32)start;
-                g_LaserManager->allocate_new_laser(LASER_CURVE, &params);
+                allocate_curve_laser_inline(&params);
             }
         }
         if (head >= 4)

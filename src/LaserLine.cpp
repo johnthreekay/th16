@@ -51,7 +51,6 @@ i32 LaserLineInf::method_30(Float3 *pos, f32 radius)
 }
 
 // The same et_ex step as LaserCurveInf::method_3c.
-// TODO: the original adds and stores the velocity one component at a time and reloads unk_60.x for the fabsf test.
 // FUNCTION: TH16 0x432dc0
 i32 LaserLineInf::method_3c()
 {
@@ -62,18 +61,12 @@ i32 LaserLineInf::method_3c()
         return 1;
     }
     length += st->floats[0] * g_game_speed;
-    unk_60 += *(Float3 *)&st->floats[5] * g_game_speed;
+    Float3 v = *(Float3 *)&st->floats[5] * g_game_speed;
+    D3DXVec3Add(&unk_60, &unk_60, &v);
     if (fabsf(unk_60.x) > 0.0001f || fabsf(unk_60.y) > 0.0001f)
     {
         angle = atan2(unk_60.y, unk_60.x);
     }
     st->timer.tick();
     return 0;
-}
-
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x432620
-i32 LaserLineInf::method_50()
-{
-    return unit5_placeholder(this);
 }
