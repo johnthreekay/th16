@@ -388,6 +388,16 @@ enum SupervisorFlags
     SUPERVISOR_IDLE_ON_EXIT = 1 << 13,
 };
 
+// The text.anm scripts of the arcade blit VMs at 640x480; each one's 960
+// and 1280 versions follow it (script + 1, script + 2).
+enum ArcadeBlitScript
+{
+    TEXT_SCRIPT_BLIT_0F = 0x3b,
+    TEXT_SCRIPT_BLIT_2C = 0x3e,
+    TEXT_SCRIPT_BLIT_1A = 0x41,
+    TEXT_SCRIPT_BLIT_39 = 0x44,
+};
+
 // Supervisor's game modes (gamemode_current, gamemode_to_switch_to). The
 // switches themselves are in Supervisor::switch_gamemodes.
 enum SupervisorGameMode

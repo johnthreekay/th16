@@ -812,66 +812,66 @@ void Supervisor::setup_special_anms()
         {
             if (g_resolution_x == 640)
             {
-                text_anm->copy_vm(vm, 0x3b);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_0F);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
                 vm = arcade_blit_vm_1a;
-                text_anm->copy_vm(vm, 0x41);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_1A);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
                 vm = arcade_blit_vm_2c;
-                text_anm->copy_vm(vm, 0x3e);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_2C);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
                 vm = arcade_blit_vm_39;
-                text_anm->copy_vm(vm, 0x44);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_39);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
             }
             else if (g_resolution_x == 960)
             {
-                text_anm->copy_vm(vm, 0x3c);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_0F + 1);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
                 vm = arcade_blit_vm_1a;
-                text_anm->copy_vm(vm, 0x42);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_1A + 1);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
                 vm = arcade_blit_vm_2c;
-                text_anm->copy_vm(vm, 0x3f);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_2C + 1);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
                 vm = arcade_blit_vm_39;
-                text_anm->copy_vm(vm, 0x45);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_39 + 1);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
             }
             else if (g_resolution_x == 1280)
             {
-                text_anm->copy_vm(vm, 0x3d);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_0F + 2);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
                 vm = arcade_blit_vm_1a;
-                text_anm->copy_vm(vm, 0x43);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_1A + 2);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
                 vm = arcade_blit_vm_2c;
-                text_anm->copy_vm(vm, 0x40);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_2C + 2);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
                 vm = arcade_blit_vm_39;
-                text_anm->copy_vm(vm, 0x46);
+                text_anm->copy_vm(vm, TEXT_SCRIPT_BLIT_39 + 2);
                 vm->unk_5b0 = NULL;
                 vm->parent = NULL;
                 vm->run();
