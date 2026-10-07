@@ -590,7 +590,6 @@ i32 LaserLineInf::on_draw()
 // An et_ex step: moves the curve's origin by ex_state[1]'s velocity (scaled
 // by the game speed) and turns it to face its direction of motion, until
 // the step's time runs out.
-// TODO: the original adds and stores the velocity one component at a time and reloads unk_60.x for the fabsf test.
 // FUNCTION: TH16 0x4395b0
 i32 LaserCurveInf::method_3c()
 {
@@ -601,7 +600,8 @@ i32 LaserCurveInf::method_3c()
         return 1;
     }
     length += st->floats[0] * g_game_speed;
-    unk_60 += *(Float3 *)&st->floats[5] * g_game_speed;
+    Float3 v = *(Float3 *)&st->floats[5] * g_game_speed;
+    D3DXVec3Add(&unk_60, &unk_60, &v);
     if (fabsf(unk_60.x) > 0.0001f || fabsf(unk_60.y) > 0.0001f)
     {
         angle = atan2(unk_60.y, unk_60.x);
