@@ -588,9 +588,10 @@ decompiled code the surroundings it had in the original:
   - The order of stores in the source decides register assignment even
     where the result is scheduled the same: GameThread::create matches with
     `g_GameThread = thread; thread->replay_mode = ...; flags.paused = 1`.
-  - `p->x += (__int64)d` evaluated the pointer after the __dtol3 call;
+  - `p->x += (__int64)d` evaluated the pointer after the conversion call;
     taking the field's address into a local first loads it before the call
-    (GameThread::update_play_time).
+    (GameThread::update_play_time, whose conversion is to unsigned
+    __int64: __dtoul3, which quickdiff does not tell from __dtol3).
   - A fade_out_bgm inlined as `modify_bgm(..., c ? 3.0f / speed : 3.0f, ...)`
     keeps the hoisted constant in the register the original uses; the
     if/assign form copied it from another (EndingChildF0::run).

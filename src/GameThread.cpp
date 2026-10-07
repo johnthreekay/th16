@@ -724,10 +724,10 @@ void GameThread::update_play_time()
     if (elapsed >= 0.0)
     {
         // The total's address is taken before the conversion: the original
-        // loads g_Scorefile before the __dtol3 call and keeps it in edi.
+        // loads g_Scorefile before the __dtoul3 call and keeps it in edi.
         Scorefile *scorefile = g_Scorefile;
         __int64 *total = &scorefile->play_time;
-        __int64 time = (__int64)(elapsed * 100.0);
+        __int64 time = (unsigned __int64)(elapsed * 100.0);
         *total += time;
         scorefile->characters[g_Globals.subshot + g_Globals.character].play_time += time;
     }
