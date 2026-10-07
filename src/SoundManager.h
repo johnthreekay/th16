@@ -405,6 +405,10 @@ enum SoundEffect
 
 #define SOUND_EFFECT_COUNT 78
 #define SOUND_QUEUE_SIZE 12
+// Slots for BGM tracks read into memory (CONFIG_BGM_IN_MEMORY).
+#define BGM_PRELOAD_SLOTS 0x10
+// Entries of the BGM command queue.
+#define BGM_QUEUE_SIZE 0x1f
 
 // SoundManager::modify_bgm's commands. The sound thread works through them
 // in order, a step per call for the longer ones (BgmCommandEntry::step).
@@ -500,10 +504,10 @@ struct SoundManager
     i32 queued_pans[SOUND_QUEUE_SIZE][0x80];
     // BGM tracks read ahead into memory (thbgm.fmt entry, file data, read
     // position and size), and the slot playing.
-    ThBgmFormat *preload_format[0x10];
-    u8 *preload_data[0x10];
-    u8 *preload_cursor[0x10];
-    i32 preload_size[0x10];
+    ThBgmFormat *preload_format[BGM_PRELOAD_SLOTS];
+    u8 *preload_data[BGM_PRELOAD_SLOTS];
+    u8 *preload_cursor[BGM_PRELOAD_SLOTS];
+    i32 preload_size[BGM_PRELOAD_SLOTS];
     i32 preload_current;
     // thbgm.fmt.
     ThBgmFormat *bgm_format;
@@ -514,10 +518,10 @@ struct SoundManager
     u8 *sound_file_data[SOUND_FILE_COUNT];
     // File name of the BGM playing.
     char bgm_name[0x100];
-    BgmCommandEntry bgm_commands[0x1f];
+    BgmCommandEntry bgm_commands[BGM_QUEUE_SIZE];
     u8 unk_4454[0x4560 - 0x4454];
     // File names of the preloaded tracks.
-    char preload_names[0x10][0x100];
+    char preload_names[BGM_PRELOAD_SLOTS][0x100];
     // The BGM archive's file name (thbgm.dat).
     char bgm_dat_name[0x100];
     BgmStream *bgm_stream;

@@ -404,7 +404,7 @@ HARNESS_CALLED i32 SoundManager::release()
         delete manager;
         manager = NULL;
     }
-    for (i32 i = 0; i < 0x10; i++)
+    for (i32 i = 0; i < BGM_PRELOAD_SLOTS; i++)
     {
         if (preload_data[i] != NULL)
         {
@@ -475,6 +475,7 @@ HARNESS_CALLED i32 SoundManager::open_bgm(const char *path)
     ThBgmFormat *format = bgm_format;
     DWORD block_align = format->format.nBlockAlign;
     i32 samples_per_sec = format->format.nSamplesPerSec;
+    // The stream buffer holds 4 seconds, refilled in 8 parts.
     DWORD notify_size = samples_per_sec * block_align * 4 / 8;
     bgm_event = CreateEventA(NULL, FALSE, FALSE, NULL);
     bgm_thread = CreateThread(NULL, 0, bgm_thread_proc, g_Supervisor.main_window, 0, &bgm_thread_id);
@@ -822,7 +823,7 @@ DWORD WINAPI SoundManager::bgm_thread_proc(void *arg)
 void SoundManager::modify_bgm(i32 command, i32 arg, const char *name)
 {
     ENTER_CS(CS_SOUND);
-    for (i32 i = 0; i < 0x1f; i++)
+    for (i32 i = 0; i < BGM_QUEUE_SIZE; i++)
     {
         if (bgm_commands[i].command == BGM_NONE)
         {
@@ -1175,7 +1176,7 @@ i32 SoundManager::update_sound_thread()
             i++;
             *cmd = cmd[1];
             cmd++;
-            if (i >= 0x1f)
+            if (i >= BGM_QUEUE_SIZE)
             {
                 break;
             }
