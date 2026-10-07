@@ -21,6 +21,10 @@
 #include "Input.h"
 #include "UpdateFunc.h"
 #include "Supervisor.h"
+#include "BulletManager.h"
+#include "GameThread.h"
+#include "Laser.h"
+#include "ReplayManager.h"
 
 // FUNCTION: TH16 0x440d50
 void Player::set_shoot_key_short_timer(i32 time)
@@ -394,8 +398,6 @@ HARNESS_CALLED i32 Player::create_damage_source(D3DXVECTOR3 *pos, f32 radius, f3
     return index + 1;
 }
 
-// TODO: the original stores both halves of the position before reading x
-// back; ours reads x back between the stores.
 // FUNCTION: TH16 0x444b20
 HARNESS_CALLED i32 Player::create_rect_damage_source(D3DXVECTOR3 *pos, f32 width, f32 height, f32 angle, i32 time,
                                                     i32 damage)
@@ -753,6 +755,7 @@ HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 wi
     return 1;
 }
 
+// TODO: the original walks the sources with two pointers (source and &timer_60.current) and rereads pos/size from the stack; ours keeps one pointer and pos/size in registers.
 // FUNCTION: TH16 0x445a30
 HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f32 rotation, f32 radius,
                                                    i32 *hit_flag, Float3 *hit_pos, i32 no_score, i32 enemy_id)
@@ -863,6 +866,7 @@ static __forceinline i32 is_on_screen(Float3 *pos)
            g_early_arcade_offset_y < pos->y && pos->y < g_early_arcade_offset_y + 448.0f;
 }
 
+// TODO: the original realigns its frame (ebx form) and reloads g_Player for every bullet; ours keeps it in a register.
 // FUNCTION: TH16 0x4456d0
 i32 Player::tick_bullets()
 {
@@ -948,6 +952,7 @@ const char *const g_player_anm_names[4] = {"pl00.anm", "pl02.anm", "pl03.anm", "
 const char *const g_subseason_anm_names[5] = {"pl00sub.anm", "pl02sub.anm", "pl03sub.anm", "pl01sub.anm",
                                               "pl04sub.anm"};
 
+// TODO: block order of the .sht loading branch and the VM pointer register differ.
 // FUNCTION: TH16 0x440fb0
 i32 Player::initialize()
 {
@@ -1076,6 +1081,7 @@ static __forceinline void player_set_script(Player *player, i32 script)
     player->vm.run();
 }
 
+// TODO: the original realigns its frame (and esp, -8) and keeps 1.0f in xmm2; register allocation differs.
 // FUNCTION: TH16 0x441cf0
 i32 Player::move()
 {
@@ -1290,6 +1296,7 @@ static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
     }
 }
 
+// TODO: ours gets a /GS cookie for the zero position passed to create_vm_inline; the original zeroes one local before the loops and aligns its frame.
 // FUNCTION: TH16 0x4440e0
 void PlayerInner::repopulate_options()
 {
@@ -1395,4 +1402,286 @@ void PlayerInner::repopulate_options()
             g_Player->inner.subseason_options[j].should_instajump = 1;
         }
     }
+}
+
+// SoundManager::stop_sound as LTCG inlined it here.
+static __forceinline void stop_sound_inline(i32 id)
+{
+    i32 i;
+    for (i = 0; i < SOUND_QUEUE_SIZE; i++)
+    {
+        if (g_SoundManager.queued_ids[i] < 0)
+        {
+            break;
+        }
+        if (g_SoundManager.queued_ids[i] == id)
+        {
+            g_SoundManager.queued_counts[i] = -1;
+            return;
+        }
+    }
+    if (i >= SOUND_QUEUE_SIZE)
+    {
+        return;
+    }
+    g_SoundManager.queued_ids[i] = id;
+    g_SoundManager.queued_counts[i] = -1;
+}
+
+// TODO: functionally complete; frame and register allocation differ. Adding it tips LTCG into calling sinf/cosf/floorf from zun_sinf/zun_cosf/zun_floorf.
+// FUNCTION: TH16 0x442560
+i32 Player::on_tick_body()
+{
+    switch (inner.state)
+    {
+    case 0:
+    {
+        // Respawning: rise from the bottom, clearing bullets and lasers.
+        inner.pos_subpixel.y = 0xf000 - inner.time_in_state.current * 0x2800 / 60;
+        inner.pos.y = inner.pos_subpixel.y / 128.0f;
+        inner.main_options[0].should_instajump = 1;
+        inner.main_options[1].should_instajump = 1;
+        inner.main_options[2].should_instajump = 1;
+        inner.main_options[3].should_instajump = 1;
+        Float3 *center;
+        f32 radius;
+        if (inner.time_in_state.current >= 30)
+        {
+            center = &inner.pos;
+            g_BulletManager->cancel_radius_as_bomb(center, 640.0f, 0);
+            radius = 640.0f;
+        }
+        else
+        {
+            center = &unk_2c76c;
+            radius = inner.time_in_state.current * 512.0f / 30.0f + 64.0f;
+            g_LaserManager->cancel_in_radius(center, radius, 0, 1);
+            radius *= 0.25f;
+        }
+        g_LaserManager->cancel_in_radius(center, radius, 0, 0);
+        if (inner.time_in_state.current < 60)
+        {
+            break;
+        }
+        inner.state = 1;
+        inner.time_in_state.set_value(0);
+    }
+    case 1:
+        if (g_MainBomb != NULL && g_MainBomb->can_activate() && (g_InputState.input_rising & INPUT_BOMB))
+        {
+            g_MainBomb->activate();
+        }
+        if (g_SubseasonBomb != NULL && g_SubseasonBomb->can_activate() &&
+            (g_InputState.input_rising & INPUT_RELEASE))
+        {
+            g_SubseasonBomb->activate();
+        }
+        move();
+        break;
+    case 4:
+        // Hit: a few frames to bomb out of it.
+        if (inner.time_in_state.current < 8)
+        {
+            if (g_MainBomb != NULL && (g_InputState.input_rising & INPUT_BOMB) && g_MainBomb->can_activate())
+            {
+                g_MainBomb->activate();
+                start_respawn();
+                if (g_SubseasonBomb != NULL && g_SubseasonBomb->can_activate() &&
+                    (g_InputState.input_rising & INPUT_RELEASE))
+                {
+                    g_SubseasonBomb->activate();
+                    start_respawn();
+                }
+            }
+            break;
+        }
+        lose_life();
+    case 2:
+        if (inner.time_in_state.current == 3)
+        {
+            // Drop half a power level as items, spread toward the top.
+            g_Globals.power = g_Globals.power - g_Globals.power_per_level / 2 < g_Globals.power_per_level
+                                  ? g_Globals.power_per_level
+                                  : g_Globals.power - g_Globals.power_per_level / 2;
+            f32 dx = 0.0f - inner.pos.x;
+            f32 dy = inner.pos.y - 224.0f - inner.pos.y;
+            f32 angle;
+            if (dy == 0.0f && dx == 0.0f)
+            {
+                angle = ZUN_PI / 2;
+            }
+            else
+            {
+                angle = zun_atan2f(dy, dx);
+            }
+            i32 items[7] = {1, 1, 1, 1, 1, 1, 1};
+            for (i32 i = 0; i < 7; i++)
+            {
+                g_ItemManager->spawn_item(items[i], &inner.pos, 0, i * ZUN_PI / 28.0f + angle - ZUN_PI / 8, 3.0f, 0,
+                                          0);
+            }
+            inner.repopulate_options();
+        }
+        if (inner.time_in_state.current < 30)
+        {
+            break;
+        }
+        if (g_Globals.lives < 0 && inner.time_in_state.current == 30)
+        {
+            if (g_ReplayManager->mode != REPLAY_PLAYBACK)
+            {
+                pause_menu_43f350();
+            }
+            inner.time_in_state++;
+            break;
+        }
+        inner.state = 0;
+        g_game_speed = 1.0f;
+        create_damage_source(&inner.pos, 32.0f, 16.0f, 30, 150);
+        g_Globals.bombs = 3;
+        if (g_Gui != NULL)
+        {
+            g_Gui->update_bombs(3, g_Globals.bomb_fragments);
+        }
+        unk_2c76c = inner.pos;
+        set_position(0.0f, 480.0f);
+        inner.iframes.set_inline(280);
+        inner.time_in_state.reset_inline();
+        break;
+    case 3:
+        switch (inner.time_in_state.current)
+        {
+        case 4:
+            break;
+        case 15:
+            g_LaserManager->clear_all(1, 0);
+            break;
+        }
+        break;
+    }
+    for (i32 i = 0; i < 0x100; i++)
+    {
+        PlayerDamageSource *source = &inner.damage_sources[i];
+        if (!(source->flags & 1))
+        {
+            continue;
+        }
+        source->pos.update_secondary_fields();
+        source->pos.step();
+        source->radius += source->unk_8;
+        source->unk_c = wrap_angle(source->unk_c + source->angular_speed);
+        source->unk_84 = 0;
+        source->timer_60.decrement(1.0f);
+        if (source->timer_60.current <= 0)
+        {
+            source->flags &= ~1;
+        }
+    }
+    if (inner.iframes.current > 0)
+    {
+        inner.iframes.decrement(1.0f);
+        if (inner.time_in_state.current != inner.time_in_state.previous && inner.time_in_state.current % 3 == 0)
+        {
+            vm.color_2.d3d = 0xff0000ff;
+            vm.flags_lo = (vm.flags_lo & ~ANM_VM_COLOR_MODE_MASK) | ANM_VM_COLOR_MODE_1;
+        }
+        else
+        {
+            vm.flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
+        }
+    }
+    else
+    {
+        vm.flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
+        if (inner.flags & 0x20)
+        {
+            if (inner.time_in_state.current % 8 < 4)
+            {
+                vm.color_2.d3d = 0xffff0000;
+                vm.flags_lo = (vm.flags_lo & ~ANM_VM_COLOR_MODE_MASK) | ANM_VM_COLOR_MODE_1;
+            }
+            i32 scripts[4] = {4, 4, 4, 4};
+            AnmId id = anm_file->create_vm(scripts[g_Globals.character], &inner.pos, 0.0f, -1, 0);
+            anm_file->set_sprite(get_vm_or_clear(id), vm.sprite_id);
+            g_AnmManager->get_vm_with_id(id)->color_1.d3d = 0xffff0000;
+        }
+        else if (inner.speed_multiplier > 1.01f)
+        {
+            if (inner.time_in_state.current % 8 < 4)
+            {
+                vm.color_2.d3d = 0xffffff00;
+                vm.flags_lo = (vm.flags_lo & ~ANM_VM_COLOR_MODE_MASK) | ANM_VM_COLOR_MODE_1;
+            }
+            i32 scripts[4] = {4, 4, 4, 4};
+            AnmId id = anm_file->create_vm(scripts[g_Globals.character], &inner.pos, 0.0f, -1, 0);
+            anm_file->set_sprite(g_AnmManager->get_vm_with_id(id), vm.sprite_id);
+        }
+    }
+    inner.speed_multiplier = 1.0f;
+    inner.unk_1607c = g_zero_vec;
+    vm.run();
+    if (inner.flags & 0x10)
+    {
+        if (player_scale_i.end_time != 0)
+        {
+            player_scale = player_scale_i.step();
+            if (player_scale_i.end_time != 0 && inner.time_in_state.current % 3 == 0)
+            {
+                vm.scale.x = 1.0f;
+                vm.scale.y = 1.0f;
+            }
+            else
+            {
+                vm.scale.x = vm.scale.y = player_scale;
+            }
+        }
+        else
+        {
+            vm.scale.x = vm.scale.y = player_scale;
+        }
+        vm.flags_lo |= ANM_VM_SCALE_CHANGED;
+        f32 scale = player_scale;
+        hurtbox.min_pos = inner.pos - hurtbox_halfsize * scale;
+        hurtbox.max_pos = inner.pos + hurtbox_halfsize * scale;
+        item_collect_box.min_pos = inner.pos - item_attract_box_unfocused_halfsize * 0.5f * scale;
+        item_collect_box.max_pos = inner.pos + item_attract_box_unfocused_halfsize * 0.5f * scale;
+        item_attract_box_focused.min_pos = inner.pos - item_attract_box_focused_halfsize * scale;
+        item_attract_box_focused.max_pos = inner.pos + item_attract_box_focused_halfsize * scale;
+        item_attract_box_unfocused.min_pos = inner.pos - item_attract_box_unfocused_halfsize * scale;
+        item_attract_box_unfocused.max_pos = inner.pos + item_attract_box_unfocused_halfsize * scale;
+    }
+    else
+    {
+        vm.flags_lo |= ANM_VM_SCALE_CHANGED;
+        vm.scale.x = 1.0f;
+        vm.scale.y = 1.0f;
+        hurtbox.min_pos = inner.pos - hurtbox_halfsize;
+        hurtbox.max_pos = inner.pos + hurtbox_halfsize;
+        item_collect_box.min_pos = inner.pos - item_attract_box_unfocused_halfsize * 0.5f;
+        item_collect_box.max_pos = inner.pos + item_attract_box_unfocused_halfsize * 0.5f;
+        item_attract_box_focused.min_pos = inner.pos - item_attract_box_focused_halfsize;
+        item_attract_box_focused.max_pos = inner.pos + item_attract_box_focused_halfsize;
+        item_attract_box_unfocused.min_pos = inner.pos - item_attract_box_unfocused_halfsize;
+        item_attract_box_unfocused.max_pos = item_attract_box_unfocused_halfsize + inner.pos;
+    }
+    inner.time_in_state.tick();
+    inner.time_in_stage.tick();
+    inner.timer_3c.tick();
+    if (g_Gui->msg == NULL && g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 &&
+        !(*(u32 *)&g_GameThread->flags & 0x4000) && inner.timer_3c.current >= 20 && !(inner.flags & 4) &&
+        !(inner.flags & 0x10))
+    {
+        tick_shooting_state();
+    }
+    else
+    {
+        inner.shoot_key_short_timer = -1;
+        inner.shoot_key_long_timer = -1;
+        unk_2c790 = 0;
+        unk_2c794 = 0;
+        stop_sound_inline(0x1e);
+        stop_sound_inline(0x37);
+    }
+    tick_bullets();
+    return 1;
 }

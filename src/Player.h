@@ -119,7 +119,12 @@ struct PlayerDamageSource
     // Rectangles (create_rect_damage_source): angle, then width and
     // height in unk_14 and unk_18.
     f32 unk_c;
-    i32 unk_10;
+    union
+    {
+        i32 unk_10;
+        // Added to unk_c each frame.
+        f32 angular_speed;
+    };
     f32 unk_14;
     f32 unk_18;
     PosVel pos;
@@ -396,7 +401,7 @@ struct Player
     // player and places their VMs.
     HARNESS_CALLED i32 update_options(PlayerOption *options, i32 count);
     // 0x442560
-    i32 on_tick_body();
+    DECOMP_NOINLINE i32 on_tick_body();
     static i32 __fastcall on_tick_callback(Player *player);
     static i32 __fastcall on_draw_callback(Player *player);
 

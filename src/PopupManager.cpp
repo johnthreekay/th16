@@ -160,6 +160,7 @@ static_assert(offsetof(PopupManager, strings) == 0x614, "PopupManager::strings")
 
 // The score strings rise digit by digit and fade near the player; the
 // release bonus strings (13 and up) go through the ASCII manager.
+// TODO: same operations; register allocation and the order of the sprite setup stores differ.
 // FUNCTION: TH16 0x44a000
 int PopupManager::on_draw()
 {

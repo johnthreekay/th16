@@ -737,6 +737,7 @@ i32 g_demo_replay_index;
 // GLOBAL: TH16 0x49371c
 const char *const g_demo_replay_names[3] = {"demo/demo1.rpy", "demo/demo2.rpy", "demo/demo3.rpy"};
 
+// TODO: the original computes the demo index with a multiply (ours idiv), calls the Supervisor members without this and keeps the replay info in ecx.
 // FUNCTION: TH16 0x44af80
 i32 TitleInf::on_tick()
 {
@@ -1002,6 +1003,7 @@ static __forceinline void title_highlight_inline(TitleInf *menu)
     }
 }
 
+// TODO: functionally complete; register allocation and the choice of inlined vs called menu highlight copies differ in places.
 // FUNCTION: TH16 0x44b5f0
 i32 TitleInf::do_title_screen()
 {

@@ -3,11 +3,6 @@
 #include "../Input.h"
 #include "../Player.h"
 
-// STUB: TH16 0x442560
-i32 Player::on_tick_body()
-{
-    return 1;
-}
 
 
 
