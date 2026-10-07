@@ -31,9 +31,3 @@ void harness_enemy_manager_create(const char *ecl_filename)
 {
     EnemyManager::create(ecl_filename);
 }
-
-// Like the dialogue skip check at 0x42b043.
-int harness_input_hold_time()
-{
-    return g_InputState.get_hold_time(9) < 20 || g_InputState.get_hold_time(0) < 20;
-}

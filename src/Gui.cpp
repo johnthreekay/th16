@@ -6,7 +6,9 @@
 #include "BulletManager.h"
 #include "EnemyManager.h"
 #include "GameThread.h"
+#include "Input.h"
 #include "Laser.h"
+#include "Player.h"
 #include "Scorefile.h"
 #include "SoundManager.h"
 #include "Spellcard.h"
@@ -279,6 +281,495 @@ i32 __fastcall Gui::on_draw_1_callback(Gui *self)
 i32 __fastcall Gui::on_draw_2_callback(Gui *self)
 {
     return self->on_draw_2_body();
+}
+
+// GLOBAL: TH16 0x492260
+// The player's face script in its anm file, per character.
+static const i32 g_msg_player_face_scripts[4] = {26, 16, 22, 35};
+
+// Fills a text VM with the text or (blank) clears it, in the current
+// side's color.
+#define MSG_TEXT_FONT() ((flags >> 1) & 1)
+#define MSG_TEXT_COLOR() ((&unk_1a0)[active_side])
+// The speech bubble shape: per side, and per bubble type set by
+// instruction 29.
+#define MSG_TEXTBOX_KIND() (active_side + ((flags >> 2) & 0xf) * 2)
+
+// Dialogue instructions; names from truth's msgmap.
+// TODO: ours gets a /GS cookie (from the Float3 locals of instruction 17 and
+// the bubble code; still unexplained) and uses ebx; the original keeps the
+// instruction pointer in ecx and reloads it after calls.
+// FUNCTION: TH16 0x42a1d0
+HARNESS_CALLED i32 GuiMsgVm::run()
+{
+    if (unk_18c > 0)
+    {
+        unk_18c--;
+    }
+    if (g_InputState.input_rising & 0x201)
+    {
+        flags |= 0x40;
+    }
+    // Skipping: jump to the next instruction's time.
+    if ((flags & 0x41) == 0x41 && ((g_InputState.input & (1 << 9)) && (u32)g_InputState.hold_time[9] >= 0x14 ||
+                                   (g_InputState.input & (1 << 0)) && (u32)g_InputState.hold_time[0] >= 0x14))
+    {
+        time_in_script.set(instr()->time);
+    }
+    while (time_in_script.current >= instr()->time)
+    {
+        switch (instr()->opcode)
+        {
+        case 26:
+            flags |= 2;
+            break;
+        // textLine1, textLine2
+        case 15:
+        {
+            AnmVm *vm = get_vm_or_clear(text_line_1);
+            const char *text = decode_msg_string(instr()->args.s);
+            g_AnmManager->draw_text(vm, MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT() + 4, 0, 0, text);
+            AnmManager::interrupt_tree(text_line_1, 2);
+            break;
+        }
+        case 16:
+        {
+            AnmVm *vm = get_vm_or_clear(text_line_2);
+            const char *text = decode_msg_string(instr()->args.s);
+            g_AnmManager->draw_text(vm, MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT() + 4, 0, 0, text);
+            AnmManager::interrupt_tree(text_line_2, 2);
+            break;
+        }
+        // bubblePos
+        case 28:
+            unk_1b0 = instr()->args.f[0] * 2.0f;
+            unk_1b4 = instr()->args.f[1] * 2.0f;
+            break;
+        // textAdd: the next line of text, or furigana ("|x,y,text") for the
+        // line being written.
+        case 17:
+            if (next_text_line == 0)
+            {
+                if (unk_198 == 0)
+                {
+                    unk_1bc = 0.0f;
+                    g_AnmManager->draw_text(text_line_1.find_or_clear(), MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT(), 0, 0,
+                                            "  ");
+                    g_AnmManager->draw_text(text_line_2.find_or_clear(), MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT(), 0, 0,
+                                            "  ");
+                    g_AnmManager->draw_text(furigana_1.find_or_clear(), MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT(), 0, 1,
+                                            "  ");
+                    g_AnmManager->draw_text(furigana_2.find_or_clear(), MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT(), 0, 1,
+                                            "  ");
+                    unk_198 = 1;
+                    AnmManager::interrupt_tree(text_line_1, 3);
+                    AnmManager::interrupt_tree(text_line_2, 3);
+                    AnmManager::interrupt_tree(furigana_1, 3);
+                    AnmManager::interrupt_tree(furigana_2, 3);
+                }
+                const char *text = decode_msg_string(instr()->args.s);
+                if (text[0] == '|')
+                {
+                    i32 x = atoi(text + 1);
+                    const char *rest = strchr(text + 1, ',') + 1;
+                    i32 y = atoi(rest);
+                    rest = strchr(rest, ',');
+                    furigana_1.find_or_clear()->flags_hi |= 0x1000;
+                    g_AnmManager->draw_text(furigana_1.find_or_clear(), 0, 0xa0a0a0, 2, x, y, rest + 1);
+                    furigana_1.set_entity_pos((Float3 *)&unk_1b0);
+                    AnmManager::interrupt_tree_and_run(furigana_1, 2);
+                }
+                else
+                {
+                    f32 width = (strlen(text) / 2 * 16 - 28) * 2.0f;
+                    unk_1bc = width > unk_1bc ? width : unk_1bc;
+                    set_textbox(unk_1b0, unk_1b4, unk_1bc, MSG_TEXTBOX_KIND());
+                    set_textbox_width(unk_1bc, MSG_TEXTBOX_KIND());
+                    g_AnmManager->draw_text(text_line_1.find_or_clear(), MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT(), 0, 0,
+                                            text);
+                    if (active_side >= 1)
+                    {
+                        Float3 pos = *(Float3 *)&unk_1b0;
+                        text_line_1.set_entity_pos(&pos);
+                        furigana_1.set_entity_pos(&pos);
+                        text_line_2.set_entity_pos(&pos);
+                        furigana_2.set_entity_pos(&pos);
+                    }
+                    else
+                    {
+                        Float3 pos = *(Float3 *)&unk_1b0;
+                        text_line_1.set_entity_pos(&pos);
+                    }
+                    AnmManager::interrupt_tree_and_run(text_line_1, 2);
+                    next_text_line++;
+                }
+            }
+            else
+            {
+                const char *text = decode_msg_string(instr()->args.s);
+                if (text[0] == '|')
+                {
+                    i32 x = atoi(text + 1);
+                    const char *rest = strchr(text + 1, ',') + 1;
+                    i32 y = atoi(rest);
+                    rest = strchr(rest, ',');
+                    furigana_2.find_or_clear()->flags_hi |= 0x1000;
+                    g_AnmManager->draw_text(furigana_2.find_or_clear(), 0, 0xa0a0a0, 2, x, y, rest + 1);
+                    furigana_2.set_entity_pos((Float3 *)&unk_1b0);
+                    AnmManager::interrupt_tree(furigana_2, 2);
+                }
+                else
+                {
+                    f32 width = (strlen(text) / 2 * 16 - 28) * 2.0f;
+                    unk_1bc = width > unk_1bc ? width : unk_1bc;
+                    set_textbox(unk_1b0, unk_1b4, unk_1bc, MSG_TEXTBOX_KIND() + 8);
+                    set_textbox_width(unk_1bc, MSG_TEXTBOX_KIND() + 8);
+                    g_AnmManager->draw_text(text_line_2.find_or_clear(), MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT(), 0, 0,
+                                            text);
+                    if (active_side >= 1)
+                    {
+                        Float3 pos = *(Float3 *)&unk_1b0;
+                        text_line_1.set_entity_pos(&pos);
+                        furigana_1.set_entity_pos(&pos);
+                        text_line_2.set_entity_pos(&pos);
+                        furigana_2.set_entity_pos(&pos);
+                    }
+                    else
+                    {
+                        Float3 pos = *(Float3 *)&unk_1b0;
+                        text_line_2.set_entity_pos(&pos);
+                    }
+                    AnmManager::interrupt_tree_and_run(text_line_2, 2);
+                    next_text_line = 0;
+                    unk_198 = 0;
+                }
+            }
+            break;
+        // textClear
+        case 18:
+            delete_vm_and_clear(textbox);
+            AnmManager::interrupt_tree(text_line_1, 3);
+            AnmManager::interrupt_tree(text_line_2, 3);
+            AnmManager::interrupt_tree(furigana_1, 3);
+            AnmManager::interrupt_tree(furigana_2, 3);
+            break;
+        // playerShow
+        case 1:
+            if (instr()->args.i[0] == 0)
+            {
+                player_face = g_Player->anm_file->create_effect(g_msg_player_face_scripts[g_Globals.character], -1, NULL);
+            }
+            else
+            {
+                player_face = g_EnemyManager->anim_statement_anms[5]->create_effect(0xb, -1, NULL);
+            }
+            break;
+        // bossShow
+        case 2:
+        {
+            i32 i = instr()->args.i[0];
+            StageBoss *boss = &g_stage_data->bosses[i];
+            enemy_faces[i] =
+                g_EnemyManager->anim_statement_anms[boss->face_anm_slot]->create_effect(boss->face_script, -1, NULL);
+            unk_1c0 = 0;
+            break;
+        }
+        case 31:
+        {
+            StageBoss *boss = &g_stage_data->bosses[1];
+            enemy_faces[1] =
+                g_EnemyManager->anim_statement_anms[boss->face_anm_slot]->create_effect(boss->face_script, -1, NULL);
+            unk_1c0 = 0;
+            break;
+        }
+        // textOffsetY
+        case 25:
+            get_vm_or_clear(text_line_1)->pos_2.y = instr()->args.i[0];
+            get_vm_or_clear(text_line_2)->pos_2.y = instr()->args.i[0];
+            get_vm_or_clear(furigana_1)->pos_2.y = instr()->args.i[0];
+            get_vm_or_clear(furigana_2)->pos_2.y = instr()->args.i[0];
+            break;
+        // playerShake, bossShake
+        case 23:
+            AnmManager::interrupt_tree(player_face, 7);
+            break;
+        case 24:
+            AnmManager::interrupt_tree(enemy_faces[0], 7);
+            AnmManager::interrupt_tree(enemy_faces[1], 7);
+            break;
+        // playerHide, bossHide, textboxHide
+        case 4:
+            AnmManager::interrupt_tree(player_face, 1);
+            player_face.id = 0;
+            break;
+        case 5:
+            AnmManager::interrupt_tree(enemy_faces[instr()->args.i[0]], 1);
+            enemy_faces[instr()->args.i[0]].id = 0;
+            AnmManager::interrupt_tree(intro, 1);
+            break;
+        case 6:
+            AnmManager::interrupt_tree(text_line_1, 1);
+            AnmManager::interrupt_tree(text_line_2, 1);
+            AnmManager::interrupt_tree(furigana_1, 1);
+            AnmManager::interrupt_tree(furigana_2, 1);
+            delete_vm_and_clear(textbox);
+            break;
+        // portraitDarken, portraitHighlight
+        case 33:
+            if (instr()->args.i[0] == 0)
+            {
+                AnmManager::interrupt_tree_and_run(player_face, 3);
+            }
+            else
+            {
+                AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[1]], 3);
+            }
+            break;
+        case 34:
+            if (instr()->args.i[0] == 0)
+            {
+                AnmManager::interrupt_tree_and_run(player_face, 2);
+            }
+            else
+            {
+                AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[1]], 2);
+            }
+            break;
+        // speakerPlayer
+        case 7:
+            for (i32 i = 0; i < 4; i++)
+            {
+                AnmManager::interrupt_tree_and_run(enemy_faces[i], 3);
+            }
+            AnmManager::interrupt_tree_and_run(player_face, 2);
+            AnmManager::interrupt_tree(id_54, 2);
+            active_side = 0;
+            get_vm_or_clear(text_line_1)->pos_2.y = 0.0f;
+            get_vm_or_clear(text_line_2)->pos_2.y = 0.0f;
+            get_vm_or_clear(furigana_1)->pos_2.y = 0.0f;
+            get_vm_or_clear(furigana_2)->pos_2.y = 0.0f;
+            flags &= ~2;
+            next_text_line = 0;
+            unk_198 = 0;
+            break;
+        // speakerBoss
+        case 8:
+            AnmManager::interrupt_tree_and_run(player_face, 3);
+            for (i32 i = 0; i < 4; i++)
+            {
+                if (i == instr()->args.i[0])
+                {
+                    AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[0]], 2);
+                }
+                else
+                {
+                    AnmManager::interrupt_tree_and_run(enemy_faces[i], 3);
+                }
+            }
+            AnmManager::interrupt_tree(id_54, 3);
+            active_side = 1;
+            get_vm_or_clear(text_line_1)->pos_2.y = 0.0f;
+            get_vm_or_clear(text_line_2)->pos_2.y = 0.0f;
+            get_vm_or_clear(furigana_1)->pos_2.y = 0.0f;
+            get_vm_or_clear(furigana_2)->pos_2.y = 0.0f;
+            flags &= ~2;
+            next_text_line = 0;
+            unk_198 = 0;
+            break;
+        case 32:
+            AnmManager::interrupt_tree(id_54, 3);
+            active_side = instr()->args.i[0];
+            get_vm_or_clear(text_line_1)->pos_2.y = 0.0f;
+            get_vm_or_clear(text_line_2)->pos_2.y = 0.0f;
+            get_vm_or_clear(furigana_1)->pos_2.y = 0.0f;
+            get_vm_or_clear(furigana_2)->pos_2.y = 0.0f;
+            flags &= ~2;
+            next_text_line = 0;
+            unk_198 = 0;
+            break;
+        // speakerNone
+        case 9:
+        {
+            AnmManager::interrupt_tree_and_run(player_face, 3);
+            for (i32 i = 0; i < 4; i++)
+            {
+                AnmManager::interrupt_tree_and_run(enemy_faces[i], 3);
+            }
+            AnmManager::interrupt_tree(id_54, 3);
+            active_side = 0;
+            AnmVm *vm = g_AnmManager->get_vm_with_id(text_line_1);
+            if (vm != NULL)
+            {
+                vm->entity_pos = (&vec_15c)[active_side];
+            }
+            vm = g_AnmManager->get_vm_with_id(text_line_2);
+            if (vm != NULL)
+            {
+                vm->entity_pos = (&vec_15c)[active_side];
+            }
+            get_vm_or_clear(text_line_1)->pos_2.y = 0.0f;
+            get_vm_or_clear(text_line_2)->pos_2.y = 0.0f;
+            vm = g_AnmManager->get_vm_with_id(furigana_1);
+            if (vm != NULL)
+            {
+                vm->entity_pos = (&vec_15c)[active_side];
+            }
+            vm = g_AnmManager->get_vm_with_id(furigana_2);
+            if (vm != NULL)
+            {
+                vm->entity_pos = (&vec_15c)[active_side];
+            }
+            get_vm_or_clear(furigana_1)->pos_2.y = 0.0f;
+            get_vm_or_clear(furigana_2)->pos_2.y = 0.0f;
+            flags &= ~2;
+            next_text_line = 0;
+            unk_198 = 0;
+            break;
+        }
+        // skippable: bit 0 of flags.
+        case 10:
+            ((GuiMsgVmFlags *)&flags)->skippable = instr()->args.s[0];
+            break;
+        // playerFace, bossFace
+        case 13:
+            AnmManager::interrupt_tree_and_run(player_face, instr()->args.i[0] + 0x11);
+            break;
+        case 14:
+            AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[1]], instr()->args.i[0] + 0x11);
+            break;
+        // textPause: wait for the given time or a key.
+        case 11:
+            if (pause_timer.current <= 0)
+            {
+                pause_timer.set_value(instr()->args.i[0]);
+            }
+            pause_timer--;
+            if (!(g_InputState.input_rising & 0x80001) && pause_timer.current > 0)
+            {
+                if ((flags & 0x41) != 0x41 ||
+                    ((u32)g_InputState.get_hold_time(9) < 0x14 && (u32)g_InputState.get_hold_time(0) < 0x14))
+                {
+                    goto waiting;
+                }
+            }
+            else
+            {
+                g_SoundManager.play_sound_centered(0, 0);
+            }
+            pause_timer.set_value(0);
+            next_text_line = 0;
+            unk_198 = 0;
+            break;
+        // eclResume
+        case 12:
+            unk_18c = 1;
+            break;
+        // musicBoss
+        case 19:
+            g_Supervisor.play_bgm(1, g_stage_data->music_ids[1]);
+            g_Gui->stage_logo_anm->create_effect(2, -1, NULL);
+            break;
+        // intro
+        case 20:
+        {
+            StageBoss *boss = &g_stage_data->bosses[instr()->args.i[0]];
+            intro = g_EnemyManager->anim_statement_anms[boss->intro_anm_slot]->create_effect(boss->intro_script, -1,
+                                                                                            NULL);
+            g_Gui->show_boss_marker();
+            break;
+        }
+        // stageEnd
+        case 21:
+            stage_clear_42e150();
+            break;
+        // musicEnd
+        case 22:
+            if (g_Globals.stage_num == 6)
+            {
+                g_Supervisor.fade_out_bgm(2.0f);
+            }
+            else
+            {
+                g_Supervisor.fade_out_bgm(8.0f);
+            }
+            break;
+        // musicFade
+        case 27:
+            g_Supervisor.fade_out_bgm(instr()->args.f[0]);
+            break;
+        // bubbleType: bits 2-5 of flags.
+        case 29:
+            ((GuiMsgVmFlags *)&flags)->textbox_type = instr()->args.i[0];
+            break;
+        // lightsOut
+        case 35:
+            Gui::create_vm_110();
+            break;
+        case 3:
+        case 30:
+            break;
+        // end
+        case 0:
+            return -1;
+        }
+        current_instr = (u8 *)current_instr + instr()->args_size + 4;
+    }
+    time_in_script.tick();
+waiting:
+    // Keep the text next to the speech bubble.
+    i32 script = textbox_kind + 0xb4;
+    if (get_vm_or_clear(textbox) == NULL)
+    {
+        return 0;
+    }
+    AnmVm *bubble = get_vm_or_clear(textbox)->search_children(script, 0);
+    if (bubble == NULL)
+    {
+        return 0;
+    }
+    Float3 pos;
+    pos = bubble->pos + bubble->entity_pos + bubble->pos_2;
+    bubble->transform_coords(&pos);
+    f32 scale = 2.0f / g_screen_coord_scale;
+    pos.y *= scale;
+    pos.x *= scale;
+    if (active_side >= 1)
+    {
+        if (bubble->scale.x < 1.0f)
+        {
+            pos.x += (bubble->scale.x + 0.125f) * 32.0f - 6.0f;
+        }
+        else
+        {
+            pos.x += 26.0f;
+        }
+    }
+    else
+    {
+        pos.x -= 36.0f;
+    }
+    AnmManager *anm = g_AnmManager;
+    AnmVm *vm = anm->get_vm_with_id(text_line_1);
+    if (vm != NULL)
+    {
+        vm->entity_pos = pos;
+    }
+    vm = anm->get_vm_with_id(furigana_1);
+    if (vm != NULL)
+    {
+        vm->entity_pos = pos;
+    }
+    vm = anm->get_vm_with_id(text_line_2);
+    if (vm != NULL)
+    {
+        vm->entity_pos = pos;
+    }
+    vm = anm->get_vm_with_id(furigana_2);
+    if (vm != NULL)
+    {
+        vm->entity_pos = pos;
+    }
+    return 0;
 }
 
 // TODO: the original aligns its frame to 8 bytes and adds two of the

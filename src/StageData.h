@@ -5,7 +5,13 @@
 // ExpHP: zTableStageDataArrayItem.
 struct StageBoss
 {
-    u8 unk_0[0x24];
+    u8 unk_0[0x14];
+    // The ECL anm slot and script of the boss's intro (dialogue
+    // instruction 20) and of its face (instruction 2).
+    i32 intro_anm_slot;
+    i32 intro_script;
+    i32 face_anm_slot;
+    i32 face_script;
     // front.anm script of the boss marker, minus 0xa4.
     i32 marker_script;
 };

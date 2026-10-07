@@ -25,10 +25,11 @@ const char *LTCG_FASTCALL decode_msg_string(const char *src)
     return s_buffer;
 }
 
+// Every caller asks about g_InputState, which the original names directly.
 // FUNCTION: TH16 0x42c830
 HARNESS_CALLED i32 InputState::get_hold_time(int button)
 {
-    return (input & (1 << button)) ? hold_time[button] : 0;
+    return (g_InputState.input & (1 << button)) ? g_InputState.hold_time[button] : 0;
 }
 
 // TODO: the original divides by 10 with idiv (as if the 10 were a folded
