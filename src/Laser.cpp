@@ -268,10 +268,6 @@ void LaserBeamInf::method_8(i32 arg)
     inner.flag_38 = arg;
 }
 
-// TODO: the original reserves an unused stack slot (push ecx) and saves esi
-// on entry; ours saves esi only on the success path. That is known stack
-// alignment from the caller chain (GameThread::thread_start realigns in the
-// original, not in ours; making create HARNESS_CALLED alone does nothing).
 // FUNCTION: TH16 0x431330
 i32 LaserManager::initialize()
 {
@@ -3026,7 +3022,9 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
 
 // Sets the laser up from its parameters: the body, origin and tip VMs, the
 // delay timers, the shot sound and the start offset along the aim.
-// TODO: the original realigns the frame (and esp, -8); everything else matches.
+// TODO: the original realigns the frame (and esp, -8); everything else matches. So do
+// the other set_vm_script callers, and set_vm_script has a padded frame there; a dead
+// double in a HARNESS_CALLED set_vm_script only makes it realign itself.
 // FUNCTION: TH16 0x431b30
 i32 LaserLineInf::initialize(void *params)
 {

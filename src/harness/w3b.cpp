@@ -40,12 +40,6 @@ LaserDataInf *harness_w3b_find_laser(i32 id)
 }
 
 
-// The ECL's anm instructions and the player's options start VMs at the
-// front of the world list.
-AnmId harness_w3b_create_vm_front(AnmLoaded *anm, i32 script, i32 layer)
-{
-    return anm->create_vm_front(script, layer, 0);
-}
 
 // The ECL reads the bosses' variables.
 EnemyInf *harness_w3b_get_boss(i32 i)

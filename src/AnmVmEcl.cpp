@@ -61,7 +61,9 @@ HARNESS_CALLED void PosVel::set_ellipse_angle(f32 angle)
     ellipse_angle.value = wrap_angle(wrap_angle(angle));
 }
 
-// TODO: identical code; the original frame has 4 more (unused) bytes, like create_vm's.
+// TODO: identical code; the original frame has 4 more (unused) bytes, like create_vm's: a
+// frame padded for known 8-byte alignment (0x10 locals + 3 saves); not every caller of ours
+// calls it aligned (ecl_run_over_300's helpers, repopulate_options).
 // FUNCTION: TH16 0x426160
 HARNESS_CALLED AnmId AnmLoaded::create_vm_front(i32 script, i32 layer, i32 unused)
 {

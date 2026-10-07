@@ -75,9 +75,15 @@ StageInner::~StageInner()
 {
 }
 
-// TODO: ours saves esi/edi after the load_std check (shrink-wrapped); the
-// original saves them in the prologue. Matches once GameThread::thread_start
-// realigns like the original (tested with a stand-in double there).
+// Takes on_tick_callback's address for load_data. In the original the
+// callback jumps to on_tick, which realigns itself: it is not entered with
+// the known alignment load_data has from GameThread::thread_start. Taking the
+// address in an inline helper node keeps LTCG from handing it down.
+static inline UpdateFuncCallback stage_on_tick_callback()
+{
+    return Stage::on_tick_callback;
+}
+
 // FUNCTION: TH16 0x4097c0
 HARNESS_CALLED i32 Stage::load_data(const char *path, i32 unused)
 {
@@ -100,7 +106,7 @@ HARNESS_CALLED i32 Stage::load_data(const char *path, i32 unused)
     inner.camera.rocking_vector_2 = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     inner.unk_3310 = 9610000.0f;
 
-    UpdateFunc *f = g_UpdateFuncRegistry->create_func(on_tick_callback);
+    UpdateFunc *f = g_UpdateFuncRegistry->create_func(stage_on_tick_callback());
     f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
     g_UpdateFuncRegistry->register_on_tick(f, 17);
@@ -198,9 +204,6 @@ Stage::~Stage()
     }
 }
 
-// TODO: the original reserves one more 4-byte stack slot (sub esp, 8): a
-// padded frame from GameThread::thread_start's realignment, which ours lacks;
-// matches once thread_start realigns (tested with a stand-in double there).
 // FUNCTION: TH16 0x409db0
 HARNESS_CALLED Stage *Stage::create(const char *path)
 {
@@ -366,7 +369,6 @@ i32 Stage::on_draw_03()
 
 // Draws layers 32 and 33 of the ANM manager and layers 8-11 of the stage,
 // and runs the fade timer.
-// TODO: the original realigns its frame through ebx and stores 0xff into the color byte after loading the flags. Matches once GameThread::thread_start realigns like the original (tested).
 // FUNCTION: TH16 0x40a410
 i32 Stage::on_draw_06()
 {
@@ -756,9 +758,6 @@ int __fastcall Stage::on_draw_06_callback(void *arg)
     return ((Stage *)arg)->on_draw_06();
 }
 
-// TODO: ours saves esi/edi late (shrink-wrapped) and merges the stack
-// cleanups of malloc/memcpy/memset. Matches once GameThread::thread_start
-// realigns like the original (tested with a stand-in double there).
 // FUNCTION: TH16 0x40ac30
 i32 Stage::load_std(const char *path)
 {
@@ -819,8 +818,10 @@ HARNESS_CALLED void Stage::start_std_vms()
 
 // Runs the VMs of objects still marked as running; unmarks objects whose
 // VMs have all finished.
-// TODO: ours saves ebx/edi after the loop guard (shrink-wrapped). Matches
-// once GameThread::thread_start realigns like the original (tested).
+// TODO: ours saves ebx/edi after the loop guard (shrink-wrapped): the
+// original's frame is padded for alignment from Stage::on_tick, which
+// realigns itself there and not in ours (it matched while on_tick_callback
+// was entered aligned, which costs that thunk its jump).
 // FUNCTION: TH16 0x40aed0
 i32 Stage::update_std_vms()
 {

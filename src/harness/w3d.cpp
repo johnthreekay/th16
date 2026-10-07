@@ -63,24 +63,6 @@ i32 harness_w3d_scorefile(Scorefile *scorefile, i32 character)
     return scorefile->has_cleared(character);
 }
 
-// GameThread creates the player (0x42ce15) and deletes it in its
-// destructor (0x42d439).
-void harness_w3d_player(i32 create)
-{
-    if (create)
-    {
-        // GameThread::thread_start realigns its frame (and esp, -8), which
-        // gives Player::create and the code it registers (on_tick_callback)
-        // known stack alignment; the double stands in for that.
-        volatile double d = create;
-        Player::create();
-    }
-    else if (g_Player != NULL)
-    {
-        delete g_Player;
-    }
-}
-
 // GameThread's stage setup (0x42dcf3, 0x42df0b).
 void harness_w3d_player_reset()
 {

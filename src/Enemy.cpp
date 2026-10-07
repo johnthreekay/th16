@@ -988,8 +988,8 @@ int EnemyInf::on_tick()
 }
 
 // TODO: ours realigns the frame (and esp, -8) because of the direct zun_atan2f call; the
-// original calls it without realigning (a harness for thread_start's aligned
-// EnemyManager::create and HARNESS_CALLED update/on_tick do not change it). Separate float
+// original calls it without realigning (GameThread::thread_start's aligned
+// EnemyManager::create call and HARNESS_CALLED update/on_tick do not change it). Separate float
 // locals for the summed position keep it in registers and avoid a /GS cookie.
 // FUNCTION: TH16 0x41d2e0
 int EnemyData::on_tick()

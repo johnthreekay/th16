@@ -61,10 +61,16 @@ Gui::Gui()
     g_Gui = this;
 }
 
-// TODO: the original frame has 4 more bytes and saves esi in the
-// prologue; ours saves it after the early returns. Known alignment from
-// GameThread::thread_start, which realigns in the original; matches once it
-// does (tested with a stand-in double there).
+// Takes on_draw_2_callback's address for initialize. In the original the
+// callback is not entered with known alignment (on_draw_2_body realigns
+// itself), so AsciiInf::create_number, which only on_draw_2_body calls,
+// keeps an unpadded frame; taking the address in an inline helper node keeps
+// LTCG from handing GameThread::thread_start's alignment down to it.
+static inline UpdateFuncCallback gui_on_draw_2_callback()
+{
+    return (UpdateFuncCallback)Gui::on_draw_2_callback;
+}
+
 // FUNCTION: TH16 0x426b00
 i32 Gui::initialize()
 {
@@ -98,7 +104,7 @@ i32 Gui::initialize()
     g_UpdateFuncRegistry->register_on_draw(f, 0x33);
     on_draw_1 = f;
 
-    f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_draw_2_callback);
+    f = g_UpdateFuncRegistry->create_func(gui_on_draw_2_callback());
     f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
     g_UpdateFuncRegistry->register_on_draw(f, 0x30);
@@ -106,9 +112,6 @@ i32 Gui::initialize()
     return 0;
 }
 
-// TODO: ours saves esi/edi only around the strcpy branch; the original
-// saves them in the prologue (known alignment from GameThread::thread_start,
-// which realigns in the original; 98.8% once it does).
 // FUNCTION: TH16 0x426c10
 i32 Gui::load_stage_files()
 {
@@ -255,9 +258,9 @@ Gui *Gui::create()
     return gui;
 }
 
-// TODO: the original calls on_tick_body with the stack realigned (push ecx)
-// instead of jumping to it; matches once GameThread::thread_start realigns
-// its frame like the original (tested with a stand-in double there).
+// The push ecx/pop ecx around the call pads the frame for 8-byte stack
+// alignment: GameThread::thread_start realigns and Gui::initialize, which
+// it calls through Gui::create, registers this callback.
 // FUNCTION: TH16 0x429af0
 i32 __fastcall Gui::on_tick_callback(Gui *self)
 {
@@ -276,8 +279,8 @@ i32 __fastcall Gui::on_draw_2_callback(Gui *self)
     return self->on_draw_2_body();
 }
 
-// GLOBAL: TH16 0x492260
 // The player's face script in its anm file, per character.
+// GLOBAL: TH16 0x492260
 static const i32 g_msg_player_face_scripts[4] = {26, 16, 22, 35};
 
 // Fills a text VM with the text or (blank) clears it, in the current
@@ -2139,11 +2142,11 @@ i32 Gui::on_tick_body()
     return 1;
 }
 
-// The original formats the percentage inline. The double argument makes
-// LTCG realign on_draw_2_body early enough to pad the frame of
-// AsciiInf::create_number (0x4082b0) in our build; kept out of line until
-// that is understood.
-static DECOMP_NOINLINE void draw_percentage(Float3 *pos, f32 percentage)
+// The original formats the percentage inline. Written out in on_draw_2_body,
+// the double argument makes LTCG realign it early enough to pad the frame of
+// AsciiInf::create_number (0x4082b0); a plain inline helper keeps the double
+// in its own call graph node, as for CStreamingSound::get_play_time.
+static inline void draw_percentage(Float3 *pos, f32 percentage)
 {
     g_AsciiManager->create_stringf(pos, "%3.1f%%", (double)percentage);
 }

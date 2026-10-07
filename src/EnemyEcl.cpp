@@ -83,8 +83,8 @@ extern EnemyFuncSetFunc const g_ecl_func_sets[3];
 int __fastcall ecl_ext_damage_stored(EnemyData *enemy, int damage);
 int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage);
 
-// GLOBAL: TH16 0x490eb4
 // The damage hooks ECL's flagExtDmg installs.
+// GLOBAL: TH16 0x490eb4
 extern EnemyExtDamageFunc const g_ecl_ext_damage_funcs[3] = {NULL, ecl_ext_damage_stored, ecl_ext_damage_anm_hurtbox};
 
 // The hooks ECL 634 installs; only entry 0 (NULL).

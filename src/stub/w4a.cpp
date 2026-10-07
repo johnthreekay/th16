@@ -6,12 +6,12 @@
 #include "../Enemy.h"
 #include "../Spellcard.h"
 
-// GLOBAL: TH16 0x4c10c8
 // Never written; the original loads it for every use.
+// GLOBAL: TH16 0x4c10c8
 D3DXVECTOR2 g_zero_vec2;
 
-// GLOBAL: TH16 0x4a6dc4
 // The hooks ECL 634 installs; only entry 0, never set.
+// GLOBAL: TH16 0x4a6dc4
 void *g_ecl_unknown_634_funcs[1];
 
 
