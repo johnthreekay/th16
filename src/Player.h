@@ -316,6 +316,10 @@ struct PlayerDamageSource
 // options' from this index.
 #define OPTION_LASER_SEASON_BASE 8
 
+#define PLAYER_BULLET_COUNT 0x100
+// damage_sources has one entry more than the code uses.
+#define PLAYER_DAMAGE_SOURCE_COUNT 0x100
+
 // The player state that LoLK kept two copies of (Player::inner and
 // Player::snapshot_inner).
 struct PlayerInner
@@ -329,10 +333,10 @@ struct PlayerInner
     ZunTimer shot_time_in_stage;
     PlayerOption main_options[4];
     PlayerOption subseason_options[8];
-    PlayerBullet bullets[0x100];
+    PlayerBullet bullets[PLAYER_BULLET_COUNT];
     // Where the search for a free damage source starts.
     i32 last_created_damage_source_index;
-    PlayerDamageSource damage_sources[0x101];
+    PlayerDamageSource damage_sources[PLAYER_DAMAGE_SOURCE_COUNT + 1];
     // PlayerState.
     i32 state;
     // The hitbox shown while focused.
@@ -586,7 +590,9 @@ struct Player
         }
         return &inner.damage_sources[index - 1];
     }
+    // 0x440d50
     void set_shoot_key_short_timer(i32 time);
+
     // 0x440dc0. At the start of a stage: brings the options back
     // (clears PLAYER_FLAG_STAGE_ENDED) and sends their VMs interrupt 2.
     void start_stage_options();
@@ -594,11 +600,14 @@ struct Player
     // vanish (PLAYER_FLAG_STAGE_ENDED), and their VMs get interrupt 3.
     // Called as g_Player->.
     HARNESS_CALLED void withdraw_options();
+    // 0x440e40. Puts the player at (x, y) and the main options straight
+    // into place.
     HARNESS_CALLED void set_position(f32 x, f32 y);
-    // Works on g_Player (replay playback restores the position with it).
+    // 0x4476d0. The same in 1/128 pixels. Works on g_Player (replay
+    // playback restores the position with it).
     HARNESS_CALLED void set_position_subpixel(Int2 *pos);
-    // Loads a .sht file and resolves its offsets and callbacks. Does not
-    // use this.
+    // 0x443790. Loads a .sht file and resolves its offsets and callbacks.
+    // Does not use this.
     HARNESS_CALLED i32 read_sht_file(ShtFile **out, const char *path);
 
     // The option a shooter's option number (minus one) names.
@@ -647,6 +656,8 @@ struct Player
     // 0x442560. The player's frame: the state machine, damage sources,
     // invincibility flashing, scaling, hitboxes, shooting and bullets.
     DECOMP_NOINLINE i32 on_tick_body();
+    // 0x443720, 0x443730. The update functions; on_draw draws the player
+    // sprite except while dead.
     static i32 __fastcall on_tick_callback(Player *player);
     static i32 __fastcall on_draw_callback(Player *player);
 

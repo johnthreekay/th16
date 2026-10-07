@@ -238,7 +238,8 @@ i32 ItemManager::on_tick_body()
         {
             goto collect;
         }
-        if ((player->inner.state != 2 && player->inner.state != 4 && (f32)item_collect_line() > player->inner.pos.y) ||
+        if ((player->inner.state != PLAYER_STATE_DEAD && player->inner.state != PLAYER_STATE_HIT &&
+             (f32)item_collect_line() > player->inner.pos.y) ||
             (g_MainBomb->in_use == 1 && g_MainBomb->timer.current < 60) || g_SubseasonBomb->is_active_before(10000) ||
             g_Gui->msg != NULL)
         {
@@ -251,7 +252,7 @@ i32 ItemManager::on_tick_body()
             item->speed_towards_player += 0.2f;
         }
         player = g_Player;
-        if (player->inner.state == 4)
+        if (player->inner.state == PLAYER_STATE_HIT)
         {
             item->state = 1;
             item->velocity.x = 0.0f;
@@ -270,7 +271,8 @@ i32 ItemManager::on_tick_body()
             player = g_Player;
             continue;
         }
-        if ((player->inner.state != 2 && player->inner.state != 4 && (f32)item_collect_line() > player->inner.pos.y) ||
+        if ((player->inner.state != PLAYER_STATE_DEAD && player->inner.state != PLAYER_STATE_HIT &&
+             (f32)item_collect_line() > player->inner.pos.y) ||
             (g_MainBomb->in_use == 1 && g_MainBomb->timer.current < 60) ||
             (g_SubseasonBomb->in_use == 1 && g_SubseasonBomb->timer.current < 10000) || g_Gui->msg != NULL)
         {
@@ -327,7 +329,7 @@ i32 ItemManager::on_tick_body()
             item->speed_towards_player += 0.2f;
         }
         player = g_Player;
-        if (player->inner.state == 4)
+        if (player->inner.state == PLAYER_STATE_HIT)
         {
             item->state = 1;
             item->velocity.x = 0.0f;
@@ -335,7 +337,7 @@ i32 ItemManager::on_tick_body()
         }
 
     collect:
-        if (player->inner.state != 2)
+        if (player->inner.state != PLAYER_STATE_DEAD)
         {
             Float3 half(0.0f, 0.0f, 0.0f);
             if (player->item_collect_box.min_pos.x <= item->position.x + half.x &&

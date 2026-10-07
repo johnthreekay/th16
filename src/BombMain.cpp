@@ -213,7 +213,7 @@ i32 BombMarisaAInf::begin()
     ScreenEffect::create_inline(SCREEN_EFFECT_SHAKE_WITH_RAMP, 3, 60, 240, 30, 0);
     AnmLoaded *anm = g_Player->anm_file;
     anm_id_64 = anm->create_vm(25, &pos, 0.0f, -1, 0);
-    g_Player->inner.flags |= 4;
+    g_Player->inner.flags |= PLAYER_FLAG_NO_SHOOTING;
     return 0;
 }
 
@@ -240,7 +240,7 @@ i32 BombMarisaAInf::on_tick()
     {
         AnmManager::interrupt_tree(anm_id, 1);
         AnmManager::interrupt_tree(anm_id_64, 1);
-        g_Player->inner.flags &= ~4;
+        g_Player->inner.flags &= ~PLAYER_FLAG_NO_SHOOTING;
         g_Player->inner.speed_multiplier = 1.0f;
     }
     vm->rotation.z = angle;

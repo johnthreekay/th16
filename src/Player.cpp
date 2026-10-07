@@ -33,6 +33,24 @@ enum
     SUBSEASON_ANM_SLOT = 0x1e,
 };
 
+// Where the player can move, in pixels (the playfield is 384x448 with x
+// centered on 0).
+enum
+{
+    PLAYER_MIN_X = -184,
+    PLAYER_MAX_X = 184,
+    PLAYER_MIN_Y = 32,
+    PLAYER_MAX_Y = 432,
+};
+
+// While the shot key is held the short shot timer wraps from this back to
+// 0, the long one from SHOT_LONG_TIMER_WRAP.
+enum
+{
+    SHOT_SHORT_TIMER_WRAP = 14,
+    SHOT_LONG_TIMER_WRAP = 0x77,
+};
+
 // FUNCTION: TH16 0x440d50
 void Player::set_shoot_key_short_timer(i32 time)
 {
@@ -248,6 +266,8 @@ HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_o
     return 1;
 }
 
+// The spell card's bonus is lost when the player is hit after its first
+// second (and lose_life and die repeat this).
 // FUNCTION: TH16 0x443cd0
 void Player::lose_life()
 {
@@ -387,10 +407,10 @@ HARNESS_CALLED i32 Player::create_damage_source(D3DXVECTOR3 *pos, f32 radius, f3
                                                 i32 damage)
 {
     i32 index = inner.last_created_damage_source_index;
-    for (i32 i = 0; i < 0x100; i++)
+    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++)
     {
         index++;
-        if (index >= 0x100)
+        if (index >= PLAYER_DAMAGE_SOURCE_COUNT)
         {
             index = 0;
         }
@@ -422,10 +442,10 @@ HARNESS_CALLED i32 Player::create_rect_damage_source(D3DXVECTOR3 *pos, f32 width
 {
     Player *player = g_Player;
     i32 index = player->inner.last_created_damage_source_index;
-    for (i32 i = 0; i < 0x100; i++)
+    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++)
     {
         index++;
-        if (index >= 0x100)
+        if (index >= PLAYER_DAMAGE_SOURCE_COUNT)
         {
             index = 0;
         }
@@ -590,14 +610,14 @@ i32 Player::shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner)
     }
     PlayerBullet *bullet = this->inner.bullets;
     i32 i;
-    for (i = 0; i < 0x100; i++, bullet++)
+    for (i = 0; i < PLAYER_BULLET_COUNT; i++, bullet++)
     {
         if (bullet->state == PLAYER_BULLET_FREE)
         {
             break;
         }
     }
-    if (i >= 0x100)
+    if (i >= PLAYER_BULLET_COUNT)
     {
         return 0;
     }
@@ -677,11 +697,11 @@ i32 Player::tick_shooting_state()
         {
             do_shooting(inner.shoot_key_short_timer.current, inner.shoot_key_long_timer.current);
         }
-        if (inner.shoot_key_short_timer.current >= 14)
+        if (inner.shoot_key_short_timer.current >= SHOT_SHORT_TIMER_WRAP)
         {
             if (g_InputState.input & INPUT_SHOT)
             {
-                inner.shoot_key_short_timer -= 14;
+                inner.shoot_key_short_timer -= SHOT_SHORT_TIMER_WRAP;
             }
             else
             {
@@ -695,11 +715,11 @@ i32 Player::tick_shooting_state()
     long_timer:
         if (inner.shoot_key_long_timer.current >= 0)
         {
-            if (inner.shoot_key_long_timer.current >= 0x77)
+            if (inner.shoot_key_long_timer.current >= SHOT_LONG_TIMER_WRAP)
             {
                 if (g_InputState.input & INPUT_SHOT)
                 {
-                    inner.shoot_key_long_timer -= 0x77;
+                    inner.shoot_key_long_timer -= SHOT_LONG_TIMER_WRAP;
                 }
                 else
                 {
@@ -801,7 +821,7 @@ HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f3
     {
         *bomb_hit = total > 0 ? 1 : 0;
     }
-    for (i32 i = 0; i < 0x100; i++)
+    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++)
     {
         PlayerDamageSource *source = &player->inner.damage_sources[i];
         if (!(source->flags & DAMAGE_SOURCE_ACTIVE))
@@ -902,7 +922,7 @@ static __forceinline i32 is_on_screen(Float3 *pos)
 // FUNCTION: TH16 0x4456d0
 i32 Player::tick_bullets()
 {
-    for (i32 i = 0; i < 0x100; i++)
+    for (i32 i = 0; i < PLAYER_BULLET_COUNT; i++)
     {
         PlayerBullet *bullet = &inner.bullets[i];
         if (bullet->state == PLAYER_BULLET_FREE)
@@ -984,6 +1004,10 @@ const char *const g_player_anm_names[4] = {"pl00.anm", "pl02.anm", "pl03.anm", "
 const char *const g_subseason_anm_names[5] = {"pl00sub.anm", "pl02sub.anm", "pl03sub.anm", "pl01sub.anm",
                                               "pl04sub.anm"};
 
+// Loads pl0X.anm/pl0Xsub.anm and the .sht files (or takes the cached
+// ones), registers the update functions, sets the speeds, power and
+// season level thresholds, hitbox and item boxes from the shot type and
+// the character tables, and places the player at the bottom.
 // FUNCTION: TH16 0x440fb0
 i32 Player::initialize()
 {
@@ -1048,6 +1072,7 @@ i32 Player::initialize()
         inner.speeds_subpixel[i] = (i32)((&sht_file->move_speed)[i] * 128.0f);
     }
     {
+        // The season power each season level takes.
         i32 season_deltas[8] = {0, 100, 130, 160, 200, 250, 300, 0};
         sht_file->power_per_level = 100;
         g_Globals.max_power = sht_file->power_per_level * sht_file->num_power_levels;
@@ -1096,13 +1121,14 @@ i32 Player::initialize()
     inner.flags &= ~PLAYER_FLAG_NO_SHOOTING;
     player_scale_i.end_time = 0;
     player_scale = 1.0f;
-    for (i32 i = 0; i < 0x100; i++)
+    for (i32 i = 0; i < PLAYER_BULLET_COUNT; i++)
     {
         inner.bullets[i].index_of_self = i;
     }
     return 0;
 }
 
+// The unit movement of each PlayerDirection.
 // GLOBAL: TH16 0x492c20
 const Int2 g_player_directions[9] = {{0, 0}, {0, -1}, {0, 1}, {-1, 0}, {1, 0}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
 
@@ -1122,42 +1148,43 @@ i32 Player::move()
     u32 input = g_InputState.input;
     if ((input & (INPUT_UP | INPUT_LEFT)) == (INPUT_UP | INPUT_LEFT))
     {
-        attempted_direction = 5;
+        attempted_direction = PLAYER_DIR_UP_LEFT;
     }
     else if ((input & (INPUT_DOWN | INPUT_LEFT)) == (INPUT_DOWN | INPUT_LEFT))
     {
-        attempted_direction = 7;
+        attempted_direction = PLAYER_DIR_DOWN_LEFT;
     }
     else if ((input & (INPUT_UP | INPUT_RIGHT)) == (INPUT_UP | INPUT_RIGHT))
     {
-        attempted_direction = 6;
+        attempted_direction = PLAYER_DIR_UP_RIGHT;
     }
     else if ((input & (INPUT_DOWN | INPUT_RIGHT)) == (INPUT_DOWN | INPUT_RIGHT))
     {
-        attempted_direction = 8;
+        attempted_direction = PLAYER_DIR_DOWN_RIGHT;
     }
     else if (input & INPUT_DOWN)
     {
-        attempted_direction = 2;
+        attempted_direction = PLAYER_DIR_DOWN;
     }
     else if (input & INPUT_UP)
     {
-        attempted_direction = 1;
+        attempted_direction = PLAYER_DIR_UP;
     }
     else if (input & INPUT_LEFT)
     {
-        attempted_direction = 3;
+        attempted_direction = PLAYER_DIR_LEFT;
     }
     else if (input & INPUT_RIGHT)
     {
-        attempted_direction = 4;
+        attempted_direction = PLAYER_DIR_RIGHT;
     }
     else
     {
-        attempted_direction = 0;
+        attempted_direction = PLAYER_DIR_NONE;
     }
     if (g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 && inner.time_in_stage.current >= 4)
     {
+        // INPUT_FOCUS as 0 or 1.
         inner.is_focused = (g_InputState.input >> 3) & 1;
     }
     else
@@ -1173,6 +1200,7 @@ i32 Player::move()
     {
         if (inner.anm_id_focused_hitbox.id == 0)
         {
+            // effect.anm's focused hitbox.
             inner.anm_id_focused_hitbox = g_EffectManager->effect_anm->create_effect(0x1a, 0xe, NULL);
         }
         AnmVm *vm = get_vm_or_clear(inner.anm_id_focused_hitbox);
@@ -1191,8 +1219,10 @@ i32 Player::move()
             }
             vm->flags_lo |= ANM_VM_SCALE_CHANGED;
         }
-        speed_x = attempted_direction >= 5 ? inner.speeds_subpixel[3] : inner.speeds_subpixel[1];
-        speed_y = attempted_direction >= 5 ? inner.speeds_subpixel[3] : inner.speeds_subpixel[1];
+        speed_x = attempted_direction >= PLAYER_DIR_UP_LEFT ? inner.speeds_subpixel[PLAYER_SPEED_FOCUSED_DIAGONAL]
+                                                            : inner.speeds_subpixel[PLAYER_SPEED_FOCUSED];
+        speed_y = attempted_direction >= PLAYER_DIR_UP_LEFT ? inner.speeds_subpixel[PLAYER_SPEED_FOCUSED_DIAGONAL]
+                                                            : inner.speeds_subpixel[PLAYER_SPEED_FOCUSED];
     }
     else
     {
@@ -1201,26 +1231,29 @@ i32 Player::move()
             AnmManager::interrupt_tree(inner.anm_id_focused_hitbox, 1);
         }
         inner.anm_id_focused_hitbox.id = 0;
-        speed_x = attempted_direction >= 5 ? inner.speeds_subpixel[2] : inner.speeds_subpixel[0];
-        speed_y = attempted_direction >= 5 ? inner.speeds_subpixel[2] : inner.speeds_subpixel[0];
+        speed_x = attempted_direction >= PLAYER_DIR_UP_LEFT ? inner.speeds_subpixel[PLAYER_SPEED_UNFOCUSED_DIAGONAL]
+                                                            : inner.speeds_subpixel[PLAYER_SPEED_UNFOCUSED];
+        speed_y = attempted_direction >= PLAYER_DIR_UP_LEFT ? inner.speeds_subpixel[PLAYER_SPEED_UNFOCUSED_DIAGONAL]
+                                                            : inner.speeds_subpixel[PLAYER_SPEED_UNFOCUSED];
     }
+    // A change of horizontal direction starts the turning animations.
     i32 vx = (f32)(speed_x * dx - (i32)(inner.push_velocity.x * -128.0f)) * inner.speed_multiplier;
     i32 vy = (f32)(speed_y * dy - (i32)(inner.push_velocity.y * -128.0f)) * inner.speed_multiplier;
     if (vx < 0 && attempted_velocity.x >= 0)
     {
-        player_set_script(this, 1);
+        player_set_script(this, PLAYER_SCRIPT_TURN_LEFT);
     }
     if (vx > 0 && attempted_velocity.x <= 0)
     {
-        player_set_script(this, 3);
+        player_set_script(this, PLAYER_SCRIPT_TURN_RIGHT);
     }
     if (vx == 0 && attempted_velocity.x < 0)
     {
-        player_set_script(this, 2);
+        player_set_script(this, PLAYER_SCRIPT_LEFT_TO_IDLE);
     }
     if (vx == 0 && attempted_velocity.x > 0)
     {
-        player_set_script(this, 4);
+        player_set_script(this, PLAYER_SCRIPT_RIGHT_TO_IDLE);
     }
     attempted_velocity.x = vx;
     attempted_velocity.y = vy;
@@ -1234,21 +1267,21 @@ i32 Player::move()
     inner.velocity_subpixel.x = (i32)inner.attempted_delta_pos_subpixel.x;
     inner.pos_subpixel.x += inner.velocity_subpixel.x;
     inner.pos_subpixel.y += inner.velocity_subpixel.y;
-    if (inner.pos_subpixel.x < -184 * 128)
+    if (inner.pos_subpixel.x < PLAYER_MIN_X * 128)
     {
-        inner.pos_subpixel.x = -184 * 128;
+        inner.pos_subpixel.x = PLAYER_MIN_X * 128;
     }
-    else if (inner.pos_subpixel.x > 184 * 128)
+    else if (inner.pos_subpixel.x > PLAYER_MAX_X * 128)
     {
-        inner.pos_subpixel.x = 184 * 128;
+        inner.pos_subpixel.x = PLAYER_MAX_X * 128;
     }
-    if (inner.pos_subpixel.y < 32 * 128)
+    if (inner.pos_subpixel.y < PLAYER_MIN_Y * 128)
     {
-        inner.pos_subpixel.y = 32 * 128;
+        inner.pos_subpixel.y = PLAYER_MIN_Y * 128;
     }
-    else if (inner.pos_subpixel.y > 432 * 128)
+    else if (inner.pos_subpixel.y > PLAYER_MAX_Y * 128)
     {
-        inner.pos_subpixel.y = 432 * 128;
+        inner.pos_subpixel.y = PLAYER_MAX_Y * 128;
     }
     inner.pos.x = inner.pos_subpixel.x / 128.0f;
     inner.pos.y = inner.pos_subpixel.y / 128.0f;
@@ -1478,10 +1511,12 @@ i32 Player::on_tick_body()
 {
     switch (inner.state)
     {
-    case 0:
+    case PLAYER_STATE_RESPAWNING:
     {
-        // Respawning: rise from the bottom, clearing bullets and lasers.
-        inner.pos_subpixel.y = 0xf000 - inner.time_in_state.current * 0x2800 / 60;
+        // Rise from y 480 to 400 in a second. For half a second lasers
+        // are cleared in a growing circle around where the player died,
+        // then bullets and lasers in a wide one around the player.
+        inner.pos_subpixel.y = 480 * 128 - inner.time_in_state.current * (80 * 128) / 60;
         inner.pos.y = inner.pos_subpixel.y / 128.0f;
         inner.main_options[0].should_instajump = 1;
         inner.main_options[1].should_instajump = 1;
@@ -1510,7 +1545,7 @@ i32 Player::on_tick_body()
         inner.state = PLAYER_STATE_NORMAL;
         inner.time_in_state.set_value(0);
     }
-    case 1:
+    case PLAYER_STATE_NORMAL:
         if (g_MainBomb != NULL && g_MainBomb->can_activate() && (g_InputState.input_rising & INPUT_BOMB))
         {
             g_MainBomb->activate();
@@ -1522,8 +1557,9 @@ i32 Player::on_tick_body()
         }
         move();
         break;
-    case 4:
-        // Hit: a few frames to bomb out of it.
+    case PLAYER_STATE_HIT:
+        // Hit: 8 frames to bomb out of it (a deathbomb); then the life is
+        // lost and the player is dead.
         if (inner.time_in_state.current < 8)
         {
             if (g_MainBomb != NULL && (g_InputState.input_rising & INPUT_BOMB) && g_MainBomb->can_activate())
@@ -1540,7 +1576,7 @@ i32 Player::on_tick_body()
             break;
         }
         lose_life();
-    case 2:
+    case PLAYER_STATE_DEAD:
         if (inner.time_in_state.current == 3)
         {
             // Drop half a power level as items, spread toward the top.
@@ -1558,6 +1594,7 @@ i32 Player::on_tick_body()
             {
                 angle = zun_atan2f(dy, dx);
             }
+            // Seven power items (item type 1).
             i32 items[7] = {1, 1, 1, 1, 1, 1, 1};
             for (i32 i = 0; i < 7; i++)
             {
@@ -1570,6 +1607,7 @@ i32 Player::on_tick_body()
         {
             break;
         }
+        // Out of lives: the game over menu (not during replays).
         if (g_Globals.lives < 0 && inner.time_in_state.current == 30)
         {
             if (g_ReplayManager->mode != REPLAY_PLAYBACK)
@@ -1579,6 +1617,8 @@ i32 Player::on_tick_body()
             inner.time_in_state++;
             break;
         }
+        // Respawn: a blast where the player died, full bombs, and the
+        // player back below the playfield.
         inner.state = PLAYER_STATE_RESPAWNING;
         g_game_speed = 1.0f;
         create_damage_source(&inner.pos, 32.0f, 16.0f, 30, 150);
@@ -1592,7 +1632,7 @@ i32 Player::on_tick_body()
         inner.iframes.set_inline(280);
         inner.time_in_state.reset_inline();
         break;
-    case 3:
+    case PLAYER_STATE_3:
         switch (inner.time_in_state.current)
         {
         case 4:
@@ -1603,7 +1643,8 @@ i32 Player::on_tick_body()
         }
         break;
     }
-    for (i32 i = 0; i < 0x100; i++)
+    // Move, grow, turn and age the damage sources.
+    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++)
     {
         PlayerDamageSource *source = &inner.damage_sources[i];
         if (!(source->flags & DAMAGE_SOURCE_ACTIVE))
@@ -1621,6 +1662,9 @@ i32 Player::on_tick_body()
             source->flags &= ~DAMAGE_SOURCE_ACTIVE;
         }
     }
+    // Flash blue every third frame while invincible; otherwise red or
+    // yellow afterimages while the winter or autumn release boosts the
+    // player.
     if (inner.iframes.current > 0)
     {
         inner.iframes.decrement(1.0f);
@@ -1664,6 +1708,7 @@ i32 Player::on_tick_body()
     inner.speed_multiplier = 1.0f;
     inner.push_velocity = g_zero_vec;
     vm.run();
+    // Scale the sprite and recompute the hurtbox and item boxes.
     if (inner.flags & PLAYER_FLAG_SCALED)
     {
         if (player_scale_i.end_time != 0)
@@ -1711,7 +1756,9 @@ i32 Player::on_tick_body()
     inner.time_in_state.tick();
     inner.time_in_stage.tick();
     inner.shot_time_in_stage.tick();
+    // Shooting: not during dialogue or before the stage's enemies run.
     if (g_Gui->msg == NULL && g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 &&
+
         !(*(u32 *)&g_GameThread->flags & 0x4000) && inner.shot_time_in_stage.current >= 20 && !(inner.flags & PLAYER_FLAG_NO_SHOOTING) &&
         !(inner.flags & PLAYER_FLAG_SCALED))
     {
