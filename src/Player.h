@@ -44,7 +44,9 @@ struct PlayerOption
     AnmId anm_id_b0;
     AnmId anm_id_b4;
     ZunTimer timer_b8;
-    u8 unk_cc[0xd4 - 0xcc];
+    u8 unk_cc[0xd0 - 0xcc];
+    // Its index among the options of its kind.
+    i32 index;
     // Next update moves the option straight to its preferred position.
     i32 should_instajump;
     u8 unk_d8[0xdc - 0xd8];
@@ -180,7 +182,8 @@ struct PlayerInner
     f32 speed_multiplier;
     // Pushes the player along (subtracted from the movement, in pixels).
     Float3 unk_1607c;
-    u8 unk_16088[0x1608c - 0x16088];
+    // The power level the main options were last laid out for.
+    i32 options_power_level;
     i32 num_season_options;
 
     // 0x440ec0. Only the members' constructors; out of line, as the

@@ -1252,3 +1252,147 @@ i32 Player::move()
     }
     return 0;
 }
+
+// Where each power level's options start in a .sht file's option position
+// list (the options of level n are entries [n - 1] onwards).
+// GLOBAL: TH16 0x4a5db0
+i32 g_season_option_layouts[5][8] = {
+    {0, 1, 3, 6, 10, 15, 21, 28}, {0, 1, 3, 6, 10, 15, 21, 28}, {0, 1, 3, 6, 10, 15, 21, 28},
+    {0, 1, 3, 6, 10, 15, 21, 28}, {0, 1, 3, 6, 10, 15, 21, 28},
+};
+// GLOBAL: TH16 0x4a5e50
+i32 g_main_option_layouts[4][8] = {
+    {0, 1, 3, 6, 10, 11, 13, 16},
+    {0, 1, 3, 6, 10, 11, 13, 16},
+    {0, 1, 3, 6, 10, 11, 13, 16},
+    {0, 1, 3, 6, 10, 11, 13, 16},
+};
+// GLOBAL: TH16 0x492be0
+const i32 g_season_option_scripts[8] = {1, 1, 1, 0x12, 1, 0, 0, 0};
+// GLOBAL: TH16 0x492c00
+const i32 g_main_option_scripts[4] = {8, 7, 11, 11};
+// The look of the main options at full power.
+// GLOBAL: TH16 0x492c10
+const i32 g_main_option_max_power_scripts[4] = {9, 8, 12, 13};
+
+// AnmManager::interrupt_tree as LTCG inlined it here.
+static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
+{
+    AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+    if (vm == NULL)
+    {
+        return;
+    }
+    vm->interrupt(interrupt);
+    for (ZunList<AnmVm> *node = vm->list_of_children.next; node != NULL; node = node->next)
+    {
+        node->entry->interrupt(interrupt);
+    }
+}
+
+// FUNCTION: TH16 0x4440e0
+void PlayerInner::repopulate_options()
+{
+    i32 *layout = g_main_option_layouts[g_Globals.character + g_Globals.subshot];
+    i32 level = g_Globals.power / g_Globals.power_per_level;
+    options_power_level = level;
+    if (g_Globals.power >= g_Globals.max_power)
+    {
+        for (i32 i = 0; i < level; i++)
+        {
+            PlayerOption *option = &main_options[i];
+            g_AnmManager->delete_vm_inline(option->anm_id_b4);
+            option->anm_id_b4.id = 0;
+            option->anm_id_b4 =
+                g_Player->anm_file->create_vm_front(g_main_option_max_power_scripts[g_Globals.character], -1, 0);
+            get_vm_or_clear(option->anm_id_b4)->entity_pos.y = -32.0f;
+        }
+    }
+    else
+    {
+        for (i32 i = 0; i < 4; i++)
+        {
+            AnmManager::interrupt_tree(main_options[i].anm_id_b4, 1);
+            main_options[i].anm_id_b4.id = 0;
+        }
+    }
+    Player *player = g_Player;
+    if (player->inner.num_main_options != level)
+    {
+        i32 i;
+        for (i = 0; i < level; i++)
+        {
+            PlayerOption *option = &main_options[i];
+            option->scaled_cur_pos.x = player->inner.pos_subpixel.x;
+            option->scaled_cur_pos.y = player->inner.pos_subpixel.y;
+            g_AnmManager->delete_vm_inline(option->anm_id_b0);
+            option->anm_id_b0.id = 0;
+            option->index = i;
+            Float2 *positions = (Float2 *)player->sht_file->option_pos;
+            option->scaled_preferred_pos_rel_to_player.x = (i32)(positions[layout[level - 1] + i].x * 128.0f);
+            option->scaled_preferred_pos_rel_to_player.y = (i32)(positions[layout[level - 1] + i].y * 128.0f);
+            option->unk_6c = (i32)(positions[layout[level - 1] + i + 21].x * 128.0f);
+            option->unk_70 = (i32)(positions[layout[level - 1] + i + 21].y * 128.0f);
+            Int2 *rel = player->inner.is_focused ? (Int2 *)&option->unk_6c : &option->scaled_preferred_pos_rel_to_player;
+            option->scaled_preferred_pos.x = player->inner.pos_subpixel.x + rel->x;
+            option->scaled_preferred_pos.y = player->inner.pos_subpixel.y + rel->y;
+            option->scaled_cur_pos = option->scaled_preferred_pos;
+            Float3 pos(0.0f, 0.0f, 0.0f);
+            option->anm_id_b0 = player->anm_file->create_vm_inline(g_main_option_scripts[g_Globals.character], &pos,
+                                                                   0.0f, 0xe);
+            get_vm_or_clear(option->anm_id_b0)->entity_pos.y = -32.0f;
+            option->active = 2;
+            player = g_Player;
+        }
+        for (; i < 4; i++)
+        {
+            main_options[i].active = 0;
+            interrupt_tree_inline(main_options[i].anm_id_b0, 1);
+        }
+        num_main_options = level;
+        g_Player->inner.main_options[0].should_instajump = 1;
+        g_Player->inner.main_options[1].should_instajump = 1;
+        g_Player->inner.main_options[2].should_instajump = 1;
+        g_Player->inner.main_options[3].should_instajump = 1;
+    }
+    i32 season_level = g_Globals.season_level();
+    if (num_season_options != season_level)
+    {
+        layout = g_season_option_layouts[g_Globals.subseason];
+        i32 i;
+        for (i = 0; i < season_level; i++)
+        {
+            PlayerOption *option = &subseason_options[i];
+            option->scaled_cur_pos.x = player->inner.pos_subpixel.x;
+            option->scaled_cur_pos.y = player->inner.pos_subpixel.y;
+            g_AnmManager->delete_vm_inline(option->anm_id_b0);
+            option->anm_id_b0.id = 0;
+            option->index = i;
+            Float2 *positions = (Float2 *)player->sht_file_subseason->option_pos;
+            option->scaled_preferred_pos_rel_to_player.x = (i32)(positions[layout[season_level - 1] + i].x * 128.0f);
+            option->scaled_preferred_pos_rel_to_player.y = (i32)(positions[layout[season_level - 1] + i].y * 128.0f);
+            option->unk_6c = (i32)(positions[layout[season_level - 1] + i + 21].x * 128.0f);
+            option->unk_70 = (i32)(positions[layout[season_level - 1] + i + 21].y * 128.0f);
+            Int2 *rel = player->inner.is_focused ? (Int2 *)&option->unk_6c : &option->scaled_preferred_pos_rel_to_player;
+            option->scaled_preferred_pos.x = player->inner.pos_subpixel.x + rel->x;
+            option->scaled_preferred_pos.y = player->inner.pos_subpixel.y + rel->y;
+            option->scaled_cur_pos = option->scaled_preferred_pos;
+            Float3 pos(0.0f, 0.0f, 0.0f);
+            option->anm_id_b0 = g_Player->subseason_anm_file->create_vm_inline(
+                g_season_option_scripts[g_Globals.subseason], &pos, 0.0f, 0xe);
+            get_vm_or_clear(option->anm_id_b0)->entity_pos.y = -32.0f;
+            option->active = 2;
+            player = g_Player;
+        }
+        for (; i < 8; i++)
+        {
+            subseason_options[i].active = 0;
+            interrupt_tree_inline(subseason_options[i].anm_id_b0, 1);
+        }
+        num_season_options = season_level;
+        for (i32 j = 0; j < 8; j++)
+        {
+            g_Player->inner.subseason_options[j].should_instajump = 1;
+        }
+    }
+}
