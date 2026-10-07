@@ -1020,7 +1020,7 @@ i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i3
                     if (params.laser_new_arg_1 > 24.0f)
                     {
                         params.start_pos = origin + step * (f32)start;
-                        g_LaserManager->allocate_new_laser(LASER_LINE, &params);
+                        allocate_line_laser_inline(&params);
                     }
                 } while (j < i);
             }
@@ -1350,7 +1350,7 @@ i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode
                 params.ang_aim = angle;
                 params.laser_new_arg_4 = width;
                 params.laser_new_arg_3 = inner.laser_new_arg_2 - start_f * 16.0f;
-                g_LaserManager->allocate_new_laser(LASER_LINE, &params);
+                allocate_line_laser_inline(&params);
             }
         }
     }
@@ -1685,7 +1685,7 @@ i32 LaserLineInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rec
                     if (params.laser_new_arg_1 > 24.0f)
                     {
                         params.start_pos = origin + step * (f32)start;
-                        g_LaserManager->allocate_new_laser(LASER_LINE, &params);
+                        allocate_line_laser_inline(&params);
                     }
                 } while (j < i);
             }
@@ -1841,7 +1841,7 @@ i32 LaserInfiniteInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32
             params.bullet_color = inner.color;
             params.laser_new_arg_3 = inner.laser_new_arg_2 - (f32)start * 16.0f;
             params.flags ^= (params.flags ^ (inner.flags >> 1)) & 1;
-            g_LaserManager->allocate_new_laser(LASER_LINE, &params);
+            allocate_line_laser_inline(&params);
         }
     }
     return count;
