@@ -27,6 +27,7 @@ ReplayManager *g_ReplayManager;
 // GLOBAL: TH16 0x4a6de0
 char g_current_replay_filename[0x100];
 
+// Starts recording or playing back (g_current_replay_filename).
 // FUNCTION: TH16 0x447e20
 HARNESS_CALLED ReplayManager *ReplayManager::create(i32 mode)
 {
@@ -39,6 +40,7 @@ HARNESS_CALLED ReplayManager *ReplayManager::create(i32 mode)
     return replay;
 }
 
+// Reads a replay for the menus; NULL if it cannot be read.
 // FUNCTION: TH16 0x447ef0
 HARNESS_CALLED ReplayManager *ReplayManager::create_from_file(const char *filename)
 {
@@ -59,11 +61,11 @@ HARNESS_CALLED void ReplayManager::destroy(ReplayManager *replay)
 }
 
 // FUNCTION: TH16 0x448e40
-int __fastcall ReplayManager::on_tick_22(void *arg)
+int __fastcall ReplayManager::on_tick_fast_forward(void *arg)
 {
     ReplayManager *replay = (ReplayManager *)arg;
 
-    // Fast-forward: run the frame list again for 7 of every 8 frames.
+    // Fast-forward: run the tick list again for 7 of every 8 ticks.
     if (g_GameThread != NULL && !g_GameThread->flags.paused && replay->mode == REPLAY_PLAYBACK &&
         (g_hardware_input & (INPUT_SKIP | INPUT_SHOT)) && replay->current_tick_num_in_stage % 8 != 0)
     {
@@ -73,13 +75,13 @@ int __fastcall ReplayManager::on_tick_22(void *arg)
 }
 
 // FUNCTION: TH16 0x448e90
-int __fastcall ReplayManager::on_draw_47(void *arg)
+int __fastcall ReplayManager::on_draw_fps(void *arg)
 {
     if (g_GameThread != NULL && g_GameThread->flags.paused)
     {
         return UPDATE_FUNC_CONTINUE;
     }
-    return on_draw_47_body(arg);
+    return draw_fps(arg);
 }
 
 // FUNCTION: TH16 0x449190
@@ -220,7 +222,7 @@ int ReplayManager::on_tick_record()
     chunk->next_input_write_pos->input_rising = g_InputState.input_rising;
     chunk->next_input_write_pos->input_falling = g_InputState.input_falling;
     chunk->next_input_write_pos++;
-    if ((u8 *)chunk->next_input_write_pos - (u8 *)chunk >= 0x1518)
+    if ((u8 *)chunk->next_input_write_pos - (u8 *)chunk >= (i32)sizeof(chunk->input))
     {
         currently_recording_chunk = new_chunk(stage_num);
     }
@@ -311,14 +313,14 @@ int ReplayManager::read_replay_file(const char *filename)
             goto fail;
         }
         rpy_file = file_read(sizeof(RpyHeader));
-        if (((RpyFileHeader *)rpy_file)->magic != 0x72363174)
+        if (((RpyFileHeader *)rpy_file)->magic != RPY_MAGIC)
         {
             file_close();
         fail:
             _chdir(g_GameWindow.exe_dir);
             return -1;
         }
-        if (((RpyFileHeader *)rpy_file)->version != 2)
+        if (((RpyFileHeader *)rpy_file)->version != RPY_VERSION)
         {
             file_close();
             goto fail;
@@ -331,15 +333,15 @@ int ReplayManager::read_replay_file(const char *filename)
         rpy_file = file_read_all(filename, &size, 0);
         data = (u8 *)rpy_file + sizeof(RpyHeader);
     }
-    rpy_thing_204 = malloc(((RpyFileHeader *)rpy_file)->size);
+    replay_data = malloc(((RpyFileHeader *)rpy_file)->size);
     zun_decrypt(data, ((RpyFileHeader *)rpy_file)->compressed_size, 0x5c, 0xe1, 0x400,
                 ((RpyFileHeader *)rpy_file)->compressed_size);
     zun_decrypt(data, ((RpyFileHeader *)rpy_file)->compressed_size, 0x7d, 0x3a, 0x100,
                 ((RpyFileHeader *)rpy_file)->compressed_size);
-    lzss_decompress(data, ((RpyFileHeader *)rpy_file)->compressed_size, (u8 *)rpy_thing_204,
+    lzss_decompress(data, ((RpyFileHeader *)rpy_file)->compressed_size, (u8 *)replay_data,
                     ((RpyFileHeader *)rpy_file)->size);
-    info = (RpyInfo *)rpy_thing_204;
-    RpyGamestate *gamestate = (RpyGamestate *)((u8 *)rpy_thing_204 + 0xa0);
+    info = (RpyInfo *)replay_data;
+    RpyGamestate *gamestate = (RpyGamestate *)((u8 *)replay_data + 0xa0);
     for (i32 i = 0; i < (info->num_stages >= 8 ? 6 : info->num_stages); i++)
     {
         stages[gamestate->stage].gamestate_at_stage_begin = gamestate;
@@ -379,7 +381,7 @@ HARNESS_CALLED void ReplayManager::start_stage()
         g_replay_unsafe_rng.seed = gamestate->rng_state;
         g_replay_safe_rng.generation_count = 0;
         gamestate->stage = g_Globals.stage_num;
-        gamestate->flag_290 = g_Supervisor.new_game_started;
+        gamestate->new_game_started = g_Supervisor.new_game_started;
     }
     else if (mode == REPLAY_PLAYBACK)
     {
@@ -404,9 +406,9 @@ HARNESS_CALLED void ReplayManager::begin_stage()
     {
         on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
     }
-    if (on_tick_22_func != NULL)
+    if (fast_forward_func != NULL)
     {
-        on_tick_22_func->flags |= UPDATE_FUNC_ACTIVE;
+        fast_forward_func->flags |= UPDATE_FUNC_ACTIVE;
     }
     if (on_draw_func != NULL)
     {
@@ -481,7 +483,7 @@ ReplayManager::~ReplayManager()
         stage_gamestate_snapshots[i] = NULL;
     }
     g_UpdateFuncRegistry->unregister_locked(on_tick_func);
-    g_UpdateFuncRegistry->unregister_locked(on_tick_22_func);
+    g_UpdateFuncRegistry->unregister_locked(fast_forward_func);
     g_UpdateFuncRegistry->unregister_locked(on_draw_func);
     if (g_ReplayManager == this)
     {
@@ -491,7 +493,7 @@ ReplayManager::~ReplayManager()
 
 // Shows the frame rate recorded in the replay while it plays back.
 // FUNCTION: TH16 0x4482f0
-int __fastcall ReplayManager::on_draw_47_body(void *arg)
+int __fastcall ReplayManager::draw_fps(void *arg)
 {
     ReplayManager *replay = (ReplayManager *)arg;
     if (g_GameThread != NULL && replay->mode != REPLAY_RECORDING && replay->mode == REPLAY_PLAYBACK)
@@ -540,8 +542,8 @@ int ReplayManager::initialize(i32 mode, const char *filename)
         free_chunks(g_Globals.stage_num);
         currently_recording_chunk = new_chunk(g_Globals.stage_num);
         RpyFileHeader *header = (RpyFileHeader *)new RpyHeader;
-        header->magic = 0x72363174;
-        header->version = 2;
+        header->magic = RPY_MAGIC;
+        header->version = RPY_VERSION;
         header->unk_10 = 0x100;
         rpy_file = header;
         info = new RpyInfo;
@@ -561,7 +563,7 @@ int ReplayManager::initialize(i32 mode, const char *filename)
         gamestate->stage = g_Globals.stage_num;
         gamestate->rng_state = g_replay_safe_rng.seed;
         g_replay_safe_rng.generation_count = 0;
-        gamestate->flag_290 = g_Supervisor.new_game_started;
+        gamestate->new_game_started = g_Supervisor.new_game_started;
         if (g_Supervisor.new_game_started)
         {
             gamestate->player_pos_subpixel[0] = 0;
@@ -576,10 +578,10 @@ int ReplayManager::initialize(i32 mode, const char *filename)
         UpdateFunc *f = new_replay_func(on_tick_record_thunk, this);
         g_UpdateFuncRegistry->register_on_tick(f, 0x10);
         on_tick_func = f;
-        f = new_replay_func(on_tick_22, this);
+        f = new_replay_func(on_tick_fast_forward, this);
         g_UpdateFuncRegistry->register_on_tick(f, 0x22);
-        on_tick_22_func = f;
-        f = new_replay_func(on_draw_47, this);
+        fast_forward_func = f;
+        f = new_replay_func(on_draw_fps, this);
         g_UpdateFuncRegistry->register_on_draw(f, 0x47);
         on_draw_func = f;
         stage_num = g_Globals.stage_num;
@@ -618,10 +620,10 @@ int ReplayManager::initialize(i32 mode, const char *filename)
         f->arg = this;
         g_UpdateFuncRegistry->register_on_tick(f, 0x10);
         on_tick_func = f;
-        f = new_replay_func(on_tick_22, this);
+        f = new_replay_func(on_tick_fast_forward, this);
         g_UpdateFuncRegistry->register_on_tick(f, 0x22);
-        on_tick_22_func = f;
-        f = g_UpdateFuncRegistry->create_func(on_draw_47);
+        fast_forward_func = f;
+        f = g_UpdateFuncRegistry->create_func(on_draw_fps);
         f->flags &= ~UPDATE_FUNC_ACTIVE;
         f->arg = this;
         g_UpdateFuncRegistry->register_on_draw(f, 0x47);
@@ -679,7 +681,7 @@ static __forceinline i32 finish_user_section(u8 *section, char *end)
 
 // TODO: ours realigns its frame to 64 bytes (alignment spreading up from a callee) and allocates registers differently.
 // FUNCTION: TH16 0x448400
-HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 unused, i32 unk_4)
+HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 unused, i32 add_end_marker)
 {
     ReplayManager *replay = g_ReplayManager;
     i32 first_stage = 0;
@@ -689,7 +691,7 @@ HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 u
     {
         replay->info->name[i] = ' ';
     }
-    if (!(replay->unk_218 & 1) && unk_4 != 0)
+    if (!(replay->save_flags & 1) && add_end_marker != 0)
     {
         RpyChunk *chunk = replay->currently_recording_chunk->entry;
         chunk->next_input_write_pos->input = 0xffff;
@@ -717,7 +719,7 @@ HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 u
             first_stage = i;
         }
         last_stage = i;
-        if (!(replay->unk_218 & 1))
+        if (!(replay->save_flags & 1))
         {
             gamestate->data_size = 0;
         }
@@ -727,7 +729,7 @@ HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 u
             RpyChunk *chunk = node->entry;
             size += ((u8 *)chunk->next_input_write_pos - (u8 *)chunk) / 6 * 6 + chunk->next_fps_count_write_pos -
                     chunk->fps_counts;
-            if (!(replay->unk_218 & 1))
+            if (!(replay->save_flags & 1))
             {
                 gamestate->data_size += ((u8 *)chunk->next_input_write_pos - (u8 *)chunk) / 6 * 6 +
                                         chunk->next_fps_count_write_pos - chunk->fps_counts;
@@ -773,7 +775,7 @@ HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 u
     RpyFileHeader *header = (RpyFileHeader *)replay->rpy_file;
     header->size = offset;
     header->compressed_size = compressed_size;
-    header->file_size = header->compressed_size + sizeof(RpyHeader);
+    header->user_offset = header->compressed_size + sizeof(RpyHeader);
     _chdir(g_GameWindow.save_dir);
     file_create(full_path);
     write_to_file(replay->rpy_file, sizeof(RpyHeader));
@@ -784,7 +786,8 @@ HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 u
     }
     u8 *user = (u8 *)malloc(0xffff);
     memset(user, 0, 0xffff);
-    *(u32 *)user = 0x52455355;
+    *(u32 *)user = RPY_USER_MAGIC;
+    // USER section 0: the replay's info as text.
     user[8] = 0;
     char *text = (char *)user + 0xc;
     text += sprintf(text, "%s \x83\x8a\x83v\x83\x8c\x83" "C\x83t\x83@\x83" "C\x83\x8b\x8f\xee\x95\xf1\r\n",
@@ -827,7 +830,8 @@ HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 u
     i32 user_size = finish_user_section(user, text);
     write_to_file(user, user_size);
     memset(user, 0, 0xffff);
-    *(u32 *)user = 0x52455355;
+    *(u32 *)user = RPY_USER_MAGIC;
+    // USER section 1: the comment ("write a comment").
     user[8] = 1;
     text = (char *)user + 0xc;
     text += sprintf(text, "\x83R\x83\x81\x83\x93\x83g\x82\xf0\x8f\x91\x82\xaf\x82\xdc\x82\xb7") + 1;
@@ -836,6 +840,6 @@ HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 u
     free(user);
     file_close_inline();
     _chdir(g_GameWindow.exe_dir);
-    replay->unk_218 |= 1;
+    replay->save_flags |= 1;
     return 0;
 }

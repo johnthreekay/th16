@@ -126,7 +126,7 @@ LoadingThread::~LoadingThread()
         delete anm->loaded_anms[0];
         anm->loaded_anms[0] = NULL;
     }
-    scorefile_save_449a00();
+    scorefile_save();
     if (g_Scorefile != NULL)
     {
         delete g_Scorefile;

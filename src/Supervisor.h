@@ -189,7 +189,7 @@ struct Supervisor
     i32 unk_6fc;
     // 1 when the game thread starts a new game (from the menu, a restart or
     // a retry), 0 when it moves on to the next stage. Copied into each
-    // stage's replay snapshot (RpyGamestate::flag_290) and read by ECL
+    // stage's replay snapshot (RpyGamestate::new_game_started) and read by ECL
     // variable -9927 (with replay_mode == 0).
     i32 new_game_started;
     // 1 after GAMEMODE_RESTART_19, 0 after the other restarts; never read.

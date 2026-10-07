@@ -445,7 +445,7 @@ fail:
 // FUNCTION: TH16 0x42d200
 DECOMP_NOINLINE GameThread::~GameThread()
 {
-    scorefile_save_449a00();
+    scorefile_save();
     GLOBALS_FLAGS_45C &= ~3;
     g_game_speed = 1.0f;
     g_draw_hook_0f = NULL;
@@ -525,9 +525,9 @@ DECOMP_NOINLINE GameThread::~GameThread()
             bullets->on_draw->flags &= ~UPDATE_FUNC_ACTIVE;
         }
         ReplayManager *replay = g_ReplayManager;
-        if (replay->on_tick_22_func != NULL)
+        if (replay->fast_forward_func != NULL)
         {
-            replay->on_tick_22_func->flags &= ~UPDATE_FUNC_ACTIVE;
+            replay->fast_forward_func->flags &= ~UPDATE_FUNC_ACTIVE;
         }
         if (replay->on_draw_func != NULL)
         {

@@ -6,6 +6,14 @@
 #include "decomp.h"
 #include "types.h"
 
+// scoreth16.dat's magic ("TH61") and version, and its sections' tags
+// ('CR' per character, 'ST' for the status) and version.
+constexpr u32 SCOREFILE_MAGIC = 0x31364854;
+constexpr u16 SCOREFILE_VERSION = 2;
+constexpr u16 SCOREFILE_SECTION_CHARA = 0x5243;
+constexpr u16 SCOREFILE_SECTION_STATUS = 0x5453;
+constexpr u16 SCOREFILE_SECTION_VERSION = 1;
+
 // Capture history of one spell card. Index 0 is the main game, 1 spell
 // practice.
 struct ScorefileSpell
@@ -52,6 +60,8 @@ struct ScorefilePractice
 // characters. Layout from the offsets the game uses.
 struct ScorefileCharacter
 {
+    // For characters[0], Scorefile's two buffer pointers; then the
+    // section header and the character (see ScorefileChara).
     u8 unk_0[0x18];
     // The top ten of each difficulty (ScorefileChara::scores).
     ScorefileScore scores[6][10];
@@ -140,7 +150,7 @@ struct Scorefile
 #pragma pack(pop)
 
 // 0x449a00 (ExpHP: sub_449a00_writes_score_file). Saves g_Scorefile.
-i32 scorefile_save_449a00();
+i32 scorefile_save();
 static_assert(sizeof(Scorefile) == 0x1a3ac, "Scorefile size");
 static_assert(offsetof(ScorefileCharacter, play_time) == 0x5160, "ScorefileCharacter::play_time");
 static_assert(offsetof(ScorefileCharacter, clears) == 0x5184, "ScorefileCharacter::clears");
@@ -163,6 +173,7 @@ extern Scorefile *g_Scorefile;
 // Each section of scoreth16.dat starts with this header.
 struct ScorefileSection
 {
+    // SCOREFILE_SECTION_CHARA or _STATUS, and SCOREFILE_SECTION_VERSION.
     u16 magic;
     u16 version;
     u32 checksum;
@@ -175,11 +186,12 @@ struct ScorefileSection
 // The header of scoreth16.dat, in front of the compressed sections.
 struct ScorefileHeader
 {
-    // "TH61"
+    // SCOREFILE_MAGIC and SCOREFILE_VERSION.
     u32 magic;
     u32 file_size;
     u16 version;
     u16 unk_a;
+    // 0x100 in every file the game writes.
     u32 unk_c;
     u32 compressed_size;
     // Of the sections after decompression.
