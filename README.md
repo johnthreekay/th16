@@ -26,16 +26,19 @@ game; `th16.exe` must have SHA-256
   generated code changed.
 - A portable build that runs on Linux (SDL2 and OpenGL, built with clang or
   gcc, 32- or 64-bit) lives on the `port` branch; see its README and
-  `port/NOTES.md`. It needs your own game data files.
+  `port/NOTES.md`. It needs your own game data files, and can apply a thcrap
+  patch stack such as the English translation.
 
 ## Portable build
 
 The same game sources also build with Clang or GCC for Linux (macOS is
 untested, see below), 64-bit or 32-bit, with a platform layer in `port/`
 in place of Windows and DirectX: the window, input and audio over SDL2,
-Direct3D 9 over OpenGL 3.3, GDI text over FreeType and fontconfig. The
-MSVC matching build does not see any of it (`#ifdef TH16_PORT`). Details,
-design and test notes: [`port/NOTES.md`](port/NOTES.md).
+Direct3D 9 over OpenGL 3.3, GDI text over FreeType and fontconfig. It
+can also apply a thcrap patch stack, such as the English translation, see
+"thcrap patches" below. The MSVC matching build does not see any of it
+(`#ifdef TH16_PORT`). Details, design and test notes:
+[`port/NOTES.md`](port/NOTES.md).
 
 ### Dependencies
 
@@ -50,6 +53,11 @@ design and test notes: [`port/NOTES.md`](port/NOTES.md).
 - For 32-bit builds (`-DTH16_M32=ON`): the 32-bit multilib (gcc-multilib,
   lib32 glibc and libstdc++) and 32-bit SDL2, FreeType and fontconfig
   (Arch `lib32-sdl2-compat lib32-freetype2 lib32-fontconfig`).
+- Optional, for thcrap patches: jansson and libpng (Arch `jansson libpng`,
+  Debian `libjansson-dev libpng-dev`). The CMake option `TH16_THCRAP` is on
+  when pkg-config finds both, and configuring prints "thcrap support:
+  on/off". There is rarely a 32-bit jansson, so 32-bit builds usually
+  have it off.
 
 ### Building
 
@@ -68,7 +76,8 @@ cmake -S port -B build-port/gcc32   -G Ninja -DCMAKE_CXX_COMPILER=g++ -DTH16_M32
 ```
 
 `-DTH16_NULL_RENDERER=ON` builds a Direct3D that draws nothing, for running
-without a display. All output stays under `build-port/` (ignored by git).
+without a display. `-DTH16_THCRAP=OFF` leaves out the thcrap support. All
+output stays under `build-port/` (ignored by git).
 
 ### Running
 
@@ -93,6 +102,35 @@ build-port/clang64/th16 ~/"Touhou Project/(TH16) Touhou Tenkuushou ~ Hidden Star
 - Without a display, `SDL_VIDEODRIVER=offscreen` (or `xvfb-run`) and
   `SDL_AUDIODRIVER=dummy` run it headless; `port/NOTES.md` ("Platform
   layer", Testing) has a scripted run that reaches stage 1.
+
+### thcrap patches
+
+A build with thcrap support applies the patch stack of an existing thcrap
+installation, as thcrap does on Windows: install thcrap (on Windows, or
+under Wine), pick the patches with its configuration tool, and the port
+reads that folder (only reads it; it does not download or update
+patches). With the English patch, the dialogue, endings, menus and other
+images, spell card names, the music room, the manual and the game's fonts
+are in English.
+
+```
+build-port/clang64/th16 --thcrap ~/.local/share/thcrap --thcrap-config en ~/"Touhou Project/..."
+```
+
+- thcrap folder: `--thcrap DIR`, else `$TH16_THCRAP_DIR`, else
+  `$XDG_DATA_HOME/thcrap` or `~/.local/share/thcrap` if it exists.
+- Run configuration (the patch stack): `--thcrap-config NAME` (a file in
+  the folder's `config/`, with or without `.js`, or any path), else
+  `$TH16_THCRAP_CONFIG`, else the newest run configuration in `config/`.
+- `--no-thcrap` (or `TH16_THCRAP=0`) runs the game unpatched. So does a
+  stack without patches for th16.
+- The log (stderr) lists the stack and every file it patches.
+
+The stack's own switches apply as with thcrap: a run configuration can
+turn off a binary hack, for example base_tsa's Stage 5 spell practice fix
+(`"binhacks": {"fix_satono_1": {"ignore": true}}`). Not supported: TL
+notes (dropped), BGM mods and patch updates; see `port/NOTES.md`,
+"thcrap".
 
 ### Controls
 

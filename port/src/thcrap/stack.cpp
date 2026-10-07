@@ -628,9 +628,10 @@ bool port_thcrap_init(const char *dir_option, const char *config_option)
         }
     }
     // runconfig_load(full_cfg, RUNCONFIG_NO_OVERWRITE): the run
-    // configuration's own keys stay.
+    // configuration's own values go over the game's, recursively (so it
+    // can switch a binary hack off with "ignore": true).
     g_runconfig = game_config(runcfg);
-    json_object_update(g_runconfig, runcfg);
+    json_object_update_recursive(g_runconfig, runcfg);
     json_decref(runcfg);
 
     // Does anything in the stack target th16? (stack_check_if_unneeded:

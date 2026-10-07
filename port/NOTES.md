@@ -8,8 +8,9 @@ layer"), audio (DirectSound over SDL2, see "Audio") and graphics
 (Direct3D 9 over OpenGL, see "Graphics"). The game boots with real files,
 threads, input and text to its title menu and plays, in all four builds;
 with `-DTH16_NULL_RENDERER=ON` (a Direct3D that draws nothing) it also
-runs without a display. The matching MSVC build is unaffected (see
-"Keeping the matching build").
+runs without a display. It can also load a thcrap patch stack (the
+English patch, for example) from the user's thcrap folder, see "thcrap".
+The matching MSVC build is unaffected (see "Keeping the matching build").
 
 
 ## Building
@@ -42,6 +43,12 @@ again from scratch. The build also makes the audio tests
 test (`th16_platform_test`, see "Platform layer"); `ctest` in a build
 directory runs the parts that need no game data.
 
+`-DTH16_THCRAP=ON` (the default when pkg-config finds jansson and libpng)
+builds the thcrap support (`src/thcrap/`, see "thcrap"), with PNG decoding
+in D3DX. Arch: `jansson libpng`; Debian: `libjansson-dev libpng-dev`.
+There is rarely a 32-bit jansson, so the `-m32` builds usually have it off;
+CMake says which at configure time ("thcrap support: on/off").
+
 `-DTH16_NULL_RENDERER=ON` builds `src/d3d9_null.cpp` in place of every other
 `src/d3d9_*.cpp` and `src/d3dx9_tex*.cpp`: a Direct3D 9 that succeeds at
 everything and draws nothing (textures and surfaces are plain memory, so
@@ -51,8 +58,8 @@ the game asks for vsync). It is for running the game without a renderer.
 The CMake build compiles every `src/*.cpp` (the glob is not recursive, so
 `src/harness/`, the matching build's stand-in callers, stays out),
 `src/stub/Opaque.cpp` by name (see "Game data in src/stub/") and
-`port/src/*.cpp`, with `-DTH16_PORT`, C++17 (gnu++17) and
-`-include port/include/port_prelude.h`.
+`port/src/*.cpp` (and `port/src/thcrap/*.cpp` with `TH16_THCRAP`), with
+`-DTH16_PORT`, C++17 (gnu++17) and `-include port/include/port_prelude.h`.
 
 Flags that matter for behaviour (CMakeLists.txt): `-fno-strict-aliasing`,
 `-fwrapv`, `-fno-delete-null-pointer-checks`, `-fsigned-char`,
@@ -91,6 +98,9 @@ path into a 256-byte buffer, as in the original).
     constructors for members of anonymous structs (see below).
   - `port_com.h`: HRESULT, GUID, IUnknown, `DEFINE_GUID` (declares only),
     CoInitialize/CoCreateInstance.
+  - `port_thcrap.h`: what the game sources call (inside `#ifdef
+    TH16_PORT`) where thcrap acts on th16.exe; inline no-ops without
+    `TH16_THCRAP`. See "thcrap".
   - `windows.h`, `mmsystem.h`, `mmreg.h`, `winnls32.h`, `shlobj.h`,
     `process.h`, `direct.h`: kernel32/user32/gdi32/winmm/shell/CRT subsets.
   - `d3d9.h`, `d3dx9.h`, `d3dx9math.h`, `d3dx9tex.h`, `dinput.h`, `dsound.h`.
@@ -136,9 +146,13 @@ path into a 256-byte buffer, as in the original).
     one SDL audio device, complete for what the game uses (see "Audio").
   - `layout_checks.cpp`: compile-time layout checks that stay on in the
     64-bit build (`TH16_PORT_CHECK`, defined in port_prelude.h).
+  - `thcrap/`: thcrap support (see "thcrap").
 - `tests/`: the audio tests (see "Audio"), the platform test
-  (`platform_test.cpp`) and `th16dat.py`, a Python copy of the game's
-  th16.dat reader that lists and extracts files for tests.
+  (`platform_test.cpp`), the thcrap test (`thcrap_test.cpp`) and
+  `th16dat.py`, a Python copy of the game's th16.dat reader that lists and
+  extracts files for tests.
+- `tools/thcrap_strings.py`: makes the table of the game's strings at their
+  original addresses (see "thcrap").
 
 The interfaces in `include/` are C++ abstract classes with only the methods
 the game calls (plus a few obvious companions), in an order of our own: the
@@ -236,7 +250,7 @@ SDK's, so code and data that use them keep their meaning.
 ### Running
 
 ```
-th16 [--game-dir DIR] [--save-dir DIR] [DIR]
+th16 [--game-dir DIR] [--save-dir DIR] [--thcrap DIR] [--thcrap-config NAME] [--no-thcrap] [DIR]
 ```
 
 The game folder (th16.dat, thbgm.dat) is `DIR`/`--game-dir`, else
@@ -250,6 +264,7 @@ game controllers) before `WinMain` and quits it afterwards. Without a
 display SDL video fails and the game runs windowless (with the null
 renderer). The port logs to stderr as `[th16-port <seconds>] ...`; the
 game's own log goes to log.txt in the save folder at exit, as on Windows.
+The thcrap options are described under "thcrap".
 
 Environment: `TH16_FONT_GOTHIC`, `TH16_FONT_MINCHO` (a font file or a
 fontconfig pattern for the two faces), `TH16_NO_DIALOGS` (no message box
@@ -399,6 +414,18 @@ does). `EnumFontFamiliesExA` reports only faces the system really has, so
 the game uses Meiryo (with its larger sizes) only if Meiryo is installed;
 otherwise MS Gothic and MS Mincho, as on a Windows without Meiryo.
 
+With a thcrap stack loaded (`port_gdi_set_utf8`), strings that are valid
+UTF-8 are taken as UTF-8 (thcrap's translations are UTF-8), others as
+Shift-JIS, as thcrap's win32_utf8 does; a real font (one fontconfig has,
+such as thcrap's Touhou Biolinum, registered from the patch with
+`port_gdi_add_font_file`) then keeps its own proportional advances, and a
+font without Japanese gets the Japanese substitute for the characters it
+lacks (GDI's font linking). `lfItalic` (synthetic oblique), `lfUnderline`
+and `NONANTIALIASED_QUALITY` (monochrome glyphs) work; thcrap's layout
+markup and font rules use them. `TextOutA` goes through thcrap's layout
+first (`port/src/thcrap/text.cpp`), which calls `port_gdi_text_out_raw` for
+each run. Without a stack nothing of this changes the text.
+
 ### For the renderer and the sound code (port_platform.h)
 
 - `port_sdl_window(hwnd)`: the SDL window behind the game's HWND (NULL
@@ -486,6 +513,197 @@ stage time.
   check crosses processes, through the lock file).
 - Not built or run on macOS yet (iconv, fontconfig and SDL paths are
   handled; the fonts may need `TH16_FONT_*`).
+
+## thcrap
+
+thcrap (Touhou Community Reliant Automatic Patcher) patches the Windows
+th16.exe in memory: it hooks the Win32 file and text functions and puts
+breakpoints and binary hacks at fixed addresses of v1.00a. None of that can
+work on the port, so `port/src/thcrap/` reads the user's thcrap folder and
+patch stack itself and does, at the same places in the decompiled game,
+what thcrap's TH16 support does. The user's English patch (thpatch's
+lang_en over nmlgc's base_tsa, script_latin and western_name_order) then
+works: dialogue, endings, menus and other images, spell card names, the
+music room, the help manual, the hardcoded strings and the fonts.
+
+### Using it
+
+The port looks for a thcrap folder at `--thcrap DIR`, else
+`$TH16_THCRAP_DIR`, else `$XDG_DATA_HOME/thcrap` or
+`~/.local/share/thcrap` if it exists, and takes its run configuration
+from `--thcrap-config NAME` (a path, or a name in the folder's `config/`
+with or without `.js`), else `$TH16_THCRAP_CONFIG`, else the newest
+`config/*.js` that has a `"patches"` list (thcrap's own `config.js` has
+none). `--no-thcrap` or `TH16_THCRAP=0` turns it off. The folder is only
+read: a thcrap installation made on Windows (or under Wine) works as it is,
+with its patches already downloaded by thcrap (the port does not update
+them). The log says what was loaded:
+
+```
+[th16-port] thcrap: run configuration .../config/en.js: base_tsa, base_tasofro, script_latin, ...
+[th16-port] thcrap: 49 hardcoded strings can be translated
+[th16-port] thcrap: font .../script_latin/THBiolinum.otf
+[th16-port] thcrap: st01a.msg: patched
+```
+
+A stack whose patches have nothing for th16 (no `th16.js`, `th16/` or
+`th16.v1.00a.js`) leaves the game unpatched.
+
+### The patch stack (stack.cpp)
+
+As in thcrap (stack.cpp, patchfile.cpp, init.cpp): each run configuration
+entry's `archive` (relative to the thcrap folder) with its `patch.js`
+(id, `ignore` wildcards, `fonts`, `supported_games`; patches naming other
+games only are dropped). Files resolve through thcrap's chains: `fn` and
+`fn` with `.v1.00a` before the first dot of the base name, under `th16/`
+for game files. A replacement file is the last patch's, build-specific
+first; JSON files merge over the whole stack in order (objects
+recursively). The game configuration is every patch's `global.js`,
+`th16.js` and `th16.v1.00a.js` (and the run configuration's `config`)
+merged in stack order, under the run configuration's own keys: that is
+where the breakpoints and binary hacks below are switched on (one with an
+`addr` and not `"ignore": true`), and where `font`, `fontrules` and
+`tsa_font_block` come from. Patch files are JSON5 (json5.cpp turns them
+into JSON for jansson; base_tsa's th16.v1.00a.js has trailing commas).
+File names are matched ignoring case, since patches are made on Windows.
+
+### Hooks in the game
+
+`port/include/port_thcrap.h` is what the game calls, always inside
+`#ifdef TH16_PORT` (the MSVC build never sees it), and each call returns
+its input unchanged without a stack. The thcrap hackpoints of base_tsa's
+`th16.js`/`th16.v1.00a.js` and script_latin's `th16.v1.00a.js`, and their
+places in the port:
+
+| thcrap (address) | game function | port |
+|---|---|---|
+| file_size, file_load (0x4024cc, 0x402504), file_loaded (0x45724b) | `file_read_all`, `Arcfile::read_file` | `port_thcrap_file_replacement` (a patch file replaces an archive file or adds one), `port_thcrap_patch_file` (format patchers) in `file_read_all`'s archive branch |
+| sprintf_* hacks (strings_sprintf) | `AnmManager::draw_text`, `draw_text_right`, `draw_text_centered`, `AsciiInf::create_stringf`, `PauseMenu::tick_open`, `TitleInf::do_replay_save`, `load_replay_list` | `port_thcrap_vsnprintf`/`snprintf` (format and `%s` arguments translated; draw_text's buffers are 0x400 bytes in the port) |
+| spell_id (0x4217c9) | `EnemyData::ecl_run_over_300`, spell instructions | `port_thcrap_spell_id` |
+| spell_id#real, spell_name (0x417f4a, 0x4180d6) | `Spellcard::start` | `port_thcrap_spell_name` (the shown name only; the score file keeps the original) |
+| spell_id#result, spell_name#result (0x452d8d, 0x452ed5) | `TitleInf::draw_spell_card_page` | `port_thcrap_spell_name_ranked` (rank: the card's difficulty) |
+| spell_name#practice (0x456622) | `TitleInf::load_spell_list` | `port_thcrap_spell_name_ranked` (rank: the row) |
+| music_title_prepare, music_title (0x454aef) | `TitleInf::do_music_room` | `port_thcrap_music_title` |
+| music_cmt#line, music_cmt (0x454d46, 0x454e0f) | its comment lines | `port_thcrap_music_comment` |
+| ruby_offset (0x42a53a, 0x42a736) | `GuiMsgVm::run` | `port_thcrap_ruby_offset` |
+| th15_textbox_size (0x42a5d0, 0x42a7c6) | `GuiMsgVm::run` | `port_thcrap_textbox_width` |
+| spell_align (0x46db40) | `AnmManager::draw_text_right` | `port_thcrap_text_right_x` |
+| result_spell_align (0x46dd11) | `AnmManager::draw_text_centered` | `port_thcrap_text_centered_x` |
+| meiryo_disable (0x458e22, script_latin) | `create_fonts` | `port_thcrap_binhack("meiryo_disable")` skips the Meiryo search |
+| score_force_visual_update (0x42d7b3) | `GameThread::on_tick_body` | calls `Gui::update_score` while the game-over menu is open |
+| fix_satono_1/2 (0x421596) | `EnemyData::ecl_run_over_300`, setNext in spell practice | the second boss ends its card in `BossDeadB` |
+| steamstub/steamdrm cracks | (Steam's DRM) | not needed |
+
+The last three are switched by the stack like the rest: base_tsa enables
+them (so they are on with the English stack); a stack without them, or
+with `"ignore": true` in a run configuration's binhacks, leaves the game
+as it is. In the port's own code: `CreateWindowExA` takes thcrap's window
+title (`tsa_CreateWindowExA`: the game title and build from th16.js),
+`CreateFontA` and `CreateFontIndirectA` apply `font` and `fontrules`
+(`textdisp.cpp`), `TextOutA` the layout (below).
+
+### Files and formats (stack.cpp, msg.cpp, anm.cpp)
+
+thcrap_tsa's patch hooks for TH16: `s*.msg` (dialogue, `MSG_TH14`),
+`e*.msg` (endings, `END_TH10`) and `*.anm`, each with `<file>.jdiff`.
+The .msg patcher (th06_msg.cpp) replaces the lines of each text box from
+the jdiff (`"<entry>": {"<time>_<index>": {"lines": [...]}}`), inserts
+extra lines, drops missing ones, re-encrypts them as the game expects, and
+moves speech bubbles that would leave the screen (by the lines' widths in
+the dialogue font, `ruby_offset`'s `font_dialog`). The file grows by at
+most the jdiff's size, as in thcrap. The .anm patcher (anm.cpp) draws
+each PNG of the stack over the texture of the entry it is named after
+(`th16/title/title_logo.png`, or thtk's `title_logo@title@3.png`), sprite
+by sprite with thcrap's blitting rules (blend over opaque pixels, else
+overwrite; empty replacement areas are skipped), in the texture's format
+(A8R8G8B8, R5G6B5, A4R4G4B4, A8), and applies the jdiff's header changes
+(`sprites` rectangles, `entries` names and blitting modes, script
+instruction deletions and changes; parameter changes take plain hex
+bytes). Any other file a patch has (help_01.png, for example) replaces the
+archive's.
+
+### Strings (strings.cpp, tools/thcrap_strings.py)
+
+thcrap translates hardcoded strings by address: `stringlocs.js` maps
+addresses in the original th16.exe to ids (`"Rx9290c":
+"th10_ascii_stage_1"`), `stringdefs.js` ids to translations, and
+`strings_lookup` compares the pointer the game passes. The port's strings
+are its own literals, so it looks them up by content:
+`th16_strings.inc` lists every string literal of `src/` with its address
+in the original executable (the decompilation matches, so each literal is
+there byte for byte), and a string translates when its text is the text
+at a stringlocs address. The build makes the table from the sources and
+`orig/th16.exe` (CMake cache variable `TH16_ORIG_EXE`) when both are there
+(`tools/thcrap_strings.py`, about 0.2 s), else it uses the copy in
+`src/thcrap/th16_strings.inc`, written by the same script. All 49
+addresses of base_tsa's TH16 stringlocs are in it. Where thcrap looks
+strings up, so does the port: the sprintf hacks (the format, and every
+`%s` argument, as `strings_va_lookup`), `TextOutA` (layout.cpp looks up
+every string it draws), `CreateFontA` (face names) and the window title.
+The translating printf takes MSVC's `%ld` as a 32-bit int and cuts a
+translation that does not fit at a whole UTF-8 character.
+
+### Text (text.cpp)
+
+thcrap_tsa's layout.cpp: a string is split into runs and commands
+`<cmds$text$width>`: `r`/`c`/`l` align the text in a tab (the width of the
+third parameter, the whole bitmap when it is empty, or a tab stop `t`
+defined earlier), `s` skips it, `b`/`i`/`u` draw it bold, italic or
+underlined. TL notes (after U+0014 or U+0012) are cut off, not shown. Text
+widths in the game's fonts (thcrap's `GetTextExtentForFontID`, through
+`tsa_font_block`: the game's `g_text_font_0` to `g_text_font_7`) give the
+speech bubble's width (`th15_textbox_size`: half the width minus 28, at
+least 0, where the game counts bytes), the right alignment of spell names
+(`spell_align`) and the ruby offset: a ruby line
+`"|\tbefore\t,\tbase\t,ruby"` gets its offset from the widths of the text
+before the annotated part and of the annotated part in the dialogue font
+and of the ruby in its font (+4 for TH16's sprite shift), passed to
+`TextOutA` through thcrap's dummy x (32767, doubled by draw_text), and the
+string pointer moves so that the game's own two `strchr(',')` calls find
+the ruby text. Fonts: the run configuration's `font` replaces every face
+the game asks for (script_latin: Touhou Biolinum, from its own
+THBiolinum.otf, which the port registers with fontconfig like every
+patch's `fonts`), and `fontrules` change matching LOGFONTs
+(script_latin: the 15-pixel bold fonts become 21-pixel, weight 100,
+non-antialiased). See "Text" under "Platform layer" for UTF-8 and the
+metrics.
+
+### Tests
+
+`th16_thcrap_test` (ctest, no game data) writes a small thcrap folder and
+checks JSON5, the stack and game configuration, the string table and the
+translating printf, spells, the music room, file replacement, the .msg
+patcher, layout markup, ruby offsets, bubble widths and the window title,
+with GDI and the game's fonts as stand-ins (10 pixels per byte).
+
+With the owner's stack (en.js: base_tsa, base_tasofro, script_latin,
+western_name_order, lang_en, and three local patches for other games),
+checked headless with the OpenGL renderer under Xvfb (clang64): the title
+screen (English logo), Player Data (spell card list with the translated
+format, layout-aligned columns and ASCII digits), the replay list (season
+names translated in the ASCII font: "Border"), the music room (themes.js
+titles, musiccmt.js comments, the centred spoiler warning), the help
+manual (lang_en's help_01.png, through the new PNG decoding), stage 1 on
+Easy to the boss dialogue (English lines, two-line boxes sized to the
+text, `<i$...>` in italics, Eternity Larva's English name card), and an
+Extra stage replay of the owner's: the midboss dialogue, Mai and Satono's
+name card and the spell card name 'Drum Dance "Powerful Cheers"'
+right-aligned. To reach stage 1's boss headless, the test script holds Z,
+sweeps left and right, bombs from 75 s on and presses Z again every few
+seconds (which takes the continues), then taps Z every 2.5 s through the
+dialogue (holding it would skip the boxes).
+
+### Not done
+
+- Ruby (furigana) lines are only checked by the unit test: they occur from
+  stage 2 on, which the test runs do not reach.
+- The endings (e01.msg to e08.msg with END_TH10, ending images) and the
+  result screen's and spell practice's names with real records are not
+  checked on screen (the code is the in-game spell lookup's).
+- TL notes are dropped rather than shown (th16's lang_en has none).
+- thcrap features TH16's stack does not use: BGM modding (`*.pos`,
+  `*bgm*.fmt`), spell comments, thcrap's full binary hack code syntax in
+  ANM script changes, patch updates, `dat_dump`/`patched_files_dump`.
 
 ## Audio
 
@@ -665,9 +883,12 @@ thread).
   from th16.dat. th16.dat has none: its 54 .anm files hold 417 embedded
   textures (formats 1, 3, 5 and 7 of `g_anm_d3d_formats`: A8R8G8B8 190,
   R5G6B5 52, A4R4G4B4 136, A8 39), 4 empty textures and 2 render targets
-  (`tests/th16dat.py` to extract, then read the entry headers). So no image
-  decoder is vendored: those three functions log the file's first bytes
-  and fail. The rest of D3DX is complete: format conversion between all
+  (`tests/th16dat.py` to extract, then read the entry headers). The help
+  manual's pages, though, are PNG files in th16.dat (help_01.png to
+  help_09.png, loaded with `file_read_all` and
+  `AnmManager::reload_texture`): with libpng (`TH16_PNG`, part of the
+  thcrap build) those three functions decode PNG, otherwise they log the
+  file's first bytes and fail (the manual's pages stay empty). The rest of D3DX is complete: format conversion between all
   the formats above, D3DX_FILTER_NONE (no scaling, transparent black
   outside the source), POINT, and the other filters as an area average
   when shrinking (the 2:1 low-resolution textures at 640x480) or bilinear
@@ -737,7 +958,10 @@ used to, in `port/src/game_tables.cpp`, while main had them zero-filled).
   lines): decomp.h, types.h, ZunAsm.h, AnmManager.h, Bomb.h, Scorefile.h,
   SoundManager.h, Player.h, Player.cpp, PlayerShot.cpp, AnmDraw.cpp,
   AnmManagerVms.cpp, BombMain.cpp, BulletManager.cpp, GameThread.cpp,
-  PauseMenu.cpp, Stage.cpp.
+  PauseMenu.cpp, Stage.cpp; for thcrap (all inside `#ifdef TH16_PORT`, see
+  "thcrap"): FileSystem.cpp, AnmText.cpp, AsciiManager.cpp, Gui.cpp,
+  Spellcard.cpp, EnemyEcl.cpp, MainMenuStates.cpp, PauseMenu.cpp,
+  TextHelper.cpp, GameThread.cpp.
 - The game's `static_assert`s are off in the 64-bit build. Layout facts that
   must hold there too go in `port/src/layout_checks.cpp` as
   `TH16_PORT_CHECK(...)` (file structures, the Scorefile and BgmStream

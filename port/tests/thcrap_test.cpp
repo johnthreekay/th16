@@ -225,7 +225,8 @@ void test_stack()
     const std::string root = "thcrap_test_dir";
     write_file(root + "/config/config.js", "{\"console\": false}");
     write_file(root + "/config/test.js", "{\"patches\": [{\"archive\": \"repos/t/base/\"}, "
-                                         "{\"archive\": \"repos/t/lang/\"}, {\"archive\": \"repos/t/other/\"}]}");
+                                         "{\"archive\": \"repos/t/lang/\"}, {\"archive\": \"repos/t/other/\"}], "
+                                         "\"binhacks\": {\"score_force_visual_update\": {\"ignore\": true}}}");
     write_file(root + "/repos/t/base/patch.js", "{\"id\": \"base\"}");
     write_file(root + "/repos/t/base/global.js",
                "{\"binhacks\": {\"spell_align\": {\"code\": \"90\"}}, \"breakpoints\": {\"ruby_offset\": "
@@ -236,7 +237,7 @@ void test_stack()
     write_file(root + "/repos/t/base/th16.v1.00a.js",
                "{\"binhacks\": {\"th15_textbox_size\": {\"addr\": [\"Rx2a5d0\", \"Rx2a7c6\"],},"
                " \"fix_satono_1\": {\"addr\": \"Rx21596\", \"ignore\": true}, \"spell_align\": {\"addr\": "
-               "\"Rx6db40\"}}, \"breakpoints\": {\"spell_name\": {\"addr\": \"Rx180d6\"}, \"music_title\": "
+               "\"Rx6db40\"}, \"score_force_visual_update\": {\"addr\": \"Rx2d7b3\"}}, \"breakpoints\": {\"spell_name\": {\"addr\": \"Rx180d6\"}, \"music_title\": "
                "{\"addr\": \"Rx54af3\"}, \"music_cmt\": {\"addr\": [\"Rx54d59\"]}, \"ruby_offset\": "
                "{\"addr\": \"Rx2a53a\"}}}");
     // "Stage 1" (0x49290c) and the full-width digit 0 (0x493330).
@@ -262,6 +263,8 @@ void test_stack()
     CHECK(port_thcrap_binhack("spell_align"));
     CHECK(!port_thcrap_binhack("fix_satono_1"));
     CHECK(!port_thcrap_binhack("meiryo_disable"));
+    // Switched off by the run configuration.
+    CHECK(!port_thcrap_binhack("score_force_visual_update"));
     CHECK(port_thcrap_breakpoint("spell_name"));
 
     // Strings, by content.
