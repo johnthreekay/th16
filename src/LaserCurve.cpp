@@ -7,13 +7,6 @@
 #include "EffectManager.h"
 #include "Laser.h"
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x438cb0
-void LaserCurveInf::run_ex()
-{
-    unit5_placeholder(this);
-}
-
 // FUNCTION: TH16 0x437760
 i32 LaserCurveInf::on_destroy()
 {

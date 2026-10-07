@@ -98,6 +98,17 @@ class LaserDataInf
     }
 };
 
+// LaserDataInf's flag word (after next) with the bit curvy lasers add.
+struct LaserDataFlagBits
+{
+    u32 ticked : 1;
+    u32 pending_delete : 2;
+    u32 flag_3 : 1;
+    // Curvy lasers: the segments stay where they are (et_ex 0x10000000).
+    u32 segments_frozen : 1;
+    u32 rest : 27;
+};
+
 // Parameters of a straight laser. Layout from ExpHP (zLaserLineInner); his
 // field names say which BulletManager shooter field each one comes from.
 struct LaserLineInner
@@ -331,7 +342,7 @@ class LaserCurveInf : public LaserDataInf
     LaserCurveInf();
 
     virtual void get_point(f32 distance, Float3 *out);
-    virtual void run_ex();
+    DECOMP_NOINLINE virtual void run_ex();
     virtual i32 initialize(void *params);
     virtual i32 on_tick();
     virtual i32 on_draw();

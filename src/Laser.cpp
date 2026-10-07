@@ -2150,6 +2150,210 @@ i32 LaserCurveInf::on_draw()
     return 0;
 }
 
+// Runs the laser's pending et_ex instructions, as LaserLineInf::run_ex
+// does, except that 4 and 8 add nodes to the curve: one moving by velocity
+// or by speed and angle deltas from the given time, followed by a straight
+// one after a duration (a) unless that is negative. An instruction already
+// running stops the list.
+// TODO: the original keeps ex as a pointer (this + 0x600 + index * 0x2c) where ours addresses through this plus the scaled index; case 4 stores start_pos.z after loading the angle, and (f32)b goes to xmm1.
+// FUNCTION: TH16 0x438cb0
+void LaserCurveInf::run_ex()
+{
+    while (ex_index < 0x12)
+    {
+        BulletEx *ex = &inner.ex[ex_index];
+        if (ex->type == 0)
+        {
+            return;
+        }
+        if (ex->slot == 0 && ex_flags != 0)
+        {
+            return;
+        }
+        if (ex->type & ex_flags)
+        {
+            return;
+        }
+        switch ((u32)ex->type)
+        {
+        case 1:
+            ex_flags |= 1;
+            ex_state[0].timer.set_value(0);
+            ex_state[0].floats[7] = 0.0f;
+            break;
+        case 4:
+        {
+            LaserCurveNode *node = append_node((f32)ex->b);
+            node->mode = 1;
+            node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->unk_c);
+            node->start_pos.z = 0.0f;
+            laser_sincosmul(&node->velocity, node->angle, 1.0f);
+            node->velocity.z = 0.0f;
+            node->speed_delta = ex->r;
+            node->angle_delta = ex->s;
+            if (ex->a >= 0)
+            {
+                node->unk_c = (f32)ex->a + (f32)ex->b;
+                node = append_node(node->unk_c);
+                node->mode = 0;
+                node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->unk_c);
+                node->start_pos.z = 0.0f;
+                laser_sincosmul(&node->velocity, node->angle, 1.0f);
+                node->velocity.z = 0.0f;
+                node->unk_c = 999999.0f;
+            }
+            else
+            {
+                node->unk_c = 999999.0f;
+            }
+            break;
+        }
+        case 8:
+        {
+            LaserCurveNode *node = append_node((f32)ex->b);
+            node->mode = 2;
+            node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->unk_c);
+            node->start_pos.z = 0.0f;
+            laser_sincosmul(&node->velocity, node->angle, 1.0f);
+            node->velocity.z = 0.0f;
+            node->speed_delta = ex->r;
+            node->angle_delta = ex->s;
+            if (ex->a >= 0)
+            {
+                node->unk_c = (f32)ex->a + (f32)ex->b;
+                node = append_node(node->unk_c);
+                node->mode = 0;
+                node->prev->get_state(&node->start_pos, &node->speed, &node->angle, node->prev->unk_c);
+                node->start_pos.z = 0.0f;
+                laser_sincosmul(&node->velocity, node->angle, 1.0f);
+                node->velocity.z = 0.0f;
+                node->unk_c = 999999.0f;
+            }
+            else
+            {
+                node->unk_c = 999999.0f;
+            }
+            break;
+        }
+        case 0x10:
+            ex_flags |= ex->type;
+            ex_state[3].floats[1] = ex->r;
+            ex_state[3].floats[0] = ex->s > -999.0f ? ex->s : length;
+            ex_state[3].timer.set_value(0);
+            ex_state[3].ints[0] = ex->a;
+            ex_state[3].ints[1] = ex->b;
+            ex_state[3].ints[2] = 0;
+            ex_state[3].ints[3] = ex->c;
+            break;
+        case 0x40:
+            if (ex->a > 0)
+            {
+                ex_flags |= ex->type;
+                if (ex->r >= 0.0f)
+                {
+                    ex_state[4].floats[0] = ex->r;
+                }
+                else
+                {
+                    ex_state[4].floats[0] = length;
+                }
+                ex->a--;
+                ex_state[4].ints[1] = ex->a;
+                ex_state[4].ints[0] = 0;
+                ex_state[4].ints[2] = ex->b;
+            }
+            break;
+        case 0x80:
+            countdown_5c8 = ex->a;
+            break;
+        case 0x100:
+            ex_flags |= ex->type;
+            ex_state[11].timer.set_inline(ex->a);
+            ex_state[11].ints[0] = ex->b;
+            break;
+        case 0x200:
+        {
+            AnmVm *vm = &vm_92c;
+            g_BulletManager->bullet_anm->copy_vm(vm, g_bullet_types[ex->a].script + ex->b);
+            vm->unk_5b0 = NULL;
+            vm->parent = NULL;
+            vm->run();
+            break;
+        }
+        case 0x400:
+            state = 3;
+            break;
+        case 0x800:
+            g_SoundManager.play_sound_at_position(ex->a, position.x);
+            break;
+        case 0x1000:
+            ex_flags |= ex->type;
+            ex_state[6].timer.set_value(ex->a);
+            break;
+        case 0x2000:
+        {
+            EnemyBulletShooter shooter;
+            laser_sincosmul(&shooter.pos, angle, unk_70);
+            u32 a = ex->a;
+            shooter.pos.x += position.x;
+            shooter.pos.z = 0.0f;
+            *(u16 *)&shooter.aim_type = (a >> 24) & 0x7f;
+            shooter.type = (a >> 16) & 0xff;
+            shooter.pos.y += position.y;
+            shooter.color = (a >> 8) & 0xff;
+            shooter.spd1 = ex->r;
+            shooter.spd2 = ex->s;
+            shooter.start_transform = a & 0xff;
+            shooter.count = ex->b;
+            ex_index++;
+            shooter.layers = ex[1].a;
+            shooter.ang_aim = ex[1].r;
+            shooter.sfx_flags = ex[1].b;
+            shooter.ang_bullet_dist = ex[1].s;
+            memcpy(shooter.ex, inner.ex, sizeof(inner.ex));
+            g_BulletManager->shoot_bullets(&shooter);
+            ex_index++;
+            if ((i32)a < 0)
+            {
+                cancel(0, 0);
+                break;
+            }
+            continue;
+        }
+        case 0x8000:
+            id = ex->a;
+            ex_index++;
+            continue;
+        case 0x10000:
+            ex_index = ex->a;
+            continue;
+        case 0x100000:
+            if (ex->a != 0)
+            {
+                vm_92c.flags_lo = vm_92c.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+            }
+            else
+            {
+                vm_92c.flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
+            }
+            break;
+        case 0x10000000:
+            ((LaserDataFlagBits *)(&next + 1))->segments_frozen = ex->a;
+            break;
+        case 0x80000000:
+            if (ex->a > 0)
+            {
+                ex_flags |= ex->type;
+                ex_state[5].timer.set_value(ex->a);
+                break;
+            }
+            ex_index++;
+            continue;
+        }
+        ex_index++;
+    }
+}
+
 // TODO: register allocation and the order of the vector temporaries differ (the original builds them with unpcklps).
 // FUNCTION: TH16 0x438370
 void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle,
@@ -2586,7 +2790,7 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
         {
             return;
         }
-        switch (ex->type)
+        switch ((u32)ex->type)
         {
         case 1:
             ex_flags |= 1;
@@ -2686,18 +2890,18 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
         {
             EnemyBulletShooter shooter;
             laser_sincosmul(&shooter.pos, angle, unk_70);
-            i32 a = ex->a;
+            u32 a = ex->a;
             shooter.pos.x += position.x;
             shooter.pos.z = 0.0f;
-            shooter.aim_type = (a >> 24) & 0x7f;
+            *(u16 *)&shooter.aim_type = (a >> 24) & 0x7f;
             shooter.type = (a >> 16) & 0xff;
             shooter.pos.y += position.y;
             shooter.color = (a >> 8) & 0xff;
             shooter.spd1 = ex->r;
             shooter.spd2 = ex->s;
             shooter.start_transform = a & 0xff;
-            ex_index++;
             shooter.count = ex->b;
+            ex_index++;
             shooter.layers = ex[1].a;
             shooter.ang_aim = ex[1].r;
             shooter.sfx_flags = ex[1].b;
@@ -2705,11 +2909,12 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
             memcpy(shooter.ex, inner.ex, sizeof(inner.ex));
             g_BulletManager->shoot_bullets(&shooter);
             ex_index++;
-            if (a < 0)
+            if ((i32)a < 0)
             {
                 cancel(0, 0);
+                break;
             }
-            break;
+            continue;
         }
         case 0x8000:
             id = ex->a;
