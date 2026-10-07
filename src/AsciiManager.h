@@ -37,6 +37,8 @@ struct AsciiStr
 
 // Draws the debug and HUD text. ExpHP calls it AsciiManager; the name is
 // ZUN's, from RTTI. Layout from ExpHP's th-re-data (zAsciiManager).
+//
+// VTABLE: TH16 0x491ce0
 class AsciiInf : public TaskInf
 {
   public:
