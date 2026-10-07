@@ -58,8 +58,8 @@ struct ConfigData
         unk_24 = 0;
         frame_pacing = 2;
         se_volume = 80;
-        window_x = 0x80000000;
-        window_y = 0x80000000;
+        window_x = CW_USEDEFAULT;
+        window_y = CW_USEDEFAULT;
     }
 };
 

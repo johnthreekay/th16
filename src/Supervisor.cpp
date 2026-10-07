@@ -74,8 +74,8 @@ Config::Config()
     unk_28 = 0;
     frame_pacing = 2;
     se_volume = 80;
-    window_x = 0x80000000;
-    window_y = 0x80000000;
+    window_x = CW_USEDEFAULT;
+    window_y = CW_USEDEFAULT;
 }
 
 // FUNCTION: TH16 0x40d510
@@ -86,6 +86,7 @@ Camera::Camera()
 Supervisor::Supervisor()
 {
     memset(this, 0, sizeof(Supervisor));
+    // SUPERVISOR_NO_STARTUP_TITLE and the unread 0x200 and 0x4000.
     flags |= 0x4240;
 }
 
