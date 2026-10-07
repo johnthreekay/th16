@@ -10,6 +10,8 @@ cheap compile of each file without /GL.
 """
 
 import argparse
+import functools
+import hashlib
 import re
 import struct
 import subprocess
@@ -68,14 +70,54 @@ def is_stub(src):
     return SRC / "stub" in src.parents
 
 
+@functools.lru_cache(maxsize=None)
+def project_files():
+    """Lowercased path -> path of every file under src/."""
+    return {str(p).lower(): p for p in SRC.rglob("*") if p.is_file()}
+
+
+def input_key(flags, src, deps):
+    """Hash of everything an object depends on: flags, source and the
+    project headers it included (SDK and CRT headers never change)."""
+    h = hashlib.sha256(("deps-v2\0" + "\0".join(flags)).encode())
+    for path in [src, *deps]:
+        p = Path(path)
+        h.update(str(p).encode() + b"\0")
+        h.update(p.read_bytes() if p.is_file() else b"\0missing\0")
+    return h.hexdigest()
+
+
 def compile_one(src, obj_dir, no_gl):
     obj = obj_dir / rel(src).with_suffix(".obj")
     obj.parent.mkdir(parents=True, exist_ok=True)
     flags = [f for f in CFLAGS if not ((no_gl or is_stub(src)) and f == "/GL")]
+    # Reuse the object while its inputs are unchanged: a build otherwise runs
+    # cl twice for every file under Wine.
+    stamp = obj.with_suffix(".dep")
+    if obj.exists() and stamp.exists():
+        key, *deps = stamp.read_text().splitlines()
+        if key == input_key(flags, src, deps):
+            return src, obj, 0, []
     rc, out = tc.run("cl", flags + [
+        "/showIncludes",
         f"/Fo{tc.winpath(obj)}", f"/Fd{tc.winpath(obj.with_suffix('.pdb'))}", tc.winpath(src),
     ])
-    lines = [l for l in out.splitlines() if l.strip() and l.strip() != src.name]
+    deps, lines = [], []
+    for l in out.splitlines():
+        m = re.match(r"Note: including file:\s*(.+)", l)
+        if m:
+            # cl lowercases the paths of quoted includes.
+            path = re.sub(r"^[A-Za-z]:", "", m.group(1).strip()).replace("\\", "/")
+            real = project_files().get(path.lower())
+            if real:
+                deps.append(str(real))
+        elif l.strip() and l.strip() != src.name:
+            lines.append(l)
+    deps = sorted(set(deps))
+    if rc == 0:
+        stamp.write_text("\n".join([input_key(flags, src, deps), *deps]) + "\n")
+    else:
+        stamp.unlink(missing_ok=True)
     return src, obj, rc, lines
 
 
