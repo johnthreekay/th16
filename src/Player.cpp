@@ -8,6 +8,7 @@
 #include "Bomb.h"
 #include "FileSystem.h"
 #include "EffectManager.h"
+#include "EnemyManager.h"
 #include "Gui.h"
 #include "AnmManager.h"
 #include "SoundManager.h"
@@ -71,6 +72,67 @@ HARNESS_CALLED void Player::set_position(f32 x, f32 y)
     inner.main_options[1].should_instajump = 1;
     inner.main_options[2].should_instajump = 1;
     inner.main_options[3].should_instajump = 1;
+}
+
+// TODO: ours gets a /GS cookie (from pos and the inlined set_entity_pos) and keeps the option pointer in esi, not edi+0x60.
+// FUNCTION: TH16 0x442380
+HARNESS_CALLED i32 Player::update_options(PlayerOption *options, i32 count)
+{
+    for (i32 i = 0; i < count; i++)
+    {
+        PlayerOption *option = &options[i];
+        if (!option->active)
+        {
+            continue;
+        }
+        if (!(inner.flags & 2))
+        {
+            i32 focused = inner.is_focused != 0;
+            option->scaled_preferred_pos.x = (&option->scaled_preferred_pos_rel_to_player)[focused].x + inner.pos_subpixel.x;
+            option->scaled_preferred_pos.y = inner.pos_subpixel.y + (&option->scaled_preferred_pos_rel_to_player)[focused].y;
+            if (option->on_update != NULL)
+            {
+                option->on_update(&inner.main_options[i]);
+            }
+        }
+        else
+        {
+            option->scaled_preferred_pos.x = inner.pos_subpixel.x;
+            option->scaled_preferred_pos.y = inner.pos_subpixel.y;
+            if (inner.unk_16074 >= 30)
+            {
+                option->active = 0;
+                AnmManager::interrupt_tree(option->anm_id_b0, 1);
+                AnmManager::interrupt_tree(option->anm_id_b4, 1);
+                continue;
+            }
+        }
+        if (!option->should_instajump)
+        {
+            if (inner.percent_moved_by_options < 30)
+            {
+                goto place;
+            }
+            i32 dx = (option->scaled_preferred_pos.x - option->scaled_cur_pos.x) * inner.percent_moved_by_options / 100;
+            i32 dy = (option->scaled_preferred_pos.y - option->scaled_cur_pos.y) * inner.percent_moved_by_options / 100;
+            if (dx != 0 || dy != 0)
+            {
+                option->scaled_cur_pos.x += dx;
+                option->scaled_cur_pos.y += dy;
+                goto place;
+            }
+        }
+        else
+        {
+            option->should_instajump = 0;
+        }
+        option->scaled_cur_pos = option->scaled_preferred_pos;
+    place:
+        Float3 pos(option->scaled_cur_pos.x / 128.0f, option->scaled_cur_pos.y / 128.0f, 0.0f);
+        option->anm_id_b0.set_entity_pos(&pos);
+        option->anm_id_b4.set_entity_pos(&pos);
+    }
+    return 0;
 }
 
 // FUNCTION: TH16 0x443840
@@ -167,6 +229,58 @@ HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_o
 }
 
 // TODO: the original reserves 8 bytes of locals where ours has 4.
+// TODO: the original realigns its frame to 8 bytes (ebx-based form); the body matches.
+// FUNCTION: TH16 0x443cd0
+void Player::lose_life()
+{
+    EffectManager *effects = g_EffectManager;
+    i32 index = effects->next_index();
+    if (index != -1)
+    {
+        effects->anm_ids[index] = effects->effect_anm->create_vm(0x1c, &inner.pos, 0.0f, -1, 0);
+    }
+    g_Globals.lives--;
+    g_Globals.bombs = 3;
+    if (g_Gui != NULL)
+    {
+        g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
+    }
+    if (g_Globals.lives >= 0)
+    {
+        g_Gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
+    }
+    g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
+    inner.state = 2;
+    inner.time_in_state.reset();
+    inner.iframes = 180;
+    anm_file->copy_vm_and_run(&vm, 0);
+    for (i32 i = 0; i < 4; i++)
+    {
+        inner.main_options[i].active = 0;
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b0, 1);
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b4, 1);
+    }
+    inner.num_main_options = 0;
+    if (g_Spellcard->flags & 1)
+    {
+        if (g_Spellcard->time.current >= 60)
+        {
+            g_Spellcard->bonus = 0;
+            g_Spellcard->flags &= ~0x22;
+        }
+        else if (g_MainBomb->in_use == 1)
+        {
+            g_Spellcard->flags |= 0x20;
+        }
+    }
+    g_EnemyManager->inner.miss_count++;
+    g_EnemyManager->inner.can_still_capture_spell = 0;
+    if (g_Globals.miss_count < 999999)
+    {
+        g_Globals.miss_count++;
+    }
+}
+
 // FUNCTION: TH16 0x443f10
 void Player::die()
 {
@@ -279,6 +393,43 @@ HARNESS_CALLED i32 Player::create_damage_source(D3DXVECTOR3 *pos, f32 radius, f3
 
 // TODO: the original stores both halves of the position before reading x
 // back; ours reads x back between the stores.
+// FUNCTION: TH16 0x444b20
+HARNESS_CALLED i32 Player::create_rect_damage_source(D3DXVECTOR3 *pos, f32 width, f32 height, f32 angle, i32 time,
+                                                    i32 damage)
+{
+    Player *player = g_Player;
+    i32 index = player->inner.last_created_damage_source_index;
+    for (i32 i = 0; i < 0x100; i++)
+    {
+        index++;
+        if (index >= 0x100)
+        {
+            index = 0;
+        }
+        PlayerDamageSource *source = &player->inner.damage_sources[index];
+        if (!(source->flags & 1))
+        {
+            source->flags = (source->flags & ~6) | 1;
+            memset(&source->pos, 0, sizeof(source->pos));
+            source->pos.pos = *pos;
+            source->unk_14 = width;
+            source->unk_18 = height;
+            source->unk_c = wrap_angle(angle);
+            source->unk_10 = 0;
+            source->timer_60 = time;
+            source->damage = damage;
+            source->total_damage_dealt = 0;
+            source->unk_7c = 9999999;
+            source->unk_80 = 1;
+            source->unk_90 = 0;
+            source->unk_84 = 0;
+            break;
+        }
+    }
+    player->inner.last_created_damage_source_index = index;
+    return index + 1;
+}
+
 // FUNCTION: TH16 0x4476d0
 HARNESS_CALLED void Player::set_position_subpixel(Int2 *pos)
 {

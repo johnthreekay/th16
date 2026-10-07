@@ -121,13 +121,6 @@ i32 LaserLineInf::method_3c()
 }
 
 // Placeholder (not decompiled yet).
-// STUB: TH16 0x432c20
-i32 LaserLineInf::method_44()
-{
-    return unit5_placeholder(this);
-}
-
-// Placeholder (not decompiled yet).
 // STUB: TH16 0x432620
 i32 LaserLineInf::method_50()
 {

@@ -6,9 +6,11 @@
 #include "MainMenu.h"
 
 #include "GameErrorContext.h"
+#include "Input.h"
 #include "LoadingThread.h"
 #include "ReplayManager.h"
 #include "Scorefile.h"
+#include "SoundManager.h"
 #include "Supervisor.h"
 
 static_assert(offsetof(TitleInf, state) == 0x18, "TitleInf::state");
@@ -235,6 +237,289 @@ i32 __fastcall TitleInf::on_draw_thunk(void *arg)
     return ((TitleInf *)arg)->on_draw();
 }
 
+extern u32 g_hardware_input_repeat;
+extern u32 g_hardware_input_pressed;
+i32 __stdcall input_pressed_or_repeating(u32 mask);
+
+// TODO: the original realigns its frame to 8 bytes; the volume clamps use al/ecx where ours uses cl/eax.
+// FUNCTION: TH16 0x44c570
+i32 TitleInf::do_options()
+{
+    switch (substate)
+    {
+    case 0:
+        menu.num_choices = 5;
+        menu.set_cursor(0);
+        anm_ids[1] = title_anm->create_effect(1, -1, NULL);
+        update_options_sprites();
+        set_substate(1);
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            AnmManager::interrupt_tree_and_run(anm_ids[1], 3);
+            AnmManager::interrupt_tree(anm_ids[1], (i16)(menu.next_selection + 0x11));
+            update_options_cursor();
+            return 1;
+        }
+        break;
+    case 2:
+        menu.current_selection = menu.next_selection;
+        if (input_pressed_or_repeating(INPUT_UP))
+        {
+            menu.move_cursor(-1);
+        }
+        if (input_pressed_or_repeating(INPUT_DOWN))
+        {
+            menu.move_cursor(1);
+        }
+        if (menu.current_selection != menu.next_selection)
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            AnmManager::interrupt_tree_and_run(anm_ids[1], 3);
+            AnmManager::interrupt_tree(anm_ids[1], (i16)(menu.next_selection + 7));
+            update_options_cursor();
+        }
+        if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
+        {
+            if (menu.next_selection != 4)
+            {
+                g_SoundManager.play_sound_centered(9, 0);
+                menu.set_cursor(4);
+                AnmManager::interrupt_tree_and_run(anm_ids[1], 3);
+                AnmManager::interrupt_tree(anm_ids[1], (i16)(menu.next_selection + 7));
+                update_options_cursor();
+                return 1;
+            }
+            goto leave;
+        }
+        if (menu.next_selection == 1 && time_in_state.ticked_on_multiple_of(60))
+        {
+            g_SoundManager.play_sound_centered(2, 0);
+        }
+        if (input_pressed_or_repeating(INPUT_LEFT))
+        {
+            switch (menu.next_selection)
+            {
+            case 0:
+                if (g_Supervisor.config.bgm_volume < 5)
+                {
+                    g_Supervisor.config.bgm_volume = 0;
+                }
+                else
+                {
+                    g_Supervisor.config.bgm_volume -= 5;
+                }
+                update_options_sprites();
+                break;
+            case 1:
+                if (g_Supervisor.config.se_volume < 5)
+                {
+                    g_Supervisor.config.se_volume = 0;
+                }
+                else
+                {
+                    g_Supervisor.config.se_volume -= 5;
+                }
+                update_options_sprites();
+                break;
+            }
+        }
+        if (input_pressed_or_repeating(INPUT_RIGHT))
+        {
+            switch (menu.next_selection)
+            {
+            case 0:
+            {
+                i8 volume = g_Supervisor.config.bgm_volume + 5;
+                g_Supervisor.config.bgm_volume = volume > 100 ? 100 : volume;
+                update_options_sprites();
+                break;
+            }
+            case 1:
+            {
+                i8 volume = g_Supervisor.config.se_volume + 5;
+                g_Supervisor.config.se_volume = volume > 100 ? 100 : volume;
+                update_options_sprites();
+                break;
+            }
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
+        {
+            switch (menu.next_selection)
+            {
+            case 2:
+                AnmManager::interrupt_tree(anm_ids[1], 6);
+                g_SoundManager.play_sound_centered(7, 0);
+                set_substate(4);
+                return 1;
+            case 3:
+                g_Supervisor.config.bgm_volume = 100;
+                g_Supervisor.config.se_volume = 80;
+                g_Supervisor.config.unk_28 = 0;
+                update_options_sprites();
+                g_SoundManager.play_sound_centered(7, 0);
+                return 1;
+            case 4:
+            leave:
+                AnmManager::interrupt_tree(anm_ids[1], 6);
+                g_SoundManager.play_sound_centered(9, 0);
+                set_substate(4);
+                return 1;
+            }
+        }
+        break;
+    case 4:
+        if (time_in_state.current >= 10)
+        {
+            switch (menu.next_selection)
+            {
+            case 2:
+                set_state(4);
+                menu.push();
+                break;
+            case 4:
+                set_state(1);
+                menu.pop();
+                return 1;
+            }
+        }
+        break;
+    }
+    return 1;
+}
+
+// TODO: the original realigns its frame to 8 bytes, and does not merge the two input tests into (pressed | repeat) & mask.
+// FUNCTION: TH16 0x44e930
+i32 TitleInf::do_key_config()
+{
+    switch (substate)
+    {
+    case 0:
+        menu.num_choices = 7;
+        menu.set_cursor(0);
+        anm_ids[2] = title_anm->create_effect(2, -1, NULL);
+        set_substate(1);
+        key_config[0] = g_pad_mapping[0];
+        key_config[1] = g_pad_mapping[1];
+        key_config[2] = g_pad_mapping[9];
+        key_config[3] = g_pad_mapping[2];
+        key_config[4] = g_pad_mapping[3];
+        update_key_config_sprites();
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            AnmManager::interrupt_tree_and_run(anm_ids[2], 3);
+            AnmManager::interrupt_tree(anm_ids[2], (i16)(menu.next_selection + 0x11));
+            update_key_config_cursor();
+            return 1;
+        }
+        break;
+    case 2:
+    {
+        menu.current_selection = menu.next_selection;
+        if (input_pressed_or_repeating(INPUT_UP))
+        {
+            menu.move_cursor(-1);
+        }
+        if (input_pressed_or_repeating(INPUT_DOWN))
+        {
+            menu.move_cursor(1);
+        }
+        if (menu.current_selection != menu.next_selection)
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            AnmManager::interrupt_tree_and_run(anm_ids[2], 3);
+            AnmManager::interrupt_tree(anm_ids[2], (i16)(menu.next_selection + 7));
+            update_key_config_cursor();
+        }
+        u8 *pad = get_controller_state();
+        for (i32 i = 0; i < 0x1f; i++)
+        {
+            if ((i8)pad[i] < 0)
+            {
+                if (menu.next_selection <= 4)
+                {
+                    set_key(menu.next_selection, i);
+                }
+                break;
+            }
+        }
+        if ((g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB)) && menu.next_selection == 6)
+        {
+            key_config[0] = g_pad_mapping[0];
+            key_config[1] = g_pad_mapping[1];
+            key_config[2] = g_pad_mapping[9];
+            key_config[3] = g_pad_mapping[2];
+            key_config[4] = g_pad_mapping[3];
+            update_key_config_sprites();
+        }
+        else
+        {
+            if (!(g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT)))
+            {
+                break;
+            }
+            switch (menu.next_selection)
+            {
+            case 5:
+                key_config[0] = g_pad_mapping[0];
+                key_config[1] = g_pad_mapping[1];
+                key_config[2] = g_pad_mapping[9];
+                key_config[3] = g_pad_mapping[2];
+                key_config[4] = g_pad_mapping[3];
+                update_key_config_sprites();
+                g_SoundManager.play_sound_centered(7, 0);
+                return 1;
+            case 6:
+                g_pad_mapping[0] = key_config[0];
+                g_pad_mapping[1] = key_config[1];
+                g_pad_mapping[9] = key_config[2];
+                g_pad_mapping[2] = key_config[3];
+                g_pad_mapping[3] = key_config[4];
+                memcpy(g_Supervisor.config.pad_mapping_copy, g_pad_mapping, sizeof(g_pad_mapping));
+                break;
+            default:
+                return 1;
+            }
+        }
+        g_SoundManager.play_sound_centered(9, 0);
+        AnmManager::interrupt_tree(anm_ids[2], 6);
+        set_substate(4);
+        return 1;
+    }
+    case 4:
+        if (time_in_state.current >= 10)
+        {
+            set_state(3);
+            menu.pop();
+        }
+        break;
+    }
+    return 1;
+}
+
+// FUNCTION: TH16 0x44f710
+void TitleInf::set_key(i32 action, i32 key)
+{
+    if (key_config[action] == key)
+    {
+        return;
+    }
+    for (i32 i = 0; i < 6; i++)
+    {
+        if (i != action && key_config[i] == key)
+        {
+            key_config[i] = key_config[action];
+        }
+    }
+    key_config[action] = key;
+    update_key_config_sprites();
+    g_SoundManager.play_sound_centered(7, 0);
+}
+
 // FUNCTION: TH16 0x44a800
 i32 Scorefile::has_cleared(i32 character)
 {
@@ -265,6 +550,40 @@ HARNESS_CALLED i32 Scorefile::all_cleared(i32 difficulty)
         return 1;
     }
     return 0;
+}
+
+// The loops run past the arrays: six difficulties of five-entry arrays, and
+// a second spell counter 0x5210 bytes past each spell of the total entry,
+// beyond the end of the score data.
+// FUNCTION: TH16 0x44a930
+HARNESS_CALLED void Scorefile::unlock_all()
+{
+    memset(endings_seen, 0x11, 16);
+    for (i32 i = 0; i < 0x77; i++)
+    {
+        ScorefileSpell *spell = &characters[4].spells[i];
+        if (spell->attempts[0] < 99999)
+        {
+            spell->attempts[0]++;
+        }
+        i32 *count = (i32 *)((u8 *)spell + 0x5210);
+        if (*count < 99999)
+        {
+            (*count)++;
+        }
+    }
+    for (i32 c = 0; c < 4; c++)
+    {
+        for (i32 d = 0; d < 6; d++)
+        {
+            characters[c].play_counts[d]++;
+            characters[c].clears[d]++;
+            for (i32 s = 0; s < 8; s++)
+            {
+                characters[c].practices[d][s].unlocked = 1;
+            }
+        }
+    }
 }
 
 // Helpers of the music room and spell practice menus.

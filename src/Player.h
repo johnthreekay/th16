@@ -44,7 +44,11 @@ struct PlayerOption
     u8 unk_cc[0xd4 - 0xcc];
     // Next update moves the option straight to its preferred position.
     i32 should_instajump;
-    u8 unk_d8[0xe4 - 0xd8];
+    u8 unk_d8[0xdc - 0xd8];
+    // Called each frame before the option moves (with the main option of
+    // the same index, even for season options).
+    void(__fastcall *on_update)(PlayerOption *option);
+    u8 unk_e0[0xe4 - 0xe0];
 };
 
 struct PlayerBullet
@@ -69,7 +73,9 @@ struct PlayerBullet
     i32 shooter_ref;
     // Index of its damage source plus one, 0 for none.
     i32 damage_source_index;
-    u8 unk_b4[0xc0 - 0xb4];
+    // Where the bullet heads (the 0x4470f0 shot: the enemy it lined up
+    // with).
+    Float3 target_pos;
 
     struct PlayerDamageSource *damage_source();
     // 0x444e10. Fires the shooter ref names from this (free) bullet; 0 on
@@ -86,8 +92,10 @@ struct PlayerDamageSource
     u32 flags;
     f32 radius;
     f32 unk_8;
+    // Rectangles (create_rect_damage_source): angle, then width and
+    // height in unk_14 and unk_18.
     f32 unk_c;
-    u8 unk_10[0x4];
+    i32 unk_10;
     f32 unk_14;
     f32 unk_18;
     PosVel pos;
@@ -134,7 +142,11 @@ struct PlayerInner
     u8 unk_16040[0x16050 - 0x16040];
     // Scaled by 1/128; aims and sizes Aya's bomb.
     f32 unk_16050;
-    u8 unk_16054[0x16074 - 0x16054];
+    u8 unk_16054[0x16070 - 0x16054];
+    // How far (in percent) options move toward their preferred position
+    // each frame; below 30 they stay put.
+    i32 percent_moved_by_options;
+    // Frames since the stage ended (ExpHP: frames_after_stage_end).
     i32 unk_16074;
     // Set every frame by the autumn release.
     f32 speed_multiplier;
@@ -309,6 +321,9 @@ struct Player
     }
     // 0x443f10
     void die();
+    // 0x443cd0. Getting hit: costs a life, refills the bombs, drops the
+    // options and starts the death state with 180 frames of invincibility.
+    void lose_life();
     // 0x445360. Fires one shooter if a bullet is free (and the option's
     // laser is not out); -1 if creating the bullet failed.
     i32 shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner);
@@ -319,6 +334,9 @@ struct Player
     i32 tick_shooting_state();
     // Enters state 1 for 60 frames.
     void start_respawn();
+    // 0x442380. Moves the options toward their positions around the
+    // player and places their VMs.
+    HARNESS_CALLED i32 update_options(PlayerOption *options, i32 count);
     // 0x442560
     i32 on_tick_body();
     static i32 __fastcall on_tick_callback(Player *player);

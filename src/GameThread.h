@@ -81,7 +81,10 @@ struct GameThreadFlags
     u32 flag_10 : 1;
     // Set while the stage restarts after its intro (sub_42dc50/sub_42dee0).
     u32 flag_11 : 1;
-    u32 flag_12 : 20;
+    u32 flag_12 : 4;
+    // Keeps the pause key from opening the pause menu.
+    u32 flag_16 : 1;
+    u32 flag_17 : 15;
 };
 
 // Runs a game in progress. Layout from ExpHP's th-re-data (zGameThread),

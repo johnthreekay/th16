@@ -106,7 +106,8 @@ struct EnemyManager
     static void __stdcall kill_all_with_unk_278(i32 value);
     // 0x41db70. kill_all, skipping the set_death subroutines.
     static void kill_all_no_set_death();
-    BOOL is_enemy_alive(int id);
+    // Reaches the manager through g_EnemyManager; LTCG dropped this.
+    HARNESS_CALLED BOOL is_enemy_alive(int id);
     EnemyInf *find_enemy_by_id(int id);
     HARNESS_CALLED struct EnemyRef find_closest(D3DXVECTOR3 *pos, f32 max_dist);
     // 0x42ca00. Restarts the stage timer and forgets the enemy list, for

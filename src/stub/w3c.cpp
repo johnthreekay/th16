@@ -13,16 +13,6 @@ void anm_manager_46b900()
 {
 }
 
-// STUB: TH16 0x4497e0
-Scorefile::Scorefile()
-{
-}
-
-// STUB: TH16 0x449a00
-void scorefile_save_449a00()
-{
-}
-
 #include "../StageData.h"
 
 // GLOBAL: TH16 0x4a22d0

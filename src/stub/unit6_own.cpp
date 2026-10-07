@@ -23,16 +23,9 @@ void play_sound_centered_stub(i32 id, i32 unused)
 #include "../PauseMenu.h"
 #include "../ReplayManager.h"
 
-// STUB: TH16 0x43e5f0
-int PauseMenu::on_tick()
+// STUB: TH16 0x43f980
+void PauseMenu::tick_open()
 {
-    return 1;
-}
-
-// STUB: TH16 0x43edc0
-int PauseMenu::on_draw()
-{
-    return 1;
 }
 
 #include "../AsciiManager.h"
@@ -52,8 +45,3 @@ int ReplayManager::initialize(i32 mode, const char *filename)
     return 0;
 }
 
-// STUB: TH16 0x448c10
-int ReplayManager::read_replay_file(const char *filename)
-{
-    return 0;
-}

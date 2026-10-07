@@ -155,7 +155,7 @@ HARNESS_CALLED void EnemyManager::set_boss_bit(int value)
 }
 
 // FUNCTION: TH16 0x41a980
-BOOL EnemyManager::is_enemy_alive(int id)
+HARNESS_CALLED BOOL EnemyManager::is_enemy_alive(int id)
 {
     if (id == 0)
     {
