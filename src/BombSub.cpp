@@ -1,6 +1,10 @@
 // The season releases. Each one runs two ANM scripts from the subseason
-// file around the player; the first one's scale is the damage and cancel
-// radius, and the release ends with its VM.
+// file (pl0Xsub.anm) around the player: an inner circle, whose scale is the
+// damage and cancel radius, and an outer ring. The scripts take their radii
+// (float variables 0 and 1) and duration (int variable 3) from the tables
+// below, by the season level the release started at. The release ends with
+// the inner VM and then cools down. Its cancels are release cancels, which
+// drop PIV items worth more at higher levels.
 #include "Bomb.h"
 
 #include "BulletManager.h"
@@ -11,7 +15,8 @@
 #include "SoundManager.h"
 #include "ZunMath.h"
 
-// Per season level: how long the release lasts and how far it reaches.
+// Per season level: how long the release lasts and how far it reaches
+// (ExpHP's names; "fall" is autumn).
 
 // GLOBAL: TH16 0x491e70
 const i32 g_release_duration_doyou[7] = {0, 40, 40, 40, 40, 40, 40};
@@ -38,6 +43,7 @@ const i32 g_release_duration_spring[7] = {0, 10, 13, 16, 20, 20, 20};
 // GLOBAL: TH16 0x491fd4
 const f32 g_release_radius_spring[7] = {0.0f, 60.0f, 100.0f, 140.0f, 190.0f, 240.0f, 300.0f};
 
+// Doyou: 10 frames of invincibility; the circle deals 100 a frame.
 // FUNCTION: TH16 0x40e0f0
 i32 BombAllSubInf::begin()
 {
@@ -53,8 +59,8 @@ i32 BombAllSubInf::begin()
     vm->int_vars[3] = g_release_duration_doyou[g_Globals.season_level()];
 
     AnmLoaded *anm = g_Player->subseason_anm_file;
-    anm_id_64 = anm->create_vm(4, &pos, 0.0f, -1, 0);
-    vm = get_vm_or_clear(anm_id_64);
+    anm_id_secondary = anm->create_vm(4, &pos, 0.0f, -1, 0);
+    vm = get_vm_or_clear(anm_id_secondary);
     vm->float_vars[0] = g_release_radius_doyou[g_Globals.season_level()] + 8.0f;
     vm->float_vars[1] = g_release_radius_2_doyou[g_Globals.season_level()] + 8.0f;
     vm->int_vars[3] = g_release_duration_doyou[g_Globals.season_level()];
@@ -64,6 +70,7 @@ i32 BombAllSubInf::begin()
     return 0;
 }
 
+// The damage source of each frame lasts that frame only.
 // FUNCTION: TH16 0x40e330
 i32 BombAllSubInf::on_tick()
 {
@@ -75,7 +82,7 @@ i32 BombAllSubInf::on_tick()
     }
     D3DXVECTOR3 pos = vm->world_pos();
     g_Player->create_damage_source(&pos, vm->scale.x, 0.0f, 1, 100);
-    method_10();
+    cancel_bullets();
     return 0;
 }
 
@@ -86,13 +93,14 @@ i32 BombAllSubInf::on_draw()
 }
 
 // FUNCTION: TH16 0x40e3b0
-i32 BombAllSubInf::method_c(i32 a, i32 b)
+i32 BombAllSubInf::compute_damage(i32 enemy_pos, i32 enemy_size)
 {
     return 0;
 }
 
+// The releases' cancel_bullets: everything inside the inner circle.
 // FUNCTION: TH16 0x40e3c0
-i32 BombAllSubInf::method_10()
+i32 BombAllSubInf::cancel_bullets()
 {
     AnmVm *vm = get_vm_or_clear(anm_id);
     if (vm == NULL)
@@ -106,10 +114,11 @@ i32 BombAllSubInf::method_10()
 }
 
 // FUNCTION: TH16 0x40e480
-void BombAllSubInf::method_14()
+void BombAllSubInf::end_at_stage_clear()
 {
 }
 
+// Autumn: 30 frames of invincibility; the circle deals 30 a frame.
 // FUNCTION: TH16 0x40ec70
 i32 BombAyaSubInf::begin()
 {
@@ -125,8 +134,8 @@ i32 BombAyaSubInf::begin()
     vm->int_vars[3] = g_release_duration_fall[g_Globals.season_level()];
 
     AnmLoaded *anm = g_Player->subseason_anm_file;
-    anm_id_64 = anm->create_vm(4, &pos, 0.0f, -1, 0);
-    vm = get_vm_or_clear(anm_id_64);
+    anm_id_secondary = anm->create_vm(4, &pos, 0.0f, -1, 0);
+    vm = get_vm_or_clear(anm_id_secondary);
     vm->float_vars[0] = g_release_radius_fall[g_Globals.season_level()] + 8.0f;
     vm->float_vars[1] = g_release_radius_2_fall[g_Globals.season_level()] + 8.0f;
     vm->int_vars[3] = g_release_duration_fall[g_Globals.season_level()];
@@ -136,7 +145,7 @@ i32 BombAyaSubInf::begin()
     return 0;
 }
 
-// The autumn release follows the player and speeds them up.
+// The autumn release follows the player and speeds them up by half.
 // FUNCTION: TH16 0x40eeb0
 i32 BombAyaSubInf::on_tick()
 {
@@ -149,14 +158,14 @@ i32 BombAyaSubInf::on_tick()
         return -1;
     }
     vm->entity_pos = player->inner.pos;
-    AnmVm *vm_2 = get_vm(anm_id_64);
+    AnmVm *vm_2 = get_vm(anm_id_secondary);
     if (vm_2 != NULL)
     {
         vm_2->entity_pos = player->inner.pos;
     }
     D3DXVECTOR3 pos = vm->world_pos();
     player->create_damage_source(&pos, vm->scale.x, 0.0f, 1, 30);
-    method_10();
+    cancel_bullets();
     return 0;
 }
 
@@ -167,13 +176,13 @@ i32 BombAyaSubInf::on_draw()
 }
 
 // FUNCTION: TH16 0x40ef90
-i32 BombAyaSubInf::method_c(i32 a, i32 b)
+i32 BombAyaSubInf::compute_damage(i32 enemy_pos, i32 enemy_size)
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x40efa0
-i32 BombAyaSubInf::method_10()
+i32 BombAyaSubInf::cancel_bullets()
 {
     AnmVm *vm = get_vm_or_clear(anm_id);
     if (vm == NULL)
@@ -187,10 +196,11 @@ i32 BombAyaSubInf::method_10()
 }
 
 // FUNCTION: TH16 0x40f060
-void BombAyaSubInf::method_14()
+void BombAyaSubInf::end_at_stage_clear()
 {
 }
 
+// Summer: 10 frames of invincibility; the circle deals 100 a frame.
 // FUNCTION: TH16 0x40f590
 i32 BombCirnoSubInf::begin()
 {
@@ -206,8 +216,8 @@ i32 BombCirnoSubInf::begin()
     vm->int_vars[3] = g_release_duration_summer[g_Globals.season_level()];
 
     AnmLoaded *anm = g_Player->subseason_anm_file;
-    anm_id_64 = anm->create_vm(4, &pos, 0.0f, -1, 0);
-    vm = get_vm_or_clear(anm_id_64);
+    anm_id_secondary = anm->create_vm(4, &pos, 0.0f, -1, 0);
+    vm = get_vm_or_clear(anm_id_secondary);
     vm->float_vars[0] = g_release_radius_summer[g_Globals.season_level()] + 8.0f;
     vm->float_vars[1] = g_release_radius_summer[g_Globals.season_level()] + 8.0f;
     vm->int_vars[3] = g_release_duration_summer[g_Globals.season_level()];
@@ -228,7 +238,7 @@ i32 BombCirnoSubInf::on_tick()
     }
     D3DXVECTOR3 pos = vm->world_pos();
     g_Player->create_damage_source(&pos, vm->scale.x, 0.0f, 1, 100);
-    method_10();
+    cancel_bullets();
     return 0;
 }
 
@@ -239,13 +249,13 @@ i32 BombCirnoSubInf::on_draw()
 }
 
 // FUNCTION: TH16 0x40f850
-i32 BombCirnoSubInf::method_c(i32 a, i32 b)
+i32 BombCirnoSubInf::compute_damage(i32 enemy_pos, i32 enemy_size)
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x40f860
-i32 BombCirnoSubInf::method_10()
+i32 BombCirnoSubInf::cancel_bullets()
 {
     AnmVm *vm = get_vm_or_clear(anm_id);
     if (vm == NULL)
@@ -259,10 +269,12 @@ i32 BombCirnoSubInf::method_10()
 }
 
 // FUNCTION: TH16 0x40f920
-void BombCirnoSubInf::method_14()
+void BombCirnoSubInf::end_at_stage_clear()
 {
 }
 
+// Winter: 30 frames of invincibility; the circle deals 9 a frame, and the
+// outer ring is a fifth larger.
 // FUNCTION: TH16 0x410150
 i32 BombMarisaSubInf::begin()
 {
@@ -278,8 +290,8 @@ i32 BombMarisaSubInf::begin()
     vm->int_vars[3] = g_release_duration_winter[g_Globals.season_level()];
 
     AnmLoaded *anm = g_Player->subseason_anm_file;
-    anm_id_64 = anm->create_vm(21, &pos, 0.0f, -1, 0);
-    vm = get_vm_or_clear(anm_id_64);
+    anm_id_secondary = anm->create_vm(21, &pos, 0.0f, -1, 0);
+    vm = get_vm_or_clear(anm_id_secondary);
     vm->float_vars[0] = g_release_radius_winter[g_Globals.season_level()] +
                         g_release_radius_winter[g_Globals.season_level()] * 0.2f;
     vm->float_vars[1] = g_release_radius_winter[g_Globals.season_level()] +
@@ -291,7 +303,7 @@ i32 BombMarisaSubInf::begin()
     return 0;
 }
 
-// The winter release raises the player's damage while it lasts.
+// The winter release raises the player's damage by half while it lasts.
 // FUNCTION: TH16 0x4103e0
 i32 BombMarisaSubInf::on_tick()
 {
@@ -305,7 +317,7 @@ i32 BombMarisaSubInf::on_tick()
     }
     D3DXVECTOR3 pos = vm->world_pos();
     player->create_damage_source(&pos, vm->scale.x, 0.0f, 1, 9);
-    method_10();
+    cancel_bullets();
     return 0;
 }
 
@@ -316,13 +328,13 @@ i32 BombMarisaSubInf::on_draw()
 }
 
 // FUNCTION: TH16 0x410470
-i32 BombMarisaSubInf::method_c(i32 a, i32 b)
+i32 BombMarisaSubInf::compute_damage(i32 enemy_pos, i32 enemy_size)
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x410480
-i32 BombMarisaSubInf::method_10()
+i32 BombMarisaSubInf::cancel_bullets()
 {
     AnmVm *vm = get_vm_or_clear(anm_id);
     if (vm == NULL)
@@ -336,12 +348,14 @@ i32 BombMarisaSubInf::method_10()
 }
 
 // FUNCTION: TH16 0x410540
-void BombMarisaSubInf::method_14()
+void BombMarisaSubInf::end_at_stage_clear()
 {
 }
 
+// Spring: the widest circle; it deals 100 a frame.
 // FUNCTION: TH16 0x411460
 i32 BombReimuSubInf::begin()
+
 {
     Player *player = g_Player;
     pos = player->inner.pos;
@@ -355,8 +369,8 @@ i32 BombReimuSubInf::begin()
     vm->int_vars[3] = g_release_duration_spring[g_Globals.season_level()];
 
     AnmLoaded *anm = g_Player->subseason_anm_file;
-    anm_id_64 = anm->create_vm(4, &pos, 0.0f, -1, 0);
-    vm = get_vm_or_clear(anm_id_64);
+    anm_id_secondary = anm->create_vm(4, &pos, 0.0f, -1, 0);
+    vm = get_vm_or_clear(anm_id_secondary);
     vm->float_vars[0] = g_release_radius_spring[g_Globals.season_level()] + 16.0f;
     vm->float_vars[1] = g_release_radius_spring[g_Globals.season_level()] + 16.0f;
     vm->int_vars[3] = g_release_duration_spring[g_Globals.season_level()];
@@ -383,7 +397,7 @@ i32 BombReimuSubInf::on_tick()
     player->create_damage_source(&pos, vm->scale.x, 0.0f, 1, 100);
     if (timer.current <= 15)
     {
-        method_10();
+        cancel_bullets();
     }
     return 0;
 }
@@ -395,13 +409,13 @@ i32 BombReimuSubInf::on_draw()
 }
 
 // FUNCTION: TH16 0x411780
-i32 BombReimuSubInf::method_c(i32 a, i32 b)
+i32 BombReimuSubInf::compute_damage(i32 enemy_pos, i32 enemy_size)
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x411790
-i32 BombReimuSubInf::method_10()
+i32 BombReimuSubInf::cancel_bullets()
 {
     AnmVm *vm = get_vm_or_clear(anm_id);
     if (vm == NULL)
@@ -415,6 +429,6 @@ i32 BombReimuSubInf::method_10()
 }
 
 // FUNCTION: TH16 0x411850
-void BombReimuSubInf::method_14()
+void BombReimuSubInf::end_at_stage_clear()
 {
 }

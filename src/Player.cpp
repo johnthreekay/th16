@@ -816,7 +816,7 @@ HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f3
     {
         return 0;
     }
-    i32 total = g_MainBomb->in_use == 0 ? 0 : g_MainBomb->method_c((i32)pos, (i32)size);
+    i32 total = g_MainBomb->in_use == 0 ? 0 : g_MainBomb->compute_damage((i32)pos, (i32)size);
     if (bomb_hit != NULL)
     {
         *bomb_hit = total > 0 ? 1 : 0;

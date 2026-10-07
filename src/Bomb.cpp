@@ -17,6 +17,7 @@ BombInf *g_SubseasonBomb;
 // GLOBAL: TH16 0x4a6da8
 BombInf *g_MainBomb;
 
+// The base class's virtual functions do nothing.
 // FUNCTION: TH16 0x40d520
 i32 BombInf::begin()
 {
@@ -36,22 +37,23 @@ i32 BombInf::on_draw()
 }
 
 // FUNCTION: TH16 0x40d550
-i32 BombInf::method_c(i32 a, i32 b)
+i32 BombInf::compute_damage(i32 enemy_pos, i32 enemy_size)
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x40d560
-i32 BombInf::method_10()
+i32 BombInf::cancel_bullets()
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x40d570
-void BombInf::method_14()
+void BombInf::end_at_stage_clear()
 {
 }
 
+// Zeroes the whole object (keeping the vtable the compiler set first).
 // FUNCTION: TH16 0x40d580
 BombInf::BombInf()
 {
@@ -62,6 +64,7 @@ BombInf::BombInf()
 // FUNCTION: TH16 0x40d600
 i32 BombInf::initialize(i32 is_season)
 {
+    // The release runs and draws right after the bomb.
     UpdateFunc *f = g_UpdateFuncRegistry->create_func(on_tick_callback);
     f->flags |= UPDATE_FUNC_ACTIVE;
     f->arg = this;
@@ -87,16 +90,16 @@ BombInf::~BombInf()
 {
     delete_vm_and_clear(anm_id);
     delete_vm_and_clear(anm_id_60);
-    delete_vm_and_clear(anm_id_64);
+    delete_vm_and_clear(anm_id_secondary);
     delete_vm_and_clear(anm_id_bc);
     delete_vm_and_clear(anm_id_c0);
     delete_vm_and_clear(anm_id_c4);
     g_UpdateFuncRegistry->unregister_locked(on_tick_func);
     g_UpdateFuncRegistry->unregister_locked(on_draw_func);
-    if (unk_70 != NULL)
+    if (reimu_orbs != NULL)
     {
-        free(unk_70);
-        unk_70 = NULL;
+        free(reimu_orbs);
+        reimu_orbs = NULL;
     }
     if (unk_d0 != NULL)
     {
@@ -116,13 +119,13 @@ BombInf *BombInf::create()
     default:
         bomb = new BombReimuAInf;
         break;
-    case 1:
+    case CHARACTER_CIRNO:
         bomb = new BombCirnoAInf;
         break;
-    case 2:
+    case CHARACTER_AYA:
         bomb = new BombAyaAInf;
         break;
-    case 3:
+    case CHARACTER_MARISA:
         bomb = new BombMarisaAInf;
         break;
     }
@@ -133,16 +136,16 @@ BombInf *BombInf::create()
         BombInf *release;
         switch (g_Globals.subseason)
         {
-        case 3:
+        case SEASON_WINTER:
             release = new BombMarisaSubInf;
             break;
-        case 1:
+        case SEASON_SUMMER:
             release = new BombCirnoSubInf;
             break;
-        case 2:
+        case SEASON_AUTUMN:
             release = new BombAyaSubInf;
             break;
-        case 4:
+        case SEASON_DOYOU:
             release = new BombAllSubInf;
             break;
         default:
@@ -181,18 +184,19 @@ int __fastcall BombInf::on_draw_callback(void *arg)
 // FUNCTION: TH16 0x40da90
 void BombInf::destroy_all()
 {
+    // BombInf's destructor is not virtual: delete through the right class.
     switch (g_Globals.subshot + g_Globals.character)
     {
     default:
         delete (BombReimuAInf *)g_MainBomb;
         break;
-    case 1:
+    case CHARACTER_CIRNO:
         delete (BombCirnoAInf *)g_MainBomb;
         break;
-    case 2:
+    case CHARACTER_AYA:
         delete (BombAyaAInf *)g_MainBomb;
         break;
-    case 3:
+    case CHARACTER_MARISA:
         delete (BombMarisaAInf *)g_MainBomb;
         break;
     }
@@ -202,16 +206,16 @@ void BombInf::destroy_all()
     default:
         delete (BombReimuSubInf *)release;
         break;
-    case 1:
+    case SEASON_SUMMER:
         delete (BombCirnoSubInf *)release;
         break;
-    case 2:
+    case SEASON_AUTUMN:
         delete (BombAyaSubInf *)release;
         break;
-    case 3:
+    case SEASON_WINTER:
         delete (BombMarisaSubInf *)release;
         break;
-    case 4:
+    case SEASON_DOYOU:
         delete (BombAllSubInf *)release;
         break;
     }
@@ -219,6 +223,10 @@ void BombInf::destroy_all()
     g_SubseasonBomb = NULL;
 }
 
+// A bomb also ends the chance to capture the spell card. A release shows
+// a still pending bonus of the previous one at once, takes its season
+// level and spends the season power (summer and doyou only one level's
+// worth).
 // The season level loop is written out: through Globals::season_level it
 // tests its counter instead of the pointer.
 // FUNCTION: TH16 0x40db20
@@ -254,6 +262,7 @@ i32 BombInf::activate()
     {
         started_during_spell = 0;
     }
+    // se_release for a release.
     if (is_season)
     {
         g_SoundManager.play_sound_at_position(77, g_Player->inner.pos.x);
@@ -283,7 +292,7 @@ i32 BombInf::activate()
         }
         season_level = level;
         release_bonus = 0.0f;
-        if (g_Globals.subseason == 1 || g_Globals.subseason == 4)
+        if (g_Globals.subseason == SEASON_SUMMER || g_Globals.subseason == SEASON_DOYOU)
         {
             i32 power = g_Globals.season_power - g_Globals.season_level_deltas[season_level];
             g_Globals.season_power = power < 0 ? 0 : power;
@@ -374,6 +383,7 @@ void BombInf::draw()
             release_bonus_pos = g_Player->inner.pos;
             release_bonus_pos.y -= 32.0f;
         }
+        // Brighter for higher season levels.
         u32 colors[7] = {0x60606060, 0xa0b0b080, 0xb0b8b880, 0xc0c0c080, 0xd0d0d080, 0xe0e0e080, 0xffffff30};
         AsciiInf *ascii = g_AsciiManager;
         ascii->color.d3d = colors[release_bonus_level];
@@ -401,20 +411,22 @@ void BombInf::start_release_cooldown()
     timer = -45;
 }
 
+// The bombs' and releases' unused virtual functions.
 // FUNCTION: TH16 0x40ebe0
 i32 BombAyaAInf::on_draw()
+
 {
     return 1;
 }
 
 // FUNCTION: TH16 0x40ebf0
-i32 BombAyaAInf::method_c(i32 a, i32 b)
+i32 BombAyaAInf::compute_damage(i32 enemy_pos, i32 enemy_size)
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x40ec00
-void BombAyaAInf::method_14()
+void BombAyaAInf::end_at_stage_clear()
 {
 }
 
@@ -425,13 +437,13 @@ i32 BombCirnoAInf::on_draw()
 }
 
 // FUNCTION: TH16 0x40f4a0
-i32 BombCirnoAInf::method_c(i32 a, i32 b)
+i32 BombCirnoAInf::compute_damage(i32 enemy_pos, i32 enemy_size)
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x40f4b0
-void BombCirnoAInf::method_14()
+void BombCirnoAInf::end_at_stage_clear()
 {
 }
 
@@ -442,13 +454,13 @@ i32 BombMarisaAInf::on_draw()
 }
 
 // FUNCTION: TH16 0x40fe70
-i32 BombMarisaAInf::method_c(i32 a, i32 b)
+i32 BombMarisaAInf::compute_damage(i32 enemy_pos, i32 enemy_size)
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x4100f0
-void BombMarisaAInf::method_14()
+void BombMarisaAInf::end_at_stage_clear()
 {
 }
 
@@ -459,7 +471,7 @@ i32 BombReimuAInf::on_draw()
 }
 
 // FUNCTION: TH16 0x411270
-i32 BombReimuAInf::method_c(i32 a, i32 b)
+i32 BombReimuAInf::compute_damage(i32 enemy_pos, i32 enemy_size)
 {
     return 0;
 }

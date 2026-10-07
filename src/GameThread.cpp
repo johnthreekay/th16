@@ -916,7 +916,7 @@ i32 stage_clear_42e150()
     g_Player->withdraw_options();
     if (g_MainBomb->in_use != 0)
     {
-        g_MainBomb->method_14();
+        g_MainBomb->end_at_stage_clear();
     }
     if (g_Globals.game_mode != 0)
     {
