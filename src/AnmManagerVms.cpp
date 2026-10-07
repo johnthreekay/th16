@@ -1008,7 +1008,6 @@ HARNESS_CALLED AnmId AnmManager::restore_snapshot(AnmId id)
     return restore_snapshot_vm(snapshot, NULL);
 }
 
-// TODO: the original stores unk_5b0 after loading the parent's parent.
 // FUNCTION: TH16 0x46f970
 AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
 {
@@ -1044,8 +1043,9 @@ AnmId AnmManager::restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent)
     }
     if (parent != NULL)
     {
+        AnmVm *root = parent->parent != NULL ? parent->parent : parent;
         vm->unk_5b0 = parent;
-        vm->parent = parent->parent != NULL ? parent->parent : parent;
+        vm->parent = root;
         parent->list_of_children.insert_after(&vm->node_as_child);
     }
     LEAVE_CS(CS_ANM_MANAGER);
