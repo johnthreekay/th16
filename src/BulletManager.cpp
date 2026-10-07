@@ -311,30 +311,27 @@ static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
     {
         if (bullet->cancel_script >= 0)
         {
-            g_BulletManager->anm_ids[bullet->index] =
-                g_BulletManager->bullet_anm->create_vm(bullet->cancel_script, &bullet->pos, 0.0f, -1, 0);
+            AnmLoaded *anm = g_BulletManager->bullet_anm;
+            g_BulletManager->anm_ids[bullet->index] = anm->create_vm(bullet->cancel_script, &bullet->pos, 0.0f, -1, 0);
         }
         g_SoundManager.play_sound_at_position(0x47, bullet->pos.x);
         gen_items_from_cancel(&bullet->pos, mode);
     }
     D3DXVECTOR3 delta = bullet->velocity * g_game_speed * 0.5f;
-    bullet->pos.x = bullet->pos.x + delta.x;
-    bullet->pos.y = bullet->pos.y + delta.y;
-    bullet->pos.z = bullet->pos.z + delta.z;
+    bullet->pos += delta;
     bullet->state = 4;
     bullet->timer_144c.reset();
     return 0;
 }
 
-// TODO: the original loads the ANM file before pushing create_vm's
-// arguments and adds pos.x + delta.x with the operands swapped.
 // FUNCTION: TH16 0x416840
 i32 Bullet::cancel(i32 mode)
 {
     return cancel_bullet(this, mode);
 }
 
-// TODO: as Bullet::cancel (create_vm argument order, vector add operands).
+// TODO: the inlined cancel_bullet's velocity scaling and pos += delta differ in register
+// allocation and scheduling (the out-of-line Bullet::cancel matches).
 // FUNCTION: TH16 0x416f40
 HARNESS_CALLED void BulletManager::clear_all(i32 unused)
 {
@@ -352,14 +349,13 @@ HARNESS_CALLED void BulletManager::clear_all(i32 unused)
 static inline i32 bullet_in_circle(Bullet *bullet, D3DXVECTOR3 *pos, f32 radius)
 {
     f32 r = bullet->hitbox_diameter * 0.5f + radius;
-    f32 dy = bullet->pos.y - pos->y;
     f32 dx = bullet->pos.x - pos->x;
+    f32 dy = bullet->pos.y - pos->y;
     return dy * dy + dx * dx <= r * r;
 }
 
-// TODO: the original does not thread the jump after the iterator's NULL
-// entry, computes the y distance first and keeps 4 more frame bytes in the
-// bomb version.
+// TODO: only the iterator differs: the original does not thread the jump after the
+// iterator's NULL entry (if/else, or iter_* defined out of line, do not change it).
 // FUNCTION: TH16 0x416c20
 HARNESS_CALLED i32 BulletManager::cancel_radius(D3DXVECTOR3 *pos, f32 radius, i32 mode)
 {
@@ -378,7 +374,7 @@ HARNESS_CALLED i32 BulletManager::cancel_radius(D3DXVECTOR3 *pos, f32 radius, i3
     return 0;
 }
 
-// TODO: as cancel_radius.
+// TODO: as cancel_radius (only the iterator's jump threading differs).
 // FUNCTION: TH16 0x416d20
 HARNESS_CALLED i32 BulletManager::cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode)
 {

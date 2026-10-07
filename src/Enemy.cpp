@@ -881,7 +881,8 @@ void EnemyDrop::eject_all_drops(D3DXVECTOR3 *pos)
     main_type = 0;
 }
 
-// TODO: the original multiplies x as dist * x with dist loaded into a register; ours loads x.
+// TODO: the original multiplies x as dist * x with dist loaded into a register; ours loads x
+// (the operand order in the source does not change it).
 // FUNCTION: TH16 0x41d700
 void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
 {
@@ -1198,7 +1199,8 @@ void __stdcall EnemyManager::kill_all_with_unk_278(i32 value)
     mgr->inner.time_in_stage.tick();
 }
 
-// TODO: the inlined tick (tick_mixed) adds speed and current_f the other way round (register choice).
+// TODO: in the inlined tick the original adds current_f into the speed's xmm1; ours loads
+// current_f into xmm0 and adds the speed, the opposite of kill_all (tick or tick_mixed alike).
 // FUNCTION: TH16 0x41db70
 void EnemyManager::kill_all_no_set_death()
 {
@@ -1219,7 +1221,7 @@ void EnemyManager::kill_all_no_set_death()
             enemy->enemy.flags_low |= 0x2000000;
         }
     }
-    mgr->inner.time_in_stage.tick_mixed();
+    mgr->inner.time_in_stage.tick();
 }
 
 // FUNCTION: TH16 0x424f00
@@ -1433,8 +1435,8 @@ EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, EnemyCreatePara
     return enemy;
 }
 
-// TODO: the original reloads the current context after the memset and the opcode after the
-// position stores (as if params had escaped); ours keeps both in registers.
+// TODO: in the inlined current_instr the original loads the offset into ecx and the
+// subroutine index into edx; ours swaps them. The rest matches.
 // FUNCTION: TH16 0x423050
 int EnemyData::ecl_enm_create()
 {
@@ -1467,14 +1469,7 @@ int EnemyData::ecl_enm_create()
     params.life = this->full->context.current_context->get_int_arg_given_value(3, instr->args[n + 2].i);
     params.score_reward = this->full->context.current_context->get_int_arg_given_value(4, instr->args[n + 3].i);
     params.item_drop = this->full->context.current_context->get_int_arg_given_value(5, instr->args[n + 4].i);
-    for (i32 i = 0; i < 4; i++)
-    {
-        params.ecl_int_vars[i] = ecl_int_vars[i];
-    }
-    for (i32 i = 0; i < 8; i++)
-    {
-        params.ecl_float_vars[i] = ecl_float_vars[i];
-    }
+    memcpy(params.ecl_int_vars, ecl_int_vars, sizeof(ecl_int_vars) + sizeof(ecl_float_vars));
     params.parent_enemy_id = this->full->enemy_id;
     g_EnemyManager->allocate_new_enemy((const char *)&instr->args[1], &params, 0);
     return 0;
