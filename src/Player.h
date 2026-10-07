@@ -236,8 +236,8 @@ enum DamageSourceFlag
     DAMAGE_SOURCE_ACTIVE = 1 << 0,
     // A circle of radius; otherwise a rectangle (width, height, angle).
     DAMAGE_SOURCE_CIRCLE = 1 << 1,
-    // Counts as bomb damage (compute_damage_to_enemy's *bomb_hit): bombs
-    // and the respawn blast.
+    // Counts as bomb damage (compute_damage_to_enemy's *bomb_hit): Reimu's
+    // orbs and Marisa's master spark.
     DAMAGE_SOURCE_BOMB = 1 << 2,
 };
 
@@ -643,7 +643,7 @@ struct Player
     // enemy at pos: a rectangle of size rotated by rotation, or a circle
     // of radius when size is NULL. Returns the damage (capped by the shot
     // type), sets *bomb_hit when bomb damage hit (DAMAGE_SOURCE_BOMB, or
-    // the bomb's own damage_enemy) and *hit_pos to the last hitting
+    // BombInf::compute_damage) and *hit_pos to the last hitting
     // source. no_score skips the score and the sources' hit callbacks;
     // enemy_id stops a source hitting the same enemy twice in a frame.
     // Reaches the player through g_Player; LTCG dropped this and passes
