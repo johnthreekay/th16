@@ -778,7 +778,7 @@ int EnemyData::step_logic()
         {
             if (time_in_ecl.current % 4 == 0)
             {
-                vm->color_1.d3d = 0xffff00ff;
+                vm->color_2.d3d = 0xffff00ff;
                 vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
             }
             else
@@ -788,7 +788,7 @@ int EnemyData::step_logic()
         }
         if ((flags_low & 0x200000) && !(flags_low & 0x2000))
         {
-            vm->color_1.d3d = 0xff0000ff;
+            vm->color_2.d3d = 0xff0000ff;
             vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
             unk_3ff0 = 4;
             if (hit_sound < 0)
@@ -807,7 +807,7 @@ int EnemyData::step_logic()
                 (((spell_flags & 1) && full->enemy.life.remaining_for_cur_attack < 100) ||
                  (!(spell_flags & 1) && full->enemy.life.remaining_for_cur_attack < 500)))
             {
-                vm->color_1.d3d = 0xff0000ff;
+                vm->color_2.d3d = 0xff0000ff;
                 vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
             }
         }

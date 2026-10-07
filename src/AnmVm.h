@@ -447,6 +447,9 @@ struct AnmVm
     void wipe_suffix();
     // Switches to another sprite of the same file, changing only the UVs.
     void set_sprite_uvs(i32 sprite);
+    // set_sprite_uvs as AsciiInf::draw_string has it inline for fonts 0
+    // and 1, with the manager already loaded.
+    __forceinline void set_sprite_uvs_inline(struct AnmManager *anm, i32 sprite);
     // ECL's anm instructions: interpolate from the current value to a goal.
     // 0x425e70
     void fade_alpha1(i32 end_time, i32 method, u8 goal);

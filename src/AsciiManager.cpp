@@ -263,7 +263,261 @@ void AnmVm::set_sprite_uvs(i32 sprite)
     uv_quad_of_sprite[2].y = uv_quad_of_sprite[3].y = s->uv_end.y;
 }
 
-// TODO: register allocation differs (the original keeps this in a stack slot); draw_string is still a stub.
+__forceinline void AnmVm::set_sprite_uvs_inline(AnmManager *anm, i32 sprite)
+{
+    AnmLoadedSprite *s = &anm->loaded_anms[anm_loaded_index]->sprites[sprite];
+    sprite_id = sprite;
+    uv_quad_of_sprite[0].x = uv_quad_of_sprite[2].x = s->uv_start.x;
+    uv_quad_of_sprite[1].x = uv_quad_of_sprite[3].x = s->uv_end.x;
+    uv_quad_of_sprite[0].y = uv_quad_of_sprite[1].y = s->uv_start.y;
+    uv_quad_of_sprite[2].y = uv_quad_of_sprite[3].y = s->uv_end.y;
+}
+
+// Draws one string a character at a time with vm_1: picks the glyph for
+// the font, aligns the string and draws an optional shadow first.
+// TODO: same structure; the original keeps this in ecx (ours edx) and numbers the xmm registers differently, which shifts most of the function.
+// FUNCTION: TH16 0x408650
+void AsciiInf::draw_string(AsciiStr *str)
+{
+    size_t len = strlen(str->text);
+    AnmVm *vm = &vm_1;
+    vm_1.flags_hi &= ~0x700000;
+    vm_1.flags_lo = (vm_1.flags_lo & 0xfebfffff) | 0xa00001;
+    vm_1.pos = str->pos;
+    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm->scale.x = str->scale.x;
+    vm->scale.y = str->scale.y;
+    f32 advance;
+    f32 line_height;
+    switch (str->font_id)
+    {
+    case 1:
+        vm_1.flags_hi &= ~0x800;
+        advance = str->scale.x * 6.0f;
+        line_height = 9.0f;
+        break;
+    case 2:
+        vm_1.flags_hi &= ~0x800;
+        line_height = 10.0f;
+        advance = str->scale.x * 7.0f;
+        break;
+    case 3:
+        vm_1.flags_hi |= 0x800;
+        line_height = 10.0f;
+        advance = str->scale.x * 7.0f;
+        break;
+    case 4:
+        vm_1.flags_hi &= ~0x800;
+        line_height = 16.0f;
+        advance = str->scale.x * 12.0f;
+        break;
+    case 5:
+        vm_1.flags_hi |= 0x800;
+        line_height = 16.0f;
+        advance = str->scale.x * 12.0f;
+        break;
+    default:
+        if (str->scale.x != 1.0f)
+        {
+            vm_1.flags_hi |= 0x800;
+        }
+        else
+        {
+            vm_1.flags_hi &= ~0x800;
+        }
+        line_height = 14.0f;
+        advance = character_spacing_for_font_0 * str->scale.x;
+        break;
+    }
+    const char *p;
+    switch (str->align_h)
+    {
+    case 0:
+        switch (str->font_id)
+        {
+        case 2:
+        case 3:
+            for (p = str->text; *p != '\0'; p++)
+            {
+                vm->pos.x += (*p == '.' ? str->scale.x * -4.0f * 0.5f : advance * -0.5f) * g_screen_coord_scale;
+            }
+            break;
+        case 4:
+        case 5:
+            for (p = str->text; *p != '\0'; p++)
+            {
+                vm->pos.x += (*p == ',' ? str->scale.x * -4.0f * 0.5f : advance * -0.5f) * g_screen_coord_scale;
+            }
+            break;
+        default:
+            vm->pos.x += -(i32)len * advance * 0.5f * g_screen_coord_scale;
+            break;
+        }
+        break;
+    case 2:
+        switch (str->font_id)
+        {
+        case 2:
+        case 3:
+            for (p = str->text; *p != '\0'; p++)
+            {
+                vm->pos.x += *p == '.' ? str->scale.x * -4.0f * g_screen_coord_scale : -(g_screen_coord_scale * advance);
+            }
+            break;
+        case 4:
+        case 5:
+            for (p = str->text; *p != '\0'; p++)
+            {
+                vm->pos.x += *p == ',' ? str->scale.x * -4.0f * g_screen_coord_scale : -(g_screen_coord_scale * advance);
+            }
+            break;
+        default:
+            vm->pos.x += -(i32)len * advance * g_screen_coord_scale;
+            break;
+        }
+        break;
+    }
+    switch (str->align_v)
+    {
+    case 0:
+        vm->pos.y += line_height * -0.5f * g_screen_coord_scale;
+        break;
+    case 2:
+        vm->pos.y += -(g_screen_coord_scale * line_height);
+        break;
+    }
+    for (p = str->text; *p != '\0'; p++)
+    {
+        char c = *p;
+        if (c == '\n')
+        {
+            vm->pos.y += str->scale.y * line_height * g_screen_coord_scale;
+            vm_1.pos.x = str->pos.x;
+            continue;
+        }
+        if (c != ' ')
+        {
+            AnmManager *anm = g_AnmManager;
+            switch (str->font_id)
+            {
+            case 0:
+                vm->set_sprite_uvs_inline(anm, (u8)c - 0x20);
+                break;
+            case 1:
+                vm->set_sprite_uvs_inline(anm, (u8)c + 0x42);
+                break;
+            case 2:
+            case 3:
+                advance = str->scale.x * 7.0f;
+                if (c >= 'a' && c <= 'z')
+                {
+                    vm->set_sprite_uvs((u8)c + 0x74);
+                }
+                else if (c >= 'A' && c <= 'Z')
+                {
+                    vm->set_sprite_uvs((u8)c + 0x94);
+                }
+                else if (c == '/')
+                {
+                    vm->set_sprite_uvs(0xce);
+                }
+                else if (c == ':')
+                {
+                    vm->set_sprite_uvs(0xcf);
+                }
+                else if (c == '-')
+                {
+                    vm->set_sprite_uvs(0xd0);
+                }
+                else if (c == '*')
+                {
+                    vm->set_sprite_uvs(0xd1);
+                }
+                else if (c == '%')
+                {
+                    vm->set_sprite_uvs(0xd2);
+                }
+                else if (c == '$')
+                {
+                    vm->set_sprite_uvs(0x101);
+                }
+                else if (c == '.')
+                {
+                    vm->set_sprite_uvs(0xd3);
+                    advance = str->scale.x * 4.0f;
+                }
+                else if (c == '+')
+                {
+                    vm->set_sprite_uvs(0xd4);
+                }
+                else
+                {
+                    vm->set_sprite_uvs((u8)c + 0x94);
+                }
+                break;
+            case 4:
+            case 5:
+                advance = str->scale.x * 12.0f;
+                vm_1.pos.y = str->pos.y;
+                if (c == '/')
+                {
+                    vm->set_sprite_uvs(0xf9);
+                }
+                else if (c == '.')
+                {
+                    vm->set_sprite_uvs(0xfa);
+                }
+                else if (c == 's')
+                {
+                    vm->set_sprite_uvs(0xfb);
+                }
+                else if (c == '*')
+                {
+                    vm->set_sprite_uvs(0xfc);
+                }
+                else if (c == ',')
+                {
+                    vm->set_sprite_uvs(0xfd);
+                    advance = str->scale.x * 4.0f;
+                    vm_1.pos.y = g_screen_coord_scale * 3.0f + str->pos.y;
+                }
+                else
+                {
+                    vm->set_sprite_uvs((u8)c + 0xbf);
+                }
+                break;
+            }
+            f32 sprite_height = anm->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_height;
+            f32 sprite_width = anm->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_width;
+            vm->flags_lo |= ANM_VM_SCALE_CHANGED;
+            vm->sprite_size.x = sprite_width;
+            vm->sprite_size.y = sprite_height;
+            if (str->draw_shadows)
+            {
+                vm_1.color_1.d3d = str->color & 0xff000000;
+                vm_1.color_1.a = str->color >> 25;
+                vm->pos.x += g_screen_coord_scale * 2.0f;
+                vm->pos.y += g_screen_coord_scale * 2.0f;
+                AnmVm::write_sprite_corners__without_rot(vm, (Float3 *)&g_sprite_temp_buffer[0],
+                                                         (Float3 *)&g_sprite_temp_buffer[1],
+                                                         (Float3 *)&g_sprite_temp_buffer[2],
+                                                         (Float3 *)&g_sprite_temp_buffer[3]);
+                anm->render_sprite_2d(vm, 1);
+                anm = g_AnmManager;
+                vm->pos.x += g_screen_coord_scale * -2.0f;
+                vm->pos.y += g_screen_coord_scale * -2.0f;
+            }
+            vm_1.color_1.d3d = str->color;
+            AnmVm::write_sprite_corners__without_rot(vm, (Float3 *)&g_sprite_temp_buffer[0],
+                                                     (Float3 *)&g_sprite_temp_buffer[1],
+                                                     (Float3 *)&g_sprite_temp_buffer[2],
+                                                     (Float3 *)&g_sprite_temp_buffer[3]);
+            anm->render_sprite_2d(vm, 1);
+        }
+        vm->pos.x += g_screen_coord_scale * advance;
+    }
+}
+
 // FUNCTION: TH16 0x408560
 i32 AsciiInf::draw_group(i32 group)
 {
