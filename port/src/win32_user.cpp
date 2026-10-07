@@ -81,9 +81,6 @@ std::map<std::string, WNDPROC> g_classes;
 std::set<PortHwnd *> g_hwnds;
 PortWindow *g_game_window;
 
-// What the renderer asked for (port_set_window_flags).
-Uint32 g_renderer_window_flags = SDL_WINDOW_OPENGL;
-
 int g_cursor_count;
 bool g_cursor_set = true;
 bool g_quit_posted;
@@ -351,17 +348,23 @@ SDL_Window *create_sdl_window(const char *title, int x, int y, int width, int he
     {
         return NULL;
     }
-    Uint32 renderer_flags = g_renderer_window_flags;
+    Uint32 renderer_flags = port_gl_window_flags();
     Uint32 flags = SDL_WINDOW_SHOWN | (full_screen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
     if (x == CW_USEDEFAULT || !position_on_screen(x, y, width, height))
     {
         x = SDL_WINDOWPOS_CENTERED;
         y = SDL_WINDOWPOS_CENTERED;
     }
+    port_gl_prepare_window();
     SDL_Window *sdl = SDL_CreateWindow(title, x, y, width, height, flags | renderer_flags);
-    if (sdl == NULL && renderer_flags != 0)
+    if (sdl != NULL)
     {
-        port_log("SDL_CreateWindow with renderer flags 0x%x failed (%s); trying without", renderer_flags,
+        port_gl_attach_window(sdl);
+        return sdl;
+    }
+    if (renderer_flags != 0)
+    {
+        port_log("SDL_CreateWindow with the renderer's flags 0x%x failed (%s); trying without", renderer_flags,
                  SDL_GetError());
         sdl = SDL_CreateWindow(title, x, y, width, height, flags);
     }
@@ -374,9 +377,23 @@ SDL_Window *create_sdl_window(const char *title, int x, int y, int width, int he
 
 } // namespace
 
-void port_set_window_flags(uint32_t flags)
+// Defaults for builds without the OpenGL renderer (see port_platform.h);
+// its definitions replace these at link time.
+__attribute__((weak)) uint32_t port_gl_window_flags()
 {
-    g_renderer_window_flags = flags;
+    return 0;
+}
+
+__attribute__((weak)) void port_gl_prepare_window()
+{
+}
+
+__attribute__((weak)) void port_gl_attach_window(SDL_Window *window)
+{
+}
+
+__attribute__((weak)) void port_gl_detach_window(SDL_Window *window)
+{
 }
 
 SDL_Window *port_sdl_window(HWND hwnd)
@@ -498,6 +515,7 @@ BOOL DestroyWindow(HWND hWnd)
         window->proc(hWnd, WM_DESTROY, 0, 0);
         if (window->sdl != NULL)
         {
+            port_gl_detach_window(window->sdl);
             SDL_DestroyWindow(window->sdl);
         }
         g_hwnds.erase(window);

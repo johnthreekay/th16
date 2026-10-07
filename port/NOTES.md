@@ -389,11 +389,14 @@ otherwise MS Gothic and MS Mincho, as on a Windows without Meiryo.
   before the window exists or without a display). The window exists by
   the time the game calls `IDirect3D9::CreateDevice` (whose hFocusWindow
   is that HWND), and lives until after the device is released.
-- `port_set_window_flags(flags)`: the SDL_WINDOW_* flags the window gets
-  (default `SDL_WINDOW_OPENGL`). WinMain calls `Direct3DCreate9` before
-  it creates the window (also after a restart), so the renderer calls this
-  there, with any `SDL_GL_*` attributes that have to precede the window.
-  If creation fails with the flags, the window is made without them.
+- The renderer's window functions (`d3d9_gl.h`, declared again in
+  `port_platform.h`): `CreateWindowExA` calls `port_gl_prepare_window()`,
+  creates the window with `port_gl_window_flags()` and calls
+  `port_gl_attach_window(window)` (before the game creates its device);
+  `DestroyWindow` calls `port_gl_detach_window(window)` first. If the
+  window cannot be made with those flags it is made without them and not
+  attached. `win32_user.cpp` has weak no-op defaults for builds without the
+  OpenGL renderer.
 - `port_window_drawable_size`: pixels to present into (full screen is
   desktop-sized; scale the back buffer, keeping 4:3).
 - `port_display_refresh_rate` (60 if unknown) and `port_display_size`:

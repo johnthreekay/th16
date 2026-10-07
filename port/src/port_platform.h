@@ -28,14 +28,18 @@ struct SDL_Window;
 // display (SDL video failed to start; the game then runs windowless).
 SDL_Window *port_sdl_window(HWND hwnd = NULL);
 
-// The SDL_WINDOW_* flags the renderer needs on the game window (default
-// SDL_WINDOW_OPENGL). WinMain calls Direct3DCreate9 before it creates the
-// window (and again before it recreates it after a restart), so the
-// renderer sets them there, together with any SDL_GL_* attributes that must
-// be set before the window exists. If creation fails with these flags, the
-// window is created without them (and the renderer then finds no GL
-// support on it).
-void port_set_window_flags(uint32_t flags);
+// The renderer's side of the window (d3d9_gl.h in the OpenGL renderer;
+// same declarations): CreateWindowExA calls port_gl_prepare_window (SDL_GL_*
+// attributes) and creates the SDL window with port_gl_window_flags(), then
+// hands it over with port_gl_attach_window; DestroyWindow calls
+// port_gl_detach_window first. If creation fails with the renderer's flags,
+// the window is made without them and not attached. win32_user.cpp has weak
+// defaults (no flags, nothing to do) for builds without that renderer (the
+// stubs, the null renderer).
+uint32_t port_gl_window_flags();
+void port_gl_prepare_window();
+void port_gl_attach_window(SDL_Window *window);
+void port_gl_detach_window(SDL_Window *window);
 
 // The size of the window's drawable area in pixels (what the back buffer is
 // scaled into when presenting; it differs from the back buffer size in
