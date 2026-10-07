@@ -356,6 +356,27 @@ decompiled code the surroundings it had in the original:
   the decrement's `* 1.0f`. No source variant found yet; it holds back
   several bullet ex steps, InterpFloat3::step and Spellcard::on_tick_body.
 
+- LTCG knows which memory a visible callee does not write: a local `pos`
+  kept across AsciiInf::create_stringf calls stays in its stack slot; write
+  `pos.y += 15` on the struct (separate x/y locals become immediates), and
+  mind the field store order.
+- MSVC does not connect a store through a struct pointer with a later int
+  load of the same address: store `*(EnemyRef *)&b->unk_90`, then test
+  `b->unk_90`, to get the original's reload.
+- `memcpy(buf, ...)` lets the compiler drop a later `buf != NULL` test;
+  `memcpy(buf + size, ...)` with `size = 0` keeps it.
+- An 8-byte field (`__time64_t date`) stored as one 8-byte zero changes the
+  register allocation of an unrolled init loop.
+- Calling both CStreamingSound::get_play_time and play_sound_centered from
+  one function makes LTCG stop folding play_sound_centered's `this`
+  program-wide (12 matches lost); 0x43f350 is parked under `#if 0`.
+- Open: our build adds a /GS cookie to functions with a memory-resident
+  D3DXVECTOR3 copy that is never passed anywhere (Player::update_options,
+  sht_on_tick, AnmVm::world_pos).
+- The score file's real layout puts the character sections 8 bytes into
+  Scorefile, after two buffer pointers: ScorefileData/ScorefileChara/
+  ScorefileStatus are the true view, ScorefileCharacter the shifted one.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
