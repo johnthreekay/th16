@@ -327,8 +327,9 @@ decompiled code the surroundings it had in the original:
   reccmp then loses the function and build.py may misread the declaration.
 - quickdiff misreports jump thunks and tail jumps; check those with
   compare.py.
-- build.py cannot tell overloads apart (two `ZunAngle::operator+` give "2
-  matching symbols"), so 0x447650 is named `ZunAngle::add` for now.
+- Overloads are told apart by the object file that defines them and then
+  by parameter types (typedefs mapped through `TYPEDEFS` in build.py; add
+  new ones there if an overload is reported as ambiguous).
 - build.py reads `template <> __declspec(noinline) X::f` as a function
   named `__declspec`; use DECOMP_NOINLINE. An explicit specialization of an
   in-class template member also needs a user in its own .cpp to be emitted.

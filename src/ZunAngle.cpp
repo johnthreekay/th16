@@ -84,7 +84,7 @@ HARNESS_CALLED ZunAngle ZunAngle::operator*(f32 factor) const
 }
 
 // FUNCTION: TH16 0x447650
-HARNESS_CALLED ZunAngle ZunAngle::add(const ZunAngle &other) const
+HARNESS_CALLED ZunAngle ZunAngle::operator+(const ZunAngle &other) const
 {
     ZunAngle result;
     result.value = wrap(value + other.value);

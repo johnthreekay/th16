@@ -156,6 +156,55 @@ def coff_functions(obj, storage_class=2):
     return out
 
 
+# Decorated name -> full undecorated signature, filled by undecorate().
+SIGNATURES = {}
+
+# Typedefs used in src/ and what undname prints for them.
+TYPEDEFS = {
+    "f32": "float", "f64": "double", "i8": "char", "u8": "unsigned char", "i16": "short",
+    "u16": "unsigned short", "i32": "int", "u32": "unsigned int", "i64": "__int64",
+    "u64": "unsigned __int64", "BOOL": "int", "DWORD": "unsigned long", "WORD": "unsigned short",
+    "BYTE": "unsigned char", "LONG": "long", "UINT": "unsigned int", "HRESULT": "long",
+    "D3DCOLOR": "unsigned long", "LPCSTR": "char const *", "LPSTR": "char *",
+}
+
+
+def param_types(params):
+    """Normalized parameter types of a parameter list, as comparable tuples."""
+    out, depth, cur = [], 0, ""
+    for ch in params:
+        if ch in "<(":
+            depth += 1
+        elif ch in ">)":
+            depth -= 1
+        if ch == "," and depth == 0:
+            out.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    if cur.strip():
+        out.append(cur)
+    types = []
+    for p in out:
+        p = p.split("=", 1)[0]
+        words = re.findall(r"[A-Za-z_]\w*|[*&]|\.\.\.", p)
+        words = [w for w in words if w not in ("const", "volatile", "struct", "class", "union", "enum")]
+        # Drop the parameter name: a trailing identifier after a type.
+        if len(words) > 1 and re.match(r"[A-Za-z_]", words[-1]) and words[-1] not in ("int", "char", "short", "long", "float", "double", "unsigned", "signed"):
+            words = words[:-1]
+        words = [TYPEDEFS.get(w, w) for w in words]
+        t = " ".join(words).replace("signed char", "char")
+        if t not in ("void", ""):
+            types.append(re.sub(r"\s+", " ", t))
+    return tuple(types)
+
+
+def signature_params(full):
+    """Parameter types of an undname signature, normalized like param_types."""
+    m = re.search(r"\((.*)\)", full)
+    return param_types(m.group(1)) if m else None
+
+
 def undecorate(names):
     """Map decorated -> qualified function name (no return type or params)."""
     if not names:
@@ -173,6 +222,7 @@ def undecorate(names):
     result = {}
     for m in re.finditer(r'Undecoration of :- "(.+?)"\s*is :- "(.+?)"', out):
         full = m.group(2)
+        SIGNATURES[m.group(1)] = full
         head = full.split("(", 1)[0].split()
         result[m.group(1)] = head[-1] if head else full
     for name in names:
@@ -232,10 +282,12 @@ def annotated_functions():
             decl = ""
             for nxt in lines[i + 1:]:
                 decl += " " + nxt.strip()
-                if "(" in decl:
+                if "(" in decl and decl.count("(") <= decl.count(")"):
                     break
             name = decl.split("(", 1)[0].split()[-1].lstrip("*&")
-            found.append((int(m.group(1), 16), name, rel(src), "HARNESS_CALLED" in decl))
+            m2 = re.search(r"\((.*)\)", decl)
+            params = param_types(m2.group(1)) if m2 else None
+            found.append((int(m.group(1), 16), name, rel(src), "HARNESS_CALLED" in decl, params))
     return found
 
 
@@ -257,8 +309,17 @@ def keepalive_symbols():
             statics.setdefault(o.stem, []).append(sym)
     static_qualified = undecorate(sorted({d for syms in statics.values() for d in syms}))
     include = []
-    for addr, name, src, harness_called in annotated_functions():
+    defined_in = {o: set(coff_functions(o)) for o in objs}
+    for addr, name, src, harness_called, params in annotated_functions():
         matches = by_name.get(name, [])
+        if len(matches) > 1:
+            # Overloads: prefer the ones defined in this file, then the one
+            # whose parameter types match the definition's.
+            here = defined_in.get(sym_dir / src.with_suffix(".obj"), set())
+            matches = [d for d in matches if d in here] or matches
+        if len(matches) > 1 and params is not None:
+            same = [d for d in matches if signature_params(SIGNATURES.get(d, "")) == params]
+            matches = same or matches
         if not matches:
             # A function with internal linkage (a per-file static copy) can't
             # be forced alive with /INCLUDE, but exists wherever it is used.

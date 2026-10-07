@@ -16,6 +16,6 @@ f32 harness_zun_angle_interp(ZunAngle *a, ZunAngle *b, f32 t, f32 u)
 {
     ZunAngle x = *a * t;
     ZunAngle y = *b * u;
-    ZunAngle sum = x.add(y);
+    ZunAngle sum = x + y;
     return sum.value;
 }
