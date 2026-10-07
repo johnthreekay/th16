@@ -166,7 +166,6 @@ HARNESS_CALLED void AnmManager::reset_vertex_buffers()
     primitive_render_cursor = primitive_vertex_data;
 }
 
-// TODO: the device and its vtable swap registers (ecx/edx) for DrawPrimitiveUP.
 // FUNCTION: TH16 0x465a80
 void AnmManager::flush_sprites()
 {
@@ -183,8 +182,9 @@ void AnmManager::flush_sprites()
     g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
     g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
     g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
-    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, unrendered_sprite_count * 2, sprite_render_cursor,
-                                             sizeof(RenderVertex144));
+    IDirect3DDevice9 *device = g_Supervisor.d3d_device;
+    device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, unrendered_sprite_count * 2, sprite_render_cursor,
+                            sizeof(RenderVertex144));
     unk_cc++;
     sprite_render_cursor = sprite_write_cursor;
     unrendered_sprite_count = 0;
