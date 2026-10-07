@@ -94,7 +94,6 @@ const char *const g_stage_names[10] = {"test   ",  "Stage 1", "Stage 2", "Stage 
                                        "Stage 5", "Stage 6", "Extra  ", "Clear  ", "ExClear"};
 
 // The stages and practice high scores of stage practice.
-// TODO: the original frame has an unused 4-byte slot and saves ebx/esi on entry rather than in the branch.
 // FUNCTION: TH16 0x4513c0
 HARNESS_CALLED i32 TitleInf::on_draw__practice_stage_select()
 {
@@ -159,7 +158,6 @@ HARNESS_CALLED i32 TitleInf::on_draw__practice_stage_select()
 
 // The capture history of the listed spell cards in spell practice (its own
 // and the main game's).
-// TODO: ours saves esi/edi after the substate checks (shrink-wrapped); the original saves them in the prologue.
 // FUNCTION: TH16 0x456d50
 HARNESS_CALLED i32 TitleInf::on_draw__spell_practice_histories()
 {
@@ -238,9 +236,67 @@ const char *const g_character_names[4] = {"Reimu  ", "Cirno  ", "Aya    ", "Mari
 // GLOBAL: TH16 0x492840
 const char g_name_entry_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-=.,!?@:;[]()_/{}|~^#$%&*   ";
 
+// Player data: the top ten of the chosen character and difficulty, the
+// number of games and the play time.
+// FUNCTION: TH16 0x453030
+HARNESS_CALLED i32 TitleInf::on_draw__player_data()
+{
+    switch (substate)
+    {
+    case 2:
+        break;
+    default:
+        return 1;
+    }
+    Float3 pos;
+    pos.x = 22.0f;
+    pos.y = 160.0f;
+    pos.z = 0.0f;
+    i32 difficulty = menu_fc.next_selection;
+    g_AsciiManager->draw_shadows = 1;
+    if (menu_1d4.next_selection == 0)
+    {
+        for (i32 i = 0; i < 10; i++)
+        {
+            g_AsciiManager->color.d3d = ~(i * 16) | 0xffffff00;
+            ScorefileScore *score = &g_Scorefile->characters[menu.next_selection].scores[difficulty][i];
+            if (score->timestamp != 0)
+            {
+                struct tm *time = localtime(&score->timestamp);
+                g_AsciiManager->create_stringf(&pos, "%2d  %s  %9ld%d  %.4d/%.2d/%.2d %.2d:%.2d %s  %s  %2.1f%%", i + 1,
+                                               score->name, score->score, score->continues_used,
+                                               time->tm_year + 1900, time->tm_mon + 1, time->tm_mday, time->tm_hour,
+                                               time->tm_min, g_season_names[score->subseason],
+                                               g_stage_names[score->stage], score->slowdown);
+            }
+            else
+            {
+                g_AsciiManager->create_stringf(&pos, "%2d  %s  %9ld%d  ----/--/-- --:-- Season  Stage -  ---%%",
+                                               i + 1, score->name, score->score, score->continues_used,
+                                               score->slowdown);
+            }
+            pos.y += 18.0f;
+        }
+    }
+    g_AsciiManager->color.d3d = 0xffffffff;
+    pos.x = 328.0f;
+    pos.y = 378.0f;
+    g_AsciiManager->create_stringf(&pos, "    %5d", g_Scorefile->characters[menu.next_selection].play_count);
+    pos.y = 396.0f;
+    __int64 seconds = g_Scorefile->characters[menu.next_selection].play_time / 100;
+    __int64 minutes = seconds / 60;
+    __int64 hours = minutes / 60;
+    g_AsciiManager->create_stringf(&pos, "%3lld:%.2lld:%.2lld", hours, minutes - hours * 60, seconds - minutes * 60);
+    pos.y = 414.0f;
+    g_AsciiManager->create_stringf(&pos, "    %5d",
+                                   g_Scorefile->characters[menu.next_selection].difficulty_play_counts[difficulty]);
+    g_AsciiManager->color.d3d = 0xffffffff;
+    g_AsciiManager->draw_shadows = 0;
+    return 1;
+}
+
 // The replay save screen: the 25 slots, then the chosen slot with the name
 // being entered and the character grid.
-// TODO: ours realigns its frame to 64 bytes (and esp, -64) because of the double vararg (the slowdown); unknown why.
 // FUNCTION: TH16 0x4541b0
 HARNESS_CALLED i32 TitleInf::on_draw__4541b0()
 {
@@ -253,12 +309,13 @@ HARNESS_CALLED i32 TitleInf::on_draw__4541b0()
         pos.y = 80.0f;
         pos.z = 0.0f;
         g_AsciiManager->draw_shadows = 1;
-        for (i32 i = 0; i < 25;)
+        ReplayManager **replay = replays;
+        for (i32 i = 0; i < 25; replay++)
         {
             g_AsciiManager->color.d3d = menu.next_selection == i ? 0xffffff00 : 0xff808080;
-            if (replays[i] != NULL)
+            if (*replay != NULL)
             {
-                RpyInfo *info = replays[i]->info;
+                RpyInfo *info = (*replay)->info;
                 struct tm *time = localtime(&info->timestamp);
                 i++;
                 g_AsciiManager->create_stringf(&pos, "No.%.2d %s %.2d/%.2d/%.2d %.2d:%.2d %s %s %s %2.1f%%", i,
@@ -311,9 +368,9 @@ HARNESS_CALLED i32 TitleInf::on_draw__4541b0()
             g_AsciiManager->color.d3d = 0xffffff00;
             g_AsciiManager->create_stringf(&pos, "_");
             pos.x = 212.0f;
+            g_AsciiManager->color.d3d = 0xffffffff;
             pos.y = 360.0f;
             pos.z = 0.0f;
-            g_AsciiManager->color.d3d = 0xffffffff;
             for (i32 i = 0; i < 91; i++)
             {
                 g_AsciiManager->color.d3d = menu_5a5c.next_selection == i ? 0xffffff00 : 0xff808080;

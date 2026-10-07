@@ -189,8 +189,8 @@ void TitleInf::destroy()
     }
 }
 
-// TODO: the original realigns its frame (and esp, -8), most likely for its
-// callees, which are opaque stubs here.
+// Realigns its frame (and esp, -8) for the draw states it calls, which then
+// rely on it (some pass doubles to create_stringf).
 // FUNCTION: TH16 0x44b530
 i32 TitleInf::on_draw()
 {

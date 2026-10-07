@@ -98,7 +98,7 @@ class TitleInf : public TaskInf
     // Not decompiled yet (ExpHP's names).
     HARNESS_CALLED i32 on_draw__practice_stage_select();
     i32 on_draw__replay();
-    i32 on_draw__player_data();
+    HARNESS_CALLED i32 on_draw__player_data();
     i32 on_draw__4538b0();
     HARNESS_CALLED i32 on_draw__4541b0();
     HARNESS_CALLED i32 on_draw__spell_practice_histories();

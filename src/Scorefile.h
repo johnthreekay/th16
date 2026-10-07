@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdlib.h>
+#include <time.h>
 
 #include "decomp.h"
 #include "types.h"
@@ -15,6 +16,19 @@ struct ScorefileSpell
     u8 unk_90[0x98 - 0x90];
     // Spell practice high score, divided by 10.
     i32 practice_score;
+};
+
+// One high score entry.
+struct ScorefileScore
+{
+    // Divided by 10; the last digit is continues_used.
+    u32 score;
+    i8 stage;
+    i8 continues_used;
+    char name[10];
+    __time64_t timestamp;
+    f32 slowdown;
+    i32 subseason;
 };
 
 // Stage practice record of one stage.
@@ -32,13 +46,18 @@ struct ScorefilePractice
 // characters. Layout from the offsets the game uses.
 struct ScorefileCharacter
 {
-    u8 unk_0[0x8d8];
+    u8 unk_0[0x18];
+    // The top ten of each difficulty.
+    ScorefileScore scores[5][10];
+    u8 unk_658[0x8d8 - 0x658];
     // 119 spell cards; the play time follows them.
     ScorefileSpell spells[0x77];
-    u8 unk_515c[0x5160 - 0x515c];
+    // Games played (shown in the player data).
+    i32 play_count;
     // In hundredths of a second.
     __int64 play_time;
-    u8 unk_5168[0x5184 - 0x5168];
+    // Games played per difficulty.
+    i32 difficulty_play_counts[7];
     // Nonzero once the game was cleared on each difficulty.
     i32 clears[5];
     // Stage practice, per difficulty and stage (1-6 used).
@@ -99,6 +118,8 @@ void scorefile_save_449a00();
 static_assert(sizeof(Scorefile) == 0x1a3ac, "Scorefile size");
 static_assert(offsetof(ScorefileCharacter, play_time) == 0x5160, "ScorefileCharacter::play_time");
 static_assert(offsetof(ScorefileCharacter, clears) == 0x5184, "ScorefileCharacter::clears");
+static_assert(offsetof(ScorefileCharacter, scores) == 0x18, "ScorefileCharacter::scores");
+static_assert(sizeof(ScorefileScore) == 0x20, "ScorefileScore size");
 static_assert(offsetof(ScorefileCharacter, practice) == 0x5198, "ScorefileCharacter::practice");
 static_assert(sizeof(ScorefileCharacter) == 0x5318, "ScorefileCharacter size");
 static_assert(offsetof(Scorefile, endings_seen) == 0x19f96, "Scorefile::endings_seen");
