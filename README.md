@@ -236,10 +236,11 @@ The project's own work (the scripts, the portable build's platform layer,
 the names, comments and documentation) is dedicated to the public domain
 under [CC0 1.0](LICENSE). The game itself, including the data tables and
 strings the source reproduces from `th16.exe`, remains the property of its
-author, ZUN (Team Shanghai Alice); CC0 cannot waive rights the contributors
-do not hold. The portable build's thcrap support adapts code from
-[thcrap](https://github.com/thpatch/thcrap), which is public domain
-(Unlicense).
+author, ZUN (Team Shanghai Alice), and `src/DSUtil.cpp` reproduces ZUN's
+adaptation of Microsoft's DirectX SDK sample code; CC0 cannot waive rights
+the contributors do not hold. The portable build's thcrap support adapts
+code from [thcrap](https://github.com/thpatch/thcrap), which is public
+domain (Unlicense).
 
 ## Credits
 
