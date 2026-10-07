@@ -134,7 +134,10 @@ struct EnemyFlagsLow
     u32 flag_1000000 : 1;
     u32 unk_25 : 1;
     u32 flag_4000000 : 1;
-    u32 unk_27 : 3;
+    u32 unk_27 : 1;
+    // Bomb shield up (ECL bombShield).
+    u32 bombshield : 1;
+    u32 unk_29 : 1;
     // Life of 1000 or more.
     u32 flag_40000000 : 1;
     u32 unk_31 : 1;

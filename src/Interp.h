@@ -25,7 +25,24 @@ struct InterpFloat
 
     DECOMP_NOINLINE void reset();
     HARNESS_CALLED f32 step();
+
+    // Starts an interpolation from initial to goal over end_time frames
+    // (ECL's move*Time instructions).
+    void start(i32 end_time, i32 method, f32 initial, f32 goal)
+    {
+        this->initial = initial;
+        this->end_time = end_time;
+        this->method = method;
+        bezier_1 = 0.0f;
+        bezier_2 = 0.0f;
+        this->goal = goal;
+        reset();
+    }
 };
+
+// A zero vector that the ECL radial and ellipse interpolations copy their
+// bezier values from.
+extern D3DXVECTOR2 g_zero_vec2;
 
 struct InterpFloat2
 {
@@ -40,6 +57,18 @@ struct InterpFloat2
 
     void reset_timer();
     D3DXVECTOR2 step();
+    // Starts an interpolation from initial to goal over end_time frames
+    // (ECL's moveCircleTime and moveEllipseTime).
+    void start(i32 end_time, i32 method, D3DXVECTOR2 *initial, D3DXVECTOR2 *goal)
+    {
+        this->end_time = end_time;
+        bezier_1 = g_zero_vec2;
+        bezier_2 = g_zero_vec2;
+        this->method = method;
+        this->initial = *initial;
+        this->goal = *goal;
+        reset_timer();
+    }
     // 0x425570. A second copy of step that the enemies' radial distance
     // interpolators use (ExpHP: InterpRadialDist::step).
     D3DXVECTOR2 step_radial_dist();
