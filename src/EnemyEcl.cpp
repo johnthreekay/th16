@@ -1782,7 +1782,8 @@ int EnemyData::ecl_run_over_300()
         bullet_props[idx].laser_new_arg_4 = get_float_arg(4);
         break;
     }
-    // laserTiming(et, a, b, c, d, flags).
+    // laserTiming(et, start, expand, duration, shrink, flags): the infinite
+    // laser phases (LaserInfiniteInner::start_time and on).
     case ECL_OP_LASER_TIMING:
     {
         i32 idx = get_int_arg(0);
