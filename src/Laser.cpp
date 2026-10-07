@@ -269,7 +269,9 @@ void LaserBeamInf::method_8(i32 arg)
 }
 
 // TODO: the original reserves an unused stack slot (push ecx) and saves esi
-// on entry; ours saves esi only on the success path.
+// on entry; ours saves esi only on the success path. That is known stack
+// alignment from the caller chain (GameThread::thread_start realigns in the
+// original, not in ours; making create HARNESS_CALLED alone does nothing).
 // FUNCTION: TH16 0x431330
 i32 LaserManager::initialize()
 {
@@ -865,7 +867,7 @@ i32 LaserLineInf::cancel(i32 mode, i32 b)
 
 // Cancels the laser like LaserLineInf::cancel, but only the points on screen
 // get an effect and items.
-// TODO: the original doubles step.x after loading position (scheduling) and stores step.z = 0 late from a second zero register.
+// TODO: the original copies step.x and adds position.x from memory (ours loads position.x first; swapping the operands or step += step does not help) and stores step.z = 0 late from a second zero register.
 // FUNCTION: TH16 0x436c70
 i32 LaserInfiniteInf::cancel(i32 mode, i32 b)
 {
@@ -1050,16 +1052,17 @@ static __forceinline i32 test_circle_rect_inline(f32 rect_x, f32 rect_y, f32 w, 
     f32 x = circle_x * c - circle_y * s;
     f32 y = circle_x * s + circle_y * c;
     f32 half_w = w * 0.5f;
-    f32 half_h = h * 0.5f;
     f32 abs_x = fabsf(x);
-    if (half_w + radius >= abs_x && half_h >= fabsf(y))
+    if (half_w + radius >= abs_x && h * 0.5f >= fabsf(y))
     {
         return 1;
     }
-    if (half_w >= abs_x && half_h + radius >= fabsf(y))
+    if (half_w >= abs_x && h * 0.5f + radius >= fabsf(y))
     {
         return 1;
     }
+    // Then the corners.
+    f32 half_h = h * 0.5f;
     f32 radius_sq = radius * radius;
     if (radius_sq > (x - half_w) * (x - half_w) + (y - half_h) * (y - half_h))
     {
@@ -1581,7 +1584,7 @@ i32 LaserInfiniteInf::check_graze_or_kill(i32 graze_only)
 
 // The same for curvy lasers, piece by piece past the first 16 units; one
 // graze per frame at most.
-// TODO: the original reloads grazed, 0.5 and dist from their spill slots in a different order and place after the hit test.
+// TODO: after the hit test the original reloads 0.5 and dist at the loop join, ours at the start of the result == 2 test (nested if or continue forms do not help).
 // FUNCTION: TH16 0x437cf0
 i32 LaserCurveInf::check_graze_or_kill(i32 graze_only)
 {
@@ -1994,7 +1997,7 @@ i32 LaserInfiniteInf::initialize(void *params)
 }
 
 // Sets a beam up from its parameters.
-// TODO: the original addresses vm_928 through the pointer left over from the inlined wipe (store order, ecx vs edx).
+// TODO: in the inlined wipe the original schedules the flags_hi and/or one store later (an instruction scheduling difference only).
 // FUNCTION: TH16 0x43a860
 i32 LaserBeamInf::initialize(void *params)
 {
@@ -2013,7 +2016,8 @@ i32 LaserBeamInf::initialize(void *params)
     width = 1.0f;
     unk_f24 = 0;
     vm_928.wipe();
-    vm_928.flags_lo = vm_928.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    AnmVm *vm = &vm_928;
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
     return 0;
 }
 
