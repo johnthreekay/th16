@@ -229,13 +229,14 @@ void LaserLineInf::get_point(f32 distance, Float3 *out)
 // FUNCTION: TH16 0x4310b0
 LaserDataInf *LaserLineInf::clone()
 {
-    LaserLineInf *copy = new LaserLineInf();
+    LaserLineInf *copy = new LaserLineInf(LaserLineInf::InlineCtor());
     memcpy(copy, this, sizeof(LaserLineInf));
     return copy;
 }
 
+// Called out of line everywhere but in clone.
 // FUNCTION: TH16 0x431130
-LaserLineInf::LaserLineInf()
+DECOMP_NOINLINE LaserLineInf::LaserLineInf()
 {
 }
 
@@ -634,6 +635,109 @@ i32 LaserCurveInf::method_40()
     length += st->floats[0] * g_game_speed;
     laser_sincosmul(&unk_60, angle, length);
     st->timer.tick();
+    return 0;
+}
+
+// allocate_new_laser(LASER_LINE, params) as LTCG inlined it into the wall
+// bounce.
+static __forceinline void allocate_line_laser_inline(void *params)
+{
+    LaserManager *mgr = g_LaserManager;
+    if (mgr->list_length < 0x200)
+    {
+        mgr->last_id++;
+        if (mgr->last_id < 0x10000)
+        {
+            mgr->last_id = 0x10000;
+        }
+        LaserDataInf *laser = new LaserLineInf();
+        laser->id = mgr->last_id;
+        mgr->append(laser);
+        laser->initialize(params);
+    }
+}
+
+// The wall bounce et_ex step (ex_flags 0x40): once the tip leaves the
+// playfield through a wall enabled in ex_state[4].ints[2] (1 top, 2 bottom,
+// 4 left, 8 right), a mirrored laser starts where the laser crosses that
+// wall, with ex_state[4].floats[0] as its speed (none with bit 0x10), and
+// the step ends. 1 if the laser bounced.
+// FUNCTION: TH16 0x432620
+i32 LaserLineInf::method_50()
+{
+    Float3 tip;
+    laser_sincosmul(&tip, angle, unk_70);
+    tip += position;
+    tip.z = 0.0f;
+    if (tip.x + 0.0f <= -192.0f || tip.x - 0.0f >= 192.0f || tip.y + 0.0f <= 0.0f || tip.y - 0.0f >= 448.0f)
+    {
+        i32 bounced = 0;
+        if ((ex_state[4].ints[2] & 1) && tip.y < 0.0f)
+        {
+            if (!(ex_state[4].ints[2] & 0x10))
+            {
+                collision_segment_intersection(&inner.start_pos.x, &inner.start_pos.y, -256.0f, 0.0f, 256.0f, 0.0f,
+                                               tip.x, tip.y, position.x, position.y);
+                inner.start_pos.z = 0.0f;
+                inner.ang_aim = -angle;
+                inner.speed = ex_state[4].floats[0];
+                inner.distance = 0.0f;
+                allocate_line_laser_inline(&inner);
+            }
+            bounced = 1;
+        }
+        if ((ex_state[4].ints[2] & 2) && tip.y > 448.0f)
+        {
+            if (!(ex_state[4].ints[2] & 0x10))
+            {
+                collision_segment_intersection(&inner.start_pos.x, &inner.start_pos.y, -256.0f, 448.0f, 256.0f,
+                                               448.0f, tip.x, tip.y, position.x, position.y);
+                inner.start_pos.z = 0.0f;
+                inner.ang_aim = -angle;
+                inner.speed = ex_state[4].floats[0];
+                inner.distance = 0.0f;
+                allocate_line_laser_inline(&inner);
+            }
+            bounced = 1;
+        }
+        if ((ex_state[4].ints[2] & 4) && tip.x < -192.0f)
+        {
+            if (!(ex_state[4].ints[2] & 0x10))
+            {
+                collision_segment_intersection(&inner.start_pos.x, &inner.start_pos.y, -192.0f, -192.0f, -192.0f,
+                                               640.0f, tip.x, tip.y, position.x, position.y);
+                inner.start_pos.z = 0.0f;
+                inner.ang_aim = normalize_angle(-angle - ZUN_PI);
+                inner.speed = ex_state[4].floats[0];
+                inner.distance = 0.0f;
+                allocate_line_laser_inline(&inner);
+            }
+            bounced = 1;
+        }
+        if ((ex_state[4].ints[2] & 8) && tip.x > 192.0f)
+        {
+            if (!(ex_state[4].ints[2] & 0x10))
+            {
+                collision_segment_intersection(&inner.start_pos.x, &inner.start_pos.y, 192.0f, -192.0f, 192.0f,
+                                               640.0f, tip.x, tip.y, position.x, position.y);
+                inner.start_pos.z = 0.0f;
+                inner.ang_aim = normalize_angle(-angle - ZUN_PI);
+                inner.speed = ex_state[4].floats[0];
+                inner.distance = 0.0f;
+                allocate_line_laser_inline(&inner);
+            }
+            bounced = 1;
+        }
+        if (bounced)
+        {
+            ex_flags &= ~0x40;
+            if (inner.shot_transform_sfx >= 0)
+            {
+                g_SoundManager.play_sound_centered(inner.shot_transform_sfx, 0);
+            }
+            return 1;
+        }
+    }
     return 0;
 }
 

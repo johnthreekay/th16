@@ -70,10 +70,3 @@ i32 LaserLineInf::method_3c()
     st->timer.tick();
     return 0;
 }
-
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x432620
-i32 LaserLineInf::method_50()
-{
-    return unit5_placeholder(this);
-}

@@ -138,6 +138,14 @@ class LaserLineInf : public LaserDataInf
     AnmVm vm_1524;
 
     LaserLineInf();
+    // The constructor as clone has it inlined; the real one is
+    // DECOMP_NOINLINE for its other callers.
+    struct InlineCtor
+    {
+    };
+    __forceinline LaserLineInf(InlineCtor)
+    {
+    }
 
     virtual void get_point(f32 distance, Float3 *out);
     DECOMP_NOINLINE virtual void run_ex();
