@@ -10,9 +10,4 @@
 
 
 
-// STUB: TH16 0x410de0
-i32 BombReimuAInf::on_tick()
-{
-    return 0;
-}
 

@@ -3,6 +3,7 @@
 #include <d3dx9math.h>
 
 #include "AnmManager.h"
+#include "EnemyManager.h"
 #include "UpdateFunc.h"
 #include "ZunTimer.h"
 #include "decomp.h"
@@ -91,7 +92,11 @@ struct BombReimuAOrb
     u8 unk_44[0xa0 - 0x44];
     i32 active;
     ZunTimer timer;
-    u8 unk_b8[0xcc - 0xb8];
+    // How far the orb moved last frame.
+    D3DXVECTOR3 move;
+    // The enemy it homes in on.
+    EnemyRef target;
+    class EnemyInf *target_enemy;
     // Which of the eight orbs this is.
     i32 index;
     // Index plus one of the orb's damage source, 0 for none.
@@ -103,6 +108,9 @@ struct BombReimuAOrb
     void start(i32 index, D3DXVECTOR3 *pos);
     // 0x410ae0
     void finish();
+    // 0x410550. Circles the player, then flies off and homes in on the
+    // closest enemy.
+    void update();
 };
 
 struct BombReimuAOrbs
