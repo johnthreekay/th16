@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <process.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1019,6 +1020,133 @@ void Supervisor::destroy_game_objects()
     delete g_EffectManager;
     g_EffectManager = NULL;
     delete g_HelpManual;
+}
+
+extern HANDLE g_file;
+
+void debug_log_43dce0(const char *fmt, ...);
+
+// TODO: the original realigns its frame to 8 bytes (ebx frame), so it also pops call arguments one call at a time.
+// FUNCTION: TH16 0x43bbd0
+int Supervisor::take_screenshot(const char *path)
+{
+    Screenshot *shot = &g_Supervisor.screenshot;
+    while (shot->thread != 0)
+    {
+        Sleep(10);
+    }
+    IDirect3DSurface9 *surface = NULL;
+    debug_log_43dce0("SnapShot! %s\n", path);
+    g_Supervisor.d3d_device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &surface);
+    memset(&shot->file_header, 0, sizeof(BITMAPFILEHEADER));
+    shot->file_header.bfType = 0x4d42;
+    shot->file_header.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+    shot->file_header.bfSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+    strcpy(shot->path, path);
+    switch (g_Supervisor.present_params.BackBufferFormat)
+    {
+    case D3DFMT_R5G6B5:
+        // "16bit is not supported"
+        g_GameErrorContext.log("16bit \x82\xcd\x8e\xe6\x82\xe8\x8d\x9e\x82\xdf\x82\xc8\x82\xa2\r\n");
+        break;
+    case D3DFMT_A8R8G8B8:
+    case D3DFMT_X8R8G8B8:
+    {
+        shot->info = (BITMAPINFO *)malloc(sizeof(BITMAPINFO));
+        if (shot->info == NULL)
+        {
+            // "snapShotScreen : could not allocate"
+            g_GameErrorContext.log("snapShotScreen : \x8am\x95\xdb\x82\xb5\x82\xad\x82\xe8\r\n");
+            break;
+        }
+        memset(shot->info, 0, sizeof(BITMAPINFO));
+        i32 row = g_resolution_x * 3;
+        i32 stride = row + 1 + (row % 4 != 0) * (4 - row % 4);
+        shot->bmp_data = (u8 *)malloc(g_resolution_y * stride);
+        if (shot->bmp_data == NULL)
+        {
+            g_GameErrorContext.log("snapShotScreen : \x8am\x95\xdb\x82\xb5\x82\xad\x82\xe8\r\n");
+            break;
+        }
+        shot->file_header.bfSize += g_resolution_y * stride;
+        shot->info->bmiHeader.biBitCount = 24;
+        shot->info->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        shot->info->bmiHeader.biWidth = g_resolution_x;
+        shot->info->bmiHeader.biHeight = g_resolution_y;
+        shot->info->bmiHeader.biPlanes = 1;
+        shot->info->bmiHeader.biCompression = BI_RGB;
+        D3DLOCKED_RECT locked;
+        surface->LockRect(&locked, NULL, 0);
+        shot->pixels = (u8 *)malloc(g_resolution_y * locked.Pitch);
+        memcpy(shot->pixels, locked.pBits, g_resolution_y * locked.Pitch);
+        shot->pitch = locked.Pitch;
+        surface->UnlockRect();
+        shot->thread = _beginthread(write_screenshot, 0, NULL);
+        break;
+    }
+    default:
+        g_GameErrorContext.log("error : snapShotScreen\n");
+        return 1;
+    }
+    if (surface != NULL)
+    {
+        surface->Release();
+    }
+    return 0;
+}
+
+// Writes to the file file_create opened; on a short write, closes it.
+static inline void file_write_chunk(const void *data, DWORD size)
+{
+    if (g_file != INVALID_HANDLE_VALUE)
+    {
+        DWORD written;
+        WriteFile(g_file, data, size, &written, NULL);
+        if (size != written)
+        {
+            CloseHandle(g_file);
+            LEAVE_CS(CS_FILE);
+        }
+    }
+}
+
+// FUNCTION: TH16 0x43be40
+void __cdecl Supervisor::write_screenshot(void *arg)
+{
+    Screenshot *shot = &g_Supervisor.screenshot;
+    u8 *dst = shot->bmp_data;
+    u8 *pixels = shot->pixels;
+    for (i32 y = g_resolution_y - 1; y > -1; y--)
+    {
+        u32 *src = (u32 *)(pixels + shot->pitch * y);
+        for (i32 x = 0; x < g_resolution_x; x++)
+        {
+            *(u32 *)dst = *src++;
+            dst += 3;
+        }
+    }
+    file_create(shot->path);
+    file_write_chunk(&shot->file_header, sizeof(BITMAPFILEHEADER));
+    file_write_chunk(shot->info, sizeof(BITMAPINFOHEADER));
+    i32 row = g_resolution_x * 3;
+    file_write_chunk(shot->bmp_data, (row % 4 != 0) * (4 - row % 4) + g_resolution_x * g_resolution_y * 3);
+    file_close();
+    if (shot->info != NULL)
+    {
+        free(shot->info);
+        shot->info = NULL;
+    }
+    if (shot->bmp_data != NULL)
+    {
+        free(shot->bmp_data);
+        shot->bmp_data = NULL;
+    }
+    if (shot->pixels != NULL)
+    {
+        free(shot->pixels);
+        shot->pixels = NULL;
+    }
+    shot->thread = 0;
 }
 
 // FUNCTION: TH16 0x43ba40

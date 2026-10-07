@@ -38,6 +38,22 @@ struct Config
     u8 unk_30[0x68 - 0x30];
 };
 
+// A screenshot being saved: Supervisor's 0x43bbd0 copies the back buffer
+// and starts write_screenshot (0x43be40) on a thread to save it as a BMP.
+struct Screenshot
+{
+    // Nonzero while the writer thread runs.
+    uintptr_t thread;
+    BITMAPFILEHEADER file_header;
+    BITMAPINFO *info;
+    // The bottom-up 24-bit rows to write.
+    u8 *bmp_data;
+    // A copy of the locked back buffer, and its pitch.
+    u8 *pixels;
+    i32 pitch;
+    char path[MAX_PATH];
+};
+
 // Owns the Direct3D/DirectInput objects and global game state. ZUN's name
 // for it in older games was MotherInf (per ExpHP).
 struct Supervisor
@@ -55,7 +71,8 @@ struct Supervisor
     u8 unk_28[0xdc - 0x28];
     // The full-window viewport, set by screen effects before they draw.
     D3DVIEWPORT9 viewport_dc;
-    u8 unk_f4[0x1ac - 0xf4];
+    D3DPRESENT_PARAMETERS present_params;
+    u8 unk_12c[0x1ac - 0x12c];
     // Render targets for the arcade region while it is drawn at the
     // default resolution (the "@R" surfaces), and the back buffer.
     IDirect3DSurface9 *arcade_surface_0;
@@ -87,7 +104,8 @@ struct Supervisor
     u32 flags;
     // timeGetTime() when on_registration ran; also the RNG seed.
     u32 start_time;
-    u8 unk_738[0x998 - 0x738];
+    u8 unk_738[0x870 - 0x738];
+    Screenshot screenshot;
     ThreadInf thread;
     i32 unk_9b4;
     i32 unk_9b8;
@@ -112,6 +130,13 @@ struct Supervisor
     void release_surfaces();
     void sub_43c630();
     void sub_43c6a0();
+    // 0x43bbd0. Copies the back buffer and starts write_screenshot to save
+    // it to path. Works on g_Supervisor; returns 1 for an unsupported
+    // back buffer format.
+    int take_screenshot(const char *path);
+    // 0x43be40. The screenshot thread: converts and saves g_Supervisor's
+    // screenshot.
+    static void __cdecl write_screenshot(void *arg);
     // 0x43cb10. Sets up the four cameras for the window size.
     void setup_cameras();
 
