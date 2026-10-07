@@ -199,6 +199,17 @@ enum AnmBlendMode
     ANM_BLEND_FORCE_RESET = 10,
 };
 
+// Anchoring along one axis (flags_lo bits 21-22 and 23-24, instruction 421,
+// and the anchor arguments of AnmManager's shape functions).
+enum AnmAnchor
+{
+    ANM_ANCHOR_CENTER = 0,
+    // The position is the left or top edge.
+    ANM_ANCHOR_START = 1,
+    // The position is the right or bottom edge.
+    ANM_ANCHOR_END = 2,
+};
+
 // ANM render modes (flags_lo bits 25-29, instruction 302 and the drawing
 // instructions 600-613): how AnmManager::draw_vm draws the VM.
 enum AnmRenderMode

@@ -45,30 +45,30 @@ HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f3
     f32 y0, y1, y2, y3;
     switch (anchor_x)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         x1 = x3 = width * 0.5f;
         x0 = x2 = width * -0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         x1 = x3 = width;
         x0 = x2 = 0.0f;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         x1 = x3 = 0.0f;
         x0 = x2 = -width;
         break;
     }
     switch (anchor_y)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         y2 = y3 = height * 0.5f;
         y0 = y1 = height * -0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         y2 = y3 = height;
         y0 = y1 = 0.0f;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         y2 = y3 = 0.0f;
         y0 = y1 = -height;
         break;
@@ -135,30 +135,30 @@ HARNESS_CALLED i32 AnmManager::draw_rect_outline(f32 x, f32 y, f32 width, f32 he
     f32 y0, y1, y2, y3;
     switch (anchor_x)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         x1 = x3 = width * 0.5f;
         x0 = x2 = width * -0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         x1 = x3 = width;
         x0 = x2 = 0.0f;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         x1 = x3 = 0.0f;
         x0 = x2 = -width;
         break;
     }
     switch (anchor_y)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         y2 = y3 = height * 0.5f;
         y0 = y1 = height * -0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         y2 = y3 = height;
         y0 = y1 = 0.0f;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         y2 = y3 = 0.0f;
         y0 = y1 = -height;
         break;
@@ -239,15 +239,15 @@ HARNESS_CALLED i32 AnmManager::draw_line(f32 x, f32 y, f32 length, f32 angle, D3
     f32 offset = 0.0f;
     switch (anchor)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         start = length * -0.5f;
         end = length * 0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         start = 0.0f;
         end = length;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         start = -length;
         end = 0.0f;
         break;

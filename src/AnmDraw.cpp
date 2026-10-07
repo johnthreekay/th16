@@ -233,12 +233,12 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
 // FUNCTION: TH16 0x465c40
 void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
 {
-    AnmAnchorCorners *anchor = &g_anchor_corners_x[(vm->flags_lo >> 21) & 3];
+    AnmAnchorCorners *anchor = &g_anchor_corners_x[(vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3];
     a->x = anchor->corner[0];
     b->x = anchor->corner[1];
     c->x = anchor->corner[2];
     d->x = anchor->corner[3];
-    anchor = &g_anchor_corners_y[(vm->flags_lo >> 23) & 3];
+    anchor = &g_anchor_corners_y[(vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3];
     a->y = anchor->corner[0];
     b->y = anchor->corner[1];
     c->y = anchor->corner[2];
@@ -321,8 +321,8 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
         fstp cosine
         fstp sine
     }
-    AnmAnchorCorners xs = g_anchor_corners_x[(vm->flags_lo >> 21) & 3];
-    AnmAnchorCorners ys = g_anchor_corners_y[(vm->flags_lo >> 23) & 3];
+    AnmAnchorCorners xs = g_anchor_corners_x[(vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3];
+    AnmAnchorCorners ys = g_anchor_corners_y[(vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3];
     i32 i;
     for (i = 0; i < 4; i++)
     {
@@ -419,32 +419,32 @@ i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
     }
     f32 x0, x1, x2, x3;
     f32 y0, y1, y2, y3;
-    switch ((vm->flags_lo >> 21) & 3)
+    switch ((vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         x0 = x2 = width * -0.5f;
         x1 = x3 = width * 0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         x0 = x2 = 0.0f;
         x1 = x3 = width;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         x0 = x2 = -width;
         x1 = x3 = 0.0f;
         break;
     }
-    switch ((vm->flags_lo >> 23) & 3)
+    switch ((vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3)
     {
-    case 0:
+    case ANM_ANCHOR_CENTER:
         y0 = y1 = height * -0.5f;
         y2 = y3 = height * 0.5f;
         break;
-    case 1:
+    case ANM_ANCHOR_START:
         y0 = y1 = 0.0f;
         y2 = y3 = height;
         break;
-    case 2:
+    case ANM_ANCHOR_END:
         y0 = y1 = -height;
         y2 = y3 = 0.0f;
         break;
@@ -701,7 +701,7 @@ i32 AnmManager::draw_3d(AnmVm *vm)
         }
         Float3 rotation = *vm->get_total_rotation();
         D3DXMATRIX rotation_matrix;
-        switch ((vm->flags_hi >> 2) & 7)
+        switch ((vm->flags_hi >> ANM_VM_ROTATION_MODE_SHIFT) & 7)
         {
         case 0:
             if (rotation.x != 0.0f)
@@ -841,8 +841,10 @@ i32 AnmManager::draw_3d(AnmVm *vm)
         last_vertex_setup = ANM_VERTEX_SETUP_3D_QUAD;
     }
     set_color_op_modulate();
+    // The vertex buffer holds one quad per anchoring (setup_vertex_buffer).
     g_Supervisor.d3d_device->DrawPrimitive(
-        D3DPT_TRIANGLESTRIP, (((vm->flags_lo >> 23) & 3) * 3 + ((vm->flags_lo >> 21) & 3)) * 4, 2);
+        D3DPT_TRIANGLESTRIP,
+        (((vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3) * 3 + ((vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3)) * 4, 2);
     return 0;
 }
 
@@ -1058,8 +1060,8 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
             width = g_screen_coord_scale * 0.5f * width;
             height = g_screen_coord_scale * 0.5f * height;
         }
-        i32 anchor_x = (vm->flags_lo >> 21) & 3;
-        i32 anchor_y = (vm->flags_lo >> 23) & 3;
+        i32 anchor_x = (vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3;
+        i32 anchor_y = (vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3;
         switch ((vm->flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
         {
         case ANM_RENDER_LINE:
