@@ -388,14 +388,15 @@ struct Gui
     // Not used.
     AnmId id_d0;
     AnmId id_d4;
-    // The boss's name. Only while a boss is on screen.
+    // The boss marker (the stage table's marker_script). Only while a boss
+    // is on screen.
     AnmId boss_marker_id;
     // The boss's remaining spell card stars: ten, the loop over them running
     // on into boss_star_id_9.
     AnmId boss_star_ids[9];
     AnmId boss_star_id_9;
     // A second difficulty display (front.anm 0x51 + difficulty), created
-    // and then hidden in a full game.
+    // when a game starts and sent interrupt 3 at once.
     AnmId id_104;
     AnmId difficulty_id;
     AnmId season_gauge_id;
