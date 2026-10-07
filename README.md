@@ -605,6 +605,39 @@ decompiled code the surroundings it had in the original:
     the source: swapping `a + b`, `a += b` or the timer tick's operands
     gave identical code in several places (LaserCurveInf::initialize,
     method_44, check_graze_or_kill); look for a different construct.
+- TODO sweep (lasers and system code):
+  - A value stored to a global and then tested: testing the global
+    (`if (!g_Supervisor.present_params.Windowed)`) keeps the boolean in a
+    register, because LTCG forwards the store across the visible
+    set_resolution_from_config call; testing the local lets the compiler
+    re-derive the condition from its inputs (create_game_window).
+  - Stores the original merged into `movaps` to fields of a big struct
+    global that code addresses as its own global (GameWindow's pacing table
+    at 0x4d9d90) need a separate global struct the compiler knows is
+    16-byte aligned: `DECOMP_ALIGN16` (decomp.h). Spelling
+    `__declspec(align(16))` on the annotated line makes reccmp's GLOBAL
+    parser take `__declspec` for the variable's name.
+  - `if (a) X; else if (b) X; else Y;` (the two X tail merged) lays X out
+    first; `if (a || b) X; else Y;` puts Y first (read_keyboard_input's
+    Acquire branch).
+  - `D3DXVec3Add(&out, &a, &b)` and `+=` give different per-component
+    operand orders; one of them often matches where the other does not
+    (LaserLineInf::check_graze_or_kill: `D3DXVec3Add(&start, &start,
+    &position)`). Neither fixes every component everywhere
+    (LaserCurveInf::on_draw).
+  - The inlined collision_test_circle_rect in the method_1c variants
+    recomputes `h * 0.5f` and `fabsf(y)` in each test, as code that does
+    not dominate the later tests would: the original writes them inline
+    in the first two tests, with only half_w and fabsf(x) as variables.
+    Open: it also squares each corner difference again in every test
+    where ours reuses the squares.
+  - Address-taken neighbours: g_early_arcade_offset_x/_y belong to the
+    address-exposed screen block too; taking their address (harness s6)
+    put LaserCurveInf::on_draw's `pos.z = 0` store after their load.
+  - Padded frames (`push ecx` with no local, esi saved on entry) in
+    LaserManager::initialize come from known alignment down the call
+    chain: GameThread::thread_start realigns in the original but not in
+    ours, so its callees (LaserManager::create, initialize) stay unpadded.
 
 ### Compiler-generated and CRT functions
 
@@ -637,6 +670,12 @@ Name-based annotations: the marker, then a comment line naming the function.
 - The `// GLOBAL:` parser does not take a constructor call with
   arguments (`ScreenEffect g_screen_effect(...);`); write it as copy
   initialization (`= ScreenEffect(...)`), which compiles the same.
+- build.py's incremental build does not record headers that files in
+  src/harness/ (and the other subdirectories) include as `"../X.h"`: only
+  headers reached through other headers end up in the `.dep` list. After
+  changing such a header, delete `build/obj/src/harness/*.dep` and
+  `build/sym/src/harness/*.dep` (or all `.dep` files), or the link can
+  fail on a stale object or quietly use one.
 - Comments must go above `// FUNCTION:`, not between it and the signature:
   reccmp then loses the function and build.py may misread the declaration.
 - quickdiff misreports jump thunks and tail jumps; check those with
