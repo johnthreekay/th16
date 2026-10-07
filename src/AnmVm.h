@@ -390,6 +390,15 @@ struct AnmVm
     // ins_508_extra_data.
     void update_special_vertices();
     HARNESS_CALLED f32 get_slowdown_factor();
+    // Its first level inlined, as in AnmVm::run.
+    f32 get_slowdown_factor_inline()
+    {
+        if (parent != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+        {
+            return parent->get_slowdown_factor();
+        }
+        return slowdown;
+    }
     void alloc_extra_data(u32 size);
     void set_layer(i32 layer);
     DECOMP_NOINLINE void set_alpha1_time(i32 end_time, i32 method, u8 initial, u8 goal);

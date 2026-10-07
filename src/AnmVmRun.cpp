@@ -298,25 +298,23 @@ __forceinline i32 AnmVm::run_script()
         return 0;
     }
     timer_1c++;
-    if (pending_interrupt != 0)
+    if (pending_interrupt == 0)
     {
-        goto interrupt;
+        if ((flags_hi & (ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000)) == ANM_VM_FLAG_HI_4000 && g_GameThread != NULL &&
+            g_GameThread->flags.flag_1)
+        {
+            return 0;
+        }
     }
-    if ((flags_hi & (ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000)) == ANM_VM_FLAG_HI_4000 && g_GameThread != NULL &&
-        g_GameThread->flags.flag_1)
+    else
     {
-        return 0;
-    }
-    goto run_script;
-
-interrupt:
-    {
+    interrupt:
         // Jump to the label of the pending interrupt, else to label -1.
-        AnmRawInstr *fallback = NULL;
         i32 fallback_offset = 0;
         i32 offset = 0;
+        AnmRawInstr *fallback = NULL;
         ins = (AnmRawInstr *)g_AnmManager->loaded_anms[anm_loaded_index]->scripts[script_id];
-        while (!(ins->opcode == 5 && ins->args[0].i == pending_interrupt) && ins->opcode != -1)
+        while (!(ins->opcode == 5 && pending_interrupt == ins->args[0].i) && ins->opcode != -1)
         {
             if (ins->opcode == 5 && ins->args[0].i == -1)
             {
@@ -345,7 +343,6 @@ interrupt:
         instr_offset = offset;
     }
 
-run_script:
     for (;;)
     {
         ins = (AnmRawInstr *)(g_AnmManager->loaded_anms[anm_loaded_index]->scripts[script_id] + instr_offset);
@@ -1190,9 +1187,9 @@ i32 AnmVm::run()
     {
         g_game_speed = 1.0f;
     }
-    if (get_slowdown_factor() > 0.0f)
+    if (get_slowdown_factor_inline() > 0.0f)
     {
-        g_game_speed = saved_game_speed - get_slowdown_factor() * saved_game_speed;
+        g_game_speed = saved_game_speed - get_slowdown_factor_inline() * saved_game_speed;
         if (g_game_speed < 0.0f)
         {
             g_game_speed = 0.0f;
