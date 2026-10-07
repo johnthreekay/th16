@@ -402,6 +402,8 @@ i32 GameThread::thread_start()
     {
         goto fail;
     }
+    // Outside the demo, load the stage and boss themes (stopping the old
+    // music unless in spell practice).
     if (!(GLOBALS_FLAGS_45C & GLOBALS_WORD_DEMO_PLAY))
     {
         // The original tests the flag byte in memory and loads the word
@@ -419,6 +421,7 @@ i32 GameThread::thread_start()
     thread->time_in_stage.set_value(0);
     (&g_Globals.unk_204)[g_Globals.stage_num] = 0;
     g_Globals.unk_224 = 0;
+    // Wait for the sound thread to take the music commands.
     while (g_SoundManager.bgm_commands[0].command != 0)
     {
         Sleep(16);

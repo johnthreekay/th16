@@ -163,9 +163,10 @@ struct GameThread
     static i32 __fastcall on_draw_callback(GameThread *thread);
     // Adds the time since the last call to the scorefile's play time.
     static void update_play_time();
-    // 0x42dc50. Starts the stage on its first frame: 1 if the thread failed
-    // (back to the title); otherwise starts the background and resets the
-    // game objects, or, coming from a previous stage, crossfades from its
+    // 0x42dc50. Starts the stage on its first frame: 1 if thread_start
+    // failed (the game then switches to mode 3, or 2 with Supervisor flag
+    // 0x2000); otherwise starts the background and resets the game
+    // objects, or, coming from a previous stage, crossfades from its
     // background and leaves the reset to finish_stage_transition.
     HARNESS_CALLED i32 begin_stage();
     // 0x42dee0. 30 frames in, finishes a stage transition that begin_stage
