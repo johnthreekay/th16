@@ -57,7 +57,7 @@ GameThread::GameThread()
 HARNESS_CALLED GameThread *GameThread::create(i32 replay_mode)
 {
     GameThread *thread = new GameThread();
-    g_frame_pacing.mode = 0;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
     g_Supervisor.d3d_device->EvictManagedResources();
     g_GameThread = thread;
     thread->replay_mode = replay_mode;
@@ -70,7 +70,7 @@ HARNESS_CALLED GameThread *GameThread::create(i32 replay_mode)
 void GameThread::destroy()
 {
     GameThread *thread = g_GameThread;
-    g_frame_pacing.mode = 0;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
     if (thread != NULL)
     {
         delete thread;
@@ -631,7 +631,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
     }
     if (time_in_stage.current == 5)
     {
-        g_frame_pacing.mode = 2;
+        g_frame_pacing.mode = FRAME_PACING_GAME;
     }
     if (*(u32 *)&flags & 4)
     {

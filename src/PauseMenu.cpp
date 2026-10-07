@@ -467,7 +467,7 @@ void PauseMenu::open()
     saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
     saved_pacing_mode = g_frame_pacing.mode;
-    g_frame_pacing.mode = 0;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
     Gui *gui = g_Gui;
     if (gui->msg != NULL)
     {
@@ -511,7 +511,7 @@ void open_stage_end_menu()
     menu->saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
     menu->saved_pacing_mode = g_frame_pacing.mode;
-    g_frame_pacing.mode = 1;
+    g_frame_pacing.mode = FRAME_PACING_MENU;
     if (gui->msg != NULL)
     {
         gui->msg->hide();
@@ -594,7 +594,7 @@ void open_replay_end_menu()
     menu->saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
     menu->saved_pacing_mode = g_frame_pacing.mode;
-    g_frame_pacing.mode = 0;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
     menu->menu_flags &= ~PAUSE_FROM_STAGE_END;
 }
 
@@ -639,7 +639,7 @@ void open_game_over_menu()
     menu->saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
     menu->saved_pacing_mode = g_frame_pacing.mode;
-    g_frame_pacing.mode = 1;
+    g_frame_pacing.mode = FRAME_PACING_MENU;
     menu->menu_flags &= ~PAUSE_FROM_STAGE_END;
 }
 

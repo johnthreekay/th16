@@ -152,7 +152,7 @@ int LoadingThread::on_tick()
     if (flags & 2)
     {
         g_Supervisor.setup_special_anms();
-        g_frame_pacing.mode = 1;
+        g_frame_pacing.mode = FRAME_PACING_MENU;
         g_AsciiManager->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
         g_AsciiManager->on_draw_func_1->flags |= UPDATE_FUNC_ACTIVE;
         g_AsciiManager->on_draw_func_2->flags |= UPDATE_FUNC_ACTIVE;

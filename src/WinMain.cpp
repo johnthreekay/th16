@@ -97,7 +97,7 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
     g_frame_pacing.pacing[3].max_sleep_ms = 8;
     g_frame_pacing.pacing[3].sleep_ms = 8;
     g_frame_pacing.pacing[3].late_frames = 0;
-    g_frame_pacing.mode = 0;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
     g_GameWindow.set_resolution_from_config();
     if (!g_Supervisor.present_params.Windowed)
     {

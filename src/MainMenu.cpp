@@ -136,7 +136,7 @@ unsigned __stdcall TitleInf::thread_start()
         g_AnmManager->unload_anm(1);
     }
     g_MainMenu->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
-    g_frame_pacing.mode = 1;
+    g_frame_pacing.mode = FRAME_PACING_MENU;
     return 0;
 }
 
@@ -204,7 +204,7 @@ TitleInf::~TitleInf()
 TitleInf *TitleInf::create()
 {
     TitleInf *menu = new TitleInf;
-    g_frame_pacing.mode = 0;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
     menu->thread.restart((ThreadStart)thread_start, menu);
     return menu;
 }
