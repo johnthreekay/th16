@@ -128,7 +128,14 @@ static __forceinline void help_highlight_pages(HelpManual *manual)
 {
     for (i32 i = 0; i < 9; i++)
     {
-        AnmManager::interrupt_tree_and_run(manual->page_vms[i], manual->menu.next_selection == i ? 2 : 3);
+        if (manual->menu.next_selection == i)
+        {
+            AnmManager::interrupt_tree_and_run(manual->page_vms[i], 2);
+        }
+        else
+        {
+            AnmManager::interrupt_tree_and_run(manual->page_vms[i], 3);
+        }
     }
 }
 
@@ -138,7 +145,14 @@ static __forceinline void help_create_pages(HelpManual *manual, D3DXVECTOR3 *pos
     for (i32 i = 0; i < 9; i++)
     {
         manual->page_vms[i] = manual->help_anm->create_ui_vm(i, pos, 0);
-        AnmManager::interrupt_tree_and_run(manual->page_vms[i], manual->menu.next_selection == i ? 2 : 3);
+        if (manual->menu.next_selection == i)
+        {
+            AnmManager::interrupt_tree_and_run(manual->page_vms[i], 2);
+        }
+        else
+        {
+            AnmManager::interrupt_tree_and_run(manual->page_vms[i], 3);
+        }
     }
 }
 
@@ -150,9 +164,8 @@ static __forceinline void help_hide_pages(HelpManual *manual)
     }
 }
 
-// TODO: ours gets a /GS cookie where the original realigns the frame, turns
-// the 2 : 3 interrupt choice into setne, and reads the input globals in a
-// different order.
+// TODO: ours gets a /GS cookie where the original realigns the frame, and
+// reads the input globals in a different order.
 // FUNCTION: TH16 0x42eab0
 DECOMP_NOINLINE i32 HelpManual::on_tick_body()
 {
