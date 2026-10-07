@@ -1380,3 +1380,156 @@ i32 LaserLineInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rec
     }
     return count;
 }
+
+// cancel_as_bomb_circle for a bomb's rectangle, tested in the rectangle's
+// frame. The pieces after the first hit run become straight lasers.
+// TODO: register allocation differs throughout, as in LaserLineInf::cancel_as_bomb_rectangle.
+// FUNCTION: TH16 0x435880
+i32 LaserInfiniteInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 e)
+{
+    if (e != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    Float3 origin = position;
+    i32 count = 0;
+    f32 dist = 8.0f;
+    u8 hit[0x100];
+    memset(hit, 0, sizeof(hit));
+    f32 dx = position.x - center->x;
+    f32 dy = position.y - center->y;
+    f32 neg_angle = -rect_angle;
+    f32 s = zun_sinf(neg_angle);
+    f32 c = zun_cosf(neg_angle);
+    f32 local_x = dx * c - dy * s;
+    f32 local_y = dy * c + dx * s;
+    i32 n = 0;
+    f32 local_angle = angle - rect_angle;
+    while (local_angle > ZUN_PI)
+    {
+        local_angle -= ZUN_2PI;
+        if (n++ > 32)
+        {
+            break;
+        }
+    }
+    while (local_angle < -ZUN_PI)
+    {
+        local_angle += ZUN_2PI;
+        if (n++ > 32)
+        {
+            break;
+        }
+    }
+    Float3 local_step;
+    laser_sincosmul(&local_step, local_angle, 8.0f);
+    local_y += local_step.y;
+    local_step.z = 0.0f;
+    local_step.y += local_step.y;
+    f32 half_w = size->x * 0.5f;
+    f32 half_h = size->y * 0.5f;
+    local_x += local_step.x;
+    local_step.x += local_step.x;
+    Float3 step;
+    laser_sincosmul(&step, angle, 8.0f);
+    step.z = 0.0f;
+    Float3 pos;
+    pos = position + step;
+    pos.z = 0.0f;
+    step.x += step.x;
+    step.y += step.y;
+    step.z += step.z;
+    i32 i;
+    for (i = 0; unk_70 >= dist + 8.0f; i++)
+    {
+        if (!(-half_w > local_x || local_x > half_w || -half_h > local_y || local_y > half_h))
+        {
+            count++;
+            hit[i] = 1;
+            gen_items_from_cancel(&pos, mode);
+            if (bullet_type <= 0x11 || bullet_type == 0x22 || bullet_type == 0x26)
+            {
+                AnmId id = g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0xd1, &pos, 0.0f, -1, 0);
+                g_EffectManager->track_inline(id);
+            }
+            else if (bullet_type <= 0x1f || bullet_type == 0x1b)
+            {
+                g_EffectManager->track(
+                    g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x101, &pos, 0.0f, -1, 0));
+            }
+            else if (bullet_type <= 0x21)
+            {
+                g_EffectManager->track(
+                    g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x119, &pos, 0.0f, -1, 0));
+            }
+        }
+        pos += step;
+        local_x += local_step.x;
+        local_y += local_step.y;
+        dist += 16.0f;
+    }
+    if (count != 0)
+    {
+        i32 j;
+        for (j = 0; j < i; j++)
+        {
+            if (!hit[j])
+            {
+                break;
+            }
+        }
+        if (j != 0)
+        {
+            unk_70 = 0.0f;
+        }
+        else
+        {
+            i32 run = 0;
+            for (; j < i; j++, run++)
+            {
+                if (hit[j])
+                {
+                    break;
+                }
+            }
+            if (j < i)
+            {
+                unk_70 = (f32)run * 16.0f;
+            }
+        }
+        while (j < i)
+        {
+            if (hit[j])
+            {
+                j++;
+                continue;
+            }
+            i32 run = 0;
+            i32 start = j;
+            while (!hit[j])
+            {
+                j++;
+                run++;
+                if (j >= i)
+                {
+                    break;
+                }
+            }
+            LaserLineInner params;
+            params.speed = 8.0f;
+            params.distance = 0.0f;
+            params.shot_sfx = -1;
+            params.shot_transform_sfx = -1;
+            params.laser_new_arg_2 = params.laser_new_arg_1 = (f32)run * 16.0f;
+            params.start_pos = origin + step * (f32)start;
+            params.ang_aim = angle;
+            params.bullet_type = inner.type;
+            params.laser_new_arg_4 = width;
+            params.bullet_color = inner.color;
+            params.laser_new_arg_3 = inner.laser_new_arg_2 - (f32)start * 16.0f;
+            params.flags ^= (params.flags ^ (inner.flags >> 1)) & 1;
+            g_LaserManager->allocate_new_laser(LASER_LINE, &params);
+        }
+    }
+    return count;
+}
