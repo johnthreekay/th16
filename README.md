@@ -256,6 +256,32 @@ decompiled code the surroundings it had in the original:
   `node = &list; while ((node = node->next) != NULL)` so the flags store
   comes first.
 
+- Globals next to address-taken ones (probably one ZUN struct, such as the
+  screen block near 0x4d9d10) need their address exposed too (a harness
+  taking `&g_x` is enough); otherwise LTCG keeps them in registers across
+  pointer stores and turns conditional stores into cmov.
+- A jump table without a bounds check comes from `default: __assume(0);`.
+- Byte/word store combining follows statement order.
+- `this->member % n` inside an inline member function keeps
+  `cdq; idiv` even when n is constant after inlining; a free inline
+  function (or n as the dividend) gets the magic multiply.
+- A struct-returning call whose result is read back from its stack slot
+  (not through eax) was inside an inlined helper returning the struct.
+- A dropped unused `this` keeps the parameter slot (callers `push ecx`); a
+  `__stdcall` static loses it entirely (`ret` instead of `ret 4`).
+- LTCG may stop folding a constant `this` once callers in several objects
+  pass it (CriticalSections::leave now reads g_CriticalSections directly);
+  when a constant caller still keeps `this`, the harness can pass an opaque
+  pointer (Supervisor::load_game_config).
+- Arguments of inlined helpers are evaluated right to left: load the object
+  pointer into a local first. `fabsf` and `fabs` compile differently.
+- Doubles at 4-byte offsets in plain structs need `#pragma pack(4)` too
+  (Spellcard, Scorefile).
+- Not reproduced yet: the original pops each `malloc` argument right after
+  the call at most sites; ours merges the pops (Fog::Fog, AnmLoaded::load).
+- Some matches depend on unrelated code existing: 0x43c940 stops matching
+  as soon as write_screenshot is defined anywhere in the program.
+
 ### Known tooling gaps
 
 - Template members cannot be annotated: build.py's name parsing does not
@@ -273,6 +299,8 @@ decompiled code the surroundings it had in the original:
 - build.py reads `template <> __declspec(noinline) X::f` as a function
   named `__declspec`; use DECOMP_NOINLINE. An explicit specialization of an
   in-class template member also needs a user in its own .cpp to be emitted.
+- Dynamic initializers (0x401000-0x401250) and C-linkage UCRT inlines
+  (0x405530, 0x405540, 0x4090d0) cannot be annotated yet.
 - SYNTHETIC only takes scalar deleting destructors, so implicit
   constructors and destructors (AnmFastVm at 0x46b770/0x46b790) need an
   explicit definition to be annotated.
