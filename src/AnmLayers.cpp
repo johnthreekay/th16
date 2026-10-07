@@ -6,7 +6,7 @@
 #include "Supervisor.h"
 
 // 0x43c780. Recomputes a camera's matrices and viewport.
-void __stdcall camera_update_43c780(Camera *camera);
+void __stdcall camera_update_2d(Camera *camera);
 
 // Makes one of the Supervisor's cameras the current one.
 inline void use_camera(i32 index)
@@ -241,7 +241,7 @@ int __fastcall AnmManager::on_draw_53_layer_42(AnmManager *mgr)
 // FUNCTION: TH16 0x46ddd0
 int __fastcall AnmManager::on_draw_0a_layer_03(AnmManager *mgr)
 {
-    camera_update_43c780(&g_Supervisor.cameras[3]);
+    camera_update_2d(&g_Supervisor.cameras[3]);
     use_camera(3);
     g_Supervisor.disable_d3d_fog_inline();
     return mgr->render_layer(3);

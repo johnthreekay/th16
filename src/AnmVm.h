@@ -145,7 +145,7 @@ struct AnmVmFlagsLoFields
     // Instruction 305.
     u32 z_write_disable : 1;
     u32 unk_14 : 1;
-    // Instruction 306: entity_pos follows the stage camera's unk_104.
+    // Instruction 306: entity_pos follows the stage camera's position_delta.
     u32 follow_camera : 1;
     u32 unk_16 : 1;
     // Which of color_1/color_2 to draw with (ANM_VM_COLOR_MODE_MASK).

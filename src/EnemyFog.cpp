@@ -14,7 +14,7 @@ void EnemyData::update_fog()
     {
         return;
     }
-    D3DXVECTOR3 *points = (D3DXVECTOR3 *)mesh->buffer_18;
+    D3DXVECTOR3 *points = (D3DXVECTOR3 *)mesh->points;
     f32 radius = fog.unk_c;
     // The angles are ZunAngles in ZUN's struct: copied as such.
     ZunAngle angle_x = *(ZunAngle *)&fog.unk_14;
@@ -28,10 +28,10 @@ void EnemyData::update_fog()
     f32 center_x = g_resolution_x * 0.5f + pos.x;
     f32 center_y = g_game_2d_origin_y + pos.y;
     D3DXVECTOR3 d;
-    FogVertex *vertex = (FogVertex *)((Fog *)fog.fog_ptr)->buffer_14;
-    for (i32 i = 0; i < ((Fog *)fog.fog_ptr)->vm_count; i++)
+    FogVertex *vertex = (FogVertex *)((Fog *)fog.fog_ptr)->vertices;
+    for (i32 i = 0; i < ((Fog *)fog.fog_ptr)->strip_count; i++)
     {
-        for (i32 j = 0; j < ((Fog *)fog.fog_ptr)->unk_4; j++)
+        for (i32 j = 0; j < ((Fog *)fog.fog_ptr)->strip_points; j++)
         {
             d = D3DXVECTOR3(points->x - center_x, points->y - center_y, points->z - pos.z);
             f32 t = radius * radius - (d.x * d.x + d.y * d.y);

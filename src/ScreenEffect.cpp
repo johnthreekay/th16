@@ -254,32 +254,32 @@ i32 __fastcall ScreenEffect::on_tick_shake(ScreenEffect *self)
     switch (g_replay_unsafe_rng.rand_u32() % 3)
     {
     case 0:
-        g_Supervisor.cameras[3].unk_fc.x = 0.0f;
-        g_Supervisor.cameras[1].unk_fc.x = 0.0f;
+        g_Supervisor.cameras[3].shake_offset.x = 0.0f;
+        g_Supervisor.cameras[1].shake_offset.x = 0.0f;
         break;
     case 1:
-        g_Supervisor.cameras[3].unk_fc.x = amount;
-        g_Supervisor.cameras[1].unk_fc.x = amount * g_screen_coord_scale;
+        g_Supervisor.cameras[3].shake_offset.x = amount;
+        g_Supervisor.cameras[1].shake_offset.x = amount * g_screen_coord_scale;
         break;
     case 2:
-        g_Supervisor.cameras[3].unk_fc.x = -amount;
+        g_Supervisor.cameras[3].shake_offset.x = -amount;
         // Not negated, unlike every other case.
-        g_Supervisor.cameras[1].unk_fc.x = amount * g_screen_coord_scale;
+        g_Supervisor.cameras[1].shake_offset.x = amount * g_screen_coord_scale;
         break;
     }
     switch (g_replay_unsafe_rng.rand_u32() % 3)
     {
     case 0:
-        g_Supervisor.cameras[3].unk_fc.y = 0.0f;
-        g_Supervisor.cameras[1].unk_fc.y = 0.0f;
+        g_Supervisor.cameras[3].shake_offset.y = 0.0f;
+        g_Supervisor.cameras[1].shake_offset.y = 0.0f;
         break;
     case 1:
-        g_Supervisor.cameras[3].unk_fc.y = amount;
-        g_Supervisor.cameras[1].unk_fc.y = amount * g_screen_coord_scale;
+        g_Supervisor.cameras[3].shake_offset.y = amount;
+        g_Supervisor.cameras[1].shake_offset.y = amount * g_screen_coord_scale;
         break;
     case 2:
-        g_Supervisor.cameras[3].unk_fc.y = -amount;
-        g_Supervisor.cameras[1].unk_fc.y = -(amount * g_screen_coord_scale);
+        g_Supervisor.cameras[3].shake_offset.y = -amount;
+        g_Supervisor.cameras[1].shake_offset.y = -(amount * g_screen_coord_scale);
         break;
     }
     return UPDATE_FUNC_CONTINUE;
@@ -321,31 +321,31 @@ i32 __fastcall ScreenEffect::on_tick_shake_with_ramp(ScreenEffect *self)
     switch (g_replay_safe_rng.rand_u32() % 3)
     {
     case 0:
-        g_Supervisor.cameras[3].unk_fc.x = 0.0f;
-        g_Supervisor.cameras[1].unk_fc.x = 0.0f;
+        g_Supervisor.cameras[3].shake_offset.x = 0.0f;
+        g_Supervisor.cameras[1].shake_offset.x = 0.0f;
         break;
     case 1:
-        g_Supervisor.cameras[3].unk_fc.x = amount;
-        g_Supervisor.cameras[1].unk_fc.x = amount * g_screen_coord_scale;
+        g_Supervisor.cameras[3].shake_offset.x = amount;
+        g_Supervisor.cameras[1].shake_offset.x = amount * g_screen_coord_scale;
         break;
     case 2:
-        g_Supervisor.cameras[3].unk_fc.x = -amount;
-        g_Supervisor.cameras[1].unk_fc.x = -(amount * g_screen_coord_scale);
+        g_Supervisor.cameras[3].shake_offset.x = -amount;
+        g_Supervisor.cameras[1].shake_offset.x = -(amount * g_screen_coord_scale);
         break;
     }
     switch (g_replay_safe_rng.rand_u32() % 3)
     {
     case 0:
-        g_Supervisor.cameras[3].unk_fc.y = 0.0f;
-        g_Supervisor.cameras[1].unk_fc.y = 0.0f;
+        g_Supervisor.cameras[3].shake_offset.y = 0.0f;
+        g_Supervisor.cameras[1].shake_offset.y = 0.0f;
         break;
     case 1:
-        g_Supervisor.cameras[3].unk_fc.y = amount;
-        g_Supervisor.cameras[1].unk_fc.y = amount * g_screen_coord_scale;
+        g_Supervisor.cameras[3].shake_offset.y = amount;
+        g_Supervisor.cameras[1].shake_offset.y = amount * g_screen_coord_scale;
         break;
     case 2:
-        g_Supervisor.cameras[3].unk_fc.y = -amount;
-        g_Supervisor.cameras[1].unk_fc.y = -(amount * g_screen_coord_scale);
+        g_Supervisor.cameras[3].shake_offset.y = -amount;
+        g_Supervisor.cameras[1].shake_offset.y = -(amount * g_screen_coord_scale);
         break;
     }
     return UPDATE_FUNC_CONTINUE;

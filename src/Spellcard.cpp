@@ -263,7 +263,7 @@ HARNESS_CALLED void Spellcard::end()
     {
         return;
     }
-    g_Stage->stage_flags |= STAGE_FLAG_1;
+    g_Stage->stage_flags |= STAGE_VISIBLE;
     AnmManager::interrupt_tree(text_anm_ids[0], 1);
     AnmManager::interrupt_tree(text_anm_ids[1], 1);
     AnmManager::interrupt_tree(text_anm_ids[2], 1);
@@ -378,7 +378,7 @@ i32 Spellcard::on_tick_body()
     ticks++;
     if (time.current >= 60 && !(flags & SPELLCARD_FLAG_200))
     {
-        g_Stage->stage_flags &= ~STAGE_FLAG_1;
+        g_Stage->stage_flags &= ~STAGE_VISIBLE;
     }
     if (time.current >= 300 && !(flags & SPELLCARD_NO_BONUS_DECAY))
     {

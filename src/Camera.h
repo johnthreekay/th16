@@ -72,14 +72,19 @@ struct CameraSky
     }
 };
 
-// One of the Supervisor's four cameras. Layout from ExpHP's th-re-data.
+// One of the Supervisor's four cameras (camera 3 is the stage's 3D view,
+// camera 2 the whole window). Layout from ExpHP's th-re-data.
 struct Camera
 {
     Float3 position;
     Float3 facing;
     Float3 up;
     Float3 facing_normalized;
-    Float3 unk_30;
+    // facing x up, normalized (camera_apply_3d): projected to size
+    // billboarded sprites.
+    Float3 right;
+    // Offsets of the eye (rocking_vector_1, added to position) and of the
+    // facing (rocking_vector_2) from STD_ROCKING_MODE.
     Float3 rocking_vector_1;
     Float3 rocking_vector_2;
     f32 field_of_view;
@@ -88,8 +93,12 @@ struct Camera
     D3DMATRIX projection_matrix;
     D3DVIEWPORT9 viewport;
     i32 camera_index;
-    Float2 unk_fc;
-    Float3 unk_104;
+    // The screen shake's offset (ScreenEffect), which the ANM manager adds
+    // to sprites.
+    Float2 shake_offset;
+    // How far STD_POS moved the camera this frame; ANM instruction 306 has
+    // VMs follow it.
+    Float3 position_delta;
     CameraSky sky;
 
     // 0x40d510. Empty; g_Supervisor's static initializer calls it for each
@@ -98,7 +107,7 @@ struct Camera
 };
 
 // 0x43c780. Recomputes a camera's matrices for a flat view of its viewport.
-void __stdcall camera_update_43c780(Camera *camera);
+void __stdcall camera_update_2d(Camera *camera);
 // 0x43c940. Recomputes a camera's matrices from its position, rocking and
-// facing, and makes them the device's.
-void __stdcall camera_apply_43c940(Camera *camera);
+// facing, and makes them the device's; also updates right.
+void __stdcall camera_apply_3d(Camera *camera);

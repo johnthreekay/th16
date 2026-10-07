@@ -311,7 +311,7 @@ HARNESS_CALLED void Supervisor::swap_transform_matrices(Camera *camera)
     g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &camera->projection_matrix);
     if (g_AnmManager != NULL)
     {
-        g_AnmManager->camera_unk_fc = camera->unk_fc;
+        g_AnmManager->camera_unk_fc = camera->shake_offset;
     }
 }
 
@@ -321,7 +321,7 @@ DECOMP_NOINLINE float __CRTDECL tanf(float);
 
 // TODO: the original builds the three vectors after the tanf call (eye and at from one packed x, y); ours stores the constants up front.
 // FUNCTION: TH16 0x43c780
-void __stdcall camera_update_43c780(Camera *camera)
+void __stdcall camera_update_2d(Camera *camera)
 {
     f32 x = camera->viewport.X + camera->viewport.Width * 0.5f;
     f32 y = camera->viewport.Height * 0.5f + camera->viewport.Y;
@@ -337,7 +337,7 @@ void __stdcall camera_update_43c780(Camera *camera)
 
 // TODO: matches until write_screenshot exists (in any file, any body): then LTCG stops keeping &camera->up in ebx. Whole-program effect.
 // FUNCTION: TH16 0x43c940
-void __stdcall camera_apply_43c940(Camera *camera)
+void __stdcall camera_apply_3d(Camera *camera)
 {
     if (g_AnmManager != NULL)
     {
@@ -351,11 +351,11 @@ void __stdcall camera_apply_43c940(Camera *camera)
                                (f32)camera->viewport.Width / (f32)camera->viewport.Height, 30.0f, 8000.0f);
     g_Supervisor.d3d_device->SetTransform(D3DTS_VIEW, &camera->view_matrix);
     g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &camera->projection_matrix);
-    D3DXVec3Cross(&camera->unk_30, &facing, &camera->up);
-    D3DXVec3Normalize(&camera->unk_30, &camera->unk_30);
+    D3DXVec3Cross(&camera->right, &facing, &camera->up);
+    D3DXVec3Normalize(&camera->right, &camera->right);
     if (g_AnmManager != NULL)
     {
-        g_AnmManager->camera_unk_fc = camera->unk_fc;
+        g_AnmManager->camera_unk_fc = camera->shake_offset;
     }
 }
 
@@ -381,7 +381,7 @@ void Supervisor::setup_cameras()
     cameras[2].camera_index = 2;
     cameras[2].window_resolution[0] = g_resolution_x;
     cameras[2].window_resolution[1] = g_resolution_y;
-    camera_update_43c780(&cameras[2]);
+    camera_update_2d(&cameras[2]);
 
     cameras[0] = cameras[2];
     cameras[0].camera_index = 0;
@@ -389,7 +389,7 @@ void Supervisor::setup_cameras()
     cameras[0].viewport.Y = (i32)(g_screen_coord_scale * 16.0f);
     cameras[0].viewport.Width = (i32)(g_screen_coord_scale * 384.0f);
     cameras[0].viewport.Height = (i32)(g_screen_coord_scale * 448.0f);
-    camera_update_43c780(&cameras[0]);
+    camera_update_2d(&cameras[0]);
 
     cameras[1] = cameras[0];
     cameras[1].camera_index = 1;
@@ -397,7 +397,7 @@ void Supervisor::setup_cameras()
     cameras[1].viewport.Y = (i32)(g_screen_coord_scale * 16.0f);
     cameras[1].viewport.Width = (i32)(g_screen_coord_scale * 384.0f);
     cameras[1].viewport.Height = (i32)(g_screen_coord_scale * 448.0f);
-    camera_update_43c780(&cameras[1]);
+    camera_update_2d(&cameras[1]);
 
     cameras[3] = cameras[0];
     cameras[3].camera_index = 3;
@@ -405,7 +405,7 @@ void Supervisor::setup_cameras()
     cameras[3].viewport.Y = (i32)((g_resolution_y - 472.0f) * 0.5f);
     cameras[3].viewport.Width = 408;
     cameras[3].viewport.Height = 472;
-    camera_update_43c780(&cameras[3]);
+    camera_update_2d(&cameras[3]);
 
     g_arcade_hud_origin_x = g_resolution_x / 2;
     g_arcade_hud_origin_y = (i32)(g_screen_coord_scale * 16.0f);
@@ -755,10 +755,10 @@ int __fastcall Supervisor::on_draw_38(void *arg)
 int __fastcall Supervisor::on_draw_55(void *arg)
 {
     g_AnmManager->flush_sprites();
-    g_Supervisor.cameras[3].unk_fc.x = 0.0f;
-    g_Supervisor.cameras[3].unk_fc.y = 0.0f;
-    g_Supervisor.cameras[1].unk_fc.x = 0.0f;
-    g_Supervisor.cameras[1].unk_fc.y = 0.0f;
+    g_Supervisor.cameras[3].shake_offset.x = 0.0f;
+    g_Supervisor.cameras[3].shake_offset.y = 0.0f;
+    g_Supervisor.cameras[1].shake_offset.x = 0.0f;
+    g_Supervisor.cameras[1].shake_offset.y = 0.0f;
     return 1;
 }
 

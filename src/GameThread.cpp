@@ -890,8 +890,8 @@ HARNESS_CALLED i32 GameThread::begin_stage()
     g_Stage->start_std_vms();
     if (g_Stage2 != NULL)
     {
-        g_Stage2->start_fade_in();
-        g_Stage->start_fade_out();
+        g_Stage2->start_exit();
+        g_Stage->start_enter();
         flags.stage_transition = 1;
         AnmManager::interrupt_tree(g_Gui->spell_notice_id, 1);
         return 0;

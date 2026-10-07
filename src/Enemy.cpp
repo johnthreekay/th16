@@ -2268,9 +2268,9 @@ int EnemyData::step_interpolators()
     abs_pos.step();
     if (flags_low & 0x4000000)
     {
-        rel_pos.pos.x += g_Supervisor.cameras[0].unk_104.x;
-        rel_pos.pos.y += g_Supervisor.cameras[0].unk_104.y;
-        rel_pos.pos.z += g_Supervisor.cameras[0].unk_104.z;
+        rel_pos.pos.x += g_Supervisor.cameras[0].position_delta.x;
+        rel_pos.pos.y += g_Supervisor.cameras[0].position_delta.y;
+        rel_pos.pos.z += g_Supervisor.cameras[0].position_delta.z;
     }
     rel_pos.step();
     update_final_pos();

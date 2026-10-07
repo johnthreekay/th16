@@ -21,13 +21,13 @@ Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
         memset(this, 0, sizeof(Fog));
         return;
     }
-    vm_count = FOG_STRIP_COUNT;
-    unk_4 = points_per_strip;
+    strip_count = FOG_STRIP_COUNT;
+    strip_points = points_per_strip;
     vm_ids = (AnmId *)malloc(sizeof(AnmId) * FOG_STRIP_COUNT - 1);
     vms = (AnmVm **)malloc(sizeof(AnmVm *) * FOG_STRIP_COUNT - 1);
     i32 num_points = FOG_STRIP_COUNT * points_per_strip;
-    buffer_14 = malloc(num_points * sizeof(FogVertex));
-    buffer_18 = malloc(num_points * sizeof(D3DXVECTOR3));
+    vertices = malloc(num_points * sizeof(FogVertex));
+    points = malloc(num_points * sizeof(D3DXVECTOR3));
     AnmId id;
     id = g_Supervisor.text_anm->create_effect(0x3b, 0x22, NULL);
     AnmVm *vm = g_AnmManager->get_vm_with_id(id);
@@ -41,7 +41,7 @@ Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
     vm = get_vm_or_clear(main_vm);
     vm->index_of_on_draw = 4;
     vm->associated_game_entity = this;
-    for (i32 i = 0; i < vm_count - 1; i++)
+    for (i32 i = 0; i < strip_count - 1; i++)
     {
         vm_ids[i] = g_Supervisor.create_fog_vm(points_per_strip, 0x3b);
         vms[i] = get_vm_or_clear(vm_ids[i]);
@@ -55,21 +55,21 @@ Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
 // FUNCTION: TH16 0x418df0
 HARNESS_CALLED void Fog::set_rect(f32 x, f32 y, f32 width, f32 height)
 {
-    if (vm_count == 0)
+    if (strip_count == 0)
     {
         return;
     }
-    f32 step_x = width / (f32)(vm_count - 1);
-    f32 step_y = height / (f32)(unk_4 - 1);
-    D3DXVECTOR3 *point = (D3DXVECTOR3 *)buffer_18;
-    FogVertex *vertex = (FogVertex *)buffer_14;
+    f32 step_x = width / (f32)(strip_count - 1);
+    f32 step_y = height / (f32)(strip_points - 1);
+    D3DXVECTOR3 *point = (D3DXVECTOR3 *)points;
+    FogVertex *vertex = (FogVertex *)vertices;
     D3DXVECTOR3 pos;
     pos.x = (f32)g_game_2d_origin_x + x;
     pos.y = (f32)g_game_2d_origin_y + y;
     pos.z = 0.0f;
-    for (i32 i = 0; i < vm_count; i++)
+    for (i32 i = 0; i < strip_count; i++)
     {
-        for (i32 j = 0; j < unk_4; j++)
+        for (i32 j = 0; j < strip_points; j++)
         {
             vertex->pos = *point = pos;
             vertex->uv.x = point->x / (f32)g_resolution_x;
@@ -97,18 +97,18 @@ HARNESS_CALLED void Fog::set_rect(f32 x, f32 y, f32 width, f32 height)
 // FUNCTION: TH16 0x418f40
 void Fog::update_vms()
 {
-    if (vm_count == 0)
+    if (strip_count == 0)
     {
         return;
     }
-    FogVertex *src = (FogVertex *)buffer_14;
-    for (i32 i = 0; i < vm_count - 1; i++)
+    FogVertex *src = (FogVertex *)vertices;
+    for (i32 i = 0; i < strip_count - 1; i++)
     {
         FogVertex *dst = (FogVertex *)vms[i]->ins_508_extra_data;
-        for (i32 j = 0; j < unk_4; j++)
+        for (i32 j = 0; j < strip_points; j++)
         {
             *dst++ = *src;
-            *dst++ = src[unk_4];
+            *dst++ = src[strip_points];
             src++;
         }
     }
