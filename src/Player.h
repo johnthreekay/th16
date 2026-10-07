@@ -139,7 +139,8 @@ struct PlayerOption
     // Nothing in TH16 uses it (ExpHP: probably a VM id).
     i32 unk_80;
     u8 unk_84[0xa8 - 0x84];
-    // The direction shooters with an angle of 995 and up fire in.
+    // The direction shooters with an angle of 995 and up fire in (nothing
+    // in TH16 sets it, so 0).
     f32 angle;
     u8 unk_ac[0xb0 - 0xac];
     // The option's VM, and (main options at full power) the VM of its
@@ -155,8 +156,9 @@ struct PlayerOption
     i32 should_instajump;
     u8 unk_d8[0xdc - 0xd8];
     // Called each frame before the option moves (with the main option of
-    // the same index, even for season options).
+    // the same index, even for season options). Nothing in TH16 sets it.
     void(__fastcall *on_update)(PlayerOption *option);
+
     u8 unk_e0[0xe4 - 0xe0];
 };
 

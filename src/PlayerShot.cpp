@@ -180,10 +180,7 @@ i32 __fastcall sht_on_init_laser(PlayerBullet *bullet)
     Player *player = g_Player;
     bullet->hitbox_width_i = 0;
     g_SoundManager.play_sound_at_position(0x14, player->inner.pos.x);
-    // The original reuses g_Player across the sound call, which LTCG knows
-    // leaves it alone; with the sound code still a placeholder, spell that out.
-    PlayerDamageSource *source =
-        bullet->damage_source_index == 0 ? NULL : &player->inner.damage_sources[bullet->damage_source_index - 1];
+    PlayerDamageSource *source = bullet->damage_source();
     source->hit_interval = 1;
     source->width = 0.0f;
     bullet->flags &= ~PLAYER_BULLET_MOVES_DAMAGE_SOURCE;
