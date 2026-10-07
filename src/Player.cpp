@@ -340,6 +340,43 @@ HARNESS_CALLED i32 Player::create_damage_source(D3DXVECTOR3 *pos, f32 radius, f3
 
 // TODO: the original stores both halves of the position before reading x
 // back; ours reads x back between the stores.
+// FUNCTION: TH16 0x444b20
+HARNESS_CALLED i32 Player::create_rect_damage_source(D3DXVECTOR3 *pos, f32 width, f32 height, f32 angle, i32 time,
+                                                    i32 damage)
+{
+    Player *player = g_Player;
+    i32 index = player->inner.last_created_damage_source_index;
+    for (i32 i = 0; i < 0x100; i++)
+    {
+        index++;
+        if (index >= 0x100)
+        {
+            index = 0;
+        }
+        PlayerDamageSource *source = &player->inner.damage_sources[index];
+        if (!(source->flags & 1))
+        {
+            source->flags = (source->flags & ~6) | 1;
+            memset(&source->pos, 0, sizeof(source->pos));
+            source->pos.pos = *pos;
+            source->unk_14 = width;
+            source->unk_18 = height;
+            source->unk_c = wrap_angle(angle);
+            source->unk_10 = 0;
+            source->timer_60 = time;
+            source->damage = damage;
+            source->total_damage_dealt = 0;
+            source->unk_7c = 9999999;
+            source->unk_80 = 1;
+            source->unk_90 = 0;
+            source->unk_84 = 0;
+            break;
+        }
+    }
+    player->inner.last_created_damage_source_index = index;
+    return index + 1;
+}
+
 // FUNCTION: TH16 0x4476d0
 HARNESS_CALLED void Player::set_position_subpixel(Int2 *pos)
 {

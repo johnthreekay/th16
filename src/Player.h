@@ -92,8 +92,10 @@ struct PlayerDamageSource
     u32 flags;
     f32 radius;
     f32 unk_8;
+    // Rectangles (create_rect_damage_source): angle, then width and
+    // height in unk_14 and unk_18.
     f32 unk_c;
-    u8 unk_10[0x4];
+    i32 unk_10;
     f32 unk_14;
     f32 unk_18;
     PosVel pos;
