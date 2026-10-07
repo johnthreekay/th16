@@ -78,6 +78,9 @@ struct PauseMenu
     // 0x43ef20 (ExpHP: take_snapshot_for_pause). Copies the game area of
     // the screen into the sprite of a new text.anm VM behind the menu.
     void take_snapshot();
+    // 0x43f0f0 (ExpHP: do_open_pause_menu). Pauses the game and opens the
+    // menu.
+    void open();
     static int __fastcall on_tick_thunk(void *arg);
     static int __fastcall on_draw_thunk(void *arg);
 };

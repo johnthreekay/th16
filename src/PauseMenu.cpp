@@ -413,6 +413,52 @@ void PauseMenu::take_snapshot()
     }
 }
 
+// TODO: ours realigns its frame to 8 bytes (caused by the call to update_play_time; the original does not).
+// FUNCTION: TH16 0x43f0f0
+void PauseMenu::open()
+{
+    GameThread::update_play_time();
+    set_state(1);
+    GameThread *thread = g_GameThread;
+    thread->flags.flag_4 = 1;
+    front_anm = g_Gui->front_anm;
+    delete_vm_and_clear(anm_id_1e4);
+    if (thread->replay_mode != 0)
+    {
+        anm_id_1e4 = front_anm->create_ui_vm_at_origin(0x9e, 0);
+    }
+    else
+    {
+        anm_id_1e4 = front_anm->create_ui_vm_at_origin(0x9c, 0);
+    }
+    AnmManager::interrupt_tree(anm_id_1e4, 3);
+    SoundManager::pause_sounds();
+    g_SoundManager.play_sound_centered(0xe, 0);
+    if (g_Globals.game_mode != 2)
+    {
+        g_SoundManager.modify_bgm(6, 0, "Pause");
+    }
+    while (SoundManager::update_sound_thread() != 0)
+    {
+    }
+    take_snapshot();
+    saved_game_speed = g_game_speed;
+    g_game_speed = 1.0f;
+    saved_global_4d9d90 = g_unk_4d9d90;
+    g_unk_4d9d90 = 0;
+    Gui *gui = g_Gui;
+    if (gui->msg != NULL)
+    {
+        gui->msg->hide();
+    }
+    AnmVm *vm = g_AnmManager->get_vm_with_id(gui->ids_11c[4]);
+    if (vm != NULL)
+    {
+        vm->clear_flag_lo_2_tree_inline();
+    }
+    flags_3ec &= ~4;
+}
+
 // FUNCTION: TH16 0x43f240
 void replay_ended_43f240()
 {
