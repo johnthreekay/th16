@@ -918,7 +918,7 @@ void Supervisor::release_dinput()
 // GLOBAL: TH16 0x4d9d20
 i32 g_unk_4d9d20;
 // GLOBAL: TH16 0x4d9d90
-i32 g_unk_4d9d90;
+DECOMP_ALIGN16 FramePacingTable g_frame_pacing;
 // GLOBAL: TH16 0x4a5788
 f32 g_game_speed;
 

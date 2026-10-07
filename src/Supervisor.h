@@ -350,8 +350,22 @@ extern void (*g_draw_hook_4a6ee8)();
 extern void (*g_draw_hook_4a6eec)();
 // Set to 3 by switch_gamemodes when it returns to the title screen (mode 16).
 extern i32 g_unk_4a6f1c;
-// Set once the loading screen is done.
-extern i32 g_unk_4d9d90;
+// GameWindow's pacing_mode and pacing table (0x4d9d90), as code outside
+// the window methods addresses them: as a global of their own, like the
+// other GameWindow fields from 0x4d9d1c on. The mode is set once the
+// loading screen is done.
+struct FramePacingTable
+{
+    i32 mode;
+    struct
+    {
+        i32 max_sleep_ms;
+        i32 sleep_ms;
+        i32 late_frames;
+    } pacing[4];
+};
+extern DECOMP_ALIGN16 FramePacingTable g_frame_pacing;
+#define g_unk_4d9d90 (g_frame_pacing.mode)
 // Counted down once per frame by Supervisor::on_tick.
 extern i32 g_unk_4d9d20;
 // The game speed multiplier. ECL changes it (slowing down final boss

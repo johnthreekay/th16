@@ -20,8 +20,9 @@ struct FramePacing
 // methods reach the fields through this; other code addresses them as
 // globals. Several of those globals are defined on their own
 // (g_unk_4d9d1c for flags, g_unk_4d9d20, g_resolution_x and the rest from
-// 0x4d9d2c, g_unk_4d9d90 for pacing_mode): they are fields of this struct,
-// and code that addresses them as globals uses those definitions.
+// 0x4d9d2c, g_frame_pacing for pacing_mode and pacing): they are fields of
+// this struct, and code that addresses them as globals uses those
+// definitions.
 #pragma pack(push, 4)
 struct GameWindow
 {
