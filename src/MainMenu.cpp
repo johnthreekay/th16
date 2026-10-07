@@ -257,7 +257,7 @@ i32 __fastcall TitleInf::on_draw_thunk(void *arg)
 
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 
-// TODO: the original realigns its frame to 8 bytes; the volume clamps use al/ecx where ours uses cl/eax.
+// TODO: the volume clamps use al/ecx where ours uses cl/eax (also with an if instead of the ternary).
 // FUNCTION: TH16 0x44c570
 i32 TitleInf::do_options()
 {

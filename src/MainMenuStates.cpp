@@ -120,7 +120,7 @@ void TitleInf::load_replay_list()
 }
 
 // Saving the replay after a game: picking a slot, then entering the name.
-// TODO: the original realigns its frame (and esp, -8), keeps this in edi (spilled), and computes the % 13 column tests with a multiply.
+// TODO: this lives in esi (the original edi, spilled), the ascii create_effect pattern (see README), and g_stage_table[8] lands on another global here.
 // FUNCTION: TH16 0x453c10
 i32 TitleInf::do_replay_save()
 {
@@ -330,7 +330,7 @@ i32 g_last_difficulty = DIFFICULTY_NORMAL;
 i32 g_last_character;
 
 // Picking the difficulty, or confirming Extra.
-// TODO: the original realigns its frame (and esp, -8) and keeps g_Globals.difficulty in ecx from the entry for the num_choices test.
+// TODO: the original reuses g_Globals.difficulty from the entry in ecx for num_choices (reloading it after the ascii create_effect); ours compares memory; plus the ascii create_effect pattern (see README).
 // FUNCTION: TH16 0x44fe20
 i32 TitleInf::do_difficulty_select()
 {
@@ -497,7 +497,7 @@ static __forceinline void clear_flag_lo_2_tree_inline(AnmId id)
 
 // Picking the character. Extra only offers the characters that cleared the
 // main game; characters marked as cleared on this difficulty get a badge.
-// TODO: the original realigns its frame (and esp, -8) and loads g_Scorefile before the difficulty for the clear badges.
+// TODO: the original loads g_Scorefile before the difficulty for the clear badges.
 // FUNCTION: TH16 0x4502c0
 i32 TitleInf::do_character_select()
 {
@@ -663,7 +663,7 @@ extern const char *g_stage_names[10];
 
 // Picking the subseason before a game (Extra has only one). In stage
 // practice this goes on to the stage select instead of starting.
-// TODO: the original realigns its frame (and esp, -8).
+// TODO: the original spills script to the create_effect result slot and reloads it (ours keeps it in esi), and inverts the branch on g_Globals.flags_hi_45c in case 3.
 // FUNCTION: TH16 0x450af0
 i32 TitleInf::do_subseason_select()
 {
@@ -809,7 +809,7 @@ u8 g_practice_keys[0x100];
 i32 g_unk_4a5bf8;
 
 // Stage practice: picking the stage.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// TODO: the original keeps both input words in registers for the cursor tests.
 // FUNCTION: TH16 0x450ef0
 i32 TitleInf::do_practice_stage_select()
 {
@@ -1861,7 +1861,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
 // The high score name entry after a game (unk_5a58 is set when the score
 // did not make the top ten), then on to saving the replay unless the game
 // was continued.
-// TODO: the original realigns its frame (and esp, -8) and computes the % 13 column tests with a multiply; ours keeps 13 in ebx for idiv.
+// TODO: the original saves ebx (push ecx; push ebx) and keeps &replay_name in it for the score copy, tests the pressed word in memory before the name entry, and has the ascii create_effect pattern (see README).
 // FUNCTION: TH16 0x4532f0
 i32 TitleInf::do_score_name_entry()
 {
@@ -2614,7 +2614,7 @@ i32 TitleInf::do_music_room()
 
 // Spell practice: picking the stage. Coming back from a game goes straight
 // on to the spell card list of the last stage.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// TODO: the original keeps both input words in registers for the cursor tests.
 // FUNCTION: TH16 0x4553d0
 i32 TitleInf::do_spell_practice_stage_select()
 {

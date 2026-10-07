@@ -566,6 +566,49 @@ decompiled code the surroundings it had in the original:
   but Gui::sub_426d70 keeps the cookie where the original copies the
   struct from memory.
 
+- Group 4 sweep (menus, replays, sound):
+  - The menu states realign (and esp, -8) because they call
+    TitleInf::set_substate: every caller of set_substate realigns in the
+    original and only those (do_manual and do_spell_practice_character
+    call set_state and create_effect but not set_substate, and do not).
+    A dead `double` local in set_substate (HARNESS_CALLED) reproduces it:
+    LTCG's double stack alignment pass counts IL-level double locals even
+    when the optimizer deletes them, and a callee that wants alignment
+    and sees all its callers makes them realign. Their callees then get
+    padded frames (update_key_config_cursor's 12-byte frame).
+  - The reverse: double math inside an inline helper belongs to the
+    helper's call graph node, so the function that inlines it does not
+    realign early. CStreamingSound::get_play_time realigns like the
+    original only with the body spelled out instead of the play_time
+    helper. This may be the missing piece for the README's "early vs late"
+    item (callers that realign without handing alignment down): keep the
+    double math in a plain inline helper, not a DECOMP_NOINLINE one.
+  - `x % 13` on a member (`menu.next_selection % 13`) or a global
+    (`(g_demo_replay_index + 1) % 3`) compiles to `mov reg, n; idiv`; the
+    same through a local copy (`i32 selection = menu.next_selection;`)
+    gets the magic multiply like the original. The demo index is still
+    open: the original divides by -3 (imul 0x55555555; sub; sar 1), and
+    `% -3` compiles like `% 3` here.
+  - An empty log function declared `(const char *fmt, ...)` loses its
+    one-argument calls (LTCG drops them); declared `(...)` it keeps them
+    (dsutil_debug_log, CWaveFile::open_file).
+  - `get_vm_or_clear(id) == NULL` before `id = create_effect(...)` keeps
+    the dead `id = 0` store; the original calls get_vm_with_id directly
+    there.
+  - Menus that save and compare the selection through the menu pointer
+    (`[esi + 4]`) use the menu_save_selection/menu_selection_moved
+    helpers; written on the member they address `[this + offset]`.
+  - Open, shared by about eight menu functions: for
+    `anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL)`
+    the original loads g_AsciiManager into eax and the result slot into
+    ecx (pushed before ascii_anm is loaded); ours loads g_AsciiManager
+    into ecx. Not a named local, a pointer local, an inline helper or
+    making create_effect HARNESS_CALLED.
+  - Open: `stage = x + 1; stage_num = stage; weird_stage_num = stage;
+    g_stage_data = &g_stage_table[stage];` keeps stage in ecx with the
+    imul hoisted above the stores in the original; ours coalesces it into
+    eax (do_replay_menu and two spell practice states).
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
