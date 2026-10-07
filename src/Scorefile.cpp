@@ -15,6 +15,9 @@
 #include "Rng.h"
 #include "Spellcard.h"
 
+// GLOBAL: TH16 0x4a6f0c
+Scorefile *g_Scorefile;
+
 // FUNCTION: TH16 0x4493c0
 void ScorefileChara::init()
 {

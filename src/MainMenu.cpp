@@ -36,7 +36,7 @@ static_assert(offsetof(TitleInf, replays) == 0x5b50, "TitleInf::replays");
 static_assert(offsetof(TitleInf, thread) == 0x5de4, "TitleInf::thread");
 static_assert(sizeof(TitleInf) == 0x5e00, "TitleInf");
 
-extern i32 g_unk_4c0f40;
+extern i32 g_cancel_screen_effects;
 
 // GLOBAL: TH16 0x4a6f20
 TitleInf *g_MainMenu;
@@ -166,7 +166,7 @@ HARNESS_CALLED i32 TitleInf::initialize()
         return -1;
     }
     menu.wraps = 1;
-    g_unk_4c0f40 = 0;
+    g_cancel_screen_effects = 0;
     return 0;
 }
 

@@ -9,6 +9,14 @@
 // GLOBAL: TH16 0x4a6db8
 EffectManager *g_EffectManager;
 
+// The effect kinds that EffectManager::create_effect sets up. In the
+// original each row names its ANM script and points at its init callback
+// (anm_effect_1_init, anm_effect_2_init, anm_effect_3_init and
+// anm_effect_3b_init, 0x4071a0, 0x405670, 0x406510, 0x406930) with the
+// matching on_tick/on_draw/on_destroy indices; not filled in here.
+// GLOBAL: TH16 0x4a2250
+EffectData g_effect_table[4];
+
 // FUNCTION: TH16 0x418790
 i32 preload_bullet_and_effect_anm()
 {

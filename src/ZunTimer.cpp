@@ -1,5 +1,12 @@
 #include "ZunTimer.h"
 
+#include "Supervisor.h"
+
+// The speed multipliers a ZunTimer can follow, selected by its
+// speed_ptr_index: 0 is the game speed, 1 (NULL) a fixed speed of 1.
+// GLOBAL: TH16 0x490eb0
+f32 *const g_timer_speed_ptrs[] = {&g_game_speed, NULL};
+
 // TODO: the unscaled path adds current_f into the delta register instead of
 // loading current_f into xmm0 and adding the delta.
 // FUNCTION: TH16 0x43ac80

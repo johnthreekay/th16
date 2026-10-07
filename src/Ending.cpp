@@ -20,8 +20,8 @@
 // GLOBAL: TH16 0x4a6dbc
 Ending *g_Ending;
 
-// Cleared when the ending goes away; also used by the screen effects.
-extern i32 g_unk_4c0f40;
+// Cleared when the ending starts and goes away (ScreenEffect.cpp).
+extern i32 g_cancel_screen_effects;
 
 // How many frames the bit at 0x114 / 4 of the raw button state has been
 // held.
@@ -57,7 +57,7 @@ Ending::~Ending()
     }
     script_file = NULL;
     g_Ending = NULL;
-    g_unk_4c0f40 = 0;
+    g_cancel_screen_effects = 0;
 }
 
 // FUNCTION: TH16 0x419640
@@ -377,7 +377,7 @@ i32 EndingChildF0::run()
             }
             timer_2c.set_value(0);
             line_index = 0;
-            g_unk_4c0f40 = 0;
+            g_cancel_screen_effects = 0;
             break;
         case 7:
         {

@@ -452,6 +452,9 @@ HARNESS_CALLED void Player::set_position_subpixel(Int2 *pos)
     inner.main_options[3].should_instajump = 1;
 }
 
+// GLOBAL: TH16 0x4a6ef8
+Player *g_Player;
+
 // GLOBAL: TH16 0x4a6f00
 ShtFile *g_cached_sht_file;
 // GLOBAL: TH16 0x4a6efc

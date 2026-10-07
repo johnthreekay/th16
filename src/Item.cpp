@@ -27,7 +27,6 @@ const i32 g_item_anm_scripts[17][2] = {
     {123, -1}, {124, -1}, {125, -1}, {-1, -1}, {129, -1},
 };
 
-i32 unit5_placeholder(void *object);
 i32 get_piv_rounded();
 
 // This file's copy of sincosmul (ZunAsm.h), which TH16 keeps once per

@@ -514,3 +514,43 @@ int __fastcall anm_effect_1_on_destroy(AnmVm *vm)
 {
     return 0;
 }
+
+// The callback tables AnmVm's index_of_* fields select from (declared in
+// AnmVm.h). In the original they are constant tables whose entry 0 is NULL
+// and whose other entries point at the callbacks named below; here they
+// are left zero.
+
+// anm_effect_1_on_switch, anm_effect_2_on_switch, anm_effect_3_on_switch.
+// GLOBAL: TH16 0x491b0c
+AnmVmSwitchFunc g_anm_on_switch_funcs[4];
+
+// anm_effect_1_on_destroy, anm_effect_2_on_destroy, anm_effect_3_on_destroy.
+// GLOBAL: TH16 0x491b58
+AnmVmFunc g_anm_on_destroy_funcs[4];
+
+// anm_effect_1_on_tick, anm_effect_2_on_tick, anm_effect_3_on_tick,
+// anm_on_tick_fan.
+// GLOBAL: TH16 0x4919e8
+AnmVmFunc g_anm_on_tick_funcs[5];
+
+// bullet_map_sprite, LaserLineInf::on_sprite_set,
+// LaserCurveInf::on_sprite_set.
+// GLOBAL: TH16 0x491b1c
+AnmVmSpriteFunc g_anm_sprite_mapping_funcs[4];
+
+// Only the NULL entry (in .data, not .rdata, in the original).
+// GLOBAL: TH16 0x4c0f44
+AnmVmFunc g_anm_on_wait_funcs[1];
+
+// anm_on_draw_masked, anm_effect_2_on_draw, anm_effect_3_on_draw,
+// anm_effect_4_on_draw, Gui::textbox_on_draw, anm_on_draw_fan.
+// GLOBAL: TH16 0x491b2c
+AnmVmFunc g_anm_on_draw_funcs[7];
+
+// anm_effect_2_on_copy_2.
+// GLOBAL: TH16 0x491b50
+AnmVmCopyFunc g_anm_on_copy_funcs[2];
+
+// anm_effect_2_on_copy_1.
+// GLOBAL: TH16 0x491b48
+AnmVmSerializeFunc g_anm_serialize_funcs[2];

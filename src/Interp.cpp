@@ -2,6 +2,12 @@
 
 #include "Interp.h"
 
+// A zero vector that is never written (ExpHP:
+// SEEMINGLY_CONST_ZERO_VEC_4d9dc4); interpolators take their unused bezier
+// control points from it, and bullet code passes it by address.
+// GLOBAL: TH16 0x4d9dc4
+Float3 g_zero_vec;
+
 // A parabola through (a, 0) rescaled to run from 0 to 1, so it dips below 0
 // first.
 static inline f32 ease_in_back(f32 x, f32 a)

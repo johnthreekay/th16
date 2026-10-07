@@ -25,6 +25,13 @@
 // GLOBAL: TH16 0x4a6db0
 Spellcard *g_Spellcard;
 
+// The difficulty of each spell card, indexed by spell id (0 Easy to 3
+// Lunatic, 4 Extra). A constant table in the original (0, 1, 2, 3 repeated
+// per card for the main game, then 4 for the Extra cards); not filled in
+// here.
+// GLOBAL: TH16 0x491700
+i8 g_spell_difficulty[0x78];
+
 Spellcard::Spellcard()
 {
     memset(this, 0, sizeof(Spellcard));

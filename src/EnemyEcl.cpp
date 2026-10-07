@@ -89,7 +89,8 @@ int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage);
 extern EnemyExtDamageFunc const g_ecl_ext_damage_funcs[3] = {NULL, ecl_ext_damage_stored, ecl_ext_damage_anm_hurtbox};
 
 // The hooks ECL 634 installs; only entry 0 (NULL).
-extern void *g_ecl_unknown_634_funcs[1];
+// GLOBAL: TH16 0x4a6dc4
+void *g_ecl_unknown_634_funcs[1];
 
 // This file's copy of sincosmul (ZunAsm.h; TH16 keeps one per object
 // file).

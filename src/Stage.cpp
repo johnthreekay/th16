@@ -11,6 +11,7 @@
 #include "Rng.h"
 #include "ScreenEffect.h"
 #include "Spellcard.h"
+#include "StageData.h"
 #include "Supervisor.h"
 #include "ZunAngle.h"
 
@@ -19,6 +20,15 @@ Stage *g_Stage;
 
 // GLOBAL: TH16 0x4a6d9c
 Stage *g_Stage2;
+
+// The current stage's row of g_stage_table.
+// GLOBAL: TH16 0x4a6f18
+StageData *g_stage_data;
+
+// The stage table, indexed by stage number. Initialized data in the
+// original (file names, music, bosses per stage); not filled in here.
+// GLOBAL: TH16 0x4a22d0
+StageData g_stage_table[8];
 
 // FUNCTION: TH16 0x409490
 void StageInner::set_sky_interp(i32 end_time, i32 method, CameraSky *goal)
