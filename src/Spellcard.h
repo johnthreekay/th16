@@ -16,6 +16,7 @@ enum SpellcardFlags
     // The name banner moved out of the player's way.
     SPELLCARD_TEXT_MOVED = 1 << 2,
     SPELLCARD_NO_BONUS_DECAY = 1 << 3,
+    SPELLCARD_FLAG_10 = 1 << 4,
     SPELLCARD_FLAG_20 = 1 << 5,
     SPELLCARD_TIMING = 1 << 6,
     SPELLCARD_FLAG_80 = 1 << 7,
@@ -73,6 +74,10 @@ struct Spellcard
     // out the bonus if it was captured and counts the capture. Only called
     // through g_Spellcard.
     HARNESS_CALLED void end();
+    // 0x417f00. Starts the spell card: id, decoded name, then two ECL
+    // arguments (the first ends up in a VM variable, the second indexes a
+    // per-boss table).
+    void start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3);
     // 0x417bc0. Measures the card's real duration: starts the clock while
     // the card runs, then turns the time into the tamper-checked
     // time_code and records it in (or, during playback, reads it from) the

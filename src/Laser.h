@@ -100,7 +100,22 @@ class LaserDataInf
 
 struct LaserLineInner
 {
-    u8 data[0x358];
+    D3DXVECTOR3 start_pos;
+    f32 ang_aim;
+    f32 laser_new_arg_2;
+    f32 laser_new_arg_1;
+    f32 laser_new_arg_3;
+    f32 laser_new_arg_4;
+    // ExpHP: spd1.
+    f32 speed;
+    i32 type;
+    i32 color;
+    f32 distance;
+    u8 unk_30[4];
+    u32 flags;
+    BulletEx ex[0x12];
+    i32 shot_sfx;
+    i32 shot_transform_sfx;
 
     LaserLineInner()
     {
@@ -147,7 +162,8 @@ class LaserLineInf : public LaserDataInf
 struct LaserInfiniteInner
 {
     D3DXVECTOR3 start_pos;
-    u8 unk_c[0x18 - 0xc];
+    // Set by ECL laserTrajectory (z always 0).
+    D3DXVECTOR3 trajectory;
     f32 ang_aim;
     f32 laser_st_rotation;
     f32 laser_new_arg_2;
@@ -286,10 +302,21 @@ class LaserCurveInf : public LaserDataInf
 
 struct LaserBeamInner
 {
-    u8 unk_0[0x38];
+    D3DXVECTOR3 start_pos;
+    u8 unk_c[0x18 - 0xc];
+    f32 ang_aim;
+    u8 unk_1c[4];
+    f32 laser_new_arg_3;
+    f32 laser_new_arg_4;
+    // Instruction 713's second argument.
+    i32 laser_beam_on_arg_1;
+    i32 color;
+    f32 distance;
+    // The shooter's laser_timing[0].
+    i32 timing;
     u32 flag_38 : 1;
     u32 flags_38_rest : 31;
-    u8 unk_3c[0x354 - 0x3c];
+    BulletEx ex[0x12];
 
     LaserBeamInner()
     {

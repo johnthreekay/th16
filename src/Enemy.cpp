@@ -401,8 +401,11 @@ void EnemyInf::set_timeout(int index, const char *sub)
     }
 }
 
+// Only ecl_run_over_300 calls the EnemyData getters, and LTCG inlined them
+// there until the function's inline budget ran out; the other callers of
+// the original read arguments through the run context directly.
 // FUNCTION: TH16 0x4251d0
-i32 EnemyData::get_int_arg(int index)
+DECOMP_NOINLINE i32 EnemyData::get_int_arg(int index)
 {
     return full->context.current_context->get_int_arg(index);
 }
@@ -420,7 +423,7 @@ HARNESS_CALLED f32 EnemyData::get_float_arg(int index)
 }
 
 // FUNCTION: TH16 0x425220
-f32 *EnemyData::get_float_arg_ptr(int index)
+DECOMP_NOINLINE f32 *EnemyData::get_float_arg_ptr(int index)
 {
     return full->context.current_context->get_float_arg_ptr(index);
 }
@@ -631,7 +634,7 @@ HARNESS_CALLED LaserDataInf *LaserManager::find_by_id(i32 id, i32 unused)
 }
 
 // GLOBAL: TH16 0x4917b8
-EnemyFuncSetFunc const g_ecl_func_sets[3] = {NULL, ecl_funcset_cancel_near_player, ecl_funcset_zero_power};
+extern EnemyFuncSetFunc const g_ecl_func_sets[3] = {NULL, ecl_funcset_cancel_near_player, ecl_funcset_zero_power};
 
 // FUNCTION: TH16 0x41d1e0
 int EnemyInf::on_tick()
@@ -1004,19 +1007,19 @@ const char *EnemyInf::check_time_interrupts()
 // FUNCTION: TH16 0x423260
 int EnemyData::ecl_anm_set_sprite()
 {
-    i32 slot = get_int_arg(0);
-    i32 script = get_int_arg(1);
+    i32 slot = full->context.current_context->get_int_arg(0);
+    i32 script = full->context.current_context->get_int_arg(1);
     delete_vm_and_clear(anm_ids[slot]);
     if (script < 0)
     {
         return 0;
     }
-    script = get_int_arg(1);
+    script = full->context.current_context->get_int_arg(1);
     AnmLoaded *file = g_EnemyManager->anim_statement_anms[selected_anm_index];
     anm_ids[slot] = file->create_vm_front(script, anm_layers + 7, 0);
     if (slot == 0)
     {
-        anm_slot_0_script = get_int_arg(1);
+        anm_slot_0_script = full->context.current_context->get_int_arg(1);
         anm_slot_0_anm_index = selected_anm_index;
     }
     AnmManager *anm;

@@ -118,9 +118,18 @@ struct GuiMsgVm
 };
 
 // One of the three boss life bars.
+// A marker on a boss life bar (ECL lifeMarker).
+struct GuiBossLifeMarker
+{
+    // Fraction of the bar.
+    f32 position;
+    u32 color;
+};
+
 struct GuiBossBar
 {
-    u8 unk_0[0x30];
+    u8 unk_0[0x10];
+    GuiBossLifeMarker life_markers[4];
     AnmId ids[7];
     i32 unk_4c;
     u8 unk_50[4];
@@ -236,6 +245,13 @@ struct Gui
     HARNESS_CALLED void sub_42bcf0(i32 unk, i32 kind);
     // 0x42c600
     static void update_season_gauge();
+    // ECL lifeMarker: puts marker index of the boss's life bar at position
+    // (a fraction of the bar).
+    __forceinline void set_boss_life_marker(i32 boss, i32 index, f32 position, u32 color)
+    {
+        boss_bars[boss].life_markers[index].position = position;
+        boss_bars[boss].life_markers[index].color = color;
+    }
 };
 
 extern Gui *g_Gui;

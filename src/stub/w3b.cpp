@@ -16,14 +16,3 @@ int EnemyData::step_logic()
 {
     return 0;
 }
-
-// STUB: TH16 0x41cbd0
-void EnemyData::update_fog()
-{
-}
-
-// STUB: TH16 0x41dcb0
-int EnemyData::ecl_run_over_300()
-{
-    return 0;
-}

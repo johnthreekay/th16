@@ -11,6 +11,11 @@ struct Rng
 
     // TH06 equivalent: Rng::GetRandomU16
     u16 rand_u16();
+    // TH06 equivalent: Rng::GetRandomU16InRange
+    __forceinline u16 rand_u16_in_range(u16 range)
+    {
+        return range != 0 ? rand_u16() % range : 0;
+    }
     // TH06 equivalent: Rng::GetRandomU32
     u32 rand_u32();
     // TH06 equivalent: Rng::GetRandomF32ZeroToOne
