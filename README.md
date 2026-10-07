@@ -315,6 +315,16 @@ decompiled code the surroundings it had in the original:
   subexpression reuse. Fall-through case order shows in jump table tail
   merges.
 
+- LTCG keeps a value in ecx across a call only when it sees every caller of
+  the callee: helpers called only from one interpreter (EclStack::enter,
+  ecl_return, get_subroutine_ptr) are HARNESS_CALLED for that.
+- Wrapper copies depend on call counts: about a dozen extra zun_sinf/zun_cosf
+  call sites made LTCG keep sinf/cosf out of line and turned the wrappers
+  into thunks. run_std calls sinf/cosf directly.
+- Large interpreters need `__forceinline` on the small stack helpers the
+  original inlined. Some constants are compared unsigned (`jae`), e.g. MSG
+  hold-time checks; ZUN's MSG VM flags are real bitfields.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
