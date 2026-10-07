@@ -18,6 +18,79 @@ static void __fastcall primitive_sincosmul(Float3 *dst, f32 angle, f32 radius)
     }
 }
 
+// A line of the given length through (x, y) at angle, anchored at its
+// center (0), start (1) or end (2), colored from color_1 to color_2.
+// TODO: ours sinks the second vertex's y computation below the color and z/w stores.
+// FUNCTION: TH16 0x469330
+HARNESS_CALLED i32 AnmManager::draw_line(f32 x, f32 y, f32 length, f32 angle, D3DCOLOR color_1, D3DCOLOR color_2,
+                                         i32 anchor, i32 unused)
+{
+    RenderVertex044 *vertices = primitive_write_cursor;
+    if (vertices + 2 >= primitive_vertex_data + 0x8000)
+    {
+        return 0;
+    }
+    flush_sprites();
+    f32 c;
+    f32 s;
+    f32 a = angle;
+    __asm {
+        fld a
+        fsincos
+        fstp c
+        fstp s
+    }
+    f32 start;
+    f32 end;
+    f32 offset = 0.0f;
+    switch (anchor)
+    {
+    case 0:
+        start = length * -0.5f;
+        end = length * 0.5f;
+        break;
+    case 1:
+        start = 0.0f;
+        end = length;
+        break;
+    case 2:
+        start = -length;
+        end = 0.0f;
+        break;
+    }
+    vertices[0].pos.x = start * c - offset * s + x;
+    vertices[0].pos.y = start * s + offset * c + y;
+    vertices[1].pos.x = end * c - offset * s + x;
+    vertices[1].pos.y = end * s + offset * c + y;
+    vertices[0].diffuse = color_1;
+    vertices[0].pos.z = vertices[1].pos.z = 0.0f;
+    vertices[0].pos.w = vertices[1].pos.w = vertices[2].pos.w = vertices[3].pos.w = vertices[4].pos.w = 1.0f;
+    vertices[1].diffuse = color_2;
+    if (g_Supervisor.zwrite_enabled != 0)
+    {
+        g_AnmManager->flush_sprites();
+        g_Supervisor.zwrite_enabled = 0;
+        g_Supervisor.d3d_device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+    }
+    if (g_AnmManager->last_color_op != 0)
+    {
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
+        g_AnmManager->last_color_op = 0;
+    }
+    if (render_cache_184fbb6 != 1)
+    {
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        render_cache_184fbb6 = 1;
+    }
+    g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_LINESTRIP, 1, primitive_write_cursor, sizeof(RenderVertex044));
+    primitive_write_cursor += 2;
+    unk_cc++;
+    return 0;
+}
+
 // A filled circle of count segments around (x, y) as a triangle fan, its
 // color fading from the center to the edge, with fog off and the depth
 // test always passing.

@@ -53,3 +53,11 @@ i32 harness_w4f_circle_fill(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 radi
                                      vm->color_2.d3d) +
            other->draw_circle(x, y, radius, vm->rotation.z, vm->int_vars[1], vm->color_2.d3d, vm->color_1.d3d);
 }
+
+// AnmManager::draw_vm (0x46886c) draws lines for render mode 16.
+i32 harness_w4f_line(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 length)
+{
+    return g_AnmManager->draw_line(x, y, length, vm->rotation.z, vm->color_1.d3d, vm->color_2.d3d,
+                                   (vm->flags_hi >> 21) & 3, 0) +
+           other->draw_line(x, y, length, vm->rotation.x, vm->color_2.d3d, vm->color_1.d3d, vm->int_vars[0], 0);
+}
