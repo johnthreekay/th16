@@ -7,6 +7,7 @@
 #include "GameThread.h"
 #include "Globals.h"
 #include "Laser.h"
+#include "Player.h"
 #include "SoundManager.h"
 
 // GLOBAL: TH16 0x4a6ee0
@@ -1037,4 +1038,179 @@ i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode
         }
     }
     return count;
+}
+
+// FUNCTION: TH16 0x4357a0
+i32 LaserInfiniteInf::on_draw()
+{
+    i32 i = 0;
+    vm_950.pos = position;
+    f32 rotation = angle + ZUN_PI / 2;
+    while (rotation > ZUN_PI)
+    {
+        rotation -= ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    while (rotation < -ZUN_PI)
+    {
+        rotation += ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    AnmVm *vm = &vm_950;
+    vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
+    vm->rotation.z = rotation;
+    g_AnmManager->draw_vm(vm);
+    if (unk_7c == 0.0f)
+    {
+        vm_f4c.pos = position;
+        g_AnmManager->draw_vm(&vm_f4c);
+    }
+    return 0;
+}
+
+// Hits or grazes the player: a hit cancels the laser around the player, a
+// graze counts every third frame at the point of the laser nearest the
+// player.
+// TODO: the original adds position.x to the loaded start.x (operand order) and calls cancel_as_bomb_rectangle without speculative devirtualization.
+// FUNCTION: TH16 0x433510
+i32 LaserLineInf::check_graze_or_kill(i32 graze_only)
+{
+    if (unk_70 > 16.0f && width > 3.0f)
+    {
+        Float3 start;
+        if (!(inner.flags & 2))
+        {
+            laser_sincosmul(&start, angle, unk_70 / 10.0f);
+            start.x += position.x;
+            start.y = position.y + start.y;
+            start.z = position.z + start.z;
+        }
+        else
+        {
+            start = position;
+        }
+        f32 length = unk_70;
+        if (!(inner.flags & 2))
+        {
+            length = length * 4.0f / 5.0f;
+        }
+        f32 w = width;
+        if (32.0f > w)
+        {
+            w = w * 0.5f;
+        }
+        else
+        {
+            w = w - (w + 16.0f) * 0.5f;
+        }
+        i32 result = g_Player->check_hit_rotated_rect(&start, angle, w, length, graze_only);
+        if (result == 1)
+        {
+            Float3 size(32.0f, 32.0f, 0.0f);
+            cancel_as_bomb_rectangle(&g_Player->inner.pos, &size, 0.0f, 0, 1);
+            return 0;
+        }
+        if (result == 2)
+        {
+            if (timer_2c.current % 3 == 0)
+            {
+                f32 x;
+                f32 y;
+                line_intersection(&x, &y, start.x, start.y, angle, g_Player->inner.pos.x, g_Player->inner.pos.y,
+                                  normalize_angle(angle + ZUN_PI / 2));
+                start.x = x;
+                start.y = y;
+                g_Player->do_graze(&start);
+            }
+            timer_2c++;
+        }
+    }
+    return 0;
+}
+
+// The same for infinite lasers, once they are out (states 2 and 4).
+// TODO: the original keeps angle in xmm3 across normalize_angle and calls cancel_as_bomb_rectangle without speculative devirtualization.
+// FUNCTION: TH16 0x435610
+i32 LaserInfiniteInf::check_graze_or_kill(i32 graze_only)
+{
+    if ((state == 4 || state == 2) && unk_70 > 16.0f)
+    {
+        Float3 start = position;
+        f32 w = width;
+        if (32.0f > w)
+        {
+            w = w * 0.5f;
+        }
+        else
+        {
+            w = w - (w + 16.0f) / 3.0f;
+        }
+        i32 result = g_Player->check_hit_rotated_rect(&start, angle, w, unk_70 * 0.9f, graze_only);
+        if (result == 1)
+        {
+            Float3 size(32.0f, 32.0f, 0.0f);
+            cancel_as_bomb_rectangle(&g_Player->inner.pos, &size, 0.0f, 0, 1);
+            return 0;
+        }
+        if (result == 2)
+        {
+            if (timer_2c.current % 3 == 0)
+            {
+                f32 x;
+                f32 y;
+                line_intersection(&x, &y, start.x, start.y, angle, g_Player->inner.pos.x, g_Player->inner.pos.y,
+                                  normalize_angle(angle + ZUN_PI / 2));
+                start.x = x;
+                start.y = y;
+                g_Player->do_graze(&start);
+            }
+            timer_2c++;
+        }
+    }
+    return 0;
+}
+
+// The same for curvy lasers, piece by piece past the first 16 units; one
+// graze per frame at most.
+// TODO: the original adds segment->pos.z to the loaded mid.z (operand order) and calls cancel_as_bomb_rectangle without speculative devirtualization.
+// FUNCTION: TH16 0x437cf0
+i32 LaserCurveInf::check_graze_or_kill(i32 graze_only)
+{
+    i32 grazed = 0;
+    f32 dist = 0.0f;
+    Float3 graze_pos;
+    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    for (i32 i = 0; i < inner.segment_count - 1; i++, segment++)
+    {
+        Float3 mid;
+        laser_sincosmul(&mid, segment->angle, segment->length * 0.5f);
+        mid += segment->pos;
+        dist += segment->length;
+        if (dist >= 16.0f)
+        {
+            i32 result = g_Player->check_hit_rotated_rect(&mid, segment->angle, width * 0.5f, segment->length, graze_only);
+            if (result == 1)
+            {
+                Float3 size(32.0f, 32.0f, 0.0f);
+                cancel_as_bomb_rectangle(&g_Player->inner.pos, &size, 0.0f, 0, 1);
+            }
+            else if (result == 2 && !grazed && timer_2c.current % 3 == 0)
+            {
+                graze_pos = mid;
+                grazed = 1;
+            }
+        }
+    }
+    if (grazed)
+    {
+        g_Player->do_graze(&graze_pos);
+    }
+    timer_2c.tick();
+    return 0;
 }

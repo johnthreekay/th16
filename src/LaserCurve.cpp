@@ -238,13 +238,6 @@ i32 LaserCurveInf::method_30(Float3 *pos, f32 radius)
     return 2;
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x437cf0
-i32 LaserCurveInf::check_graze_or_kill(i32 a)
-{
-    return unit5_placeholder(this);
-}
-
 
 
 // Counts down ex_state[11]'s timer; when it runs out, flips ex_flags bit

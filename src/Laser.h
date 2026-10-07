@@ -263,7 +263,10 @@ struct LaserCurveInner
 struct LaserCurveSegment
 {
     Float3 pos;
-    u8 unk_c[0x20 - 0xc];
+    u8 unk_c[0x18 - 0xc];
+    // Direction and length of the piece to the next point.
+    f32 angle;
+    f32 length;
 };
 
 // VTABLE: TH16 0x4922e0
@@ -428,3 +431,9 @@ struct LaserManager
 };
 
 extern LaserManager *g_LaserManager;
+
+// 0x404220. Where the line through (x1, y1) at angle1 meets the line
+// through (x2, y2) at angle2; the laser graze checks use it to find the
+// point of the laser closest to the player.
+HARNESS_CALLED i32 __stdcall line_intersection(f32 *out_x, f32 *out_y, f32 x1, f32 y1, f32 angle1, f32 x2, f32 y2,
+                                               f32 angle2);

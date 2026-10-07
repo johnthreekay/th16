@@ -61,13 +61,6 @@ i32 LaserInfiniteInf::on_tick()
 }
 
 // Placeholder (not decompiled yet).
-// STUB: TH16 0x4357a0
-i32 LaserInfiniteInf::on_draw()
-{
-    return unit5_placeholder(this);
-}
-
-// Placeholder (not decompiled yet).
 // STUB: TH16 0x436010
 i32 LaserInfiniteInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 {
@@ -102,9 +95,3 @@ i32 LaserInfiniteInf::method_30(Float3 *pos, f32 radius)
     return 2;
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x435610
-i32 LaserInfiniteInf::check_graze_or_kill(i32 a)
-{
-    return unit5_placeholder(this);
-}

@@ -78,13 +78,6 @@ i32 LaserLineInf::method_30(Float3 *pos, f32 radius)
     return 2;
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x433510
-i32 LaserLineInf::check_graze_or_kill(i32 a)
-{
-    return unit5_placeholder(this);
-}
-
 // The same et_ex step as LaserCurveInf::method_3c.
 // TODO: the original adds and stores the velocity one component at a time and reloads unk_60.x for the fabsf test.
 // FUNCTION: TH16 0x432dc0
