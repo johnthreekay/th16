@@ -49,6 +49,11 @@ static_assert(sizeof(DSBUFFERDESC) == sizeof(((CSound *)0)->m_desc), "CSound lay
         } \
     }
 
+// dsound.h's interface id, defined here (rather than taken from dxguid.lib)
+// so that it can be annotated.
+// GLOBAL: TH16 0x48b80c
+extern "C" const GUID IID_IDirectSoundNotify = {0xb0210783, 0x89cd, 0x11d0, {0xaf, 0x8, 0x0, 0xa0, 0xc9, 0x25, 0xcd, 0x16}};
+
 // The guard of the streaming buffer, shared with the sound thread.
 #define CS_BGM_STREAM 12
 
@@ -56,6 +61,161 @@ static_assert(sizeof(DSBUFFERDESC) == sizeof(((CSound *)0)->m_desc), "CSound lay
 // FUNCTION: TH16 0x471d90
 void dsutil_debug_log(const char *fmt, ...)
 {
+}
+
+// FUNCTION: TH16 0x470320
+HARNESS_CALLED HRESULT CSoundManager::CreateStreaming(CStreamingSound **ppStreamingSound, const char *strWaveFileName,
+                                                     DWORD dwCreationFlags, GUID guid3DAlgorithm, DWORD dwNotifyCount,
+                                                     DWORD dwNotifySize, HANDLE hNotifyEvent, ThBgmFormat *track)
+{
+    HRESULT hr;
+
+    if (m_pDS == NULL)
+    {
+        return CO_E_NOTINITIALIZED;
+    }
+
+    LPDIRECTSOUNDBUFFER pDSBuffer = NULL;
+    DWORD dwDSBufferSize;
+    CWaveFile *pWaveFile = NULL;
+    DSBPOSITIONNOTIFY *aPosNotify = NULL;
+    LPDIRECTSOUNDNOTIFY pDSNotify = NULL;
+
+    pWaveFile = new CWaveFile();
+    if (pWaveFile->Open(strWaveFileName, track) != S_OK)
+    {
+        // SAFE_DELETE(pWaveFile) as LTCG inlined it; ours would call an
+        // out-of-line scalar deleting destructor here.
+        pWaveFile->~CWaveFile();
+        operator delete(pWaveFile, sizeof(CWaveFile));
+        return E_FAIL;
+    }
+
+    dwDSBufferSize = dwNotifySize * dwNotifyCount;
+
+    DSBUFFERDESC dsbd;
+    ZeroMemory(&dsbd, sizeof(DSBUFFERDESC));
+    dsbd.dwSize = sizeof(DSBUFFERDESC);
+    dsbd.dwFlags = dwCreationFlags | DSBCAPS_CTRLPOSITIONNOTIFY | DSBCAPS_GETCURRENTPOSITION2 | DSBCAPS_GLOBALFOCUS |
+                   DSBCAPS_CTRLVOLUME | DSBCAPS_LOCSOFTWARE;
+    dsbd.dwBufferBytes = dwDSBufferSize;
+    dsbd.guid3DAlgorithm = guid3DAlgorithm;
+    dsbd.lpwfxFormat = &pWaveFile->m_track->format;
+
+    if (FAILED(hr = ((IDirectSound8 *)m_pDS)->CreateSoundBuffer(&dsbd, &pDSBuffer, NULL)))
+    {
+        return E_FAIL;
+    }
+
+    if (FAILED(hr = pDSBuffer->QueryInterface(IID_IDirectSoundNotify, (VOID **)&pDSNotify)))
+    {
+        return E_FAIL;
+    }
+
+    aPosNotify = new DSBPOSITIONNOTIFY[dwNotifyCount];
+    if (aPosNotify == NULL)
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    for (DWORD i = 0; i < dwNotifyCount; i++)
+    {
+        aPosNotify[i].dwOffset = (dwNotifySize * i) + dwNotifySize - 1;
+        aPosNotify[i].hEventNotify = hNotifyEvent;
+    }
+
+    if (FAILED(hr = pDSNotify->SetNotificationPositions(dwNotifyCount, aPosNotify)))
+    {
+        SAFE_RELEASE(pDSNotify);
+        SAFE_DELETE(aPosNotify);
+        return E_FAIL;
+    }
+
+    SAFE_RELEASE(pDSNotify);
+    SAFE_DELETE(aPosNotify);
+
+    *ppStreamingSound = new CStreamingSound(pDSBuffer, dwDSBufferSize, pWaveFile, dwNotifySize);
+    *(DSBUFFERDESC *)(*ppStreamingSound)->m_desc = dsbd;
+    (*ppStreamingSound)->m_manager = this;
+    (*ppStreamingSound)->m_hNotifyEvent = hNotifyEvent;
+    (*ppStreamingSound)->m_refilling = FALSE;
+
+    return S_OK;
+}
+
+// FUNCTION: TH16 0x470680
+HARNESS_CALLED HRESULT CSoundManager::CreateStreamingFromMemory(CStreamingSound **ppStreamingSound, BYTE *pbData,
+                                                               ULONG ulDataSize, ThBgmFormat *track,
+                                                               DWORD dwCreationFlags, GUID guid3DAlgorithm,
+                                                               DWORD dwNotifyCount, DWORD dwNotifySize,
+                                                               HANDLE hNotifyEvent)
+{
+    HRESULT hr;
+
+    if (m_pDS == NULL)
+    {
+        return CO_E_NOTINITIALIZED;
+    }
+
+    LPDIRECTSOUNDBUFFER pDSBuffer = NULL;
+    DWORD dwDSBufferSize;
+    CWaveFile *pWaveFile = NULL;
+    DSBPOSITIONNOTIFY *aPosNotify = NULL;
+    LPDIRECTSOUNDNOTIFY pDSNotify = NULL;
+
+    pWaveFile = new CWaveFile();
+    pWaveFile->OpenFromMemory(pbData, ulDataSize, track);
+
+    dwDSBufferSize = dwNotifySize * dwNotifyCount;
+
+    DSBUFFERDESC dsbd;
+    ZeroMemory(&dsbd, sizeof(DSBUFFERDESC));
+    dsbd.dwSize = sizeof(DSBUFFERDESC);
+    dsbd.dwFlags = dwCreationFlags | DSBCAPS_CTRLPOSITIONNOTIFY | DSBCAPS_GETCURRENTPOSITION2 | DSBCAPS_GLOBALFOCUS |
+                   DSBCAPS_CTRLVOLUME | DSBCAPS_LOCSOFTWARE;
+    dsbd.dwBufferBytes = dwDSBufferSize;
+    dsbd.guid3DAlgorithm = guid3DAlgorithm;
+    dsbd.lpwfxFormat = &pWaveFile->m_track->format;
+
+    if (FAILED(hr = ((IDirectSound8 *)m_pDS)->CreateSoundBuffer(&dsbd, &pDSBuffer, NULL)))
+    {
+        return E_FAIL;
+    }
+
+    if (FAILED(hr = pDSBuffer->QueryInterface(IID_IDirectSoundNotify, (VOID **)&pDSNotify)))
+    {
+        return E_FAIL;
+    }
+
+    aPosNotify = new DSBPOSITIONNOTIFY[dwNotifyCount];
+    if (aPosNotify == NULL)
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    for (DWORD i = 0; i < dwNotifyCount; i++)
+    {
+        aPosNotify[i].dwOffset = (dwNotifySize * i) + dwNotifySize - 1;
+        aPosNotify[i].hEventNotify = hNotifyEvent;
+    }
+
+    if (FAILED(hr = pDSNotify->SetNotificationPositions(dwNotifyCount, aPosNotify)))
+    {
+        SAFE_RELEASE(pDSNotify);
+        SAFE_DELETE(aPosNotify);
+        return E_FAIL;
+    }
+
+    SAFE_RELEASE(pDSNotify);
+    SAFE_DELETE(aPosNotify);
+
+    *ppStreamingSound = new CStreamingSound(pDSBuffer, dwDSBufferSize, pWaveFile, dwNotifySize);
+    *(DSBUFFERDESC *)(*ppStreamingSound)->m_desc = dsbd;
+    (*ppStreamingSound)->m_manager = this;
+    (*ppStreamingSound)->m_hNotifyEvent = hNotifyEvent;
+    (*ppStreamingSound)->m_refilling = FALSE;
+
+    return S_OK;
 }
 
 // CSound::RestoreBuffer, which LTCG inlined into FillBufferWithSound and
@@ -280,6 +440,9 @@ HARNESS_CALLED CSound::CSound(LPDIRECTSOUNDBUFFER *apDSBuffer, DWORD dwDSBufferS
     m_playing = FALSE;
     m_paused = FALSE;
 }
+
+// SYNTHETIC: TH16 0x470b80
+// CSound::`scalar deleting destructor'
 
 // FUNCTION: TH16 0x470e10
 CSound::~CSound()
@@ -621,6 +784,9 @@ CStreamingSound::CStreamingSound(LPDIRECTSOUNDBUFFER pDSBuffer, DWORD dwDSBuffer
     m_dwNextWriteOffset = 0;
     m_bFillNextNotificationWithSilence = FALSE;
 }
+
+// SYNTHETIC: TH16 0x471490
+// CStreamingSound::`scalar deleting destructor'
 
 CStreamingSound::~CStreamingSound()
 {

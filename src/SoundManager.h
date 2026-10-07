@@ -51,8 +51,8 @@ struct CWaveFile
 
     CWaveFile()
     {
-        m_pwfx = NULL;
         m_track = NULL;
+        m_pwfx = NULL;
         m_dwSize = 0;
         m_bIsReadingFromMemory = FALSE;
     }
@@ -85,6 +85,16 @@ struct CWaveFile
     // 0x471930. Seeks to offset bytes into the track, or to the loop start
     // when loop is set.
     HARNESS_CALLED HRESULT ResetFile(bool loop, DWORD offset);
+    HRESULT OpenFromMemory(BYTE *pbData, ULONG ulDataSize, ThBgmFormat *track)
+    {
+        m_track = track;
+        m_ulDataSize = ulDataSize;
+        m_pbData = pbData;
+        m_pbDataCur = m_pbData;
+        m_bIsReadingFromMemory = TRUE;
+        return S_OK;
+    }
+
     // ResetFile as LTCG inlined it into the CSound constructor.
     HRESULT reset_file_inline(bool loop, DWORD offset);
     // 0x471a30
@@ -132,12 +142,23 @@ struct CSoundManager
     // the arguments.
     HARNESS_CALLED HRESULT SetPrimaryBufferFormat(DWORD dwPrimaryChannels, DWORD dwPrimaryFreq,
                                                   DWORD dwPrimaryBitRate);
+    // 0x470320. Streams a track of thbgm.dat. The file name, flags and
+    // notification count are the same at every call site; LTCG folded them.
+    HARNESS_CALLED HRESULT CreateStreaming(CStreamingSound **ppStreamingSound, const char *strWaveFileName,
+                                           DWORD dwCreationFlags, GUID guid3DAlgorithm, DWORD dwNotifyCount,
+                                           DWORD dwNotifySize, HANDLE hNotifyEvent, ThBgmFormat *track);
+    // 0x470680. The same for a track already in memory.
+    HARNESS_CALLED HRESULT CreateStreamingFromMemory(CStreamingSound **ppStreamingSound, BYTE *pbData,
+                                                     ULONG ulDataSize, ThBgmFormat *track, DWORD dwCreationFlags,
+                                                     GUID guid3DAlgorithm, DWORD dwNotifyCount, DWORD dwNotifySize,
+                                                     HANDLE hNotifyEvent);
 };
 
 // The DirectSound sample's CSound with ZUN's fades, pausing and track
 // switching. Its doubles are only 4-aligned: MSVC would otherwise pad the
 // vtable pointer to 8 bytes.
 #pragma pack(push, 4)
+// VTABLE: TH16 0x4943a0
 class CSound
 {
   public:
@@ -195,6 +216,7 @@ class CSound
 #pragma pack(pop)
 
 // The DirectSound sample's CStreamingSound.
+// VTABLE: TH16 0x494398
 class CStreamingSound : public CSound
 {
   public:
