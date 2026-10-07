@@ -21,6 +21,9 @@ static_assert(offsetof(Gui, front_anm) == 0x2d8, "Gui::front_anm");
 // GLOBAL: TH16 0x4a6ef4
 PauseMenu *g_PauseMenu;
 
+// The characters of the name entry grid (MainMenuStates.cpp).
+extern const char g_name_entry_chars[];
+
 // FUNCTION: TH16 0x43e150
 HARNESS_CALLED void PauseMenu::set_state(i32 state)
 {
@@ -179,7 +182,7 @@ void PauseMenu::draw_keyboard(Float3 pos)
         i32 c;
         if (i < 0x58)
         {
-            c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-=.,!?@:;[]()_/{}|~^#$%&*   "[i];
+            c = g_name_entry_chars[i];
         }
         else if (i == 0x58)
         {

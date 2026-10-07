@@ -286,6 +286,10 @@ int ReplayManager::on_tick_playback()
 
 static_assert(offsetof(RpyInfo, timestamp) == 0xc, "RpyInfo::timestamp");
 static_assert(offsetof(RpyInfo, stage) == 0x90, "RpyInfo::stage");
+static_assert(offsetof(RpyInfo, score) == 0x14, "RpyInfo::score");
+static_assert(offsetof(RpyInfo, slowdown) == 0x7c, "RpyInfo::slowdown");
+static_assert(offsetof(RpyInfo, num_stages) == 0x80, "RpyInfo::num_stages");
+static_assert(offsetof(RpyInfo, character) == 0x84, "RpyInfo::character");
 static_assert(sizeof(RpyInfo) == 0xa0, "RpyInfo");
 
 // TODO: the original's frame is 4 bytes smaller (size shares its stack slot with data).

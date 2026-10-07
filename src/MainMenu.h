@@ -33,17 +33,34 @@ class TitleInf : public TaskInf
     AnmId anm_id_73c;
     AnmId anm_ids_740[0x24];
     AnmId anm_ids_7d0[9];
-    u8 unk_7f4[0x5a5c - 0x7f4];
+    u8 unk_7f4[0x5a48 - 0x7f4];
+    // The replay name being entered, and the cursor in it.
+    char replay_name[0xc];
+    i32 replay_name_cursor;
+    i32 unk_5a58;
     MenuHelper menu_5a5c;
     // The key config being edited: the button for each action.
     i16 key_config[6];
-    u8 unk_5b40[0x5b50 - 0x5b40];
+    u8 unk_5b40[0x5b44 - 0x5b40];
+    i32 unk_5b44;
+    // The replay slot being saved to or played.
+    i32 replay_slot;
+    // The stage picked to start a replay from (minus one).
+    i32 replay_stage;
     ReplayManager *replays[100];
     // Allocated with malloc.
     void *unk_5ce0;
-    u8 unk_5ce4[0x5cec - 0x5ce4];
+    i32 unk_5ce4;
+    // Bit 2 stops the replay list loading; bit 3 is set once it is done.
+    u32 flags_5ce8;
     MenuHelper menu_5cec;
-    u8 unk_5dc4[0x5de4 - 0x5dc4];
+    // Spell practice: the stage and boss attack whose spell cards are
+    // listed, and the spell card ids of the listed rows.
+    i32 spell_stage;
+    i32 spell_row;
+    // The row of spell_ids picked.
+    i32 spell_index;
+    i32 spell_ids[5];
     ThreadInf thread;
 
     TitleInf();
@@ -98,13 +115,37 @@ class TitleInf : public TaskInf
     static i32 __fastcall on_tick_thunk(void *arg);
     static i32 __fastcall on_draw_thunk(void *arg);
 
-    // Not decompiled yet (ExpHP's names).
-    i32 on_draw__practice_stage_select();
-    i32 on_draw__replay();
-    i32 on_draw__player_data();
-    i32 on_draw__4538b0();
-    i32 on_draw__4541b0();
-    i32 on_draw__spell_practice_histories();
+    // Draw states of on_draw (ExpHP's names).
+    HARNESS_CALLED i32 on_draw__practice_stage_select();
+    HARNESS_CALLED i32 on_draw__replay();
+    HARNESS_CALLED i32 on_draw__player_data();
+    HARNESS_CALLED i32 on_draw__4538b0();
+    HARNESS_CALLED i32 on_draw__4541b0();
+    HARNESS_CALLED i32 on_draw__spell_practice_histories();
+
+    // States of on_tick (ExpHP: do_*).
+    i32 do_subseason_select();
+    i32 do_practice_stage_select();
+    i32 do_manual();
+    i32 do_replay_menu();
+    i32 do_replay_save();
+    i32 do_spell_practice_stage_select();
+    i32 do_spell_practice_character();
+    i32 do_spell_practice_row();
+    i32 do_spell_practice_subseason();
+    i32 do_spell_practice_difficulty();
+    // 0x4560b0. Fills spell_ids (and their VMs) with the spell cards of a
+    // stage's boss attack. The last argument is the same at every call
+    // site; LTCG folded it.
+    DECOMP_NOINLINE void load_spell_list(i32 stage, i32 row, i32 *ids, i32 unused);
+    i32 highlight_spell_row(i32 selected);
+    // 0x452c30. The spell card page of the player data.
+    i32 draw_spell_card_page();
+    // The row of replay_slot on its page of 25.
+    i32 replay_slot_row()
+    {
+        return replay_slot % 25;
+    }
 };
 
 extern TitleInf *g_MainMenu;

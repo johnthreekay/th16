@@ -60,7 +60,11 @@ struct RpyInfo
     // 2: spell practice.
     u16 flags_a;
     __time64_t timestamp;
-    u8 unk_14[0x80 - 0x14];
+    // The final score, divided by 10.
+    u32 score;
+    u8 unk_18[0x7c - 0x18];
+    // Percentage of frames slowed down.
+    f32 slowdown;
     // Stage snapshots stored after this.
     i32 num_stages;
     i32 character;
@@ -194,6 +198,9 @@ struct ReplayManager
     // 0x4483b0. Dates the replay and records the stage it ends on (the
     // extra stage as 8 and up). Every caller goes through g_ReplayManager.
     HARNESS_CALLED i32 set_end_stage(i32 extra_stage);
+    // 0x448400. Saves g_ReplayManager's replay under the name. The third
+    // argument is the same at every call site; LTCG folded it.
+    HARNESS_CALLED i32 save(const char *path, const char *name, i32 unused, i32 unk_4);
 };
 
 // 0x449120. Clears the game's button state (not the hardware's).

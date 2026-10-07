@@ -330,6 +330,9 @@ struct AnmManager
     // 0x468350. Draws vertex_count vertices (a triangle fan, in screen
     // space) with the VM's texture and blending.
     i32 draw_vm__mode_11(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count);
+    // 0x4681f0 (ExpHP: draw_vm__mode_9__textureCircle). The same as a
+    // triangle strip, for visible VMs only.
+    i32 draw_vm__mode_9(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count);
     // 0x46efa0
     AnmVm *get_vm_with_id(AnmId id);
     // 0x46f1c0. Marks the VM and its children for deletion. Reaches the
@@ -383,6 +386,12 @@ struct AnmManager
     // ending and dialogue lines). Variadic, so __cdecl with this pushed
     // first.
     void draw_text(AnmVm *vm, D3DCOLOR color, i32 unk_10, i32 font, i32 x, i32 y, const char *fmt, ...);
+    // 0x46dab0 and 0x46dc20. The same right-aligned (ExpHP: draw_rtext) and
+    // centered in the sprite; spacing as in draw_text's last argument.
+    void draw_text_right(AnmVm *vm, D3DCOLOR color, D3DCOLOR shadow_color, i32 font, i32 spacing,
+                         const char *fmt, ...);
+    void draw_text_centered(AnmVm *vm, D3DCOLOR color, D3DCOLOR shadow_color, i32 font, i32 spacing,
+                            const char *fmt, ...);
     // 0x46cf80. Loads a file into a slot without waiting for its textures.
     AnmLoaded *do_preload_anm(i32 slot, const char *path);
     // 0x46d1c0. Creates the textures of the next entry, or the prototype
@@ -440,6 +449,30 @@ struct AnmManager
     // offset by offsets[i] and colored colors[i]. Every caller goes through
     // g_AnmManager, so LTCG dropped this.
     HARNESS_CALLED void draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors);
+    // 0x469a00. A circle outline of count segments around (x, y), from
+    // angle on. draw_vm passes x, y and radius in xmm registers.
+    HARNESS_CALLED i32 draw_circle_outline(f32 x, f32 y, f32 radius, f32 angle, i32 count, D3DCOLOR color);
+    // 0x468c70. A rotated rectangle at (x, y), anchored by anchor_x and
+    // anchor_y (0 center, 1 left/top, 2 right/bottom).
+    HARNESS_CALLED i32 draw_rect(f32 x, f32 y, f32 width, f32 height, f32 angle, D3DCOLOR color_1, D3DCOLOR color_2,
+                                 i32 anchor_x, i32 anchor_y);
+    // 0x468fc0. The outline of draw_rect's rectangle.
+    HARNESS_CALLED i32 draw_rect_outline(f32 x, f32 y, f32 width, f32 height, f32 angle, D3DCOLOR color_1,
+                                         D3DCOLOR color_2, i32 anchor_x, i32 anchor_y);
+    // 0x469570. draw_rect over a half-transparent one pixel border.
+    HARNESS_CALLED i32 draw_rect_bordered(f32 x, f32 y, f32 width, f32 height, f32 angle, D3DCOLOR color_1,
+                                          D3DCOLOR color_2, i32 anchor_x, i32 anchor_y);
+    // 0x469330. A line through (x, y) at angle (anchor: 0 center, 1 start,
+    // 2 end). The last argument is the same at every call site; LTCG folded
+    // it.
+    HARNESS_CALLED i32 draw_line(f32 x, f32 y, f32 length, f32 angle, D3DCOLOR color_1, D3DCOLOR color_2, i32 anchor,
+                                 i32 unused);
+    // 0x469640. A filled circle of count segments around (x, y), fading
+    // from center_color to edge_color.
+    HARNESS_CALLED i32 draw_circle(f32 x, f32 y, f32 radius, f32 angle, i32 count, D3DCOLOR center_color,
+                                   D3DCOLOR edge_color);
+    // 0x469bd0. A ring of count segments, width wide, around (x, y).
+    HARNESS_CALLED i32 draw_ring(f32 x, f32 y, f32 radius, f32 width, f32 angle, i32 count, D3DCOLOR color);
 
     // get_snapshot_vm_with_id as LTCG inlined it into the ANM callbacks.
     AnmVm *get_snapshot_vm_with_id_inline(AnmId id)

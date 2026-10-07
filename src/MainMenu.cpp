@@ -18,6 +18,12 @@ static_assert(offsetof(TitleInf, menu) == 0x24, "TitleInf::menu");
 static_assert(offsetof(TitleInf, time_in_state) == 0x2ac, "TitleInf::time_in_state");
 static_assert(offsetof(TitleInf, anm_ids) == 0x2c0, "TitleInf::anm_ids");
 static_assert(offsetof(TitleInf, anm_id_73c) == 0x73c, "TitleInf::anm_id_73c");
+static_assert(offsetof(TitleInf, replay_name) == 0x5a48, "TitleInf::replay_name");
+static_assert(offsetof(TitleInf, menu_5a5c) == 0x5a5c, "TitleInf::menu_5a5c");
+static_assert(offsetof(TitleInf, key_config) == 0x5b34, "TitleInf::key_config");
+static_assert(offsetof(TitleInf, unk_5b44) == 0x5b44, "TitleInf::unk_5b44");
+static_assert(offsetof(TitleInf, replay_slot) == 0x5b48, "TitleInf::replay_slot");
+static_assert(offsetof(TitleInf, replay_stage) == 0x5b4c, "TitleInf::replay_stage");
 static_assert(offsetof(TitleInf, replays) == 0x5b50, "TitleInf::replays");
 static_assert(offsetof(TitleInf, thread) == 0x5de4, "TitleInf::thread");
 static_assert(sizeof(TitleInf) == 0x5e00, "TitleInf");
@@ -191,8 +197,8 @@ void TitleInf::destroy()
     }
 }
 
-// TODO: the original realigns its frame (and esp, -8), most likely for its
-// callees, which are opaque stubs here.
+// Realigns its frame (and esp, -8) for the draw states it calls, which then
+// rely on it (some pass doubles to create_stringf).
 // FUNCTION: TH16 0x44b530
 i32 TitleInf::on_draw()
 {

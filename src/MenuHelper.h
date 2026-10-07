@@ -38,4 +38,32 @@ struct MenuHelper
     // 0x440c00. Adds a choice the cursor skips, moving the cursor off it
     // (and off any other disabled choice) if needed.
     void disable(i32 choice);
+
+    // push and pop as LTCG inlined them into some menus.
+    __forceinline void push_inline()
+    {
+        stack_selection[stack_depth] = next_selection;
+        stack_num_choices[stack_depth] = num_choices;
+        stack_depth++;
+        num_disabled = 0;
+        if (stack_depth >= 0x10)
+        {
+            stack_depth = 0xf;
+        }
+    }
+
+    __forceinline void pop_inline()
+    {
+        stack_depth--;
+        if (stack_depth < 0)
+        {
+            stack_depth = 0;
+            next_selection = 0;
+            num_disabled = 0;
+            return;
+        }
+        next_selection = stack_selection[stack_depth];
+        num_choices = stack_num_choices[stack_depth];
+        num_disabled = 0;
+    }
 };
