@@ -771,7 +771,7 @@ HARNESS_CALLED AnmId Supervisor::create_fog_vm(i32 count, i32 script)
     vm->alloc_extra_data(count * 2 * sizeof(RenderVertex144));
     if (count > 2)
     {
-        RenderVertex144 *vertices = (RenderVertex144 *)vm->ins_508_extra_data;
+        RenderVertex144 *vertices = (RenderVertex144 *)vm->extra_data;
         vm->flags_lo = (vm->flags_lo & ~(0x1f << ANM_VM_RENDER_MODE_SHIFT)) | (12 << ANM_VM_RENDER_MODE_SHIFT);
         vm->int_vars[0] = count;
         for (i32 i = 0; i < count * 2; i++)
@@ -809,73 +809,73 @@ void Supervisor::setup_special_anms()
             if (g_resolution_x == 640)
             {
                 text_anm->copy_vm(vm, 0x3b);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c0;
                 text_anm->copy_vm(vm, 0x41);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c4;
                 text_anm->copy_vm(vm, 0x3e);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c8;
                 text_anm->copy_vm(vm, 0x44);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
             else if (g_resolution_x == 960)
             {
                 text_anm->copy_vm(vm, 0x3c);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c0;
                 text_anm->copy_vm(vm, 0x42);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c4;
                 text_anm->copy_vm(vm, 0x3f);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c8;
                 text_anm->copy_vm(vm, 0x45);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
             else if (g_resolution_x == 1280)
             {
                 text_anm->copy_vm(vm, 0x3d);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c0;
                 text_anm->copy_vm(vm, 0x43);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c4;
                 text_anm->copy_vm(vm, 0x40);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c8;
                 text_anm->copy_vm(vm, 0x46);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
         }
         if (g_screen_coord_scale == 1.5f)
         {
-            vm_1c4->flags_hi &= ~0x800;
+            vm_1c4->flags_hi &= ~(1 << ANM_VM_FILTER_POINT_SHIFT);
         }
     }
     else

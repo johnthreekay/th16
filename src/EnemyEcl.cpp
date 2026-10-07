@@ -449,7 +449,7 @@ int EnemyData::ecl_run_over_300()
         }
         if (flags_low & 0x20)
         {
-            anm_ids[slot].clear_flag_lo_2_tree();
+            anm_ids[slot].hide_tree();
         }
         if (slot == 0)
         {
@@ -485,7 +485,7 @@ int EnemyData::ecl_run_over_300()
         }
         if (flags_low & 0x20)
         {
-            anm_ids[slot].clear_flag_lo_2_tree();
+            anm_ids[slot].hide_tree();
         }
         break;
     }
@@ -506,7 +506,7 @@ int EnemyData::ecl_run_over_300()
         }
         if (flags_low & 0x20)
         {
-            anm_ids[slot].clear_flag_lo_2_tree();
+            anm_ids[slot].hide_tree();
         }
         break;
     }
@@ -1242,7 +1242,7 @@ int EnemyData::ecl_run_over_300()
         {
             for (i32 i = 0; i < 16; i++)
             {
-                anm_ids[i].clear_flag_lo_2_tree();
+                anm_ids[i].hide_tree();
             }
         }
         break;
@@ -1253,7 +1253,7 @@ int EnemyData::ecl_run_over_300()
         {
             for (i32 i = 0; i < 16; i++)
             {
-                anm_ids[i].set_flag_lo_2_tree();
+                anm_ids[i].show_tree();
             }
         }
         break;

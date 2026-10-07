@@ -31,7 +31,7 @@ i32 AnmManager::render_layer(i32 layer)
     ENTER_CS(CS_ANM_MANAGER);
     for (AnmVm *vm = layer_list_dummy_heads[layer].next_in_layer; vm != NULL; vm = vm->next_in_layer)
     {
-        if (!(vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_FLAG_HI_40)))
+        if (!(vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_IN_DELETE_LIST)))
         {
             draw_vm(vm);
         }

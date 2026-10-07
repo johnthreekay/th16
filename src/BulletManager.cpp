@@ -630,14 +630,14 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
     bullet->vm0.associated_game_entity = bullet;
     bullet_anm->set_vm_script(&bullet->vm0, g_bullet_types[props->type].script);
     bullet->flags |= 0x10;
-    bullet->vm0.flags_hi = (bullet->vm0.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+    bullet->vm0.flags_hi = (bullet->vm0.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
     bullet->vm1.wipe();
     bullet->vm1.flags_lo &= ~1;
     if (g_bullet_types[props->type].unk_110 != 0)
     {
         bullet->vm1.flags_lo |= 1;
         g_BulletManager->bullet_anm->set_vm_script(&bullet->vm1, g_bullet_types[props->type].unk_110);
-        bullet->vm1.flags_hi = (bullet->vm1.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+        bullet->vm1.flags_hi = (bullet->vm1.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
     }
     switch (g_bullet_types[props->type].unk_10c)
     {
@@ -870,14 +870,14 @@ void Bullet::run_ex()
             vm0.associated_game_entity = this;
             g_BulletManager->bullet_anm->set_vm_script(&vm0, g_bullet_types[ex->a].script);
             flags |= 0x10;
-            vm0.flags_hi = (vm0.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+            vm0.flags_hi = (vm0.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
             vm1.wipe();
             vm1.flags_lo &= ~1;
             if (g_bullet_types[ex->a].unk_110 != 0)
             {
                 vm1.flags_lo |= 1;
                 g_BulletManager->bullet_anm->set_vm_script(&vm1, g_bullet_types[ex->a].unk_110);
-                vm1.flags_hi = (vm1.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+                vm1.flags_hi = (vm1.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
             }
             switch (g_bullet_types[sprite].unk_10c)
             {
@@ -1655,7 +1655,7 @@ i32 Bullet::step_ex_17()
 // FUNCTION: TH16 0x4124b0
 i32 Bullet::sub_4124b0(i32 graze_only)
 {
-    vm0.flags_lo &= ~0x60000;
+    vm0.flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
     vm0.pos = g_zero_vec;
     if ((flags & 2) && hitbox_diameter > 0.0f)
     {

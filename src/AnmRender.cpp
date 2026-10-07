@@ -218,7 +218,7 @@ i32 AnmManager::draw_vm__mode_9(AnmVm *vm, RenderVertex144 *vertices, i32 vertex
     {
         return -1;
     }
-    if (!(vm->flags_lo & ANM_VM_FLAG_LO_2))
+    if (!(vm->flags_lo & ANM_VM_SHOWN))
     {
         return -1;
     }
@@ -401,7 +401,7 @@ static __forceinline void anm_mask_draw(AnmMaskVertex *vertices)
 // FUNCTION: TH16 0x4073a0
 i32 __fastcall anm_on_draw_masked(AnmVm *vm)
 {
-    AnmMaskData *data = (AnmMaskData *)vm->ins_508_extra_data;
+    AnmMaskData *data = (AnmMaskData *)vm->extra_data;
     if (data->mode == 2)
     {
         anm_mask_begin();
@@ -472,16 +472,16 @@ static void __fastcall fan_sincosmul(Float3 *dst, f32 angle, f32 radius)
 // FUNCTION: TH16 0x469e20
 int __fastcall anm_effect_4_init(AnmVm *vm)
 {
-    if (vm->ins_508_extra_data != NULL)
+    if (vm->extra_data != NULL)
     {
-        free(vm->ins_508_extra_data);
-        vm->ins_508_extra_data = NULL;
-        vm->ins_508_extra_data_size = 0;
+        free(vm->extra_data);
+        vm->extra_data = NULL;
+        vm->extra_data_size = 0;
     }
     vm->alloc_extra_data(sizeof(AnmFanData));
     vm->index_of_on_tick = 4;
     vm->index_of_on_draw = 6;
-    AnmFanData *data = (AnmFanData *)vm->ins_508_extra_data;
+    AnmFanData *data = (AnmFanData *)vm->extra_data;
     data->uv_speed = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);
     data->unk_4a8 = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);
     f32 angle = -ZUN_PI;
@@ -558,7 +558,7 @@ static inline void fan_scroll_v(AnmFanData *data, RenderVertex144 *vertex)
 // FUNCTION: TH16 0x46a0b0
 i32 __fastcall anm_on_tick_fan(AnmVm *vm)
 {
-    AnmFanData *data = (AnmFanData *)vm->ins_508_extra_data;
+    AnmFanData *data = (AnmFanData *)vm->extra_data;
     *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
     data->vertices[0].uv.x += data->uv_speed;
     if (data->vertices[0].uv.x < 0.0f)
@@ -601,7 +601,7 @@ i32 __fastcall anm_on_tick_fan(AnmVm *vm)
 // FUNCTION: TH16 0x46a330
 i32 __fastcall anm_on_draw_fan(AnmVm *vm)
 {
-    g_AnmManager->draw_vm__mode_11(vm, (RenderVertex144 *)vm->ins_508_extra_data, 0x21);
+    g_AnmManager->draw_vm__mode_11(vm, (RenderVertex144 *)vm->extra_data, 0x21);
     return 0;
 }
 
@@ -612,43 +612,43 @@ i32 __fastcall anm_on_draw_fan(AnmVm *vm)
 void AnmManager::render_sub_466f00(AnmVm *vm)
 {
     D3DXMATRIX m;
-    if (!(vm->flags_lo & 0x10000))
+    if (!(vm->flags_lo & ANM_VM_KEEP_WORLD_MATRIX))
     {
-        vm->matrix_410 = vm->matrix_3d0;
-        vm->matrix_410._11 *= vm->scale_2.x * vm->scale.x;
-        vm->matrix_410._22 *= vm->scale_2.y * vm->scale.y;
+        vm->world_matrix = vm->sprite_matrix;
+        vm->world_matrix._11 *= vm->scale_2.x * vm->scale.x;
+        vm->world_matrix._22 *= vm->scale_2.y * vm->scale.y;
         vm->flags_lo &= ~ANM_VM_SCALE_CHANGED;
         Float3 rotation = *vm->get_total_rotation();
         D3DXMATRIX rotation_matrix;
         if (rotation.x != 0.0f)
         {
             D3DXMatrixRotationX(&rotation_matrix, rotation.x);
-            D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+            D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
         }
         if (rotation.y != 0.0f)
         {
             D3DXMatrixRotationY(&rotation_matrix, rotation.y);
-            D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+            D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
         }
         if (rotation.z != 0.0f)
         {
             D3DXMatrixRotationZ(&rotation_matrix, rotation.z);
-            D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+            D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
         }
         vm->flags_lo &= ~ANM_VM_ROTATION_CHANGED;
     }
-    m = vm->matrix_410;
+    m = vm->world_matrix;
     m._41 = vm->entity_pos.x + vm->pos.x + vm->pos_2.x + m._41;
-    if ((vm->flags_hi & ANM_VM_LAYER_KIND_MASK) && vm->unk_5b0 == NULL)
+    if ((vm->flags_hi & ANM_VM_ORIGIN_MODE_MASK) && vm->parent_vm == NULL)
     {
         m._41 += g_resolution_x * 0.5f;
         m._42 += (g_resolution_y - 448.0f) * 0.5f;
     }
     m._42 = vm->entity_pos.y + vm->pos.y + vm->pos_2.y + m._42;
     m._43 = vm->entity_pos.z + vm->pos.z + vm->pos_2.z;
-    if (vm->unk_5b0 != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
+    if (vm->parent_vm != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
     {
-        AnmVm *parent = vm->unk_5b0;
+        AnmVm *parent = vm->parent_vm;
         m._41 = parent->entity_pos.x + parent->pos.x + parent->pos_2.x + m._41;
         m._42 = parent->entity_pos.y + parent->pos.y + parent->pos_2.y + m._42;
         m._43 = parent->entity_pos.z + parent->pos.z + parent->pos_2.z + m._43;
@@ -673,12 +673,12 @@ void AnmVm::write_sprite_corners(Float3 *corners)
 {
     switch ((flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
     {
-    case 1:
+    case ANM_RENDER_SPRITE_ROTATED:
         write_sprite_corners__with_z_rot(this, &corners[0], &corners[1], &corners[2], &corners[3]);
         break;
-    case 0:
-    case 2:
-    case 3:
+    case ANM_RENDER_SPRITE:
+    case ANM_RENDER_SPRITE_UNSNAPPED:
+    case ANM_RENDER_SPRITE_ROTATED_3:
         write_sprite_corners__without_rot(this, &corners[0], &corners[1], &corners[2], &corners[3]);
         break;
     }

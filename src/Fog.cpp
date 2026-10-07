@@ -46,7 +46,7 @@ Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
         vm_ids[i] = g_Supervisor.create_fog_vm(points_per_strip, 0x3b);
         vms[i] = get_vm_or_clear(vm_ids[i]);
         vms[i]->flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
-        vms[i]->flags_hi &= ~ANM_VM_LAYER_KIND_MASK;
+        vms[i]->flags_hi &= ~ANM_VM_ORIGIN_MODE_MASK;
     }
 }
 
@@ -104,7 +104,7 @@ void Fog::update_vms()
     FogVertex *src = (FogVertex *)buffer_14;
     for (i32 i = 0; i < vm_count - 1; i++)
     {
-        FogVertex *dst = (FogVertex *)vms[i]->ins_508_extra_data;
+        FogVertex *dst = (FogVertex *)vms[i]->extra_data;
         for (i32 j = 0; j < unk_4; j++)
         {
             *dst++ = *src;

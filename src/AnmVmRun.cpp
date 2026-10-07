@@ -10,7 +10,7 @@
 #include "Rng.h"
 #include "Supervisor.h"
 
-static_assert(offsetof(AnmVm, rotation_related) == 0x5f0, "AnmVm layout");
+static_assert(offsetof(AnmVm, total_rotation) == 0x5f0, "AnmVm layout");
 static_assert(sizeof(AnmVm) == 0x5fc, "AnmVm layout");
 static_assert(sizeof(InterpInt3) == 0x58, "InterpInt3 layout");
 static_assert(sizeof(InterpAngle) == 0x30, "InterpAngle layout");
@@ -47,15 +47,15 @@ HARNESS_CALLED f32 AnmVm::get_float_var(f32 value)
     case ANM_VAR_F3:
         return float_vars[3];
     case ANM_VAR_F4:
-        return script_vars_33_34_35.x;
+        return float_vars_4_to_6.x;
     case ANM_VAR_F5:
-        return script_vars_33_34_35.y;
+        return float_vars_4_to_6.y;
     case ANM_VAR_F6:
-        return script_vars_33_34_35.z;
+        return float_vars_4_to_6.z;
     case ANM_VAR_I4:
-        return script_var_8;
+        return int_var_4;
     case ANM_VAR_I5:
-        return script_var_9;
+        return int_var_5;
     case ANM_VAR_RANDF_UNSAFE:
         return g_replay_unsafe_rng.randf_0_to(rand_scale_one);
     case ANM_VAR_RANDF2_UNSAFE:
@@ -128,15 +128,15 @@ HARNESS_CALLED i32 AnmVm::get_int_var(i32 value)
     case ANM_VAR_F3:
         return float_vars[3];
     case ANM_VAR_F4:
-        return script_vars_33_34_35.x;
+        return float_vars_4_to_6.x;
     case ANM_VAR_F5:
-        return script_vars_33_34_35.y;
+        return float_vars_4_to_6.y;
     case ANM_VAR_F6:
-        return script_vars_33_34_35.z;
+        return float_vars_4_to_6.z;
     case ANM_VAR_I4:
-        return script_var_8;
+        return int_var_4;
     case ANM_VAR_I5:
-        return script_var_9;
+        return int_var_5;
     case ANM_VAR_RAND_SCALE_ONE:
         return rand_scale_one;
     case ANM_VAR_RAND_SCALE_PI:
@@ -175,11 +175,11 @@ HARNESS_CALLED f32 *AnmVm::get_float_var_ptr(f32 *value)
     case ANM_VAR_ROT_Z:
         return &rotation.z;
     case ANM_VAR_F4:
-        return &script_vars_33_34_35.x;
+        return &float_vars_4_to_6.x;
     case ANM_VAR_F5:
-        return &script_vars_33_34_35.y;
+        return &float_vars_4_to_6.y;
     case ANM_VAR_F6:
-        return &script_vars_33_34_35.z;
+        return &float_vars_4_to_6.z;
     case ANM_VAR_RAND_SCALE_ONE:
         return &rand_scale_one;
     case ANM_VAR_RAND_SCALE_PI:
@@ -202,9 +202,9 @@ HARNESS_CALLED i32 *AnmVm::get_int_var_ptr(i32 *value)
     case ANM_VAR_I3:
         return &int_vars[3];
     case ANM_VAR_I4:
-        return &script_var_8;
+        return &int_var_4;
     case ANM_VAR_I5:
-        return &script_var_9;
+        return &int_var_5;
     case ANM_VAR_NUM_CYCLES:
         return &num_cycles_in_texture;
     }
@@ -258,7 +258,7 @@ static void __fastcall anm_sincosmul(Float3 *dst, f32 angle, f32 radius)
 }
 
 // Rebuilds the vertices that render modes 9, 13, 14, 24 and 25 draw from
-// ins_508_extra_data: a ring strip around the VM (9), an arc of it (13,
+// extra_data: a ring strip around the VM (9), an arc of it (13,
 // 14) and an upright cylinder band (24, 25), int_vars[0] steps around
 // with the texture's u spread over int_vars[1].
 // TODO: register allocation differs (the original keeps this in edi and the vertex cursor on the stack in mode 9).
@@ -267,10 +267,10 @@ void AnmVm::update_special_vertices()
 {
     switch ((flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
     {
-    case 9: {
+    case ANM_RENDER_TEX_CIRCLE: {
         i32 n = int_vars[0] - 1;
         f32 angle = rotation.z;
-        RenderVertex144 *vertex = (RenderVertex144 *)ins_508_extra_data;
+        RenderVertex144 *vertex = (RenderVertex144 *)extra_data;
         f32 angle_step = ZUN_2PI / n;
         f32 v_step = (f32)int_vars[1] / n;
         Float3 pos;
@@ -280,17 +280,17 @@ void AnmVm::update_special_vertices()
         f32 half_width = scale.x * 0.5f;
         f32 outer = scale.y + half_width;
         f32 inner = scale.y - half_width;
-        if (unk_5b0 != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+        if (parent_vm != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
         {
-            outer *= unk_5b0->scale.x;
-            inner *= unk_5b0->scale.y;
+            outer *= parent_vm->scale.x;
+            inner *= parent_vm->scale.y;
         }
-        if ((flags_hi & ANM_VM_COORD_MODE_MASK) == 1 << 20)
+        if ((flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_SCALED)
         {
             outer *= g_screen_coord_scale;
             inner *= g_screen_coord_scale;
         }
-        else if ((flags_hi & ANM_VM_COORD_MODE_MASK) == 2 << 20)
+        else if ((flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_HALF_SCALED)
         {
             outer *= g_screen_coord_scale * 0.5f;
             inner *= g_screen_coord_scale * 0.5f;
@@ -322,26 +322,26 @@ void AnmVm::update_special_vertices()
             vertex++;
             angle = wrap_angle(angle);
         }
-        RenderVertex144 *first = (RenderVertex144 *)ins_508_extra_data;
+        RenderVertex144 *first = (RenderVertex144 *)extra_data;
         vertex[0] = first[0];
         vertex[0].uv.y = uv_scroll_pos.y + v;
-        first = (RenderVertex144 *)ins_508_extra_data;
+        first = (RenderVertex144 *)extra_data;
         vertex[1] = first[1];
         vertex[1].uv.y = uv_scroll_pos.y + v;
         break;
     }
-    case 13:
-    case 14: {
+    case ANM_RENDER_TEX_ARC_EVEN:
+    case ANM_RENDER_TEX_ARC: {
         f32 start = wrap_angle(rotation.z - rotation.x * 0.5f);
         i32 n = int_vars[0];
         f32 v = 0.0f;
-        RenderVertex144 *vertex = (RenderVertex144 *)ins_508_extra_data;
+        RenderVertex144 *vertex = (RenderVertex144 *)extra_data;
         f32 angle_step = rotation.x / (n - 1);
         f32 v_step = (f32)int_vars[1] / (n - 1);
         Float3 pos;
         get_own_transformed_pos(&pos);
         f32 angle;
-        if ((flags_lo & (0x1f << ANM_VM_RENDER_MODE_SHIFT)) == 14 << ANM_VM_RENDER_MODE_SHIFT)
+        if ((flags_lo & (0x1f << ANM_VM_RENDER_MODE_SHIFT)) == ANM_RENDER_TEX_ARC << ANM_VM_RENDER_MODE_SHIFT)
         {
             angle = normalize_angle(rotation.z);
         }
@@ -353,17 +353,17 @@ void AnmVm::update_special_vertices()
         f32 half_width = scale.x * 0.5f;
         f32 outer = scale.y + half_width;
         f32 inner = scale.y - half_width;
-        if (unk_5b0 != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+        if (parent_vm != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
         {
-            outer *= unk_5b0->scale.x;
-            inner *= unk_5b0->scale.y;
+            outer *= parent_vm->scale.x;
+            inner *= parent_vm->scale.y;
         }
-        if ((flags_hi & ANM_VM_COORD_MODE_MASK) == 1 << 20)
+        if ((flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_SCALED)
         {
             outer *= g_screen_coord_scale;
             inner *= g_screen_coord_scale;
         }
-        else if ((flags_hi & ANM_VM_COORD_MODE_MASK) == 2 << 20)
+        else if ((flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_HALF_SCALED)
         {
             outer *= g_screen_coord_scale * 0.5f;
             inner *= g_screen_coord_scale * 0.5f;
@@ -395,20 +395,20 @@ void AnmVm::update_special_vertices()
         }
         break;
     }
-    case 24:
-    case 25: {
+    case ANM_RENDER_TEX_CYLINDER_3D:
+    case ANM_RENDER_TEX_RING_3D: {
         f32 width = float_vars[0];
         f32 angle = wrap_angle(float_vars[3] - width * 0.5f);
         i32 n = int_vars[0];
         f32 angle_step = width / (n - 1);
         f32 v = 0.0f;
-        RenderVertexXyzDiffuseTex *vertex = (RenderVertexXyzDiffuseTex *)ins_508_extra_data;
+        RenderVertexXyzDiffuseTex *vertex = (RenderVertexXyzDiffuseTex *)extra_data;
         f32 v_step = (f32)int_vars[1] / (n - 1);
         D3DCOLOR color = (flags_lo & ANM_VM_COLOR_MODE_MASK) ? color_2.d3d : color_1.d3d;
         f32 y = float_vars[1] * 0.5f;
         f32 radius_top = float_vars[2];
         f32 radius_bottom = float_vars[2];
-        if ((flags_lo & (0x1f << ANM_VM_RENDER_MODE_SHIFT)) == 25 << ANM_VM_RENDER_MODE_SHIFT)
+        if ((flags_lo & (0x1f << ANM_VM_RENDER_MODE_SHIFT)) == ANM_RENDER_TEX_RING_3D << ANM_VM_RENDER_MODE_SHIFT)
         {
             radius_top = radius_bottom - y;
             radius_bottom = y + radius_bottom;
@@ -493,14 +493,14 @@ __forceinline i32 AnmVm::run_script()
 {
     AnmRawInstr *ins;
     i32 result = 0;
-    if (instr_offset < 0 || (flags_lo & ANM_VM_FLAG_LO_100000))
+    if (instr_offset < 0 || (flags_lo & ANM_VM_SCRIPT_DISABLED))
     {
         return 0;
     }
-    timer_1c++;
+    time_in_script++;
     if (pending_interrupt == 0)
     {
-        if ((flags_hi & (ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000)) == ANM_VM_FLAG_HI_4000 && g_GameThread != NULL &&
+        if ((flags_hi & (ANM_VM_FREEZES_WITH_WORLD | ANM_VM_FREEZES_AFTER_FIRST_RUN)) == ANM_VM_FREEZES_WITH_WORLD && g_GameThread != NULL &&
             g_GameThread->flags.flag_1)
         {
             return 0;
@@ -514,9 +514,10 @@ __forceinline i32 AnmVm::run_script()
         i32 offset = 0;
         AnmRawInstr *fallback = NULL;
         ins = (AnmRawInstr *)g_AnmManager->loaded_anms[anm_loaded_index]->scripts[script_id];
-        while (!(ins->opcode == 5 && pending_interrupt == ins->args[0].i) && ins->opcode != -1)
+        while (!(ins->opcode == ANM_OP_INTERRUPT_LABEL && pending_interrupt == ins->args[0].i) &&
+               ins->opcode != ANM_OP_END)
         {
-            if (ins->opcode == 5 && ins->args[0].i == -1)
+            if (ins->opcode == ANM_OP_INTERRUPT_LABEL && ins->args[0].i == -1)
             {
                 fallback = ins;
                 fallback_offset = offset;
@@ -526,7 +527,7 @@ __forceinline i32 AnmVm::run_script()
         }
         flags_lo &= ~ANM_VM_STOPPED;
         pending_interrupt = 0;
-        if (ins->opcode != 5)
+        if (ins->opcode != ANM_OP_INTERRUPT_LABEL)
         {
             if (fallback == NULL)
             {
@@ -552,13 +553,11 @@ __forceinline i32 AnmVm::run_script()
         }
         switch (ins->opcode)
         {
-        // jmp
-        case 200:
+        case ANM_OP_JMP:
             script_time.set_value(ins->args[1].i);
             instr_offset = ins->args[0].i;
             continue;
-        // jmpDec
-        case 201:
+        case ANM_OP_JMP_DEC:
             (*(!ANM_IS_VAR(0) ? &ins->args[0].i : get_int_var_ptr(&ins->args[0].i)))--;
             if (ANM_INT(0) > 0)
             {
@@ -567,24 +566,20 @@ __forceinline i32 AnmVm::run_script()
                 continue;
             }
             break;
-        // wait
-        case 6:
+        case ANM_OP_WAIT:
             script_time.rewind(ANM_INT(0));
             break;
-        // caseReturn
-        case 7:
+        case ANM_OP_CASE_RETURN:
             script_time.set_from(interrupt_return_time);
             instr_offset = interrupt_return_offset;
             continue;
-        // iset, fset
-        case 100:
+        case ANM_OP_ISET:
             *ANM_INT_PTR(0) = ANM_INT(1);
             break;
-        case 101:
+        case ANM_OP_FSET:
             *ANM_FLOAT_PTR(0) = ANM_FLOAT(1);
             break;
-        // isetAdd ... fsetMod
-        case 112:
+        case ANM_OP_ISET_ADD:
         {
             i32 a = ANM_INT(1);
             i32 b = ANM_INT(2);
@@ -596,22 +591,22 @@ __forceinline i32 AnmVm::run_script()
             *p = a + b;
             break;
         }
-        case 113:
+        case ANM_OP_FSET_ADD:
             *ANM_FLOAT_PTR(0) = ANM_FLOAT(1) + ANM_FLOAT(2);
             break;
-        case 114:
+        case ANM_OP_ISET_SUB:
             *ANM_INT_PTR(0) = ANM_INT(1) - ANM_INT(2);
             break;
-        case 115:
+        case ANM_OP_FSET_SUB:
             *ANM_FLOAT_PTR(0) = ANM_FLOAT(1) - ANM_FLOAT(2);
             break;
-        case 116:
+        case ANM_OP_ISET_MUL:
             *ANM_INT_PTR(0) = ANM_INT(1) * ANM_INT(2);
             break;
-        case 117:
+        case ANM_OP_FSET_MUL:
             *ANM_FLOAT_PTR(0) = ANM_FLOAT(1) * ANM_FLOAT(2);
             break;
-        case 118:
+        case ANM_OP_ISET_DIV:
         {
             i32 a = ANM_INT(1);
             i32 b = ANM_INT(2);
@@ -623,10 +618,10 @@ __forceinline i32 AnmVm::run_script()
             *p = a / b;
             break;
         }
-        case 119:
+        case ANM_OP_FSET_DIV:
             *ANM_FLOAT_PTR(0) = ANM_FLOAT(1) / ANM_FLOAT(2);
             break;
-        case 120:
+        case ANM_OP_ISET_MOD:
         {
             i32 a = ANM_INT(1);
             i32 b = ANM_INT(2);
@@ -638,35 +633,34 @@ __forceinline i32 AnmVm::run_script()
             *p = a % b;
             break;
         }
-        case 121:
+        case ANM_OP_FSET_MOD:
             anm_store_float(this, ins, 0, fmodf(ANM_FLOAT(1), ANM_FLOAT(2)));
             break;
-        // iadd ... fmod
-        case 102:
+        case ANM_OP_IADD:
         {
             i32 value = ANM_INT(1);
             *ANM_INT_PTR(0) += value;
             break;
         }
-        case 103:
+        case ANM_OP_FADD:
         {
             f32 value = ANM_FLOAT(1);
             *ANM_FLOAT_PTR(0) += value;
             break;
         }
-        case 104:
+        case ANM_OP_ISUB:
         {
             i32 value = ANM_INT(1);
             *ANM_INT_PTR(0) -= value;
             break;
         }
-        case 105:
+        case ANM_OP_FSUB:
         {
             f32 value = ANM_FLOAT(1);
             *ANM_FLOAT_PTR(0) -= value;
             break;
         }
-        case 106:
+        case ANM_OP_IMUL:
         {
             i32 value = ANM_INT(1);
             i32 *p = &ins->args[0].i;
@@ -677,13 +671,13 @@ __forceinline i32 AnmVm::run_script()
             *p *= value;
             break;
         }
-        case 107:
+        case ANM_OP_FMUL:
         {
             f32 value = ANM_FLOAT(1);
             *ANM_FLOAT_PTR(0) *= value;
             break;
         }
-        case 108:
+        case ANM_OP_IDIV:
         {
             i32 value = ANM_INT(1);
             i32 *p = &ins->args[0].i;
@@ -694,13 +688,13 @@ __forceinline i32 AnmVm::run_script()
             *p /= value;
             break;
         }
-        case 109:
+        case ANM_OP_FDIV:
         {
             f32 value = ANM_FLOAT(1);
             *ANM_FLOAT_PTR(0) /= value;
             break;
         }
-        case 110:
+        case ANM_OP_IMOD:
         {
             i32 value = ANM_INT(1);
             i32 *p = &ins->args[0].i;
@@ -711,60 +705,55 @@ __forceinline i32 AnmVm::run_script()
             *p %= value;
             break;
         }
-        case 111:
+        case ANM_OP_FMOD:
             anm_store_float(this, ins, 0, fmodf(ANM_FLOAT(0), ANM_FLOAT(1)));
             break;
-        // isetRand, fsetRand
-        case 122:
+        case ANM_OP_ISET_RAND:
         {
             u32 range = ANM_INT(1);
             *ANM_INT_PTR(0) = range != 0 ? g_replay_unsafe_rng.rand_u32() % range : 0;
             break;
         }
-        case 123:
+        case ANM_OP_FSET_RAND:
             anm_store_float(this, ins, 0, g_replay_unsafe_rng.randf_0_to(ANM_FLOAT(1)));
             break;
-        // fsin, fcos, ftan, facos, fatan
-        case 124:
+        case ANM_OP_FSIN:
         {
             f32 value = sinf(ANM_FLOAT(1));
             *ANM_FLOAT_PTR(0) = value;
             break;
         }
-        case 125:
+        case ANM_OP_FCOS:
         {
             f32 value = cosf(ANM_FLOAT(1));
             *ANM_FLOAT_PTR(0) = value;
             break;
         }
-        case 126:
+        case ANM_OP_FTAN:
         {
             f32 value = tanf(ANM_FLOAT(1));
             *ANM_FLOAT_PTR(0) = value;
             break;
         }
-        case 127:
+        case ANM_OP_FACOS:
         {
             f32 value = acosf(ANM_FLOAT(1));
             *ANM_FLOAT_PTR(0) = value;
             break;
         }
-        case 128:
+        case ANM_OP_FATAN:
         {
             f32 value = atanf(ANM_FLOAT(1));
             *ANM_FLOAT_PTR(0) = value;
             break;
         }
-        // validRad
-        case 129:
+        case ANM_OP_VALID_RAD:
             *ANM_FLOAT_PTR(0) = add_normalize_angle(ANM_FLOAT(0), 0.0f);
             break;
-        // circlePos
-        case 130:
+        case ANM_OP_CIRCLE_POS:
             anm_sincosmul_xy(ANM_FLOAT_PTR(0), ANM_FLOAT_PTR(1), ANM_FLOAT(2), ANM_FLOAT(3));
             break;
-        // circlePosRand
-        case 131:
+        case ANM_OP_CIRCLE_POS_RAND:
         {
             f32 min = ANM_FLOAT(2);
             f32 max = ANM_FLOAT(3);
@@ -776,74 +765,73 @@ __forceinline i32 AnmVm::run_script()
             *ANM_FLOAT_PTR(1) = point.y;
             break;
         }
-        // ije ... fjge
-        case 202:
+        case ANM_OP_IJE:
             if (ANM_INT(0) == ANM_INT(1))
             {
                 goto jump;
             }
             break;
-        case 203:
+        case ANM_OP_FJE:
             if (ANM_FLOAT(0) == ANM_FLOAT(1))
             {
                 goto jump;
             }
             break;
-        case 204:
+        case ANM_OP_IJNE:
             if (ANM_INT(0) != ANM_INT(1))
             {
                 goto jump;
             }
             break;
-        case 205:
+        case ANM_OP_FJNE:
             if (ANM_FLOAT(0) != ANM_FLOAT(1))
             {
                 goto jump;
             }
             break;
-        case 206:
+        case ANM_OP_IJL:
             if (ANM_INT(0) < ANM_INT(1))
             {
                 goto jump;
             }
             break;
-        case 207:
+        case ANM_OP_FJL:
             if (ANM_FLOAT(0) < ANM_FLOAT(1))
             {
                 goto jump;
             }
             break;
-        case 208:
+        case ANM_OP_IJLE:
             if (ANM_INT(0) <= ANM_INT(1))
             {
                 goto jump;
             }
             break;
-        case 209:
+        case ANM_OP_FJLE:
             if (ANM_FLOAT(0) <= ANM_FLOAT(1))
             {
                 goto jump;
             }
             break;
-        case 210:
+        case ANM_OP_IJG:
             if (ANM_INT(0) > ANM_INT(1))
             {
                 goto jump;
             }
             break;
-        case 211:
+        case ANM_OP_FJG:
             if (ANM_FLOAT(0) > ANM_FLOAT(1))
             {
                 goto jump;
             }
             break;
-        case 212:
+        case ANM_OP_IJGE:
             if (ANM_INT(0) >= ANM_INT(1))
             {
                 goto jump;
             }
             break;
-        case 213:
+        case ANM_OP_FJGE:
             if (ANM_FLOAT(0) >= ANM_FLOAT(1))
             {
                 goto jump;
@@ -854,8 +842,7 @@ __forceinline i32 AnmVm::run_script()
             script_time.set_value(ins->args[3].i);
             instr_offset = ins->args[2].i;
             continue;
-        // sprite
-        case 300:
+        case ANM_OP_SPRITE:
         {
             flags_lo |= ANM_VM_VISIBLE;
             i32 sprite;
@@ -878,41 +865,36 @@ __forceinline i32 AnmVm::run_script()
             time_of_last_sprite_set = script_time.current;
             break;
         }
-        case 432:
+        case ANM_OP_IGNORE_GAME_SPEED:
             ANM_FLAGS_HI->ignore_game_speed = ANM_INT(0);
             break;
-        // scriptNew
-        case 500:
-            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, 0);
+        case ANM_OP_SCRIPT_NEW:
+            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, ANM_CREATE_WORLD_BACK);
             break;
-        // scriptNewPos
-        case 505:
+        case ANM_OP_SCRIPT_NEW_POS:
         {
-            AnmId id = g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, 0);
+            AnmId id = g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, ANM_CREATE_WORLD_BACK);
             AnmVm *child = id.find_or_clear();
             child->pos_2.x = ANM_FLOAT(1);
             child->pos_2.y = ANM_FLOAT(2);
             break;
         }
-        // scriptNewFront, scriptNewUI, scriptNewUIFront
-        case 502:
-            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, 2);
+        case ANM_OP_SCRIPT_NEW_FRONT:
+            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, ANM_CREATE_FRONT);
             break;
-        case 501:
-            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, 4);
+        case ANM_OP_SCRIPT_NEW_UI:
+            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, ANM_CREATE_UI);
             break;
-        case 503:
-            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, 6);
+        case ANM_OP_SCRIPT_NEW_UI_FRONT:
+            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, ANM_CREATE_UI_FRONT);
             break;
-        // copyVars
-        case 509:
-            if (unk_5b0 != NULL)
+        case ANM_OP_COPY_VARS:
+            if (parent_vm != NULL)
             {
-                memcpy(int_vars, unk_5b0->int_vars, offsetof(AnmVm, pos_2) - offsetof(AnmVm, int_vars));
+                memcpy(int_vars, parent_vm->int_vars, offsetof(AnmVm, pos_2) - offsetof(AnmVm, int_vars));
             }
             break;
-        // scriptNewRootPos
-        case 506:
+        case ANM_OP_SCRIPT_NEW_ROOT_POS:
         {
             AnmId id = g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_root(ANM_INT(0), this, 0);
             AnmVm *child = id.find_or_clear();
@@ -920,16 +902,13 @@ __forceinline i32 AnmVm::run_script()
             child->pos_2.y = ANM_FLOAT(2);
             break;
         }
-        // scriptNewRoot
-        case 504:
+        case ANM_OP_SCRIPT_NEW_ROOT:
             g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_root(ANM_INT(0), this, 0);
             break;
-        // effectNew
-        case 508:
+        case ANM_OP_EFFECT_NEW:
             g_EffectManager->create_effect(ANM_INT(0), (D3DXVECTOR3 *)this, this);
             break;
-        // spriteRand
-        case 301:
+        case ANM_OP_SPRITE_RAND:
         {
             flags_lo |= ANM_VM_VISIBLE;
             i32 sprite;
@@ -953,84 +932,75 @@ __forceinline i32 AnmVm::run_script()
             time_of_last_sprite_set = script_time.current;
             break;
         }
-        // scale, scale2, zoomOut
-        case 402:
+        case ANM_OP_SCALE:
             scale.x = ANM_FLOAT(0);
             scale.y = ANM_FLOAT(1);
             flags_lo |= ANM_VM_SCALE_CHANGED;
             break;
-        case 434:
+        case ANM_OP_SCALE2:
             scale_2.x = ANM_FLOAT(0);
             scale_2.y = ANM_FLOAT(1);
             flags_lo |= ANM_VM_SCALE_CHANGED;
             break;
-        case 429:
+        case ANM_OP_ZOOM_OUT:
             uv_scale.x = ANM_FLOAT(0);
             uv_scale.y = ANM_FLOAT(1);
             flags_lo |= ANM_VM_UV_SCALE_CHANGED;
             break;
-        // alpha, color, alpha2, color2
-        case 403:
+        case ANM_OP_ALPHA:
             color_1.a = ANM_INT(0);
             break;
-        case 404:
+        case ANM_OP_COLOR:
             color_1.r = ANM_INT(0);
             color_1.g = ANM_INT(1);
             color_1.b = ANM_INT(2);
             break;
-        case 405:
+        case ANM_OP_ALPHA2:
             color_2.a = ANM_INT(0);
             break;
-        case 406:
+        case ANM_OP_COLOR2:
             color_2.r = ANM_INT(0);
             color_2.g = ANM_INT(1);
             color_2.b = ANM_INT(2);
             break;
-        // flipX, flipY
-        case 308:
-            flags_lo ^= ANM_VM_FLAG_LO_800;
+        case ANM_OP_FLIP_X:
+            flags_lo ^= ANM_VM_FLIP_X;
             scale.x *= -1.0f;
             flags_lo |= ANM_VM_SCALE_CHANGED;
             break;
-        case 309:
-            flags_lo ^= ANM_VM_FLAG_LO_1000;
+        case ANM_OP_FLIP_Y:
+            flags_lo ^= ANM_VM_FLIP_Y;
             scale.y *= -1.0f;
             flags_lo |= ANM_VM_SCALE_CHANGED;
             break;
-        // colorizeChildren
-        case 315:
+        case ANM_OP_COLORIZE_CHILDREN:
             ANM_FLAGS_HI->colorize_children = (u8)ins->args[0].i;
             break;
-        case 316:
-            flags_lo |= ANM_VM_FLAG_LO_2;
+        case ANM_OP_SHOW:
+            flags_lo |= ANM_VM_SHOWN;
             break;
-        case 317:
-            flags_lo &= ~ANM_VM_FLAG_LO_2;
+        case ANM_OP_HIDE:
+            flags_lo &= ~ANM_VM_SHOWN;
             break;
-        // rotate
-        case 401:
+        case ANM_OP_ROTATE:
             rotation.x = ANM_FLOAT(0);
             rotation.y = ANM_FLOAT(1);
             rotation.z = ANM_FLOAT(2);
             flags_lo |= ANM_VM_ROTATION_CHANGED;
             break;
-        // angleVel, scaleGrowth
-        case 415:
+        case ANM_OP_ANGLE_VEL:
             set_angular_velocity(ANM_FLOAT(0), ANM_FLOAT(1), ANM_FLOAT(2));
             break;
-        case 416:
+        case ANM_OP_SCALE_GROWTH:
             set_scale_growth(ANM_FLOAT(0), ANM_FLOAT(1));
             break;
-        // alphaTimeLinear
-        case 417:
+        case ANM_OP_ALPHA_TIME_LINEAR:
             set_alpha1_time(ANM_INT(1), INTERP_LINEAR, color_1.a, (u8)ins->args[0].i);
             break;
-        // blendMode
-        case 303:
+        case ANM_OP_BLEND_MODE:
             ANM_FLAGS_LO->blend_mode = ins->args[0].i;
             break;
-        // pos
-        case 400:
+        case ANM_OP_POS:
             if (!(flags_lo & ANM_VM_POS_I_TO_POS_2))
             {
                 pos = Float3(ANM_FLOAT(0), ANM_FLOAT(1), ANM_FLOAT(2));
@@ -1040,46 +1010,38 @@ __forceinline i32 AnmVm::run_script()
                 pos_2 = Float3(ANM_FLOAT(0), ANM_FLOAT(1), ANM_FLOAT(2));
             }
             break;
-        // anchorOffset
-        case 436:
+        case ANM_OP_ANCHOR_OFFSET:
             anchor_offset.x = ANM_FLOAT(0);
             anchor_offset.y = ANM_FLOAT(1);
             break;
-        // rotationMode
-        case 437:
+        case ANM_OP_ROTATION_MODE:
             ANM_FLAGS_HI->rotation_mode = ANM_INT(0);
             break;
-        // visible
-        case 310:
+        case ANM_OP_VISIBLE:
             ANM_FLAGS_LO->visible = ins->args[0].i;
             break;
-        // anchor
-        case 421:
+        case ANM_OP_ANCHOR:
             ANM_FLAGS_LO->anchor_x = ((u16 *)ins->args)[0];
             ANM_FLAGS_LO->anchor_y = ((u16 *)ins->args)[1];
             break;
-        // scrollX, scrollY
-        case 425:
+        case ANM_OP_SCROLL_X:
             uv_scroll_vel.x = ANM_FLOAT(0);
             flags_hi |= ANM_VM_HAS_VELOCITY;
             break;
-        case 426:
+        case ANM_OP_SCROLL_Y:
             uv_scroll_vel.y = ANM_FLOAT(0);
             flags_hi |= ANM_VM_HAS_VELOCITY;
             break;
-        // zWriteDisable
-        case 305:
+        case ANM_OP_Z_WRITE_DISABLE:
             ANM_FLAGS_LO->z_write_disable = ins->args[0].i;
             break;
-        case 306:
+        case ANM_OP_FOLLOW_CAMERA:
             ANM_FLAGS_LO->follow_camera = ins->args[0].i;
             break;
-        // resampleMode
-        case 311:
+        case ANM_OP_RESAMPLE_MODE:
             ANM_FLAGS_HI->filter_point = ins->args[0].i;
             break;
-        // posTime
-        case 407:
+        case ANM_OP_POS_TIME:
             pos_i.end_time = ANM_INT(0);
             pos_i.bezier_1 = g_zero_vec;
             pos_i.bezier_2 = g_zero_vec;
@@ -1095,8 +1057,7 @@ __forceinline i32 AnmVm::run_script()
             pos_i.goal = Float3(ANM_FLOAT(2), ANM_FLOAT(3), ANM_FLOAT(4));
             pos_i.reset_timer();
             break;
-        // Like posTime, to a point given by angle and distance.
-        case 433:
+        case ANM_OP_POS_TIME_POLAR:
         {
             pos_i.end_time = ANM_INT(0);
             pos_i.bezier_1 = g_zero_vec;
@@ -1117,8 +1078,7 @@ __forceinline i32 AnmVm::run_script()
             pos_i.reset_timer();
             break;
         }
-        // moveBezier
-        case 420:
+        case ANM_OP_MOVE_BEZIER:
         {
             Float3 bezier_1;
             Float3 bezier_2;
@@ -1144,8 +1104,7 @@ __forceinline i32 AnmVm::run_script()
             pos_i.reset_timer();
             break;
         }
-        // colorTime, alphaTime, color2Time, alpha2Time
-        case 408:
+        case ANM_OP_COLOR_TIME:
         {
             AnmRgb initial;
             anm_rgb(&initial, color_1.r, color_1.g, color_1.b);
@@ -1154,10 +1113,10 @@ __forceinline i32 AnmVm::run_script()
             set_rgb1_time(ANM_INT(0), (u8)ins->args[1].i, (ZunColor *)&initial, (ZunColor *)&goal);
             break;
         }
-        case 409:
+        case ANM_OP_ALPHA_TIME:
             set_alpha1_time(ANM_INT(0), (u8)ins->args[1].i, color_1.a, ANM_INT(2));
             break;
-        case 413:
+        case ANM_OP_COLOR2_TIME:
         {
             AnmRgb initial;
             anm_rgb(&initial, color_2.r, color_2.g, color_2.b);
@@ -1166,11 +1125,10 @@ __forceinline i32 AnmVm::run_script()
             set_rgb2_time(ANM_INT(0), (u8)ins->args[1].i, (ZunColor *)&initial, (ZunColor *)&goal);
             break;
         }
-        case 414:
+        case ANM_OP_ALPHA2_TIME:
             set_alpha2_time(ANM_INT(0), (u8)ins->args[1].i, color_2.a, ANM_INT(2));
             break;
-        // rotateTime
-        case 410:
+        case ANM_OP_ROTATE_TIME:
         {
             Float3 goal(ANM_FLOAT(2), ANM_FLOAT(3), ANM_FLOAT(4));
             rotate_i.end_time = ANM_INT(0);
@@ -1183,8 +1141,7 @@ __forceinline i32 AnmVm::run_script()
             flags_lo |= ANM_VM_ROTATION_CHANGED;
             break;
         }
-        // rotateTime2D
-        case 411:
+        case ANM_OP_ROTATE_TIME_2D:
         {
             ZunAngle goal(ANM_FLOAT(2));
             ZunAngle initial(rotation.z);
@@ -1199,31 +1156,29 @@ __forceinline i32 AnmVm::run_script()
             flags_lo |= ANM_VM_ROTATION_CHANGED;
             break;
         }
-        // scaleTime, scale2Time (which starts from scale, not scale_2),
-        // zoomOutTime
-        case 412:
+        case ANM_OP_SCALE_TIME:
         {
             Float2 goal(ANM_FLOAT(2), ANM_FLOAT(3));
             set_scale_interp(ANM_INT(0), (u8)ins->args[1].i, &scale, &goal);
             flags_lo |= ANM_VM_SCALE_CHANGED;
             break;
         }
-        case 435:
+        // Starts from scale, not scale_2.
+        case ANM_OP_SCALE2_TIME:
         {
             Float2 goal(ANM_FLOAT(2), ANM_FLOAT(3));
-            set_434_time(ANM_INT(0), (u8)ins->args[1].i, &scale, &goal);
+            set_scale_2_time(ANM_INT(0), (u8)ins->args[1].i, &scale, &goal);
             flags_lo |= ANM_VM_SCALE_CHANGED;
             break;
         }
-        case 430:
+        case ANM_OP_ZOOM_OUT_TIME:
         {
             Float2 goal(ANM_FLOAT(2), ANM_FLOAT(3));
             set_uv_scale_time(ANM_INT(0), (u8)ins->args[1].i, &uv_scale, &goal);
             flags_lo |= ANM_VM_UV_SCALE_CHANGED;
             break;
         }
-        // scrollXTime, scrollYTime
-        case 427:
+        case ANM_OP_SCROLL_X_TIME:
         {
             f32 goal = ANM_FLOAT(2);
             u_vel_i.end_time = ANM_INT(0);
@@ -1235,7 +1190,7 @@ __forceinline i32 AnmVm::run_script()
             u_vel_i.reset();
             break;
         }
-        case 428:
+        case ANM_OP_SCROLL_Y_TIME:
         {
             f32 goal = ANM_FLOAT(2);
             v_vel_i.end_time = ANM_INT(0);
@@ -1247,45 +1202,40 @@ __forceinline i32 AnmVm::run_script()
             v_vel_i.reset();
             break;
         }
-        // type
-        case 302:
+        case ANM_OP_TYPE:
             ANM_FLAGS_LO->render_mode = ins->args[0].i;
-            if (ANM_FLAGS_LO->render_mode == 10)
+            if (ANM_FLAGS_LO->render_mode == ANM_RENDER_FAN)
             {
                 anm_effect_4_init(this);
             }
             break;
-        // Moves entity_pos into pos.
-        case 422:
+        case ANM_OP_POS_FROM_ENTITY:
             pos = entity_pos;
             entity_pos.x = 0.0f;
             entity_pos.y = 0.0f;
             entity_pos.z = 0.0f;
             break;
-        // texCircle, texArcEven, texArc
-        case 600:
-            ANM_FLAGS_LO->render_mode = 9;
+        case ANM_OP_TEX_CIRCLE:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_TEX_CIRCLE;
             alloc_extra_data(ANM_INT(0) * 56);
             break;
-        case 601:
-            ANM_FLAGS_LO->render_mode = 13;
+        case ANM_OP_TEX_ARC_EVEN:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_TEX_ARC_EVEN;
             alloc_extra_data(ANM_INT(0) * 56);
             break;
-        case 602:
-            ANM_FLAGS_LO->render_mode = 14;
+        case ANM_OP_TEX_ARC:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_TEX_ARC;
             alloc_extra_data(ANM_INT(0) * 56);
             break;
-        // texCylinder3D, texRing3D
-        case 609:
-            ANM_FLAGS_LO->render_mode = 24;
+        case ANM_OP_TEX_CYLINDER_3D:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_TEX_CYLINDER_3D;
             alloc_extra_data(ANM_INT(0) * 48);
             break;
-        case 610:
-            ANM_FLAGS_LO->render_mode = 25;
+        case ANM_OP_TEX_RING_3D:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_TEX_RING_3D;
             alloc_extra_data(ANM_INT(0) * 48);
             break;
-        // UVs from the sprite's current corners.
-        case 418:
+        case ANM_OP_UV_FROM_CORNERS:
         {
             Float3 corners[4];
             write_sprite_corners(corners);
@@ -1295,113 +1245,103 @@ __forceinline i32 AnmVm::run_script()
             divide_vec2_by_640_480(&uv_quad_of_sprite[3], (Float2 *)&corners[3]);
             break;
         }
-        case 419:
+        case ANM_OP_UV_FROM_CORNERS_ALWAYS:
             ANM_FLAGS_HI->uv_quad_from_corners = ANM_INT(0);
             break;
-        // drawRect, drawRectGrad, drawRectRot, drawRectRotGrad, drawLine,
-        // drawRectBorder
-        case 603:
-            ANM_FLAGS_LO->render_mode = 16;
+        case ANM_OP_DRAW_RECT:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_RECT;
             sprite_size.x = ANM_FLOAT(0);
             sprite_size.y = ANM_FLOAT(1);
             break;
-        case 606:
-            ANM_FLAGS_LO->render_mode = 20;
+        case ANM_OP_DRAW_RECT_GRAD:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_RECT_GRAD;
             sprite_size.x = ANM_FLOAT(0);
             sprite_size.y = ANM_FLOAT(1);
             break;
-        case 607:
-            ANM_FLAGS_LO->render_mode = 21;
+        case ANM_OP_DRAW_RECT_ROT:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_RECT_ROT;
             sprite_size.x = ANM_FLOAT(0);
             sprite_size.y = ANM_FLOAT(1);
             break;
-        case 608:
-            ANM_FLAGS_LO->render_mode = 22;
+        case ANM_OP_DRAW_RECT_ROT_GRAD:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_RECT_ROT_GRAD;
             sprite_size.x = ANM_FLOAT(0);
             sprite_size.y = ANM_FLOAT(1);
             break;
-        case 613:
-            ANM_FLAGS_LO->render_mode = 26;
+        case ANM_OP_DRAW_LINE:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_LINE;
             sprite_size.x = ANM_FLOAT(0);
             sprite_size.y = ANM_FLOAT(1);
             break;
-        case 612:
-            ANM_FLAGS_LO->render_mode = 27;
+        case ANM_OP_DRAW_RECT_BORDER:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_RECT_BORDER;
             sprite_size.x = ANM_FLOAT(0);
             sprite_size.y = ANM_FLOAT(1);
             break;
-        // drawPoly, drawPolyBorder, drawRing
-        case 604:
-            ANM_FLAGS_LO->render_mode = 17;
+        case ANM_OP_DRAW_POLY:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_POLY;
             sprite_size.x = ANM_FLOAT(0);
             int_vars[0] = ANM_INT(1);
             break;
-        case 605:
-            ANM_FLAGS_LO->render_mode = 18;
+        case ANM_OP_DRAW_POLY_BORDER:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_POLY_BORDER;
             sprite_size.x = ANM_FLOAT(0);
             int_vars[0] = ANM_INT(1);
             break;
-        case 611:
-            ANM_FLAGS_LO->render_mode = 19;
+        case ANM_OP_DRAW_RING:
+            ANM_FLAGS_LO->render_mode = ANM_RENDER_RING;
             sprite_size.x = ANM_FLOAT(0);
             sprite_size.y = ANM_FLOAT(1);
             int_vars[0] = ANM_INT(2);
             break;
-        case 507:
+        case ANM_OP_NO_PARENT_POS:
             ANM_FLAGS_HI->no_parent_pos = ANM_INT(0);
             break;
-        // scrollMode
-        case 312:
+        case ANM_OP_SCROLL_MODE:
             ANM_FLAGS_HI->address_u = ANM_INT(0);
             ANM_FLAGS_LO->address_v = ANM_INT(1);
             break;
-        // resolutionMode
-        case 313:
+        case ANM_OP_RESOLUTION_MODE:
             ANM_FLAGS_HI->resolution_mode = ANM_INT(0);
             break;
-        case 314:
+        case ANM_OP_ROTATE_WITH_PARENT:
             ANM_FLAGS_HI->rotate_with_parent = ANM_INT(0);
             break;
-        // originMode
-        case 438:
+        case ANM_OP_ORIGIN_MODE:
             ANM_FLAGS_HI->origin_mode = (u8)ins->args[0].i;
             break;
-        case 431:
-            ANM_FLAGS_HI->flag_8 = (u8)ins->args[0].i;
+        case ANM_OP_431:
+            ANM_FLAGS_HI->ins_431_flag = (u8)ins->args[0].i;
             break;
-        // layer
-        case 304:
+        case ANM_OP_LAYER:
             set_layer((u8)ins->args[0].i);
             break;
-        // colorMode
-        case 423:
+        case ANM_OP_COLOR_MODE:
             ANM_FLAGS_LO->color_mode = (u8)ins->args[0].i;
             break;
-        // rotateAuto
-        case 424:
+        case ANM_OP_ROTATE_AUTO:
             ANM_FLAGS_HI->auto_rotate = (u8)ins->args[0].i;
             break;
-        // randMode
-        case 307:
+        case ANM_OP_RAND_MODE:
             ANM_FLAGS_HI->rand_mode = (u8)ins->args[0].i;
             break;
-        // stopHide, stop
-        case 4:
+        // stopHide is stop that also hides the VM.
+        case ANM_OP_STOP_HIDE:
             flags_lo &= ~ANM_VM_VISIBLE;
-        case 3:
+        case ANM_OP_STOP:
             if (pending_interrupt != 0)
             {
                 goto interrupt;
             }
             flags_lo |= ANM_VM_STOPPED;
             goto stop;
-        // delete
-        case -1:
-        case 1:
+        // The end of the script deletes the VM too.
+        case ANM_OP_END:
+        case ANM_OP_DELETE:
             flags_lo &= ~ANM_VM_VISIBLE;
             result = 1;
-        // static
-        case 2:
+        // delete falls through: both end the script.
+        case ANM_OP_STATIC:
             instr_offset = -1;
             return result;
         }
@@ -1470,15 +1410,15 @@ i32 AnmVm::run()
 // FUNCTION: TH16 0x464dd0
 Float3 *AnmVm::get_total_rotation()
 {
-    rotation_related = rotation;
-    if (parent != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+    total_rotation = rotation;
+    if (root_vm != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
     {
-        rotation_related += *parent->get_total_rotation();
+        total_rotation += *root_vm->get_total_rotation();
         rotation.x = wrap_angle(rotation.x);
         rotation.y = wrap_angle(rotation.y);
         rotation.z = wrap_angle(rotation.z);
     }
-    return &rotation_related;
+    return &total_rotation;
 }
 
 // FUNCTION: TH16 0x464960
@@ -1492,13 +1432,13 @@ void AnmVm::set_uv_scale_time(i32 end_time, i32 method, Float2 *initial, Float2 
 }
 
 // FUNCTION: TH16 0x464a00
-void AnmVm::set_434_time(i32 end_time, i32 method, Float2 *initial, Float2 *goal)
+void AnmVm::set_scale_2_time(i32 end_time, i32 method, Float2 *initial, Float2 *goal)
 {
-    op_434_i.end_time = end_time;
-    op_434_i.method = method;
-    op_434_i.initial = *initial;
-    op_434_i.goal = *goal;
-    op_434_i.time = 0;
+    scale_2_i.end_time = end_time;
+    scale_2_i.method = method;
+    scale_2_i.initial = *initial;
+    scale_2_i.goal = *goal;
+    scale_2_i.time = 0;
 }
 
 // FUNCTION: TH16 0x464aa0
@@ -1573,9 +1513,9 @@ HARNESS_CALLED void AnmVm::step_interpolators()
         scale = scale_i.step();
         flags_lo |= ANM_VM_SCALE_CHANGED;
     }
-    if (op_434_i.end_time != 0)
+    if (scale_2_i.end_time != 0)
     {
-        scale_2 = op_434_i.step();
+        scale_2 = scale_2_i.step();
         flags_lo |= ANM_VM_SCALE_CHANGED;
     }
     if (uv_scale_i.end_time != 0)

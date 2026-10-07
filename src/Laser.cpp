@@ -1961,8 +1961,8 @@ i32 LaserInfiniteInf::initialize(void *params)
     vm_950.flags_hi = vm_950.flags_hi & ~0x80000 | 0x40000;
     vm = &vm_f4c;
     g_LaserManager->bullet_anm->copy_vm(vm, inner.color + 0x38);
-    vm->unk_5b0 = NULL;
-    vm->parent = NULL;
+    vm->parent_vm = NULL;
+    vm->root_vm = NULL;
     vm->run();
     vm->interrupt(2);
     vm->run();
@@ -2053,8 +2053,8 @@ i32 LaserCurveInf::initialize(void *params)
     vm_92c.flags_hi = vm_92c.flags_hi & ~0x80000 | 0x40000;
     vm = &vm_f28;
     g_LaserManager->bullet_anm->copy_vm(vm, inner.color + 0x38);
-    vm->unk_5b0 = NULL;
-    vm->parent = NULL;
+    vm->parent_vm = NULL;
+    vm->root_vm = NULL;
     vm->run();
     vm->interrupt(2);
     vm->run();
@@ -2361,8 +2361,8 @@ void LaserCurveInf::run_ex()
         {
             AnmVm *vm = &vm_92c;
             g_BulletManager->bullet_anm->copy_vm(vm, g_bullet_types[ex->a].script + ex->b);
-            vm->unk_5b0 = NULL;
-            vm->parent = NULL;
+            vm->parent_vm = NULL;
+            vm->root_vm = NULL;
             vm->run();
             break;
         }
@@ -2947,8 +2947,8 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
         {
             AnmVm *vm = &vm_92c;
             g_BulletManager->bullet_anm->copy_vm(vm, g_bullet_types[ex->a].script + ex->b);
-            vm->unk_5b0 = NULL;
-            vm->parent = NULL;
+            vm->parent_vm = NULL;
+            vm->root_vm = NULL;
             vm->run();
             break;
         }
@@ -3049,8 +3049,8 @@ i32 LaserLineInf::initialize(void *params)
     vm_92c.flags_hi = vm_92c.flags_hi & ~0x80000 | 0x40000;
     vm = &vm_f28;
     g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x38);
-    vm->unk_5b0 = NULL;
-    vm->parent = NULL;
+    vm->parent_vm = NULL;
+    vm->root_vm = NULL;
     vm->run();
     vm->interrupt(2);
     vm->run();
@@ -3061,16 +3061,16 @@ i32 LaserLineInf::initialize(void *params)
     {
         vm = &vm_1524;
         g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x53);
-        vm->unk_5b0 = NULL;
-        vm->parent = NULL;
+        vm->parent_vm = NULL;
+        vm->root_vm = NULL;
         vm->run();
     }
     else
     {
         vm = &vm_1524;
         g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x5b);
-        vm->unk_5b0 = NULL;
-        vm->parent = NULL;
+        vm->parent_vm = NULL;
+        vm->root_vm = NULL;
         vm->run();
         vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
     }

@@ -234,7 +234,7 @@ EndingChildF0::EndingChildF0(void *script)
         anm_ids[i] = g_Supervisor.text_anm->create_effect(i + 0x2e, -1, NULL);
         get_vm_or_clear(anm_ids[i])->font_dims[0] = 16;
         get_vm_or_clear(anm_ids[i])->font_dims[1] = 16;
-        get_vm_or_clear(anm_ids[i])->flags_hi &= ~0x1000;
+        get_vm_or_clear(anm_ids[i])->flags_hi &= ~ANM_VM_TEXT_NO_OUTLINE;
     }
     instr = (EndingInstr *)script;
     timer_4.reset();

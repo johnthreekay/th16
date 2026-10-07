@@ -326,10 +326,10 @@ HARNESS_CALLED AnmId AnmLoaded::create_ui_vm(i32 script, D3DXVECTOR3 *pos, i32 u
     }
     vm->rotation.z = 0.0f;
     vm->run();
-    vm->mode_of_create_child = 4;
+    vm->mode_of_create_child = ANM_CREATE_UI;
     AnmId id;
     id = g_AnmManager->insert_in_ui_list_back(vm);
-    vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
+    vm->flags_hi &= ~(ANM_VM_FREEZES_WITH_WORLD | ANM_VM_FREEZES_AFTER_FIRST_RUN);
     LEAVE_CS(CS_ANM_MANAGER);
     return id;
 }

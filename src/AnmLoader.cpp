@@ -461,7 +461,7 @@ AnmLoaded *__stdcall AnmManager::load_next_entry(AnmLoaded *anm)
         (anm->vms + j)->wipe();
         anm->init_script_vm(anm->vms + j, j);
         (anm->vms + j)->script_time = -1;
-        (anm->vms + j)->timer_1c = -1;
+        (anm->vms + j)->time_in_script = -1;
         (anm->vms + j)->run();
     }
     anm->load_wait = 0;

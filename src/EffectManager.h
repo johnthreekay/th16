@@ -24,8 +24,8 @@ struct EffectData
     i32 index_of_on_draw;
     i32 index_of_on_destroy;
     i32 index_of_on_interrupt;
-    i32 index_of_on_copy_1;
-    i32 index_of_on_copy_2;
+    i32 index_of_on_copy;
+    i32 index_of_on_serialize;
 };
 
 extern EffectData g_effect_table[4];

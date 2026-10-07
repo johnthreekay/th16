@@ -466,7 +466,7 @@ void PauseMenu::open()
     AnmVm *vm = g_AnmManager->get_vm_with_id(gui->ids_11c[4]);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
     flags_3ec &= ~4;
 }
@@ -662,7 +662,7 @@ void PauseMenu::leave_state_1()
     AnmVm *vm = g_AnmManager->get_vm_with_id(gui->ids_11c[4]);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
     g_unk_4d9d90 = saved_global_4d9d90;
 }
@@ -791,7 +791,7 @@ void PauseMenu::tick_open()
             goto score_entered;
         }
         set_unk_1f4(15);
-        anm_id_1e4.clear_flag_lo_2_tree();
+        anm_id_1e4.hide_tree();
         return;
     case 6:
         // The menu itself.
@@ -1011,7 +1011,7 @@ void PauseMenu::tick_open()
         flags_3ec &= ~2;
         flags_3ec |= 1;
         set_unk_1f4(11);
-        anm_id_1e4.clear_flag_lo_2_tree();
+        anm_id_1e4.hide_tree();
         menu_34.push();
         menu_34.num_choices = 25;
         menu_34.wraps = 1;
@@ -1266,7 +1266,7 @@ void PauseMenu::tick_open()
                 return;
             }
             set_unk_1f4(6);
-            anm_id_1e4.set_flag_lo_2_tree();
+            anm_id_1e4.show_tree();
             if (g_Globals.game_mode != 0)
             {
                 menu_34.disable(0);
@@ -1280,7 +1280,7 @@ void PauseMenu::tick_open()
         // The manual.
         if (time_in_current_menu.current == 20)
         {
-            anm_id_1e4.clear_flag_lo_2_tree();
+            anm_id_1e4.hide_tree();
             HelpManual::create();
             g_HelpManual->unk_128 = 32.0f;
         }
@@ -1288,7 +1288,7 @@ void PauseMenu::tick_open()
         {
             HelpManual::destroy();
             set_unk_1f4(6);
-            anm_id_1e4.set_flag_lo_2_tree();
+            anm_id_1e4.show_tree();
             return;
         }
         break;

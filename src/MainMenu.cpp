@@ -491,45 +491,45 @@ void TitleInf::update_options_sprites()
     set_child_sprite(get_child_vm(anm_ids[1], 0x2f), g_Supervisor.config.se_volume % 10 + 0x35);
     if (g_Supervisor.config.bgm_volume < 10)
     {
-        get_child_vm(anm_ids[1], 0x21)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x22)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x25)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x26)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x21)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x22)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x25)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x26)->flags_lo &= ~ANM_VM_SHOWN;
     }
     else if (g_Supervisor.config.bgm_volume < 100)
     {
-        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo &= ~ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo &= ~ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_SHOWN;
     }
     else
     {
-        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_SHOWN;
     }
     if (g_Supervisor.config.se_volume < 10)
     {
-        get_child_vm(anm_ids[1], 0x29)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x2a)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x2d)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x2e)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x29)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x2a)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x2d)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x2e)->flags_lo &= ~ANM_VM_SHOWN;
     }
     else if (g_Supervisor.config.se_volume < 100)
     {
-        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo &= ~ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo &= ~ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_SHOWN;
     }
     else
     {
-        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_SHOWN;
     }
 }
 

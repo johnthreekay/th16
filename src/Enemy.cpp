@@ -779,17 +779,17 @@ int EnemyData::step_logic()
             if (time_in_ecl.current % 4 == 0)
             {
                 vm->color_2.d3d = 0xffff00ff;
-                vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
+                vm->flags_lo = (vm->flags_lo & ~ANM_VM_COLOR_MODE_2) | ANM_VM_COLOR_MODE_1;
             }
             else
             {
-                vm->flags_lo &= ~0x60000;
+                vm->flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
             }
         }
         if ((flags_low & 0x200000) && !(flags_low & 0x2000))
         {
             vm->color_2.d3d = 0xff0000ff;
-            vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
+            vm->flags_lo = (vm->flags_lo & ~ANM_VM_COLOR_MODE_2) | ANM_VM_COLOR_MODE_1;
             unk_3ff0 = 4;
             if (hit_sound < 0)
             {
@@ -808,17 +808,17 @@ int EnemyData::step_logic()
                  (!(spell_flags & 1) && full->enemy.life.remaining_for_cur_attack < 500)))
             {
                 vm->color_2.d3d = 0xff0000ff;
-                vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
+                vm->flags_lo = (vm->flags_lo & ~ANM_VM_COLOR_MODE_2) | ANM_VM_COLOR_MODE_1;
             }
         }
         else
         {
-            vm->flags_lo &= ~0x60000;
+            vm->flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
         }
     }
     else
     {
-        vm->flags_lo &= ~0x60000;
+        vm->flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
         unk_3ff0--;
     }
     if (unk_4024.current > 0)
@@ -1355,7 +1355,7 @@ int EnemyData::ecl_anm_set_sprite()
         vm = get_vm(anm_ids[slot]);
         if (vm != NULL)
         {
-            vm->clear_flag_lo_2_tree_inline();
+            vm->hide_tree_inline();
         }
     }
     return 0;
@@ -1727,7 +1727,7 @@ int EnemyInf::get_int_global(int var)
     case -9962:
         return (i32)g_EnemyManager->get_boss(0)->enemy.final_pos.pos.y;
     case -9961:
-        return enemy.anm_ids[0].find_or_clear()->unk_49c;
+        return enemy.anm_ids[0].find_or_clear()->script_id_short;
     case -9960:
         return g_Globals.rank;
     case -9959:
@@ -2317,8 +2317,8 @@ int EnemyData::step_interpolators()
                 new_vm->layer = layer;
                 if (layer <= 23)
                 {
-                    new_vm->flags_hi &= ~ANM_VM_LAYER_UI;
-                    new_vm->flags_hi |= ANM_VM_LAYER_SET;
+                    new_vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
+                    new_vm->flags_hi |= ANM_VM_ORIGIN_GAME;
                 }
             }
             new_vm->entity_pos = pos;

@@ -162,9 +162,9 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
             ZunColor color;
             color.d3d = (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d;
             u8 r, g, b, a;
-            if ((vm->flags_hi & ANM_VM_FLAG_HI_2000000) && vm->unk_5b0 != NULL)
+            if ((vm->flags_hi & ANM_VM_COLORIZE_CHILDREN) && vm->parent_vm != NULL)
             {
-                ZunColor parent = vm->unk_5b0->mixed_inherited_color;
+                ZunColor parent = vm->parent_vm->mixed_inherited_color;
                 color.r = r = color_mul(color.r, parent.r);
                 color.g = g = color_mul(color.g, parent.g);
                 color.b = b = color_mul(color.b, parent.b);
@@ -207,7 +207,7 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
                 color_2.a = color_mul(color_2.a, unk_1c7fd88.a);
             }
             g_sprite_temp_buffer[3].diffuse = color_2.d3d;
-            if ((vm->flags_lo & ANM_VM_COLOR_MODE_MASK) == 2 << 17)
+            if ((vm->flags_lo & ANM_VM_COLOR_MODE_MASK) == ANM_VM_COLOR_MODE_2)
             {
                 g_sprite_temp_buffer[1].diffuse = color_2.d3d;
                 g_sprite_temp_buffer[2].diffuse = color_1.d3d;
@@ -259,9 +259,9 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
     b->y -= vm->anchor_offset.y;
     c->y -= vm->anchor_offset.y;
     d->y -= vm->anchor_offset.y;
-    switch (vm->flags_hi & ANM_VM_COORD_MODE_MASK)
+    switch (vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK)
     {
-    case 1 << 20:
+    case ANM_VM_RESOLUTION_SCALED:
         a->x *= g_screen_coord_scale;
         b->x *= g_screen_coord_scale;
         c->x *= g_screen_coord_scale;
@@ -271,7 +271,7 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
         c->y *= g_screen_coord_scale;
         d->y *= g_screen_coord_scale;
         break;
-    case 2 << 20:
+    case ANM_VM_RESOLUTION_HALF_SCALED:
         a->x *= g_screen_coord_scale * 0.5f;
         b->x *= g_screen_coord_scale * 0.5f;
         c->x *= g_screen_coord_scale * 0.5f;
@@ -284,10 +284,10 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
     }
     f32 scale_x = vm->scale_2.x * vm->scale.x;
     f32 scale_y = vm->scale_2.y * vm->scale.y;
-    if (vm->unk_5b0 != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
+    if (vm->parent_vm != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
     {
-        scale_x *= vm->unk_5b0->scale_2.x * vm->unk_5b0->scale.x;
-        scale_y *= vm->unk_5b0->scale_2.y * vm->unk_5b0->scale.y;
+        scale_x *= vm->parent_vm->scale_2.x * vm->parent_vm->scale.x;
+        scale_y *= vm->parent_vm->scale_2.y * vm->parent_vm->scale.y;
     }
     a->x *= scale_x;
     b->x *= scale_x;
@@ -329,16 +329,16 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
         xs.corner[i] = xs.corner[i] * vm->sprite_size.x - vm->anchor_offset.x;
         ys.corner[i] = ys.corner[i] * vm->sprite_size.y - vm->anchor_offset.y;
     }
-    switch (vm->flags_hi & ANM_VM_COORD_MODE_MASK)
+    switch (vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK)
     {
-    case 1 << 20:
+    case ANM_VM_RESOLUTION_SCALED:
         for (i = 0; i < 4; i++)
         {
             xs.corner[i] *= g_screen_coord_scale;
             ys.corner[i] *= g_screen_coord_scale;
         }
         break;
-    case 2 << 20:
+    case ANM_VM_RESOLUTION_HALF_SCALED:
         for (i = 0; i < 4; i++)
         {
             xs.corner[i] *= g_screen_coord_scale * 0.5f;
@@ -350,10 +350,10 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
     vm->get_own_transformed_pos(&pos);
     f32 scale_x = vm->scale_2.x * vm->scale.x;
     f32 scale_y = vm->scale_2.y * vm->scale.y;
-    if (vm->unk_5b0 != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
+    if (vm->parent_vm != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
     {
-        scale_x *= vm->unk_5b0->scale_2.x * vm->unk_5b0->scale.x;
-        scale_y *= vm->unk_5b0->scale_2.y * vm->unk_5b0->scale.y;
+        scale_x *= vm->parent_vm->scale_2.x * vm->parent_vm->scale.x;
+        scale_y *= vm->parent_vm->scale_2.y * vm->parent_vm->scale.y;
     }
     for (i = 0; i < 4; i++)
     {
@@ -475,7 +475,7 @@ i32 AnmManager::draw_vm__mode_6(AnmVm *vm)
     diff.x = vm->entity_pos.x + vm->pos.x + vm->pos_2.x - camera->position.x;
     diff.y = vm->entity_pos.y + vm->pos.y + vm->pos_2.y - camera->position.y;
     diff.z = vm->entity_pos.z + vm->pos.z + vm->pos_2.z - camera->position.z;
-    if ((vm->flags_hi & ANM_VM_LAYER_KIND_MASK) && vm->unk_5b0 == NULL)
+    if ((vm->flags_hi & ANM_VM_ORIGIN_MODE_MASK) && vm->parent_vm == NULL)
     {
         diff.x += g_resolution_x * 0.5f;
         diff.y += (g_resolution_y - 448.0f) * 0.5f;
@@ -553,7 +553,7 @@ i32 AnmManager::draw_vm__mode_6(AnmVm *vm)
             g_sprite_temp_buffer[0].diffuse = color_1.d3d;
             g_sprite_temp_buffer[3].diffuse = color_2.d3d;
         }
-        if ((vm->flags_lo & ANM_VM_COLOR_MODE_MASK) == 2 << 17)
+        if ((vm->flags_lo & ANM_VM_COLOR_MODE_MASK) == ANM_VM_COLOR_MODE_2)
         {
             g_sprite_temp_buffer[1].diffuse = g_sprite_temp_buffer[3].diffuse;
             g_sprite_temp_buffer[2].diffuse = g_sprite_temp_buffer[0].diffuse;
@@ -635,7 +635,7 @@ static inline void set_texture_transform_of_vm(AnmManager *mgr, AnmVm *vm, AnmLo
         vm->uv_scale.x != 1.0f || vm->uv_scale.y != 1.0f)
     {
         mgr->render_cache_184fbc0 = (i32)sprite;
-        D3DXMATRIX texture_matrix = vm->matrix_450;
+        D3DXMATRIX texture_matrix = vm->texture_matrix;
         texture_matrix._31 = vm->uv_quad_of_sprite[0].x + vm->uv_scroll_pos.x;
         texture_matrix._32 = vm->uv_quad_of_sprite[0].y + vm->uv_scroll_pos.y;
         texture_matrix._11 = vm->uv_scale.x * texture_matrix._11;
@@ -662,7 +662,7 @@ i32 AnmManager::draw_vm__mode_8(AnmVm *vm)
     {
         return -1;
     }
-    if (!(vm->flags_lo & ANM_VM_FLAG_LO_2))
+    if (!(vm->flags_lo & ANM_VM_SHOWN))
     {
         return -1;
     }
@@ -674,7 +674,7 @@ i32 AnmManager::draw_vm__mode_8(AnmVm *vm)
     {
         flush_sprites();
     }
-    if (vm->flags_lo & 0x2000)
+    if (vm->flags_lo & ANM_VM_Z_WRITE_DISABLE)
     {
         g_Supervisor.disable_zwrite();
     }
@@ -682,21 +682,21 @@ i32 AnmManager::draw_vm__mode_8(AnmVm *vm)
     {
         g_Supervisor.enable_zwrite();
     }
-    if (!(vm->flags_lo & 0x10000))
+    if (!(vm->flags_lo & ANM_VM_KEEP_WORLD_MATRIX))
     {
-        vm->matrix_410 = vm->matrix_3d0;
-        vm->matrix_410._11 *= vm->scale_2.x * vm->scale.x;
-        vm->matrix_410._22 *= vm->scale_2.y * vm->scale.y;
+        vm->world_matrix = vm->sprite_matrix;
+        vm->world_matrix._11 *= vm->scale_2.x * vm->scale.x;
+        vm->world_matrix._22 *= vm->scale_2.y * vm->scale.y;
         vm->flags_lo &= ~ANM_VM_SCALE_CHANGED;
-        switch (vm->flags_hi & ANM_VM_COORD_MODE_MASK)
+        switch (vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK)
         {
-        case 1 << 20:
-            vm->matrix_410._11 *= g_screen_coord_scale;
-            vm->matrix_410._22 *= g_screen_coord_scale;
+        case ANM_VM_RESOLUTION_SCALED:
+            vm->world_matrix._11 *= g_screen_coord_scale;
+            vm->world_matrix._22 *= g_screen_coord_scale;
             break;
-        case 2 << 20:
-            vm->matrix_410._11 *= g_screen_coord_scale * 0.5f;
-            vm->matrix_410._22 *= g_screen_coord_scale * 0.5f;
+        case ANM_VM_RESOLUTION_HALF_SCALED:
+            vm->world_matrix._11 *= g_screen_coord_scale * 0.5f;
+            vm->world_matrix._22 *= g_screen_coord_scale * 0.5f;
             break;
         }
         Float3 rotation = *vm->get_total_rotation();
@@ -707,108 +707,108 @@ i32 AnmManager::draw_vm__mode_8(AnmVm *vm)
             if (rotation.x != 0.0f)
             {
                 D3DXMatrixRotationX(&rotation_matrix, rotation.x);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.y != 0.0f)
             {
                 D3DXMatrixRotationY(&rotation_matrix, rotation.y);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.z != 0.0f)
             {
                 D3DXMatrixRotationZ(&rotation_matrix, rotation.z);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             break;
         case 1:
             if (rotation.x != 0.0f)
             {
                 D3DXMatrixRotationX(&rotation_matrix, rotation.x);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.z != 0.0f)
             {
                 D3DXMatrixRotationZ(&rotation_matrix, rotation.z);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.y != 0.0f)
             {
                 D3DXMatrixRotationY(&rotation_matrix, rotation.y);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             break;
         case 2:
             if (rotation.y != 0.0f)
             {
                 D3DXMatrixRotationY(&rotation_matrix, rotation.y);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.x != 0.0f)
             {
                 D3DXMatrixRotationX(&rotation_matrix, rotation.x);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.z != 0.0f)
             {
                 D3DXMatrixRotationZ(&rotation_matrix, rotation.z);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             break;
         case 3:
             if (rotation.y != 0.0f)
             {
                 D3DXMatrixRotationY(&rotation_matrix, rotation.y);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.z != 0.0f)
             {
                 D3DXMatrixRotationZ(&rotation_matrix, rotation.z);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.x != 0.0f)
             {
                 D3DXMatrixRotationX(&rotation_matrix, rotation.x);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             break;
         case 4:
             if (rotation.z != 0.0f)
             {
                 D3DXMatrixRotationZ(&rotation_matrix, rotation.z);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.x != 0.0f)
             {
                 D3DXMatrixRotationX(&rotation_matrix, rotation.x);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.y != 0.0f)
             {
                 D3DXMatrixRotationY(&rotation_matrix, rotation.y);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             break;
         case 5:
             if (rotation.z != 0.0f)
             {
                 D3DXMatrixRotationZ(&rotation_matrix, rotation.z);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.y != 0.0f)
             {
                 D3DXMatrixRotationY(&rotation_matrix, rotation.y);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             if (rotation.x != 0.0f)
             {
                 D3DXMatrixRotationX(&rotation_matrix, rotation.x);
-                D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+                D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
             }
             break;
         }
         vm->flags_lo &= ~ANM_VM_ROTATION_CHANGED;
     }
-    D3DXMATRIX world = vm->matrix_410;
+    D3DXMATRIX world = vm->world_matrix;
     world._41 = vm->entity_pos.x + vm->pos.x + vm->pos_2.x - vm->anchor_offset.x * vm->scale.x * vm->scale_2.x;
     world._42 = vm->entity_pos.y + vm->pos.y + vm->pos_2.y - vm->anchor_offset.y * vm->scale.y * vm->scale_2.y;
     vm->transform_coords((Float3 *)&world._41);
@@ -854,7 +854,7 @@ i32 AnmManager::draw_vm__mode_24(AnmVm *vm, RenderVertexXyzDiffuseTex *vertices,
     {
         return -1;
     }
-    if (!(vm->flags_lo & ANM_VM_FLAG_LO_2))
+    if (!(vm->flags_lo & ANM_VM_SHOWN))
     {
         return -1;
     }
@@ -862,7 +862,7 @@ i32 AnmManager::draw_vm__mode_24(AnmVm *vm, RenderVertexXyzDiffuseTex *vertices,
     {
         flush_sprites();
     }
-    if (!(vm->flags_lo & 0x2000))
+    if (!(vm->flags_lo & ANM_VM_Z_WRITE_DISABLE))
     {
         g_Supervisor.enable_zwrite();
     }
@@ -870,31 +870,31 @@ i32 AnmManager::draw_vm__mode_24(AnmVm *vm, RenderVertexXyzDiffuseTex *vertices,
     {
         g_Supervisor.disable_zwrite();
     }
-    D3DXMatrixIdentity(&vm->matrix_3d0);
-    vm->matrix_410 = vm->matrix_3d0;
-    vm->matrix_410._11 *= vm->scale_2.x * vm->scale.x;
-    vm->matrix_410._22 *= vm->scale_2.y * vm->scale.y;
+    D3DXMatrixIdentity(&vm->sprite_matrix);
+    vm->world_matrix = vm->sprite_matrix;
+    vm->world_matrix._11 *= vm->scale_2.x * vm->scale.x;
+    vm->world_matrix._22 *= vm->scale_2.y * vm->scale.y;
     vm->flags_lo &= ~ANM_VM_SCALE_CHANGED;
     D3DXMATRIX rotation_matrix;
     if (vm->rotation.x != 0.0f)
     {
         D3DXMatrixRotationX(&rotation_matrix, vm->rotation.x);
-        D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+        D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
     }
     if (vm->rotation.y != 0.0f)
     {
         D3DXMatrixRotationY(&rotation_matrix, vm->rotation.y);
-        D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+        D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
     }
     if (vm->rotation.z != 0.0f)
     {
         D3DXMatrixRotationZ(&rotation_matrix, vm->rotation.z);
-        D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+        D3DXMatrixMultiply(&vm->world_matrix, &vm->world_matrix, &rotation_matrix);
     }
     vm->flags_lo &= ~ANM_VM_ROTATION_CHANGED;
-    D3DXMATRIX world = vm->matrix_410;
+    D3DXMATRIX world = vm->world_matrix;
     world._41 = vm->entity_pos.x + vm->pos.x + vm->pos_2.x;
-    if ((vm->flags_hi & ANM_VM_LAYER_KIND_MASK) && vm->unk_5b0 == NULL)
+    if ((vm->flags_hi & ANM_VM_ORIGIN_MODE_MASK) && vm->parent_vm == NULL)
     {
         world._41 += g_game_2d_origin_x;
     }
@@ -936,18 +936,18 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
     {
         return -1;
     }
-    if (!(vm->flags_lo & ANM_VM_FLAG_LO_2))
+    if (!(vm->flags_lo & ANM_VM_SHOWN))
     {
         return -1;
     }
-    if (vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_FLAG_HI_40))
+    if (vm->flags_hi & (ANM_VM_DELETE_PENDING | ANM_VM_IN_DELETE_LIST))
     {
         return -1;
     }
     g_Supervisor.disable_zwrite();
     switch ((vm->flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
     {
-    case 0:
+    case ANM_RENDER_SPRITE:
         if (is_transparent(vm))
         {
             return -1;
@@ -956,8 +956,8 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
             vm, (Float3 *)&g_sprite_temp_buffer[0].pos, (Float3 *)&g_sprite_temp_buffer[1].pos,
             (Float3 *)&g_sprite_temp_buffer[2].pos, (Float3 *)&g_sprite_temp_buffer[3].pos);
         return render_sprite_2d(vm, 1);
-    case 1:
-    case 3:
+    case ANM_RENDER_SPRITE_ROTATED:
+    case ANM_RENDER_SPRITE_ROTATED_3:
         if (is_transparent(vm))
         {
             return -1;
@@ -966,7 +966,7 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
             vm, (Float3 *)&g_sprite_temp_buffer[0].pos, (Float3 *)&g_sprite_temp_buffer[1].pos,
             (Float3 *)&g_sprite_temp_buffer[2].pos, (Float3 *)&g_sprite_temp_buffer[3].pos);
         return render_sprite_2d(vm, 0);
-    case 4:
+    case ANM_RENDER_BILLBOARD:
         if (is_transparent(vm))
         {
             return -1;
@@ -976,31 +976,31 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
             return -1;
         }
         return render_sprite_2d(vm, 0);
-    case 5:
+    case ANM_RENDER_MODE_5:
         if (is_transparent(vm))
         {
             return -1;
         }
         return draw_vm__mode_5(vm);
-    case 6:
+    case ANM_RENDER_BILLBOARD_FOG:
         if (is_transparent(vm))
         {
             return -1;
         }
         return draw_vm__mode_6(vm);
-    case 7:
+    case ANM_RENDER_SPRITE_FOG:
         if (is_transparent(vm))
         {
             return -1;
         }
         return draw_vm__mode_7(vm);
-    case 8:
+    case ANM_RENDER_3D:
         if (is_transparent(vm))
         {
             return -1;
         }
         return draw_vm__mode_8(vm);
-    case 15:
+    case ANM_RENDER_3D_FOG:
         if (is_transparent(vm))
         {
             return -1;
@@ -1009,17 +1009,17 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
         draw_vm__mode_8(vm);
         g_Supervisor.disable_d3d_fog();
         return 0;
-    case 9:
-    case 12:
-    case 13:
-    case 14:
-        return draw_vm__mode_9(vm, (RenderVertex144 *)vm->ins_508_extra_data, vm->int_vars[0] * 2);
-    case 11:
-        return draw_vm__mode_11(vm, (RenderVertex144 *)vm->ins_508_extra_data, vm->int_vars[0] * 2);
-    case 24:
-    case 25:
-        return draw_vm__mode_24(vm, (RenderVertexXyzDiffuseTex *)vm->ins_508_extra_data, vm->int_vars[0] * 2);
-    case 2:
+    case ANM_RENDER_TEX_CIRCLE:
+    case ANM_RENDER_MODE_12:
+    case ANM_RENDER_TEX_ARC_EVEN:
+    case ANM_RENDER_TEX_ARC:
+        return draw_vm__mode_9(vm, (RenderVertex144 *)vm->extra_data, vm->int_vars[0] * 2);
+    case ANM_RENDER_TRIANGLE_FAN:
+        return draw_vm__mode_11(vm, (RenderVertex144 *)vm->extra_data, vm->int_vars[0] * 2);
+    case ANM_RENDER_TEX_CYLINDER_3D:
+    case ANM_RENDER_TEX_RING_3D:
+        return draw_vm__mode_24(vm, (RenderVertexXyzDiffuseTex *)vm->extra_data, vm->int_vars[0] * 2);
+    case ANM_RENDER_SPRITE_UNSNAPPED:
         if (is_transparent(vm))
         {
             return -1;
@@ -1028,12 +1028,12 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
             vm, (Float3 *)&g_sprite_temp_buffer[0].pos, (Float3 *)&g_sprite_temp_buffer[1].pos,
             (Float3 *)&g_sprite_temp_buffer[2].pos, (Float3 *)&g_sprite_temp_buffer[3].pos);
         return render_sprite_2d(vm, 0);
-    case 16:
-    case 20:
-    case 21:
-    case 22:
-    case 26:
-    case 27: {
+    case ANM_RENDER_RECT:
+    case ANM_RENDER_RECT_GRAD:
+    case ANM_RENDER_RECT_ROT:
+    case ANM_RENDER_RECT_ROT_GRAD:
+    case ANM_RENDER_LINE:
+    case ANM_RENDER_RECT_BORDER: {
         f32 angle = vm->rotation.z;
         f32 width;
         f32 height;
@@ -1041,19 +1041,19 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
         height = vm->sprite_size.y * vm->scale.y;
         Float3 pos;
         vm->get_own_transformed_pos(&pos);
-        if (vm->unk_5b0 != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
+        if (vm->parent_vm != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
         {
-            width = vm->unk_5b0->scale.x * width;
-            height = vm->unk_5b0->scale.y * height;
-            angle = vm->unk_5b0->rotation.z + angle;
+            width = vm->parent_vm->scale.x * width;
+            height = vm->parent_vm->scale.y * height;
+            angle = vm->parent_vm->rotation.z + angle;
         }
         setup_render_state_for_vm(vm);
-        if ((vm->flags_hi & ANM_VM_COORD_MODE_MASK) == 1 << 20)
+        if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_SCALED)
         {
             width = g_screen_coord_scale * width;
             height = g_screen_coord_scale * height;
         }
-        else if ((vm->flags_hi & ANM_VM_COORD_MODE_MASK) == 2 << 20)
+        else if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_HALF_SCALED)
         {
             width = g_screen_coord_scale * 0.5f * width;
             height = g_screen_coord_scale * 0.5f * height;
@@ -1062,35 +1062,35 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
         i32 anchor_y = (vm->flags_lo >> 23) & 3;
         switch ((vm->flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
         {
-        case 26:
+        case ANM_RENDER_LINE:
             draw_line(pos.x, pos.y, width, angle, vm->color_1.d3d,
                       (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d, anchor_x, 0);
             return 0;
-        case 16:
+        case ANM_RENDER_RECT:
             draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d, anchor_x, anchor_y);
             return 0;
-        case 27:
+        case ANM_RENDER_RECT_BORDER:
             draw_rect_outline(pos.x, pos.y, width, height, angle, vm->color_1.d3d,
                               (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d,
                               anchor_x, anchor_y);
             return 0;
-        case 20:
+        case ANM_RENDER_RECT_GRAD:
             draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d, anchor_x, anchor_y);
             return 0;
-        case 21:
+        case ANM_RENDER_RECT_ROT:
             draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d, anchor_x,
                                anchor_y);
             return 0;
-        case 22:
+        case ANM_RENDER_RECT_ROT_GRAD:
             draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d, anchor_x,
                                anchor_y);
             return 0;
         }
         break;
     }
-    case 17:
-    case 18:
-    case 19: {
+    case ANM_RENDER_POLY:
+    case ANM_RENDER_POLY_BORDER:
+    case ANM_RENDER_RING: {
         f32 width;
         f32 height;
         width = vm->sprite_size.x * vm->scale.x;
@@ -1098,18 +1098,18 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
         f32 angle = vm->rotation.z;
         Float3 pos;
         vm->get_own_transformed_pos(&pos);
-        if (vm->unk_5b0 != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
+        if (vm->parent_vm != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
         {
-            angle = vm->unk_5b0->rotation.z + angle;
-            width *= vm->unk_5b0->scale.x;
-            height *= vm->unk_5b0->scale.y;
+            angle = vm->parent_vm->rotation.z + angle;
+            width *= vm->parent_vm->scale.x;
+            height *= vm->parent_vm->scale.y;
         }
-        if ((vm->flags_hi & ANM_VM_COORD_MODE_MASK) == 1 << 20)
+        if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_SCALED)
         {
             width = g_screen_coord_scale * width;
             height = g_screen_coord_scale * height;
         }
-        else if ((vm->flags_hi & ANM_VM_COORD_MODE_MASK) == 2 << 20)
+        else if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_HALF_SCALED)
         {
             width = g_screen_coord_scale * 0.5f * width;
             height = g_screen_coord_scale * 0.5f * height;
@@ -1117,13 +1117,13 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
         setup_render_state_for_vm(vm);
         switch ((vm->flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
         {
-        case 19:
+        case ANM_RENDER_RING:
             draw_ring(pos.x, pos.y, width, height, angle, vm->int_vars[0], vm->color_1.d3d);
             return 0;
-        case 18:
+        case ANM_RENDER_POLY_BORDER:
             draw_circle_outline(pos.x, pos.y, width, angle, vm->int_vars[0], vm->color_1.d3d);
             return 0;
-        case 17:
+        case ANM_RENDER_POLY:
             draw_circle(pos.x, pos.y, width, angle, vm->int_vars[0], vm->color_1.d3d, vm->color_2.d3d);
             return 0;
         }

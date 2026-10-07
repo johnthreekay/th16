@@ -398,7 +398,7 @@ struct AnmManager
     void delete_vm_inline(AnmId id)
     {
         AnmVm *vm = get_vm_with_id(id);
-        if (vm != NULL && !(vm->flags_hi & ANM_VM_FLAG_HI_4000000))
+        if (vm != NULL && !(vm->flags_hi & ANM_VM_IS_SNAPSHOT))
         {
             vm->mark_for_deletion();
             ZunList<AnmVm> *node = &vm->list_of_children;
@@ -649,8 +649,8 @@ __forceinline AnmId AnmLoaded::create_vm_inline(i32 script, Float3 *pos, f32 rot
         vm->layer = layer;
         if (layer <= 23)
         {
-            vm->flags_hi &= ~ANM_VM_LAYER_UI;
-            vm->flags_hi |= ANM_VM_LAYER_SET;
+            vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
+            vm->flags_hi |= ANM_VM_ORIGIN_GAME;
         }
     }
     if (pos == NULL)
@@ -663,7 +663,7 @@ __forceinline AnmId AnmLoaded::create_vm_inline(i32 script, Float3 *pos, f32 rot
     }
     vm->rotation.z = rotation;
     vm->run();
-    vm->mode_of_create_child = 0;
+    vm->mode_of_create_child = ANM_CREATE_WORLD_BACK;
     AnmId id;
     id = g_AnmManager->insert_in_world_list_back(vm);
     LEAVE_CS(CS_ANM_MANAGER);

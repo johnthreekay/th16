@@ -334,7 +334,7 @@ i32 __fastcall Player::on_draw_callback(Player *player)
     if (player->inner.state != 2)
     {
         player->vm.entity_pos = player->inner.pos;
-        player->vm.flags_hi = (player->vm.flags_hi & ~ANM_VM_LAYER_UI) | ANM_VM_LAYER_SET;
+        player->vm.flags_hi = (player->vm.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
         g_AnmManager->draw_vm(&player->vm);
     }
     return 1;
@@ -935,7 +935,7 @@ i32 Player::tick_bullets()
             source->damage = bullet->unk_9c;
         }
         vm->entity_pos = bullet->pos.pos;
-        if (vm->flags_hi & 0x80)
+        if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
         {
             vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
             vm->rotation.z = bullet->pos.angle.value;
@@ -1018,8 +1018,8 @@ i32 Player::initialize()
     {
         AnmVm *player_vm = &vm;
         anm_file->copy_vm(player_vm, 0);
-        player_vm->unk_5b0 = NULL;
-        player_vm->parent = NULL;
+        player_vm->parent_vm = NULL;
+        player_vm->root_vm = NULL;
         player_vm->run();
     }
     set_position(0.0f, 400.0f);
@@ -1090,8 +1090,8 @@ const Int2 g_player_directions[9] = {{0, 0}, {0, -1}, {0, 1}, {-1, 0}, {1, 0}, {
 static __forceinline void player_set_script(Player *player, i32 script)
 {
     player->anm_file->copy_vm(&player->vm, script);
-    player->vm.unk_5b0 = NULL;
-    player->vm.parent = NULL;
+    player->vm.parent_vm = NULL;
+    player->vm.root_vm = NULL;
     player->vm.run();
 }
 

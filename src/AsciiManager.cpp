@@ -557,9 +557,9 @@ i32 AsciiInf::draw_group_1()
     g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
     g_Supervisor.current_camera_index = 0;
     g_AnmManager->flush_sprites();
-    vm_1.flags_hi = vm_1.flags_hi & ~ANM_VM_LAYER_KIND_MASK | ANM_VM_LAYER_UI;
+    vm_1.flags_hi = vm_1.flags_hi & ~ANM_VM_ORIGIN_MODE_MASK | ANM_VM_ORIGIN_HUD;
     draw_group(1);
-    vm_1.flags_hi &= ~ANM_VM_LAYER_KIND_MASK;
+    vm_1.flags_hi &= ~ANM_VM_ORIGIN_MODE_MASK;
     g_AnmManager->flush_sprites();
     g_Supervisor.current_camera = &g_Supervisor.cameras[2];
     g_Supervisor.swap_transform_matrices(&g_Supervisor.cameras[2]);

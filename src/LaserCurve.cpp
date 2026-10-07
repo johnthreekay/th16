@@ -290,8 +290,8 @@ static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECT
         vm->layer = layer;
         if (layer <= 23)
         {
-            vm->flags_hi &= ~ANM_VM_LAYER_UI;
-            vm->flags_hi |= ANM_VM_LAYER_SET;
+            vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
+            vm->flags_hi |= ANM_VM_ORIGIN_GAME;
         }
     }
     if (pos == NULL)
@@ -304,7 +304,7 @@ static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECT
     }
     vm->rotation.z = rotation;
     vm->run();
-    vm->mode_of_create_child = 0;
+    vm->mode_of_create_child = ANM_CREATE_WORLD_BACK;
     AnmId id;
     id = g_AnmManager->insert_in_world_list_back(vm);
     LEAVE_CS(CS_ANM_MANAGER);

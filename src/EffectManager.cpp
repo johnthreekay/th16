@@ -180,8 +180,8 @@ AnmId EffectManager::create_effect(i32 effect, D3DXVECTOR3 *pos, AnmVm *vm)
     vm->index_of_on_draw = data->index_of_on_draw;
     vm->index_of_on_destroy = data->index_of_on_destroy;
     vm->index_of_on_interrupt = data->index_of_on_interrupt;
-    vm->index_of_on_copy_1 = data->index_of_on_copy_1;
-    vm->index_of_on_copy_2 = data->index_of_on_copy_2;
+    vm->index_of_on_copy = data->index_of_on_copy;
+    vm->index_of_on_serialize = data->index_of_on_serialize;
     return id;
 }
 
@@ -213,8 +213,8 @@ HARNESS_CALLED AnmId EffectManager::create_ui_effect(i32 effect, D3DXVECTOR3 *po
     vm->index_of_on_draw = data->index_of_on_draw;
     vm->index_of_on_destroy = data->index_of_on_destroy;
     vm->index_of_on_interrupt = data->index_of_on_interrupt;
-    vm->index_of_on_copy_1 = data->index_of_on_copy_1;
-    vm->index_of_on_copy_2 = data->index_of_on_copy_2;
+    vm->index_of_on_copy = data->index_of_on_copy;
+    vm->index_of_on_serialize = data->index_of_on_serialize;
     return id;
 }
 
@@ -229,10 +229,10 @@ HARNESS_CALLED AnmId AnmLoaded::create_ui_vm_at_origin(i32 script, i32 unused)
     vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     vm->rotation.z = 0.0f;
     vm->run();
-    vm->mode_of_create_child = 4;
+    vm->mode_of_create_child = ANM_CREATE_UI;
     AnmId id;
     id = g_AnmManager->insert_in_ui_list_back(vm);
-    vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
+    vm->flags_hi &= ~(ANM_VM_FREEZES_WITH_WORLD | ANM_VM_FREEZES_AFTER_FIRST_RUN);
     LEAVE_CS(CS_ANM_MANAGER);
     return id;
 }

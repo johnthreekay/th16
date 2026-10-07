@@ -48,7 +48,7 @@ struct AnmEffect2Data
 int __fastcall anm_effect_2_init(AnmVm *vm, i32 arg)
 {
     vm->alloc_extra_data(sizeof(AnmEffect2Data));
-    AnmEffect2Data *data = (AnmEffect2Data *)vm->ins_508_extra_data;
+    AnmEffect2Data *data = (AnmEffect2Data *)vm->extra_data;
     memset(data, 0, sizeof(AnmEffect2Data));
     data->timer = 0;
     return 0;
@@ -89,14 +89,14 @@ static __forceinline void effect2_setup_child(AnmId *id, ZunColor color, AnmVm *
 int __fastcall anm_effect_2_on_tick(AnmVm *vm)
 {
     i32 alive = 0;
-    AnmEffect2Data *data = (AnmEffect2Data *)vm->ins_508_extra_data;
+    AnmEffect2Data *data = (AnmEffect2Data *)vm->extra_data;
     Float3 offset;
     Float3 pos = vm->entity_pos;
     data->unk_1900 = data->unk_190c = data->unk_1918 = pos;
     effect2_sincosmul(&offset, vm->rotation.z, 300.0f);
     offset.z = 0.0f;
     data->unk_190c += offset;
-    effect2_sincosmul(&offset, vm->script_vars_33_34_35.z + vm->rotation.z, 150.0f);
+    effect2_sincosmul(&offset, vm->float_vars_4_to_6.z + vm->rotation.z, 150.0f);
     offset.z = 0.0f;
     data->unk_1900 += offset;
     if (data->timer.current != data->timer.previous && data->timer.current < 50)
@@ -154,7 +154,7 @@ int __fastcall anm_effect_2_on_tick(AnmVm *vm)
             data->unk_c80[i] = bezier_2;
             data->states[i] = 1;
         }
-        else if (child->timer_1c.current >= vm->int_vars[0] + 1 && data->states[i] == 1)
+        else if (child->time_in_script.current >= vm->int_vars[0] + 1 && data->states[i] == 1)
         {
             Float3 end = vm->entity_pos;
             f32 angle = g_replay_safe_rng.randf_neg_1_to_1() * ZUN_PI;
@@ -187,7 +187,7 @@ int __fastcall anm_effect_2_on_draw(AnmVm *vm)
 // FUNCTION: TH16 0x405ed0
 int __fastcall anm_effect_2_on_destroy(AnmVm *vm)
 {
-    AnmEffect2Data *data = (AnmEffect2Data *)vm->ins_508_extra_data;
+    AnmEffect2Data *data = (AnmEffect2Data *)vm->extra_data;
     AnmManager *anm_manager = g_AnmManager;
     for (i32 i = 0; i < 200; i++)
     {
@@ -211,7 +211,7 @@ int __fastcall anm_effect_2_on_switch(AnmVm *vm, i32 n)
     switch (n)
     {
     case 1:
-        ((AnmEffect2Data *)vm->ins_508_extra_data)->timer += 300.0f;
+        ((AnmEffect2Data *)vm->extra_data)->timer += 300.0f;
         break;
     }
     return 0;
@@ -235,8 +235,8 @@ static AnmId snapshot_of_vm_id(AnmId id)
 // FUNCTION: TH16 0x405fa0
 int __fastcall anm_effect_2_on_copy_2(AnmVm *vm, const AnmVm *other, i32 mode)
 {
-    AnmEffect2Data *dst = (AnmEffect2Data *)vm->ins_508_extra_data;
-    AnmEffect2Data *src = (AnmEffect2Data *)other->ins_508_extra_data;
+    AnmEffect2Data *dst = (AnmEffect2Data *)vm->extra_data;
+    AnmEffect2Data *src = (AnmEffect2Data *)other->extra_data;
     if (mode == 0)
     {
         for (i32 i = 0; i < 200; i++)
@@ -260,7 +260,7 @@ int __fastcall anm_effect_2_on_copy_2(AnmVm *vm, const AnmVm *other, i32 mode)
 // FUNCTION: TH16 0x406040
 int __fastcall anm_effect_2_on_copy_1(AnmVm *vm, u8 *buffer, i32 *size, i32 mode)
 {
-    AnmEffect2Data *data = (AnmEffect2Data *)vm->ins_508_extra_data;
+    AnmEffect2Data *data = (AnmEffect2Data *)vm->extra_data;
     *size += sizeof(AnmEffect2Data);
     AnmEffect2Data *saved = (AnmEffect2Data *)buffer;
     buffer += sizeof(AnmEffect2Data);
@@ -319,7 +319,7 @@ struct AnmEffect3Data
 int __fastcall anm_effect_3_init(AnmVm *vm, D3DXVECTOR3 *pos)
 {
     vm->alloc_extra_data(sizeof(AnmEffect3Data));
-    AnmEffect3Data *data = (AnmEffect3Data *)vm->ins_508_extra_data;
+    AnmEffect3Data *data = (AnmEffect3Data *)vm->extra_data;
     memset(data, 0, sizeof(AnmEffect3Data));
     data->offsets[0].x = pos->x;
     data->offsets[0].y = pos->y;
@@ -350,7 +350,7 @@ int __fastcall anm_effect_3_init(AnmVm *vm, D3DXVECTOR3 *pos)
 // FUNCTION: TH16 0x406690
 int __fastcall anm_effect_3_on_tick(AnmVm *vm)
 {
-    AnmEffect3Data *data = (AnmEffect3Data *)vm->ins_508_extra_data;
+    AnmEffect3Data *data = (AnmEffect3Data *)vm->extra_data;
     i32 n = data->timer.current;
     if (n < 64)
     {
@@ -384,7 +384,7 @@ int __fastcall anm_effect_3_on_tick(AnmVm *vm)
 // FUNCTION: TH16 0x406860
 int __fastcall anm_effect_3_on_draw(AnmVm *vm)
 {
-    AnmEffect3Data *data = (AnmEffect3Data *)vm->ins_508_extra_data;
+    AnmEffect3Data *data = (AnmEffect3Data *)vm->extra_data;
     g_AnmManager->setup_render_state_for_vm(vm);
     Float3 pos;
     pos = vm->entity_pos + vm->pos + vm->pos_2;
@@ -397,7 +397,7 @@ int __fastcall anm_effect_3_on_draw(AnmVm *vm)
 int __fastcall anm_effect_3b_init(AnmVm *vm, D3DXVECTOR3 *pos)
 {
     vm->alloc_extra_data(sizeof(AnmEffect3Data));
-    AnmEffect3Data *data = (AnmEffect3Data *)vm->ins_508_extra_data;
+    AnmEffect3Data *data = (AnmEffect3Data *)vm->extra_data;
     memset(data, 0, sizeof(AnmEffect3Data));
     data->offsets[0].x = 0.0f;
     data->offsets[0].y = 0.0f;
@@ -447,7 +447,7 @@ struct AnmEffect1Data
 int __fastcall anm_effect_1_init(AnmVm *vm, D3DXVECTOR3 *pos)
 {
     vm->alloc_extra_data(sizeof(AnmEffect1Data));
-    AnmEffect1Data *data = (AnmEffect1Data *)vm->ins_508_extra_data;
+    AnmEffect1Data *data = (AnmEffect1Data *)vm->extra_data;
     memset(data, 0, sizeof(AnmEffect1Data));
     vm->set_layer(0);
     D3DXVECTOR3 center(320.0f, 240.0f, 0.0f);
@@ -468,7 +468,7 @@ int __fastcall anm_effect_1_init(AnmVm *vm, D3DXVECTOR3 *pos)
 // FUNCTION: TH16 0x407330
 int __fastcall anm_effect_1_on_tick(AnmVm *vm)
 {
-    AnmEffect1Data *data = (AnmEffect1Data *)vm->ins_508_extra_data;
+    AnmEffect1Data *data = (AnmEffect1Data *)vm->extra_data;
     i32 finished = 0;
     for (i32 i = 0; i < 4; i++)
     {
@@ -491,7 +491,7 @@ int __fastcall anm_effect_1_on_tick(AnmVm *vm)
 // FUNCTION: TH16 0x407900
 int __fastcall anm_effect_1_on_switch(AnmVm *vm, i32 n)
 {
-    AnmEffect1Data *data = (AnmEffect1Data *)vm->ins_508_extra_data;
+    AnmEffect1Data *data = (AnmEffect1Data *)vm->extra_data;
     switch (n)
     {
     case 1:

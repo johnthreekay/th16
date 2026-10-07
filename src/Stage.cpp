@@ -1157,8 +1157,8 @@ i32 StageInner::run_std()
             {
                 AnmVm *vm = &anm_vms[ins->args[0]];
                 stage->stage_anm->copy_vm(vm, script);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
             else if (script == -2)
