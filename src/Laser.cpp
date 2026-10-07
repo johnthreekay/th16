@@ -2806,18 +2806,8 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
         case 4:
             ex_flags |= 4;
             ex_state[1].floats[0] = ex->r;
-            if (-990.0f >= ex->s)
-            {
-                ex_state[1].floats[1] = angle;
-            }
-            else if (ex->s >= 990.0f)
-            {
-                ex_state[1].floats[1] = g_Player->angle_to_player(&position);
-            }
-            else
-            {
-                ex_state[1].floats[1] = ex->s;
-            }
+            ex_state[1].floats[1] =
+                -990.0f >= ex->s ? angle : (ex->s >= 990.0f ? g_Player->angle_to_player(&position) : ex->s);
             ex_state[1].timer.set_value(0);
             ex_state[1].ints[0] = ex->a;
             laser_sincosmul((Float3 *)&ex_state[1].floats[5], ex_state[1].floats[1], ex_state[1].floats[0]);
