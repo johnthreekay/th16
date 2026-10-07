@@ -19,15 +19,6 @@ void harness_w3e_create_textures()
     g_AnmManager->create_d3d_textures_for_loaded_anms();
 }
 
-// Like the text VM drawing at 0x46da88 and draw_rtext (0x46dbf9, 0x46dd60).
-void harness_w3e_draw_text(RECT *rect, i32 x, i32 size, D3DCOLOR color, D3DCOLOR shadow, const char *text,
-                           IDirect3DTexture9 *texture, i32 font, i32 spacing)
-{
-    draw_text(rect, x, size, color, shadow, text, texture, font, spacing, 1);
-    draw_text(rect, x * 2, size, color, shadow, text, texture, font, 0, 0);
-    draw_text(rect + 1, x, size + 1, shadow, color, text, texture, font + 1, spacing * 2, spacing);
-}
-
 // Like the BGM code of update_sound_thread (0x45e3de, 0x45e410). The real
 // caller of open_bgm is LoadingThread::thread_start (0x43aefa).
 i32 harness_w3e_bgm(i32 slot, const char *name, SoundManager *other)

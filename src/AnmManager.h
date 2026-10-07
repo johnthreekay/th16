@@ -382,6 +382,12 @@ struct AnmManager
     // ending and dialogue lines). Variadic, so __cdecl with this pushed
     // first.
     void draw_text(AnmVm *vm, D3DCOLOR color, i32 unk_10, i32 font, i32 x, i32 y, const char *fmt, ...);
+    // 0x46dab0 and 0x46dc20. The same right-aligned (ExpHP: draw_rtext) and
+    // centered in the sprite; spacing as in draw_text's last argument.
+    void draw_text_right(AnmVm *vm, D3DCOLOR color, D3DCOLOR shadow_color, i32 font, i32 spacing,
+                         const char *fmt, ...);
+    void draw_text_centered(AnmVm *vm, D3DCOLOR color, D3DCOLOR shadow_color, i32 font, i32 spacing,
+                            const char *fmt, ...);
     // 0x46cf80. Loads a file into a slot without waiting for its textures.
     AnmLoaded *do_preload_anm(i32 slot, const char *path);
     // 0x46d1c0. Creates the textures of the next entry, or the prototype
