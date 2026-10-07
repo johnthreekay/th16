@@ -4,9 +4,3 @@
 
 // GLOBAL: TH16 0x491b2c
 AnmVmFunc g_anm_on_draw_funcs[7];
-
-// The decompiled body is parked in src/AnmTexels.cpp (see there).
-// STUB: TH16 0x46c0d0
-void __stdcall AnmManager::convert_texture(IDirect3DTexture9 *texture)
-{
-}
