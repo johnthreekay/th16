@@ -31,9 +31,9 @@ initial contents of the executable's data tables and its string literals.
   documented macros in `src/ZunAsm.h`. `scripts/check_unchanged.py`
   confirmed that the readability pass changed no function's generated code.
 - A portable build that runs on Linux (SDL2 and OpenGL, built with clang or
-  gcc, 32- or 64-bit) lives on the `port` branch; see its README and
-  `port/NOTES.md`. It needs your own game data files, and can apply a thcrap
-  patch stack such as the English translation.
+  gcc, 32- or 64-bit) is on this branch; see "Portable build" below. It
+  needs your own game data files, and can apply a thcrap patch stack such
+  as the English translation.
 
 ## Portable build
 
@@ -227,8 +227,8 @@ Each function carries its address in the original as a
   found while matching.
 - [AGENTS.md](AGENTS.md): the short version for coding agents and
   contributors. Commands, matching gotchas and rules for parallel work.
-- `port/NOTES.md` on the `port` branch: the portable build's design and
-  test notes.
+- [port/NOTES.md](port/NOTES.md): the portable build's design and test
+  notes.
 
 ## License
 
@@ -237,7 +237,9 @@ the names, comments and documentation) is dedicated to the public domain
 under [CC0 1.0](LICENSE). The game itself, including the data tables and
 strings the source reproduces from `th16.exe`, remains the property of its
 author, ZUN (Team Shanghai Alice); CC0 cannot waive rights the contributors
-do not hold.
+do not hold. The portable build's thcrap support adapts code from
+[thcrap](https://github.com/thpatch/thcrap), which is public domain
+(Unlicense).
 
 ## Credits
 
