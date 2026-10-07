@@ -497,7 +497,7 @@ static __forceinline void clear_flag_lo_2_tree_inline(AnmId id)
 
 // Picking the character. Extra only offers the characters that cleared the
 // main game; characters marked as cleared on this difficulty get a badge.
-// TODO: the original realigns its frame (and esp, -8), keeps the menu in edx and g_Scorefile in edi across has_cleared, and loads g_Scorefile before the difficulty.
+// TODO: the original realigns its frame (and esp, -8) and loads g_Scorefile before the difficulty for the clear badges.
 // FUNCTION: TH16 0x4502c0
 i32 TitleInf::do_character_select()
 {
@@ -522,7 +522,7 @@ i32 TitleInf::do_character_select()
             }
             for (i32 i = 0; i < 4; i++)
             {
-                if (!g_Scorefile->has_cleared(i))
+                if (!g_Scorefile->has_cleared_inline(i))
                 {
                     menu.disable(i);
                 }

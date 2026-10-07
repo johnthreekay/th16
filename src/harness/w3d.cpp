@@ -68,10 +68,11 @@ i32 *harness_w3d_unk_4d9d90()
     return &g_unk_4d9d90;
 }
 
-// The title menu (0x44b621).
-i32 harness_w3d_scorefile()
+// The title menu (0x44b621). has_cleared keeps this in ecx: a second
+// object stops LTCG from folding it.
+i32 harness_w3d_scorefile(Scorefile *scorefile, i32 character)
 {
-    return g_Scorefile->any_cleared();
+    return g_Scorefile->any_cleared() + scorefile->has_cleared(character);
 }
 
 // GameThread creates the player (0x42ce15) and deletes it in its

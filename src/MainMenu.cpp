@@ -720,7 +720,7 @@ void TitleInf::update_key_config_cursor()
 }
 
 // FUNCTION: TH16 0x44a800
-i32 Scorefile::has_cleared(i32 character)
+HARNESS_CALLED i32 Scorefile::has_cleared(i32 character)
 {
     if (characters[character].clears[0] != 0 || characters[character].clears[1] != 0 ||
         characters[character].clears[2] != 0 || characters[character].clears[3] != 0)
@@ -733,7 +733,7 @@ i32 Scorefile::has_cleared(i32 character)
 // FUNCTION: TH16 0x44a850
 HARNESS_CALLED i32 Scorefile::any_cleared()
 {
-    if (has_cleared(0) || has_cleared(1) || has_cleared(2) || has_cleared(3))
+    if (has_cleared_inline(0) || has_cleared_inline(1) || has_cleared_inline(2) || has_cleared(3))
     {
         return 1;
     }

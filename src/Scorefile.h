@@ -94,8 +94,19 @@ struct Scorefile
     u8 unk_19fd0[0x1a3ac - 0x19fd0];
 
     // 0x44a800. Whether the character cleared any of the main
-    // difficulties.
-    i32 has_cleared(i32 character);
+    // difficulties. Not forced alive: the character select keeps edx
+    // across it, which needs LTCG to see every caller.
+    HARNESS_CALLED i32 has_cleared(i32 character);
+    // has_cleared as LTCG inlined it into some callers.
+    __forceinline i32 has_cleared_inline(i32 character)
+    {
+        if (characters[character].clears[0] != 0 || characters[character].clears[1] != 0 ||
+            characters[character].clears[2] != 0 || characters[character].clears[3] != 0)
+        {
+            return 1;
+        }
+        return 0;
+    }
     // Members that reach the score data through g_Scorefile; LTCG dropped
     // this. 0x44a850: whether any character cleared the main game.
     HARNESS_CALLED i32 any_cleared();
