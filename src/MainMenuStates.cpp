@@ -2728,7 +2728,6 @@ i32 TitleInf::do_spell_practice_stage_select()
 }
 
 // Spell practice: picking the character, which reloads the spell list.
-// TODO: the original reserves a dead 4-byte local (push ecx) and tests the input after the store.
 // FUNCTION: TH16 0x455790
 i32 TitleInf::do_spell_practice_character()
 {

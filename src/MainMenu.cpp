@@ -56,9 +56,15 @@ void TitleInf::set_state(i32 state)
     time_in_state.reset();
 }
 
+// The dead double is not ZUN's code but stands in for whatever double math
+// the optimizer removed from his body: LTCG's double stack alignment pass
+// sees it at the IL level, so every caller (exactly the menu states that
+// call set_substate) realigns its frame (and esp, -8) as in the original.
 // FUNCTION: TH16 0x44a5e0
-void TitleInf::set_substate(i32 substate)
+HARNESS_CALLED void TitleInf::set_substate(i32 substate)
 {
+    double unused = substate;
+    (void)unused;
     this->substate = substate;
     time_in_state.reset();
 }
@@ -686,7 +692,6 @@ void TitleInf::set_key(i32 action, i32 key)
 
 // Rows above the cursor get interrupt 30, rows below it 31; the five
 // remappable actions have two more pairs of sprites each.
-// TODO: the original keeps g_AnmManager in edi across the lookups (get_vm_with_id is an opaque stub here) and reserves a 12-byte frame.
 // FUNCTION: TH16 0x44f810
 void TitleInf::update_key_config_cursor()
 {
