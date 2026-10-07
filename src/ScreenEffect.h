@@ -9,6 +9,9 @@
 #include "decomp.h"
 #include "types.h"
 
+// Debug logging, compiled out of the release build (0x45d410).
+void screen_debug_log(const char *fmt, ...);
+
 // Full-screen fades, flashes and screen shake. Layout from ExpHP's
 // th-re-data (zScreenEffect). The meaning of the creation arguments depends
 // on the mode; arg_18 is the duration in frames for most of them.
@@ -28,6 +31,17 @@ struct ScreenEffect
     i32 unk_28;
     ZunTimer timer;
 
+    ScreenEffect()
+    {
+    }
+    // The constructor of the static instance (0x4d9dd0), which logs its
+    // creation; create clears the effects it allocates itself.
+    ScreenEffect(const char *log)
+    {
+        screen_debug_log(log);
+        memset(this, 0, sizeof(ScreenEffect));
+        flags |= 2;
+    }
     ~ScreenEffect();
 
     // Creates an effect and registers its update functions (ExpHP:

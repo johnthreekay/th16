@@ -220,6 +220,22 @@ struct RenderVertex044
     D3DCOLOR diffuse;
 };
 
+// Named in the same scheme: a transformed position and texture
+// coordinates, no color (AnmManager::initialize sets rhw to 1).
+struct RenderVertex140
+{
+    D3DXVECTOR4 pos;
+    Float2 uv;
+};
+
+// An untransformed position, color and texture coordinates.
+struct RenderVertex134
+{
+    D3DXVECTOR3 pos;
+    D3DCOLOR diffuse;
+    Float2 uv;
+};
+
 // A request to copy part of the back buffer into the texture of a loaded
 // .anm entry (the pause menu's snapshot of the game screen; TH06:
 // AnmManager::RequestScreenshot). anm_slot < 0 marks a free entry.
@@ -617,6 +633,9 @@ __forceinline AnmId AnmLoaded::create_vm_inline(i32 script, Float3 *pos, f32 rot
 
 // The quad being built by the draw functions.
 extern RenderVertex144 g_sprite_temp_buffer[4];
+// Set up by AnmManager::initialize (0x46a3a0) and 0x46b900.
+extern RenderVertex140 g_vertices_4df4a8[4];
+extern RenderVertex134 g_vertices_4df8a0[4];
 
 // Deletes the VM (if still alive) and forgets the id.
 inline void delete_vm_and_clear(AnmId &id)

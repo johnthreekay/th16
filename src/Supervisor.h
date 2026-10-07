@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string.h>
 #include <windows.h>
 
 #include <d3d9.h>
@@ -10,6 +11,8 @@
 #include "Camera.h"
 #include "Thread.h"
 #include "types.h"
+
+extern i16 g_pad_mapping[10];
 
 // The game's settings, as stored in th16.cfg. Layout from ExpHP's
 // th-re-data; most fields are still unknown.
@@ -42,7 +45,13 @@ struct Config
     u8 unk_2a[0x2c - 0x2a];
     // 0x8 skips DirectInput setup.
     u32 flags_2c;
-    u8 unk_30[0x68 - 0x30];
+    u32 unk_30;
+    u32 unk_34;
+    u8 unk_38[0x68 - 0x38];
+
+    // The defaults ConfigData::set_defaults also writes, for the whole
+    // struct.
+    Config();
 };
 
 // A screenshot being saved: Supervisor's 0x43bbd0 copies the back buffer
@@ -147,6 +156,8 @@ struct Supervisor
     // Seconds the last frame's update and draw took.
     double frame_time;
     D3DCOLOR background_color;
+
+    Supervisor();
 
     u32 read_joypad(u32 input);
 

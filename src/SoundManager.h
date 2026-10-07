@@ -351,6 +351,8 @@ enum SoundThreadState
     SOUND_THREAD_QUIT = 2,
 };
 
+extern SoundEffectData g_sound_effect_table[SOUND_EFFECT_COUNT];
+
 struct SoundManager
 {
     struct IDirectSound8 *dsound;
@@ -403,6 +405,25 @@ struct SoundManager
     i32 se_volume;
     // DirectSound volume (hundredths of dB) for the BGM.
     i32 bgm_db;
+
+    // Gives each sound slot its row of the sound effect table.
+    SoundManager()
+    {
+        for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
+        {
+            sound_buffers[i].unk_4 = -1;
+            SoundEffectData *data;
+            for (data = g_sound_effect_table; data != NULL; data++)
+            {
+                if (data->id == i)
+                {
+                    break;
+                }
+            }
+            sound_buffers[i].id = i;
+            sound_buffers[i].data = data;
+        }
+    }
 
     // Queues a command for the sound thread.
     void modify_bgm(i32 command, i32 arg, const char *name);

@@ -12,8 +12,27 @@ static_assert(offsetof(AnmManager, sprite_write_cursor) == 0x1bcfc1c, "AnmManage
 static_assert(offsetof(AnmManager, primitive_write_cursor) == 0x1c6fc28, "AnmManager layout");
 static_assert(sizeof(RenderVertex144) == 0x1c, "RenderVertex144 layout");
 
+// GLOBAL: TH16 0x4df4a8
+RenderVertex140 g_vertices_4df4a8[4];
+// SYNTHETIC: TH16 0x4011f0
+// ??__Eg_vertices_4df4a8@@YAXXZ
 // GLOBAL: TH16 0x4df830
 RenderVertex144 g_sprite_temp_buffer[4];
+// SYNTHETIC: TH16 0x401220
+// ??__Eg_sprite_temp_buffer@@YAXXZ
+// GLOBAL: TH16 0x4df8a0
+RenderVertex134 g_vertices_4df8a0[4];
+// SYNTHETIC: TH16 0x401250
+// ??__Eg_vertices_4df8a0@@YAXXZ
+
+// The implicit constructors the static initializers call; LTCG keeps them
+// out of line.
+// SYNTHETIC: TH16 0x46a370
+// RenderVertex140::RenderVertex140
+// SYNTHETIC: TH16 0x46a380
+// RenderVertex144::RenderVertex144
+// SYNTHETIC: TH16 0x46a390
+// RenderVertex134::RenderVertex134
 
 // FUNCTION: TH16 0x464f10
 void AnmManager::setup_render_state_for_vm(AnmVm *vm)

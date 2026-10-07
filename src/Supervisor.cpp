@@ -57,13 +57,46 @@ static_assert(offsetof(Config, flags_2c) == 0x2c, "Config::flags_2c");
 static_assert(offsetof(GameWindow, save_dir) == 0x2d, "GameWindow::save_dir");
 static_assert(offsetof(SoundManager, bgm_dat_name) == 0x5560, "SoundManager::bgm_dat_name");
 
-// GLOBAL: TH16 0x4c10d0
-Supervisor g_Supervisor;
+Config::Config()
+{
+    memset(this, 0, sizeof(Config));
+    flags_2c |= 0x100;
+    color_mode = 0;
+    bgm_mode = 1;
+    unk_4 = 0x160002;
+    deadzone_x = deadzone_y = 600;
+    unk_22 = 1;
+    window_size = 5;
+    frame_skip = 0;
+    memcpy(pad_mapping_copy, g_pad_mapping, sizeof(pad_mapping_copy));
+    unk_25 = 2;
+    bgm_volume = 100;
+    unk_28 = 0;
+    unk_29 = 2;
+    se_volume = 80;
+    unk_30 = 0x80000000;
+    unk_34 = 0x80000000;
+}
 
 // FUNCTION: TH16 0x40d510
 Camera::Camera()
 {
 }
+
+Supervisor::Supervisor()
+{
+    memset(this, 0, sizeof(Supervisor));
+    flags |= 0x4240;
+}
+
+// GLOBAL: TH16 0x4c10d0
+Supervisor g_Supervisor;
+// TODO: the original keeps the Config constructor's memset and stores before the Camera constructor calls; ours drops them as overwritten by Supervisor's memset.
+// SYNTHETIC: TH16 0x401030
+// ??__Eg_Supervisor@@YAXXZ
+// SYNTHETIC: TH16 0x48ac40
+// ??__Fg_Supervisor@@YAXXZ
+
 
 // GLOBAL: TH16 0x4a52e4
 i16 g_pad_mapping[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};

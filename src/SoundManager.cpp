@@ -10,6 +10,11 @@
 #include "SoundManager.h"
 #include "Supervisor.h"
 
+// GLOBAL: TH16 0x4d9e10
+SoundManager g_SoundManager;
+// SYNTHETIC: TH16 0x4011b0
+// ??__Eg_SoundManager@@YAXXZ
+
 // GLOBAL: TH16 0x4a2a30
 SoundEffectData g_sound_effect_table[SOUND_EFFECT_COUNT] = {
     {0, 0, -1900, 0, 0, 0}, {1, 0, -2100, 0, 0, 0}, {3, 1, -1200, 5, 0, 1}, {4, 1, -1500, 5, 0, 1},

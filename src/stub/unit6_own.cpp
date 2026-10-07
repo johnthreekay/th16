@@ -4,9 +4,6 @@
 #include "../SoundManager.h"
 #include "../Supervisor.h"
 
-// GLOBAL: TH16 0x4d9e10
-SoundManager g_SoundManager;
-
 // GLOBAL: TH16 0x4a6f0c
 Scorefile *g_Scorefile;
 

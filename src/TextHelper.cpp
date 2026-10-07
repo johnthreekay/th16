@@ -18,6 +18,10 @@ FormatInfo g_format_info[7] = {
 
 // GLOBAL: TH16 0x4a5c10
 D3DThreadInf g_D3DThreadInf;
+// SYNTHETIC: TH16 0x401140
+// ??__Eg_D3DThreadInf@@YAXXZ
+// SYNTHETIC: TH16 0x48ac80
+// ??__Fg_D3DThreadInf@@YAXXZ
 
 // SYNTHETIC: TH16 0x4584f0
 // D3DThreadInf::`scalar deleting destructor'
@@ -28,6 +32,17 @@ u8 g_text_random_bytes[256];
 
 // GLOBAL: TH16 0x4a5d60
 TextHelper g_TextHelper;
+// SYNTHETIC: TH16 0x401150
+// ??__Eg_TextHelper@@YAXXZ
+// SYNTHETIC: TH16 0x48aca0
+// ??__Fg_TextHelper@@YAXXZ
+
+// GLOBAL: TH16 0x4a5d90
+ThreadInf g_thread_4a5d90;
+// SYNTHETIC: TH16 0x401160
+// ??__Eg_thread_4a5d90@@YAXXZ
+// SYNTHETIC: TH16 0x48acb0
+// ??__Fg_thread_4a5d90@@YAXXZ
 
 // Set when the system has Meiryo; the fonts then use it instead of MS Gothic.
 // GLOBAL: TH16 0x4a6f2c

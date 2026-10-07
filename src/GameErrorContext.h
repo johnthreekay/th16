@@ -10,6 +10,18 @@ struct GameErrorContext
     char *buffer_end;
     i8 show_message_box;
 
+    // Simple enough to be evaluated at compile time; only the empty
+    // destructor is registered at startup (0x401010).
+    GameErrorContext()
+    {
+        buffer_end = buffer;
+        buffer[0] = '\0';
+        show_message_box = false;
+    }
+    ~GameErrorContext()
+    {
+    }
+
     // Variadic member functions are __cdecl with this as the first stack
     // argument.
     const char *log(const char *fmt, ...);

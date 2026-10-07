@@ -374,6 +374,15 @@ void ScreenEffect::initialize(i32 mode, i32 arg_18, i32 arg_1c, i32 arg_20, i32 
     initialize_inline(mode, arg_18, arg_1c, arg_20, arg_24, draw_priority);
 }
 
+// A ScreenEffect nothing uses besides its static constructor and
+// destructor.
+// GLOBAL: TH16 0x4d9dd0
+ScreenEffect g_screen_effect("initialize ScreenInf\n");
+// SYNTHETIC: TH16 0x401170
+// ??__Eg_screen_effect@@YAXXZ
+// SYNTHETIC: TH16 0x48acd0
+// ??__Fg_screen_effect@@YAXXZ
+
 // FUNCTION: TH16 0x45d360
 ScreenEffect::~ScreenEffect()
 {
@@ -381,8 +390,7 @@ ScreenEffect::~ScreenEffect()
     g_UpdateFuncRegistry->unregister_locked(on_draw);
 }
 
-// Debug logging, compiled out of the release build. The static constructor
-// at 0x401170 logs "initialize ScreenInf" through it.
+// The static constructor at 0x401170 logs "initialize ScreenInf" through it.
 // FUNCTION: TH16 0x45d410
 void screen_debug_log(const char *fmt, ...)
 {

@@ -458,6 +458,13 @@ PlayerInner::PlayerInner()
 {
 }
 
+// A PlayerInner nothing uses besides its static constructor (ExpHP:
+// STATIC_PLAYER_INNER__CAUSE_THAT_MAKES_SENSE).
+// GLOBAL: TH16 0x4c1b10
+PlayerInner g_static_player_inner;
+// SYNTHETIC: TH16 0x401100
+// ??__Eg_static_player_inner@@YAXXZ
+
 // FUNCTION: TH16 0x441a50
 Player::~Player()
 {
