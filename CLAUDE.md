@@ -30,7 +30,8 @@ Matching decomp of TH16 1.00a. See README.md for the toolchain evidence and work
 - A class with a vtable must use the RTTI name from the binary.
 - Redundant stores kept, or flag updates not merged: something blocks MSVC's
   dead store elimination. Plain-int flags with `&=`/`|=` (not bitfields),
-  then `volatile` (see create_func). Check every function that inlines the
+  then `volatile` (see create_func). Exception: field assignments that
+  compile to xor/and/xor are real bitfields (EnemyFlagsLow). Check every function that inlines the
   same struct code before settling on a struct-level change.
 - Our build inlines a callee the original calls: mark it `DECOMP_NOINLINE`.
 - Callee not decompiled yet: placeholder in `src/stub/` (built without /GL,
