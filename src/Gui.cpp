@@ -30,8 +30,6 @@ Gui *g_Gui;
 // GLOBAL: TH16 0x4a6dd0
 MsgFile *g_msg_file_cache;
 
-// TODO: inlined delete_vm loads the child list before storing the flags,
-// and the loop does not reuse this's register for the id pointer.
 // FUNCTION: TH16 0x4264a0
 GuiMsgVm::~GuiMsgVm()
 {
@@ -42,18 +40,12 @@ GuiMsgVm::~GuiMsgVm()
         anm->delete_vm_inline(enemy_faces[i]);
         enemy_faces[i].id = 0;
     }
-    anm->delete_vm_inline(id_54);
-    id_54.id = 0;
-    anm->delete_vm_inline(text_line_1);
-    text_line_1.id = 0;
-    anm->delete_vm_inline(text_line_2);
-    text_line_2.id = 0;
-    anm->delete_vm_inline(furigana_1);
-    furigana_1.id = 0;
-    anm->delete_vm_inline(furigana_2);
-    furigana_2.id = 0;
-    anm->delete_vm_inline(intro);
-    intro.id = 0;
+    delete_vm_inline_and_clear(id_54);
+    delete_vm_inline_and_clear(text_line_1);
+    delete_vm_inline_and_clear(text_line_2);
+    delete_vm_inline_and_clear(furigana_1);
+    delete_vm_inline_and_clear(furigana_2);
+    delete_vm_inline_and_clear(intro);
     anm->delete_vm_inline(textbox);
     textbox.id = 0;
 }
@@ -70,7 +62,9 @@ Gui::Gui()
 }
 
 // TODO: the original frame has 4 more bytes and saves esi in the
-// prologue; ours saves it after the early returns.
+// prologue; ours saves it after the early returns. Known alignment from
+// GameThread::thread_start, which realigns in the original; matches once it
+// does (tested with a stand-in double there).
 // FUNCTION: TH16 0x426b00
 i32 Gui::initialize()
 {
@@ -113,7 +107,8 @@ i32 Gui::initialize()
 }
 
 // TODO: ours saves esi/edi only around the strcpy branch; the original
-// saves them in the prologue.
+// saves them in the prologue (known alignment from GameThread::thread_start,
+// which realigns in the original; 98.8% once it does).
 // FUNCTION: TH16 0x426c10
 i32 Gui::load_stage_files()
 {
@@ -148,7 +143,6 @@ i32 Gui::load_stage_files()
     return 0;
 }
 
-// TODO: inlined delete_vm loads the child list before storing the flags.
 // FUNCTION: TH16 0x427730
 void Gui::release_stage_files()
 {
@@ -227,8 +221,6 @@ HARNESS_CALLED void Gui::release_msg()
     }
 }
 
-// TODO: inlined delete_vm loads the child list before storing the flags,
-// and some id clears are scheduled after the next push.
 // FUNCTION: TH16 0x427a20
 Gui::~Gui()
 {
@@ -245,10 +237,8 @@ Gui::~Gui()
         anm->delete_vm_inline(ids_a0[i]);
         ids_a0[i].id = 0;
     }
-    anm->delete_vm_inline(id_4c);
-    id_4c.id = 0;
-    anm->delete_vm_inline(id_50);
-    id_50.id = 0;
+    delete_vm_inline_and_clear(id_4c);
+    delete_vm_inline_and_clear(id_50);
     g_AnmManager->disable_vms_from_anm_file(front_anm);
     g_Gui = NULL;
 }
@@ -266,7 +256,8 @@ Gui *Gui::create()
 }
 
 // TODO: the original calls on_tick_body with the stack realigned (push ecx)
-// instead of jumping to it; LTCG did that for the real body's sake.
+// instead of jumping to it; matches once GameThread::thread_start realigns
+// its frame like the original (tested with a stand-in double there).
 // FUNCTION: TH16 0x429af0
 i32 __fastcall Gui::on_tick_callback(Gui *self)
 {
@@ -938,27 +929,23 @@ void GuiMsgVm::show()
     }
 }
 
-// TODO: the original keeps g_AnmManager in ebx across the lookups; LTCG
-// knows get_vm_with_id and search_children leave it alone.
 // FUNCTION: TH16 0x42ba30
 HARNESS_CALLED void GuiMsgVm::set_textbox(f32 x, f32 y, f32 width, i32 kind)
 {
     delete_vm_and_clear(textbox);
+    AnmLoaded *anm = g_Gui->front_anm;
     Float3 pos(x, y, 0.0f);
-    textbox = g_Gui->front_anm->create_vm(kind + 0xe4, &pos, 0.0f, -1, 0);
+    textbox = anm->create_vm(kind + 0xe4, &pos, 0.0f, -1, 0);
     find_child_of(textbox, kind + 0xb4)->float_vars[0] = width;
     find_child_of(textbox, kind + 0xd4)->float_vars[0] = width;
     textbox_kind = kind;
 }
 
-// TODO: the original keeps g_AnmManager in edi and the width in xmm1
-// across the lookups (LTCG knows the callees leave them alone).
 // FUNCTION: TH16 0x42bb30
 HARNESS_CALLED void GuiMsgVm::set_textbox_width(f32 width, i32 kind)
 {
-    width += 16.0f;
-    find_child_of(textbox, kind + 0xb4)->float_vars[0] = width;
-    find_child_of(textbox, kind + 0xd4)->float_vars[0] = width;
+    find_child_of(textbox, kind + 0xb4)->float_vars[0] = width + 16.0f;
+    find_child_of(textbox, kind + 0xd4)->float_vars[0] = width + 16.0f;
 }
 
 // TODO: the original aligns its frame to 8 bytes, which LTCG adds for
@@ -1429,8 +1416,8 @@ void __fastcall anm_vm_interrupt_2_run(AnmVm *vm)
     vm->run();
 }
 
-// TODO: the original keeps g_AnmManager in edi across the lookups (LTCG
-// knows get_vm_with_id leaves it alone).
+// TODO: ours gets a /GS cookie and keeps the create_effect results in a
+// local; the original has no cookie and reuses script's argument slot for them.
 // FUNCTION: TH16 0x429b20
 GuiMsgVm::GuiMsgVm(void *script)
 {
@@ -1493,7 +1480,6 @@ GuiMsgVm::GuiMsgVm(void *script)
     unk_1bc = 320.0f;
 }
 
-// TODO: the original stores ".wav" as an immediate (see play_bgm_wav).
 // FUNCTION: TH16 0x429ff0
 void Gui::start_dialogue(i32 script)
 {
@@ -1506,7 +1492,7 @@ void Gui::start_dialogue(i32 script)
         {
             char path[0x100];
             strcpy(path, stage->music_names[boss]);
-            strcat(path, ".wav");
+            append_wav_extension(path);
             if (strcmp(g_SoundManager.bgm_name, path) == 0)
             {
                 return;

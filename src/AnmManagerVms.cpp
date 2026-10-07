@@ -375,7 +375,7 @@ void AnmLoadedD3D::clear_texture()
 }
 
 // FUNCTION: TH16 0x46f510
-AnmVm *AnmVm::search_children(i32 unk_49c, i32 n)
+HARNESS_CALLED AnmVm *AnmVm::search_children(i32 unk_49c, i32 n)
 {
     for (ZunList<AnmVm> *node = &list_of_children; node != NULL; node = node->next)
     {

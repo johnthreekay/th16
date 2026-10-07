@@ -1383,7 +1383,7 @@ HARNESS_CALLED i32 Supervisor::play_bgm_wav(i32 arg, const char *name)
     char path[256];
 
     strcpy(path, name);
-    strcat(path, ".wav");
+    append_wav_extension(path);
     g_SoundManager.modify_bgm(BGM_PLAY_WAV, arg, path);
     return 1;
 }

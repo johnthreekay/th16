@@ -53,16 +53,15 @@ GameThread::GameThread()
     memset(this, 0, sizeof(GameThread));
 }
 
-// TODO: esi and edi swapped (replay_mode and thread).
 // FUNCTION: TH16 0x42d700
 HARNESS_CALLED GameThread *GameThread::create(i32 replay_mode)
 {
     GameThread *thread = new GameThread();
     g_unk_4d9d90 = 0;
     g_Supervisor.d3d_device->EvictManagedResources();
-    thread->flags.paused = 1;
     g_GameThread = thread;
     thread->replay_mode = replay_mode;
+    thread->flags.paused = 1;
     g_Supervisor.start_thread((ThreadStart)thread_start_callback, NULL);
     return thread;
 }
@@ -118,6 +117,15 @@ static const i32 g_initial_piv_per_difficulty[6] = {10000, 10000, 10000, 10000, 
 // The game thread: waits for the loading screen, sets up a new game (or
 // the next stage) and creates the game objects. 0 on success; -1 (with the
 // thread flagged as failed) if something could not be created.
+// TODO: the original realigns its frame (and esp, -8; sub esp, 8) and tests
+// GLOBALS_FLAGS_45C & 0x40 as a byte. Forcing the realignment (a volatile
+// double here, harness_w3d_player's removed) gains 12 matches below it
+// (Stage::create, load_data, load_std, update_std_vms, on_draw_06,
+// Gui::initialize, LaserManager::initialize, ...), loses start_std_vms and
+// AsciiInf::create_number, and gives GameThread::on_tick_callback the
+// aligned thunk where the original jumps. HARNESS_CALLED on its callees (the
+// managers' create, get_runtime, AnmVm::run, repopulate_options) does not
+// make LTCG realign it.
 // FUNCTION: TH16 0x42cb60
 i32 GameThread::thread_start()
 {
@@ -427,7 +435,6 @@ fail:
 // Ends a game: saves the score file, shows "now loading" for what comes
 // next, and deletes the game objects (keeping the stage, GUI and player
 // across a stage transition, flag 2) and the update functions.
-// TODO: the original's frame is 4 bytes larger and it lays out the mode 4/16 branch before mode 14.
 // FUNCTION: TH16 0x42d200
 DECOMP_NOINLINE GameThread::~GameThread()
 {
@@ -449,7 +456,11 @@ DECOMP_NOINLINE GameThread::~GameThread()
         g_AsciiManager->show_now_loading(480.0f, 392.0f);
         GLOBALS_FLAGS_45C |= 2;
     }
-    else if (g_Supervisor.gamemode_to_switch_to == 4 || g_Supervisor.gamemode_to_switch_to == 16)
+    else if (g_Supervisor.gamemode_to_switch_to == 4)
+    {
+        g_AsciiManager->show_now_loading(480.0f, 392.0f);
+    }
+    else if (g_Supervisor.gamemode_to_switch_to == 16)
     {
         g_AsciiManager->show_now_loading(480.0f, 392.0f);
     }
@@ -698,8 +709,6 @@ void GameThread::enable_update_funcs()
     }
 }
 
-// TODO: register allocation: the original keeps the converted time in
-// eax:edx and computes the index in ecx, saving only esi/edi.
 // FUNCTION: TH16 0x42dbc0
 void GameThread::update_play_time()
 {
@@ -714,9 +723,12 @@ void GameThread::update_play_time()
     double elapsed = get_runtime() - g_play_time_runtime;
     if (elapsed >= 0.0)
     {
+        // The total's address is taken before the conversion: the original
+        // loads g_Scorefile before the __dtoul3 call and keeps it in edi.
         Scorefile *scorefile = g_Scorefile;
-        __int64 time = (__int64)(elapsed * 100.0);
-        scorefile->play_time += time;
+        __int64 *total = &scorefile->play_time;
+        __int64 time = (unsigned __int64)(elapsed * 100.0);
+        *total += time;
         scorefile->characters[g_Globals.subshot + g_Globals.character].play_time += time;
     }
     g_play_time_runtime = get_runtime();

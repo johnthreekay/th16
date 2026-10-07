@@ -673,6 +673,60 @@ decompiled code the surroundings it had in the original:
     on_tick_callback pads its tail call too: in the original on_tick_body
     realigns itself (and esp,-8), so on_tick_callback can jump to it.
 
+- TODO sweep, group 3 (Gui, stage, game thread, HUD text):
+  - Inlined timer ticks: ZunTimer::tick_split (current_f stored in each
+    branch) matches EndingChildF0::run and ScreenEffect::on_tick_pulse,
+    where tick gave the other xmm register. Still open: in on_tick_flash,
+    on_tick_hold and on_tick_shake the original adds current_f from memory
+    into the speed's xmm1; every tick form and operand order loads it into
+    xmm0 instead.
+  - `delete_vm_inline_and_clear(id)` (an inline helper) keeps the id clear
+    before the next lookup's push, like the original; spelling it out with
+    a cached `anm` lets the push move ahead (Gui and GuiMsgVm destructors).
+  - `strcat(path, ".wav")` in play_bgm_wav and start_dialogue is strlen
+    plus byte stores that combine into one immediate dword, the terminator
+    taken from the zero the strlen loop ended on (append_wav_extension in
+    Supervisor.h). strcat, or strcpy/memcpy of the literal, copy it from
+    memory; indexing the local array (`path[len + 4] = 0`) adds a /GS range
+    check, so the stores go through a pointer.
+  - `if (x == 4 || x == 16)` put that body after the next else-if's;
+    separate branches with the same body (tail merged) give the original's
+    layout (GameThread::~GameThread).
+  - The order of stores in the source decides register assignment even
+    where the result is scheduled the same: GameThread::create matches with
+    `g_GameThread = thread; thread->replay_mode = ...; flags.paused = 1`.
+  - `p->x += (__int64)d` evaluated the pointer after the conversion call;
+    taking the field's address into a local first loads it before the call
+    (GameThread::update_play_time, whose conversion is to unsigned
+    __int64: __dtoul3, which quickdiff does not tell from __dtol3).
+  - A fade_out_bgm inlined as `modify_bgm(..., c ? 3.0f / speed : 3.0f, ...)`
+    keeps the hoisted constant in the register the original uses; the
+    if/assign form copied it from another (EndingChildF0::run).
+  - AnmVm::search_children is HARNESS_CALLED now that all its callers are
+    real: LTCG then keeps xmm values and g_AnmManager in registers across
+    find_child_of (set_textbox, set_textbox_width; TitleInf's
+    update_options_cursor went to 99.9%). `w + 16.0f` written at each store
+    keeps the add after the first lookup; adding into the parameter first
+    hoists it.
+  - GameThread::thread_start does not realign its frame like the original.
+    Forcing it (a volatile double in it, harness_w3d_player's removed)
+    matched 12 more functions it reaches (Stage::create, load_data,
+    load_std, update_std_vms, on_draw_06, Gui::initialize,
+    LaserManager::initialize, render_layer, ...) and lost
+    Stage::start_std_vms and AsciiInf::create_number (early alignment, see
+    above), and GameThread::on_tick_callback got the aligned
+    `push ecx; call; pop ecx` thunk where the original jumps (its on_tick_body
+    realigns itself). Nothing tried makes LTCG realign it: HARNESS_CALLED on
+    its callees that realign in the original (AnmVm::run, get_runtime,
+    PlayerInner::repopulate_options) or on the managers' create functions,
+    nor four extra harness functions spilling doubles. thread_start itself
+    is only reached through thread_start_callback (`jmp`). Our
+    repopulate_options realigns through ebx with a /GS cookie where the
+    original realigns plainly without one; that may be the missing source.
+  - Gui::create_vm_110 realigns in the original for its zero D3DXVECTOR3
+    temporary (movq copy, z through a stack slot); ours emits the same code
+    without realigning, HARNESS_CALLED or not.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
