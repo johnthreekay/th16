@@ -5,6 +5,8 @@
 // GLOBAL: TH16 0x4a5790
 Globals g_Globals;
 
+// The scores (divided by 10) of the score extends, for the extra stage and
+// for the main game.
 // GLOBAL: TH16 0x4917c4
 const i32 g_score_extend_quotas_extra[7] = {
     1000000, 2000000, 4000000, 6000000, 8000000, 10000000, 1000000000,
@@ -65,6 +67,8 @@ i32 get_score_extend_quota()
 
 // TODO: the original reserves an unused stack slot (push ecx) and saves esi
 // up front, probably stack alignment for Gui::show_notice (see add_to_score).
+// Adds power up to the maximum (with the full power notice when it gets
+// there).
 // FUNCTION: TH16 0x43ddf0
 i32 Globals::add_power(i32 amount)
 {
@@ -81,6 +85,8 @@ i32 Globals::add_power(i32 amount)
     return (power - amount) / power_per_level != power / power_per_level;
 }
 
+// One more point of season power: returns whether the season level went
+// up.
 // FUNCTION: TH16 0x43de50
 i32 Globals::collect_season_item(i32 unused)
 {
@@ -97,6 +103,8 @@ i32 Globals::collect_season_item(i32 unused)
     return old_level != g_Globals.season_level();
 }
 
+// Sets the season power needed for a level and recomputes where that level
+// begins.
 // FUNCTION: TH16 0x43deb0
 HARNESS_CALLED void Globals::init_season_level_delta(i32 level, i32 delta)
 {
@@ -125,6 +133,7 @@ HARNESS_CALLED f32 get_season_gauge_fill_ratio()
            (f32)g_Globals.season_level_deltas[level + 1];
 }
 
+// One more life, up to MAX_LIVES: returns whether there was room for it.
 // FUNCTION: TH16 0x43df70
 i32 Globals::collect_extend(i32 unused)
 {
@@ -141,6 +150,7 @@ i32 Globals::collect_extend(i32 unused)
     return 1;
 }
 
+// One more bomb, up to MAX_BOMBS (with a sound when it fits).
 // FUNCTION: TH16 0x43dfb0
 void Globals::collect_bomb(i32 unused)
 {
@@ -156,6 +166,8 @@ void Globals::collect_bomb(i32 unused)
     g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
 }
 
+// One more bomb fragment; five make a bomb. None count with the bombs
+// full.
 // FUNCTION: TH16 0x43dff0
 void Globals::collect_bomb_fragment(i32 unused)
 {

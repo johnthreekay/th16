@@ -30,6 +30,10 @@ Gui *g_Gui;
 // GLOBAL: TH16 0x4a6dd0
 MsgFile *g_msg_file_cache;
 
+// The ANM manager slots of front.anm and the stage logo's anm file.
+#define ANM_SLOT_FRONT 5
+#define ANM_SLOT_STAGE_LOGO 6
+
 // Deletes the faces and text.
 // FUNCTION: TH16 0x4264a0
 GuiMsgVm::~GuiMsgVm()
@@ -77,7 +81,7 @@ static inline UpdateFuncCallback gui_on_draw_2_callback()
 // FUNCTION: TH16 0x426b00
 i32 Gui::initialize()
 {
-    front_anm = AnmManager::preload_anm(5, "front.anm");
+    front_anm = AnmManager::preload_anm(ANM_SLOT_FRONT, "front.anm");
     if (front_anm == NULL)
     {
         // "The data is corrupt."
@@ -120,7 +124,7 @@ i32 Gui::initialize()
 // FUNCTION: TH16 0x426c10
 i32 Gui::load_stage_files()
 {
-    stage_logo_anm = AnmManager::preload_anm(6, g_stage_data->logo_anm_filename);
+    stage_logo_anm = AnmManager::preload_anm(ANM_SLOT_STAGE_LOGO, g_stage_data->logo_anm_filename);
     if (stage_logo_anm == NULL)
     {
         // "The data is corrupt."
@@ -140,6 +144,7 @@ i32 Gui::load_stage_files()
         msg_file = (MsgFile *)file_read_all(g_ecl_path, NULL, 0);
         if (msg_file == NULL)
         {
+            // "The data is corrupt."
             g_GameErrorContext.log("\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
             return -1;
         }
@@ -158,7 +163,7 @@ void Gui::release_stage_files()
 {
     if (!(g_Globals.flags_lo_45c & GLOBALS_STAGE_RESTART_MASK))
     {
-        g_AnmManager->unload_anm(6);
+        g_AnmManager->unload_anm(ANM_SLOT_STAGE_LOGO);
     }
     else
     {
@@ -195,7 +200,7 @@ void Gui::release_stage_files()
     {
         boss_star_ids[i].id = 0;
     }
-    id_100.id = 0;
+    boss_star_id_9.id = 0;
     AnmManager *anm = g_AnmManager;
     for (i32 i = 0; i < 10; i++)
     {
@@ -220,7 +225,7 @@ HARNESS_CALLED void Gui::release_msg()
     }
     if (!(g_Globals.flags_lo_45c & GLOBALS_STAGE_RESTART_MASK))
     {
-        g_AnmManager->unload_anm(6);
+        g_AnmManager->unload_anm(ANM_SLOT_STAGE_LOGO);
         stage_logo_anm = NULL;
         if (msg_file != NULL)
         {
@@ -231,6 +236,7 @@ HARNESS_CALLED void Gui::release_msg()
     }
 }
 
+// Also deletes the HUD's own VMs and disables front.anm's.
 // FUNCTION: TH16 0x427a20
 Gui::~Gui()
 {
@@ -784,6 +790,7 @@ waiting:
     return 0;
 }
 
+// Puts vm just outside the bubble's body, on the side of the speaker.
 // TODO: the original aligns its frame to 8 bytes and adds two of the
 // vector components the other way round.
 // FUNCTION: TH16 0x42b480
@@ -830,6 +837,7 @@ i32 __fastcall Gui::textbox_on_draw(AnmVm *vm)
     return 0;
 }
 
+// The pause menu hides the dialogue and shows it again.
 // FUNCTION: TH16 0x42b610
 void GuiMsgVm::hide()
 {
@@ -948,6 +956,8 @@ void GuiMsgVm::show()
     }
 }
 
+// A new speech bubble of the given kind at (x, y), with its body and edge
+// stretched to width.
 // FUNCTION: TH16 0x42ba30
 HARNESS_CALLED void GuiMsgVm::set_textbox(f32 x, f32 y, f32 width, i32 kind)
 {
@@ -960,6 +970,7 @@ HARNESS_CALLED void GuiMsgVm::set_textbox(f32 x, f32 y, f32 width, i32 kind)
     textbox_kind = kind;
 }
 
+// Stretches the bubble's body and edge to width plus a 16-pixel margin.
 // FUNCTION: TH16 0x42bb30
 HARNESS_CALLED void GuiMsgVm::set_textbox_width(f32 width, i32 kind)
 {
@@ -2034,7 +2045,7 @@ i32 Gui::on_tick_body()
     }
 
     // The boss's remaining spell card stars (boss_star_ids runs into
-    // id_100).
+    // boss_star_id_9).
     AnmId *stars = boss_star_ids;
     for (u32 i = 0; i < 10; i++)
     {
@@ -2274,8 +2285,8 @@ i32 Gui::on_draw_2_body()
             ascii->color.d3d = 0xffffffff;
         }
     }
-    // Under the spell card bonus notice: the time the capture took, and the
-    // card's record below it in grey.
+    // Under the spell card bonus notice: the card's time (Spellcard::unk_90
+    // frames) and, in grey, the time Spellcard::decode_time_code gives.
     ascii = g_AsciiManager;
     if (spell_bonus_shown != 0)
     {

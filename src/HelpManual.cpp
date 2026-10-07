@@ -59,6 +59,8 @@ void help_manual_read_file()
     g_Supervisor.thread.stop_requested = TRUE;
 }
 
+// Registers the update functions (inactive until help.anm is loaded) and
+// loads help.anm on the Supervisor's worker thread.
 // FUNCTION: TH16 0x42e810
 i32 HelpManual::initialize()
 {
@@ -320,6 +322,8 @@ i32 __fastcall HelpManual::on_draw_callback(HelpManual *manual)
     return 1;
 }
 
+// Creates a VM running script at pos in the UI list (like create_ui_effect,
+// with a position).
 // TODO: same frame difference as create_vm (4 more bytes, esi saved before the critical section).
 // FUNCTION: TH16 0x42efb0
 HARNESS_CALLED AnmId AnmLoaded::create_ui_vm(i32 script, D3DXVECTOR3 *pos, i32 unused)

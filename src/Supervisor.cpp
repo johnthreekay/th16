@@ -1313,7 +1313,7 @@ HARNESS_CALLED int Supervisor::load_game_config(const char *path)
     {
         *data = *file;
         free(file);
-        if (data->unk_1c >= 2 || data->unk_1d >= 3 || data->unk_1e >= 2 || data->unk_1f >= 6 || data->unk_20 >= 3 ||
+        if (data->color_mode >= 2 || data->bgm_mode >= 3 || data->unk_1e >= 2 || data->window_size >= 6 || data->frame_skip >= 3 ||
             data->unk_21 >= 3 || data->version != 0x160002 || size != sizeof(ConfigData))
         {
             // "Config data was broken, so it was reinitialized"

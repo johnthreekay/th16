@@ -41,6 +41,7 @@ Ending::Ending()
     flags_0 |= 2;
 }
 
+// Unloads the ending's anm files and script; clears g_unk_4c0f40.
 // FUNCTION: TH16 0x419450
 Ending::~Ending()
 {
@@ -136,6 +137,7 @@ const char *const g_staff_files[4] = {
     "staff4.msg",
 };
 
+// Waits for the loading thread and deletes the text lines.
 // FUNCTION: TH16 0x4190b0
 EndingScriptVm::~EndingScriptVm()
 {
@@ -234,6 +236,7 @@ i32 Ending::initialize()
     return 0;
 }
 
+// Creates the five text lines (16-pixel glyphs) and starts the script.
 // FUNCTION: TH16 0x4197c0
 EndingScriptVm::EndingScriptVm(void *script)
 {

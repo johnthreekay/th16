@@ -390,10 +390,10 @@ struct Gui
     AnmId id_d4;
     // The boss's name. Only while a boss is on screen.
     AnmId boss_marker_id;
-    // The boss's remaining spell card stars; the loop over them runs on into
-    // id_100 (10 stars).
+    // The boss's remaining spell card stars: ten, the loop over them running
+    // on into boss_star_id_9.
     AnmId boss_star_ids[9];
-    AnmId id_100;
+    AnmId boss_star_id_9;
     // A second difficulty display (front.anm 0x51 + difficulty), created
     // and then hidden in a full game.
     AnmId id_104;
