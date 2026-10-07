@@ -42,6 +42,8 @@ target_compile_options(th16 PRIVATE
     -fno-strict-aliasing
     -fwrapv
     -fno-delete-null-pointer-checks
+    # char is signed in MSVC; ARM Linux defaults to unsigned.
+    -fsigned-char
     # Float results must not depend on the compiler fusing operations.
     -ffp-contract=off
     -fno-fast-math
@@ -80,6 +82,10 @@ target_compile_options(th16 PRIVATE
 )
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(th16 PRIVATE
+        # The game indexes past the end of arrays in places (for example
+        # Scorefile::unlock_all writes clears[5] of an i32[5]), which GCC
+        # would otherwise use to cut loops short.
+        -fno-aggressive-loop-optimizations
         -Wno-class-memaccess
         -Wno-maybe-uninitialized
         -Wno-unused-local-typedefs

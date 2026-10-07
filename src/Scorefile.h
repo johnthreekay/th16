@@ -79,6 +79,11 @@ struct ScorefileCharacter
 #pragma pack(push, 4)
 struct Scorefile
 {
+#if defined(TH16_PORT) && TH16_PORT_64BIT
+    // ScorefileData's two buffer pointers take 16 bytes on 64-bit instead of
+    // 8; this keeps every field of this view where ScorefileData has it.
+    u8 port_64bit_padding[8];
+#endif
     ScorefileCharacter characters[5];
     u8 unk_19f78[0x19f8c - 0x19f78];
     // The name last entered for a replay.
@@ -221,6 +226,10 @@ struct ScorefileStatus
 static_assert(sizeof(ScorefileStatus) == 0x42c, "ScorefileStatus size");
 
 // Scorefile's real layout, as its own member functions see it.
+#ifdef TH16_PORT
+// 4-byte packed so that it ends where Scorefile does on 64-bit too.
+#pragma pack(push, 4)
+#endif
 struct ScorefileData
 {
     ScorefileHeader *file;
@@ -229,4 +238,7 @@ struct ScorefileData
     ScorefileChara charas[5];
     ScorefileStatus status;
 };
+#ifdef TH16_PORT
+#pragma pack(pop)
+#endif
 static_assert(sizeof(ScorefileData) == sizeof(Scorefile), "ScorefileData size");

@@ -58,6 +58,13 @@
 #define _alloca(size) __builtin_alloca(size)
 #endif
 
+// A compile-time check that stays on in the 64-bit build, for layout facts
+// that hold at every pointer size (port/src/layout_checks.cpp).
+#define TH16_PORT_CHECK_CAT2(a, b) a##b
+#define TH16_PORT_CHECK_CAT(a, b) TH16_PORT_CHECK_CAT2(a, b)
+#define TH16_PORT_CHECK(cond) \
+    typedef char TH16_PORT_CHECK_CAT(th16_port_check_, __LINE__)[(cond) ? 1 : -1] __attribute__((unused))
+
 // The game's static_assert checks describe the 32-bit MSVC layout (offsets
 // of fields next to pointers, sizes of structs holding pointers). They stay
 // in force for the -m32 build, which keeps that layout; the 64-bit build

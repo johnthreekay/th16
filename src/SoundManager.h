@@ -103,6 +103,11 @@ struct CWaveFile
 
 // The BGM stream (an adapted DirectSound sample CStreamingSound). Fields
 // from 0x14 on are ZUN's fade state.
+#ifdef TH16_PORT
+// Packed like CSound, so that with 8-byte pointers this view still lines up
+// with CStreamingSound (port/src/layout_checks.cpp checks it).
+#pragma pack(push, 4)
+#endif
 struct BgmStream
 {
     void *vtable;
@@ -116,7 +121,13 @@ struct BgmStream
     i32 fade_mode;
     u8 unk_20[0x50 - 0x20];
     i32 unk_50;
+#if defined(TH16_PORT) && TH16_PORT_64BIT
+    // CSound::m_desc, m_manager and CStreamingSound::m_hNotifyEvent (with its
+    // alignment) are 0x10 bytes longer.
+    u8 unk_54[0x9c - 0x54 + 0x10];
+#else
     u8 unk_54[0x9c - 0x54];
+#endif
     // Set while the streaming thread refills the buffer.
     i32 refilling;
 
@@ -130,6 +141,9 @@ struct BgmStream
     // Deletes the stream through its virtual destructor.
     void destroy();
 };
+#ifdef TH16_PORT
+#pragma pack(pop)
+#endif
 
 class CStreamingSound;
 
@@ -193,8 +207,9 @@ class CSound
     double unk_48;
     BOOL m_playing;
     BOOL m_paused;
-    // The DSBUFFERDESC the buffer was created with.
-    u8 m_desc[0x24];
+    // The DSBUFFERDESC the buffer was created with (0x24 bytes on x86, 0x28
+    // with 8-byte pointers).
+    u8 m_desc[0x20 + sizeof(void *)];
     CSoundManager *m_manager;
 
     // 0x4709b0. The buffer count is 1 at every call site; LTCG folded it.

@@ -347,10 +347,54 @@ void Player::start_respawn()
     inner.state = 1;
 }
 
+#ifdef TH16_PORT
+// A .sht file holds the shooter tables as 4-byte offsets and the callbacks
+// as 4-byte indices: 0x58-byte shooters after a 0x1b8-byte header. With
+// 8-byte pointers ShtFile and ShtShooter are larger, so the port rebuilds
+// the file in the in-memory layout, leaving the offsets (converted to the
+// new shooter size) and indices for read_sht_file to resolve as usual.
+static ShtFile *port_convert_sht_file(const u8 *raw, i32 size)
+{
+    const i32 header_size = offsetof(ShtFile, shooter_arrays);
+    const i32 raw_tables_size = 0xa * 4;
+    const i32 raw_shooter_size = 0x58;
+    const i32 raw_funcs_offset = offsetof(ShtShooter, func_on_init);
+    const i32 raw_tail_offset = raw_funcs_offset + 4 * 4;
+    i32 count = (size - header_size - raw_tables_size) / raw_shooter_size;
+    ShtFile *sht = (ShtFile *)malloc(offsetof(ShtFile, shooters) + count * sizeof(ShtShooter));
+    memcpy(sht, raw, header_size);
+    for (i32 i = 0; i < 0xa; i++)
+    {
+        u32 offset = ((const u32 *)(raw + header_size))[i];
+        sht->shooter_arrays[i] = (ShtShooter *)(uptr)(offset / raw_shooter_size * sizeof(ShtShooter));
+    }
+    const u8 *src = raw + header_size + raw_tables_size;
+    for (i32 k = 0; k < count; k++, src += raw_shooter_size)
+    {
+        ShtShooter *dst = &sht->shooters[k];
+        const u32 *indices = (const u32 *)(src + raw_funcs_offset);
+        memcpy(dst, src, raw_funcs_offset);
+        dst->func_on_init = (ShtBulletFunc)(uptr)indices[0];
+        dst->func_on_tick = (ShtBulletFunc)(uptr)indices[1];
+        dst->func_3 = (ShtBulletFunc)(uptr)indices[2];
+        dst->func_on_hit = (ShtHitFunc)(uptr)indices[3];
+        memcpy(dst->unk_38, src + raw_tail_offset, sizeof(dst->unk_38));
+    }
+    return sht;
+}
+#endif
+
 // FUNCTION: TH16 0x443790
 HARNESS_CALLED i32 Player::read_sht_file(ShtFile **out, const char *path)
 {
+#ifdef TH16_PORT
+    i32 size;
+    u8 *raw = file_read_all(path, &size, 0);
+    *out = raw != NULL ? port_convert_sht_file(raw, size) : NULL;
+    free(raw);
+#else
     *out = (ShtFile *)file_read_all(path, NULL, 0);
+#endif
     if (*out == NULL)
     {
         return -1;

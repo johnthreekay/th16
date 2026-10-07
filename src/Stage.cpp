@@ -163,6 +163,11 @@ Stage::~Stage()
         inner.anm_vms[i].~AnmVm();
         lolk_snapshot_inner.anm_vms[i].~AnmVm();
     }
+#ifdef TH16_PORT
+    // load_std's table of object pointers.
+    free(objects);
+    objects = NULL;
+#endif
     if (std != NULL)
     {
         free(std);
@@ -783,6 +788,20 @@ i32 Stage::load_std(const char *path)
                                "\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
+#ifdef TH16_PORT
+    // The file has a table of 4-byte offsets, which only fits pointers in
+    // place on 32-bit; the port builds a table of its own (freed with std).
+    {
+        u32 *offsets = (u32 *)std->objects;
+        objects = (StdObject **)malloc(std->num_objects * sizeof(StdObject *));
+        for (i32 i = 0; i < std->num_objects; i++)
+        {
+            objects[i] = (StdObject *)((u8 *)std + offsets[i]);
+        }
+    }
+    instances = (StdInstance *)((u8 *)std + std->instances_offset);
+    script = (StdInstr *)((u8 *)std + std->script_offset);
+#else
     objects = std->objects;
     instances = (StdInstance *)((u8 *)std + std->instances_offset);
     script = (StdInstr *)((u8 *)std + std->script_offset);
@@ -790,6 +809,7 @@ i32 Stage::load_std(const char *path)
     {
         objects[i] = (StdObject *)((u8 *)objects[i] + (uptr)std);
     }
+#endif
     vms = (AnmVm *)malloc(std->num_quads * sizeof(AnmVm));
     memset(vms, 0, std->num_quads * sizeof(AnmVm));
     snapshot_vms = (AnmVm *)malloc(std->num_quads * sizeof(AnmVm));

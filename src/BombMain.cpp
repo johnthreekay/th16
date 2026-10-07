@@ -18,6 +18,9 @@
 #include "Spellcard.h"
 #include "ZunMath.h"
 
+// Reimu's bomb allocates its orbs by size (0x6c0 bytes in the original).
+static_assert(sizeof(BombReimuAOrbs) == 0x6c0, "BombReimuAOrbs size");
+
 // The copy of ZunMath.h's sincosmul in Cirno's bomb's object file (TH16
 // keeps one per object file). A static of its own so that it can be
 // annotated.
@@ -315,8 +318,8 @@ i32 BombReimuAInf::begin()
         free(unk_70);
         unk_70 = NULL;
     }
-    unk_70 = malloc(0x6c0);
-    memset(unk_70, 0, 0x6c0);
+    unk_70 = malloc(sizeof(BombReimuAOrbs));
+    memset(unk_70, 0, sizeof(BombReimuAOrbs));
     AnmLoaded *anm = g_Player->anm_file;
     anm_id_64 = anm->create_vm(23, &pos, 0.0f, -1, 0);
     return 0;
