@@ -210,6 +210,20 @@ struct ArcfileHeader
     u32 entry_count;
 };
 
+// "THA1", read as a little-endian u32.
+const u32 ARCFILE_MAGIC = '1AHT';
+// What the header's fields have added to them.
+const u32 ARCFILE_UNPACKED_SIZE_BIAS = 123456789;
+const u32 ARCFILE_PACKED_SIZE_BIAS = 987654321;
+const u32 ARCFILE_ENTRY_COUNT_BIAS = 135792468;
+// zun_decrypt's key and step for the header, and key, step and block size
+// for the directory.
+const u8 ARCFILE_HEADER_KEY = 0x1b;
+const u8 ARCFILE_HEADER_STEP = 0x37;
+const u8 ARCFILE_DIRECTORY_KEY = 0x3e;
+const u8 ARCFILE_DIRECTORY_STEP = 0x9b;
+const i32 ARCFILE_DIRECTORY_BLOCK = 0x80;
+
 // Opens the archive at path and reads its directory into g_Arcfile: the
 // header at the start, then the directory at the end of the file
 // (encrypted and compressed).
@@ -228,12 +242,13 @@ HARNESS_CALLED bool Arcfile::read_directory(const char *path)
     {
         if (g_Arcfile.file->read(&header, sizeof(header)) != 0)
         {
-            zun_decrypt((u8 *)&header, sizeof(header), 0x1b, 0x37, sizeof(header), sizeof(header));
-            if (header.magic == '1AHT')
+            zun_decrypt((u8 *)&header, sizeof(header), ARCFILE_HEADER_KEY, ARCFILE_HEADER_STEP, sizeof(header),
+                        sizeof(header));
+            if (header.magic == ARCFILE_MAGIC)
             {
-                header.unpacked_size -= 123456789;
-                header.packed_size -= 987654321;
-                g_Arcfile.entry_count = header.entry_count - 135792468;
+                header.unpacked_size -= ARCFILE_UNPACKED_SIZE_BIAS;
+                header.packed_size -= ARCFILE_PACKED_SIZE_BIAS;
+                g_Arcfile.entry_count = header.entry_count - ARCFILE_ENTRY_COUNT_BIAS;
                 u32 dir_offset = g_Arcfile.file->get_size() - header.packed_size;
                 g_Arcfile.file->seek(dir_offset, FILE_BEGIN);
                 u32 packed_size = header.packed_size;
@@ -242,7 +257,8 @@ HARNESS_CALLED bool Arcfile::read_directory(const char *path)
                 {
                     if (g_Arcfile.file->read(packed, packed_size) != 0)
                     {
-                        zun_decrypt(packed, packed_size, 0x3e, 0x9b, 0x80, packed_size);
+                        zun_decrypt(packed, packed_size, ARCFILE_DIRECTORY_KEY, ARCFILE_DIRECTORY_STEP,
+                                    ARCFILE_DIRECTORY_BLOCK, packed_size);
                         unpacked = lzss_decompress(packed, packed_size, NULL, header.unpacked_size);
                         if (unpacked != NULL)
                         {

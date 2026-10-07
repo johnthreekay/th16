@@ -106,34 +106,30 @@ program is linked. That has consequences for how we work:
 
 ### Placeholders and stand-in callers
 
-Three directories hold code that is not ZUN's, to give partially
-decompiled code the surroundings it had in the original:
+While the decompilation was partial, three directories held code that is
+not ZUN's, to give decompiled functions the surroundings they had in the
+original: `src/stub/` (placeholder bodies compiled **without** `/GL`, so
+calls to them stayed opaque), `src/placeholder/` (`/GL` stand-ins for
+callees whose shape LTCG had to see) and `src/harness/` (stand-in callers).
+With every function decompiled, what is left is:
 
-- `src/stub/` is compiled **without** `/GL`. It holds placeholder bodies for
-  functions we call but have not decompiled (and the temporary `WinMain`).
-  Link-time code generation cannot see inside them, so calls to them stay
-  opaque the way calls to real, non-trivial code are: they may throw, they
-  keep the standard calling convention, and nothing gets inlined.
-- `src/placeholder/` is compiled **with** `/GL` and not forced alive. It holds
-  stand-ins for callees whose shape LTCG must see: a custom calling
-  convention, a constructor LTCG has to know cannot throw, a parameter it
-  should fold, overrides that stop speculative devirtualization. Their
-  bodies call an opaque stub so the calls survive, and they should clobber
-  registers roughly like the real code, because LTCG's register allocation
-  across calls looks inside them.
-- `src/harness/` is compiled **with** `/GL`. It recreates call sites from code
-  that is not decompiled yet, when a function's shape depends on how it is
-  called (for example `delete g_UpdateFuncRegistry`, which is what makes the
-  compiler generate and specialize the scalar deleting destructor).
+- `src/stub/Opaque.cpp`, compiled **without** `/GL`: one global LTCG must
+  not see (`g_zero_vec2`, which it would fold into constant zeros) and two
+  sinks the harness uses to make an address escape or a frame 8-byte
+  aligned.
+- `src/harness/`, compiled **with** `/GL`: stand-in callers for functions
+  whose shape still depends on calls our build does not reproduce (constant
+  arguments LTCG must not fold, globals whose address the original takes
+  elsewhere, frames the original keeps aligned). Each one says which
+  original call site it stands for.
 - `DECOMP_NOINLINE` (`src/decomp.h`) marks functions the original keeps out of
-  line but our smaller program would inline. Remove it once enough callers
-  exist.
-- `HARNESS_CALLED` marks functions kept alive by harness callers instead of
-  `/INCLUDE`. That lets LTCG see every caller and pick the same custom
-  calling convention it did in the original, including conventions no
-  keyword can request (`this` in `ecx` with a float in `xmm1`). Prefer it
-  over spelling out `LTCG_FASTCALL`/`LTCG_VECTORCALL`, which only cover the
-  simpler cases.
+  line where ours would inline them.
+- `HARNESS_CALLED` marks functions kept alive by their callers (real or
+  harness) instead of `/INCLUDE`. That lets LTCG see every caller and pick
+  the same custom calling convention it did in the original, including
+  conventions no keyword can request (`this` in `ecx` with a float in
+  `xmm1`). Prefer it over spelling out `LTCG_FASTCALL`/`LTCG_VECTORCALL`,
+  which only cover the simpler cases.
 
 ### Things learned so far
 
@@ -181,8 +177,8 @@ decompiled code the surroundings it had in the original:
   vectorize where ours would.
 - Constructors and `new` expressions in the original sometimes keep a dead
   `push ecx; mov [ebp-4], this`: leftover EH cleanup state. It appears when
-  the callee is visible to LTCG and not known nothrow; `LTCG_NOTHROW`
-  (decomp.h) declares a stubbed constructor nothrow when it must not appear.
+  the callee is visible to LTCG and not known nothrow (while callees were
+  still stubs, an `LTCG_NOTHROW` macro declared them nothrow).
 - ExpHP's Supervisor layout is 4 bytes off at the start: `d3d` is at +4,
   `d3d_device` at +8 (0x4c10d8, hundreds of uses), `dinput` at +0xc.
 - Whether a function realigns its frame (`and esp, -8`) for a spilled

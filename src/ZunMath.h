@@ -5,12 +5,16 @@
 #include "decomp.h"
 #include "types.h"
 
+// Small math helpers shared by the whole game: angles, ZUN's vector types
+// and wrappers around the CRT's float functions.
+
 #define ZUN_PI ((f32)(3.14159265358979323846))
 #define ZUN_2PI ((f32)(ZUN_PI * 2.0f))
 
-// Wrap an angle into [-pi, pi], giving up after 32 turns either way.
+// a + b wrapped into [-pi, pi], giving up after 32 turns either way.
 // TH06 equivalent: utils::AddNormalizeAngle
 f32 LTCG_VECTORCALL add_normalize_angle(f32 a, f32 b);
+// a wrapped into [-pi, pi] the same way.
 f32 LTCG_VECTORCALL normalize_angle(f32 a);
 
 // ZUN's vectors are D3DX's: get_point's adds only match with D3DXVECTOR3's
@@ -85,15 +89,16 @@ inline f32 zun_floorf(f32 x)
 {
     return floorf(x);
 }
-// atan2f (0x4052a0) is still an out-of-line wrapper.
-// And fabsf (0x405240), which ECL and the HUD call.
+// fabsf (0x405240), atan2f (0x4052a0) and tanf (0x43dc90) stay out-of-line
+// wrappers of their own, called from all over the game (ECL, the HUD, the
+// camera setup).
 HARNESS_CALLED f32 zun_fabsf(f32 x);
 HARNESS_CALLED f32 zun_atan2f(f32 y, f32 x);
-// The same for tanf (0x43dc90), which the camera setup (0x43c858) calls.
 HARNESS_CALLED f32 zun_tanf(f32 x);
 
-// The loop of normalize_angle, for the many places that inline it. The
-// original inlines it everywhere; ours would call it from PosVel::step.
+// normalize_angle's loop, for the many places that inline it (ZunAngle,
+// PosVel, the collision code). The original inlines it everywhere; ours
+// would call normalize_angle from PosVel::step.
 __forceinline f32 wrap_angle(f32 a)
 {
     i32 i = 0;
