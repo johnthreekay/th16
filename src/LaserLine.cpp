@@ -73,11 +73,25 @@ i32 LaserLineInf::cancel(i32 mode, i32 b)
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x434f70
-i32 LaserLineInf::method_30(i32 a, i32 b)
+// 2 if a circle at pos touches the laser's rectangle, else 0.
+// TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
+// FUNCTION: TH16 0x434f70
+i32 LaserLineInf::method_30(Float3 *pos, f32 radius)
 {
-    return unit5_placeholder(this);
+    f32 dx = pos->x - position.x;
+    f32 dy = pos->y - position.y;
+    f32 a = -angle;
+    f32 s = zun_sinf(a);
+    f32 c = zun_cosf(a);
+    f32 x = dx * c - dy * s;
+    f32 y = dx * s + dy * c;
+    D3DXVECTOR2 lo(x - radius, y - radius);
+    D3DXVECTOR2 hi(x + radius, y + radius);
+    if (lo.x > unk_70 || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
+    {
+        return 0;
+    }
+    return 2;
 }
 
 // Placeholder (not decompiled yet).

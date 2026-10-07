@@ -72,7 +72,7 @@ class LaserDataInf
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
     virtual i32 method_2c(i32 a, i32 b, i32 c, i32 d);
-    virtual i32 method_30(i32 a, i32 b);
+    virtual i32 method_30(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
     virtual i32 method_38();
     virtual i32 method_3c();
@@ -129,7 +129,7 @@ class LaserLineInf : public LaserDataInf
     virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(i32 a, i32 b);
+    virtual i32 method_30(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
     virtual i32 method_3c();
     virtual i32 method_44();
@@ -195,7 +195,7 @@ class LaserInfiniteInf : public LaserDataInf
     virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(i32 a, i32 b);
+    virtual i32 method_30(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
 };
 
@@ -246,7 +246,7 @@ class LaserCurveInf : public LaserDataInf
     virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(i32 a, i32 b);
+    virtual i32 method_30(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
     virtual i32 method_3c();
     virtual i32 method_40();
@@ -292,7 +292,7 @@ class LaserBeamInf : public LaserDataInf
     virtual i32 on_destroy();
     virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(i32 a, i32 b);
+    virtual i32 method_30(Float3 *pos, f32 radius);
 };
 
 // Placeholder virtual methods (not decompiled yet) live in the laser .cpp

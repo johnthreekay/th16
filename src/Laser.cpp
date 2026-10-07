@@ -116,7 +116,7 @@ i32 LaserDataInf::method_2c(i32 a, i32 b, i32 c, i32 d)
 }
 
 // FUNCTION: TH16 0x430ee0
-i32 LaserDataInf::method_30(i32 a, i32 b)
+i32 LaserDataInf::method_30(Float3 *pos, f32 radius)
 {
     return 0;
 }

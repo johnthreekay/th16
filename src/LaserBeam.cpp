@@ -35,7 +35,7 @@ i32 LaserBeamInf::cancel(i32 mode, i32 b)
 }
 
 // FUNCTION: TH16 0x43ac60
-i32 LaserBeamInf::method_30(i32 a, i32 b)
+i32 LaserBeamInf::method_30(Float3 *pos, f32 radius)
 {
     return 0;
 }
