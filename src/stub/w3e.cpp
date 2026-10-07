@@ -24,11 +24,6 @@ void Supervisor::release_dinput()
 {
 }
 
-// STUB: TH16 0x45ba80
-void Supervisor::reset_render_state()
-{
-}
-
 void w3e_opaque_double(double *value)
 {
 }

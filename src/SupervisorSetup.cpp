@@ -333,3 +333,55 @@ void Supervisor::init_input()
     g_Supervisor.flags =
         (g_Supervisor.flags & ~SUPERVISOR_USE_DIRECTINPUT_PAD) | ((g_Supervisor.joystick != NULL) << 11);
 }
+
+// FUNCTION: TH16 0x45ba80
+void Supervisor::reset_render_state()
+{
+    f32 f;
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_ZENABLE, TRUE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_LIGHTING, FALSE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, FALSE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_GOURAUD);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_ZFUNC, D3DCMP_ALWAYS);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHAREF, 1);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATEREQUAL);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_FOGENABLE, TRUE);
+    f = 1.0f;
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_FOGDENSITY, *(DWORD *)&f);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_FOGTABLEMODE, D3DFOG_NONE);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_FOGVERTEXMODE, D3DFOG_LINEAR);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_FOGCOLOR, 0xffa0a0a0);
+    f = 1000.0f;
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_FOGSTART, *(DWORD *)&f);
+    f = 5000.0f;
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_FOGEND, *(DWORD *)&f);
+    g_Supervisor.d3d_device->SetRenderState(D3DRS_MULTISAMPLEANTIALIAS, FALSE);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
+    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
+    g_Supervisor.d3d_device->SetSamplerState(0, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+    g_Supervisor.d3d_device->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+    g_Supervisor.d3d_device->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+    g_Supervisor.d3d_device->SetSamplerState(0, D3DSAMP_ADDRESSW, D3DTADDRESS_CLAMP);
+    g_Supervisor.d3d_device->SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_WRAP);
+    g_Supervisor.d3d_device->SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_WRAP);
+    if (g_AnmManager != NULL)
+    {
+        g_AnmManager->last_blend_mode = 10;
+        g_AnmManager->render_cache_184fbb5 = 0xff;
+        g_AnmManager->render_cache_184fbb6 = 0xff;
+        g_AnmManager->render_cache_184fbb0 = -1;
+        g_AnmManager->render_cache_184fbb8 = 0xff;
+    }
+}
