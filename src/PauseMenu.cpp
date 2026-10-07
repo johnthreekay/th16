@@ -24,6 +24,7 @@ PauseMenu *g_PauseMenu;
 // The characters of the name entry grid (MainMenuStates.cpp).
 extern const char g_name_entry_chars[];
 
+// Switches to another PauseState, back to its first substate.
 // FUNCTION: TH16 0x43e150
 HARNESS_CALLED void PauseMenu::set_state(i32 state)
 {
@@ -35,6 +36,7 @@ HARNESS_CALLED void PauseMenu::set_state(i32 state)
     item_menu.num_disabled = 0;
 }
 
+// Moves to another PauseSubstate, restarting its timer.
 // FUNCTION: TH16 0x43e200
 void PauseMenu::set_substate(i32 value)
 {
@@ -42,6 +44,8 @@ void PauseMenu::set_substate(i32 value)
     time_in_current_menu.reset();
 }
 
+// Puts the game's score into this character's top ten for the difficulty
+// played, with a blank name. Returns the rank, or -1 if it did not make it.
 // FUNCTION: TH16 0x43e250
 i32 ScorefileChara::insert_score()
 {
@@ -81,6 +85,8 @@ PauseMenu::PauseMenu()
     g_PauseMenu = this;
 }
 
+// Registers the tick (priority 10) and draw (0x4a) callbacks, inactive for
+// now.
 // FUNCTION: TH16 0x43e3f0
 int PauseMenu::initialize()
 {
@@ -129,13 +135,15 @@ PauseMenu *PauseMenu::create()
 
 #include "Input.h"
 
+// Opens the pause menu on Esc (or after a device reset) once the stage has
+// run for 30 frames, unless a demo plays; runs the open menu.
 // TODO: the inlined timer ticks use other xmm registers for 1.0, 1.01 and the speed.
 // FUNCTION: TH16 0x43e5f0
 int PauseMenu::on_tick()
 {
     switch (state)
     {
-    case 0:
+    case PAUSE_CLOSED:
         if (!(g_Globals.flags_hi_45c & 1) && !g_GameThread->flags.flag_16 &&
             ((g_hardware_input_pressed & INPUT_MENU) || (g_Supervisor.flags & SUPERVISOR_DEVICE_WAS_RESET)) && g_GameThread->on_tick != NULL &&
             (g_GameThread->on_tick->flags & UPDATE_FUNC_ACTIVE) && g_GameThread->time_in_stage.current >= 30)
@@ -143,9 +151,9 @@ int PauseMenu::on_tick()
             open();
         }
         break;
-    case 1:
-    case 2:
-    case 3:
+    case PAUSE_PAUSED:
+    case PAUSE_GAME_OVER:
+    case PAUSE_STAGE_END:
         tick_open();
         break;
     }
@@ -335,6 +343,8 @@ void PauseMenu::draw_high_scores()
 // GLOBAL: TH16 0x4a5bfc
 i32 g_continues_remaining;
 
+// Draws the text parts over the menu: the replay slots, the name entry, the
+// high scores and the remaining credits.
 // FUNCTION: TH16 0x43edc0
 int PauseMenu::on_draw()
 {
@@ -349,31 +359,31 @@ int PauseMenu::on_draw()
     }
     switch (state)
     {
-    case 1:
-    case 3:
-        if ((menu_flags & 3) == 1)
+    case PAUSE_PAUSED:
+    case PAUSE_STAGE_END:
+        if ((menu_flags & (PAUSE_SHOW_REPLAY_SLOTS | PAUSE_SHOW_REPLAY_NAME)) == PAUSE_SHOW_REPLAY_SLOTS)
         {
             draw_replay_list();
         }
-        else if ((menu_flags & 3) == 2)
+        else if ((menu_flags & (PAUSE_SHOW_REPLAY_SLOTS | PAUSE_SHOW_REPLAY_NAME)) == PAUSE_SHOW_REPLAY_NAME)
         {
             draw_replay_name_entry();
         }
         break;
-    case 2:
-        if (substate == 15)
+    case PAUSE_GAME_OVER:
+        if (substate == PAUSE_SUB_SCORE_NAME_ENTRY)
         {
             draw_high_scores();
         }
-        if ((menu_flags & 3) == 1)
+        if ((menu_flags & (PAUSE_SHOW_REPLAY_SLOTS | PAUSE_SHOW_REPLAY_NAME)) == PAUSE_SHOW_REPLAY_SLOTS)
         {
             draw_replay_list();
         }
-        else if ((menu_flags & 3) == 2)
+        else if ((menu_flags & (PAUSE_SHOW_REPLAY_SLOTS | PAUSE_SHOW_REPLAY_NAME)) == PAUSE_SHOW_REPLAY_NAME)
         {
             draw_replay_name_entry();
         }
-        else if (substate != 14)
+        else if (substate != PAUSE_SUB_MANUAL)
         {
             g_AsciiManager->create_stringf(&Float3(184.0f, 448.0f, 0.0f), "Credit %d", g_continues_remaining);
         }
@@ -430,7 +440,7 @@ void PauseMenu::take_snapshot()
 void PauseMenu::open()
 {
     GameThread::update_play_time();
-    set_state(1);
+    set_state(PAUSE_PAUSED);
     GameThread *thread = g_GameThread;
     thread->flags.flag_4 = 1;
     front_anm = g_Gui->front_anm;
@@ -468,7 +478,7 @@ void PauseMenu::open()
     {
         vm->clear_flag_lo_2_tree_inline();
     }
-    menu_flags &= ~4;
+    menu_flags &= ~PAUSE_FROM_STAGE_END;
 }
 
 // FUNCTION: TH16 0x43f500
@@ -482,11 +492,11 @@ void open_stage_end_menu()
         return;
     }
     g_GameThread->flags.flag_4 = 1;
-    menu->set_state(3);
-    menu->set_substate_inline(3);
+    menu->set_state(PAUSE_STAGE_END);
+    menu->set_substate_inline(PAUSE_SUB_OPEN_STAGE_END);
     if (g_Globals.game_mode == 2)
     {
-        menu->set_substate(5);
+        menu->set_substate(PAUSE_SUB_OPEN_SPELL_PRACTICE_END);
     }
     if (g_Globals.game_mode == 0)
     {
@@ -507,7 +517,7 @@ void open_stage_end_menu()
         gui->msg->hide();
     }
     Gui::sub_42c580();
-    menu->menu_flags |= 4;
+    menu->menu_flags |= PAUSE_FROM_STAGE_END;
 }
 
 // TODO: ours folds the character offset into the practice index (one imul by 0xa63, scaled by 8); the original adds it to the pointer.
@@ -571,8 +581,8 @@ void PauseMenu::begin_score_entry()
 void open_replay_end_menu()
 {
     PauseMenu *menu = g_PauseMenu;
-    menu->set_state(1);
-    menu->set_substate_inline(1);
+    menu->set_state(PAUSE_PAUSED);
+    menu->set_substate_inline(PAUSE_SUB_OPEN_REPLAY_END);
     g_GameThread->flags.flag_4 = 1;
     menu->take_snapshot();
     menu->front_anm = g_Gui->front_anm;
@@ -585,7 +595,7 @@ void open_replay_end_menu()
     g_game_speed = 1.0f;
     menu->saved_pacing_mode = g_frame_pacing.mode;
     g_frame_pacing.mode = 0;
-    menu->menu_flags &= ~4;
+    menu->menu_flags &= ~PAUSE_FROM_STAGE_END;
 }
 
 // TODO: the original keeps an ebp frame with a 4-byte pad (push ebp; push ecx), most likely known entry alignment through its callers (Player::on_tick_body, Gui::start_dialogue); ours has no frame (HARNESS_CALLED does not change it).
@@ -599,8 +609,8 @@ void open_game_over_menu()
         g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         return;
     }
-    menu->set_state(2);
-    menu->set_substate_inline(2);
+    menu->set_state(PAUSE_GAME_OVER);
+    menu->set_substate_inline(PAUSE_SUB_OPEN_GAME_OVER);
     g_GameThread->flags.flag_4 = 1;
     SoundManager::pause_sounds();
     g_SoundManager.play_sound_centered(SE_PAUSE, 0);
@@ -630,7 +640,7 @@ void open_game_over_menu()
     g_game_speed = 1.0f;
     menu->saved_pacing_mode = g_frame_pacing.mode;
     g_frame_pacing.mode = 1;
-    menu->menu_flags &= ~4;
+    menu->menu_flags &= ~PAUSE_FROM_STAGE_END;
 }
 
 // The original's callback is a jmp to the member function, most likely the
@@ -725,52 +735,52 @@ void PauseMenu::tick_open()
 
     switch (substate)
     {
-    case 0:
+    case PAUSE_SUB_OPEN_PAUSE:
         // The pause menu opens.
         if (time_in_current_menu.current < 10)
         {
             break;
         }
-        set_substate(6);
-        item_menu.num_choices = 5;
+        set_substate(PAUSE_SUB_CHOOSE);
+        item_menu.num_choices = PAUSE_ITEM_COUNT;
         if (g_GameThread->replay_mode != 0)
         {
-            item_menu.disable(2);
-            item_menu.disable(3);
+            item_menu.disable(PAUSE_ITEM_SAVE_REPLAY);
+            item_menu.disable(PAUSE_ITEM_MANUAL);
         }
         if (g_Globals.continues_used > 0)
         {
-            item_menu.disable(2);
+            item_menu.disable(PAUSE_ITEM_SAVE_REPLAY);
             AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
             AnmManager::interrupt_tree(menu_anm_id.search_children(0x82, 0), 5);
             AnmManager::interrupt_tree(menu_anm_id.search_children(0x8b, 0), 5);
             AnmManager::interrupt_tree(menu_anm_id.search_children(0x97, 0), 5);
         }
         item_menu.wraps = 1;
-        item_menu.set_cursor(0);
+        item_menu.set_cursor(PAUSE_ITEM_RESUME);
         AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
         replay_ended = 0;
         return;
-    case 1:
+    case PAUSE_SUB_OPEN_REPLAY_END:
         // The menu shown when a replay ends opens.
         if (time_in_current_menu.current < 10)
         {
             break;
         }
-        set_substate(6);
-        item_menu.num_choices = 5;
-        item_menu.disable(3);
-        item_menu.disable(2);
-        item_menu.disable(0);
+        set_substate(PAUSE_SUB_CHOOSE);
+        item_menu.num_choices = PAUSE_ITEM_COUNT;
+        item_menu.disable(PAUSE_ITEM_MANUAL);
+        item_menu.disable(PAUSE_ITEM_SAVE_REPLAY);
+        item_menu.disable(PAUSE_ITEM_RESUME);
         item_menu.wraps = 1;
-        item_menu.set_cursor(1);
+        item_menu.set_cursor(PAUSE_ITEM_QUIT);
         AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
         replay_ended = 1;
         return;
-    case 2:
-    case 3:
-    case 4:
-    case 5:
+    case PAUSE_SUB_OPEN_GAME_OVER:
+    case PAUSE_SUB_OPEN_STAGE_END:
+    case PAUSE_SUB_OPEN_4:
+    case PAUSE_SUB_OPEN_SPELL_PRACTICE_END:
         // The game ended: the score goes into the table first.
         if (time_in_current_menu.current < 10)
         {
@@ -790,10 +800,10 @@ void PauseMenu::tick_open()
             // No name to enter.
             goto score_entered;
         }
-        set_substate(15);
+        set_substate(PAUSE_SUB_SCORE_NAME_ENTRY);
         menu_anm_id.clear_flag_lo_2_tree();
         return;
-    case 6:
+    case PAUSE_SUB_CHOOSE:
         // The menu itself.
         menu_save_selection(&item_menu);
         if (input_pressed_or_repeating(INPUT_UP))
@@ -814,57 +824,57 @@ void PauseMenu::tick_open()
             g_SoundManager.play_sound_centered(SE_OK00, 0);
             switch (item_menu.next_selection)
             {
-            case 0:
+            case PAUSE_ITEM_RESUME:
                 AnmManager::interrupt_tree(snapshot_id, 1);
                 AnmManager::interrupt_tree(menu_anm_id, 1);
-                set_substate(16);
+                set_substate(PAUSE_SUB_CLOSE);
                 break;
-            case 1:
+            case PAUSE_ITEM_QUIT:
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x81, 0), 6);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x8a, 0), 6);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x92, 0), 6);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x94, 0), 6);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x96, 0), 6);
-                if (g_GameThread->replay_mode == 0 && state == 1)
+                if (g_GameThread->replay_mode == 0 && state == PAUSE_PAUSED)
                 {
-                    set_substate(7);
+                    set_substate(PAUSE_SUB_CONFIRM);
                 }
                 else
                 {
-                    set_substate(16);
+                    set_substate(PAUSE_SUB_CLOSE);
                 }
                 break;
-            case 2:
+            case PAUSE_ITEM_SAVE_REPLAY:
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x82, 0), 6);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x8b, 0), 6);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x97, 0), 6);
-                if (state == 1)
+                if (state == PAUSE_PAUSED)
                 {
-                    set_substate(9);
+                    set_substate(PAUSE_SUB_CONFIRM_SAVE);
                 }
                 else
                 {
-                    set_substate(10);
+                    set_substate(PAUSE_SUB_OPEN_REPLAY_SLOTS);
                 }
                 break;
-            case 3:
+            case PAUSE_ITEM_MANUAL:
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x83, 0), 6);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x8c, 0), 6);
-                set_substate(14);
+                set_substate(PAUSE_SUB_MANUAL);
                 break;
-            case 4:
+            case PAUSE_ITEM_RESTART:
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x84, 0), 6);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x8d, 0), 6);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x93, 0), 6);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x95, 0), 6);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x98, 0), 6);
-                if (g_GameThread->replay_mode == 0 && state == 1)
+                if (g_GameThread->replay_mode == 0 && state == PAUSE_PAUSED)
                 {
-                    set_substate(7);
+                    set_substate(PAUSE_SUB_CONFIRM);
                 }
                 else
                 {
-                    set_substate(16);
+                    set_substate(PAUSE_SUB_CLOSE);
                 }
                 break;
             }
@@ -877,8 +887,8 @@ void PauseMenu::tick_open()
                 g_SoundManager.play_sound_centered(SE_OK00, 0);
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x84, 0), 6);
                 AnmManager::interrupt_tree(snapshot_id, 1);
-                item_menu.set_cursor(4);
-                set_substate(16);
+                item_menu.set_cursor(PAUSE_ITEM_RESTART);
+                set_substate(PAUSE_SUB_CLOSE);
             }
             if (g_hardware_input_pressed & INPUT_MENU)
             {
@@ -889,13 +899,14 @@ void PauseMenu::tick_open()
         {
             g_SoundManager.play_sound_centered(SE_OK00, 0);
             AnmManager::interrupt_tree(menu_anm_id.search_children(0x81, 0), 6);
-            item_menu.set_cursor(1);
-            set_substate(16);
+            item_menu.set_cursor(PAUSE_ITEM_QUIT);
+            set_substate(PAUSE_SUB_CLOSE);
         }
         break;
-    case 7:
-    case 9:
-        // "Really?" for quitting (7) or retrying (9).
+    case PAUSE_SUB_CONFIRM:
+    case PAUSE_SUB_CONFIRM_SAVE:
+        // "Really?" before quitting or restarting, or before saving the
+        // replay (which ends the game). The cursor starts on "no" (1).
         if (time_in_current_menu.current < 20)
         {
             break;
@@ -936,19 +947,19 @@ void PauseMenu::tick_open()
             {
             case 0:
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x9a, 0), 6);
-                if (substate == 9)
+                if (substate == PAUSE_SUB_CONFIRM_SAVE)
                 {
-                    set_substate(10);
+                    set_substate(PAUSE_SUB_OPEN_REPLAY_SLOTS);
                 }
                 else
                 {
-                    set_substate(8);
+                    set_substate(PAUSE_SUB_CONFIRM_CLOSE);
                 }
                 g_SoundManager.play_sound_centered(SE_OK00, 0);
                 break;
             case 1:
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x9b, 0), 6);
-                set_substate(8);
+                set_substate(PAUSE_SUB_CONFIRM_CLOSE);
                 g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 break;
             }
@@ -964,7 +975,7 @@ void PauseMenu::tick_open()
                 break;
             case 1:
                 AnmManager::interrupt_tree(menu_anm_id.search_children(0x9b, 0), 6);
-                set_substate(8);
+                set_substate(PAUSE_SUB_CONFIRM_CLOSE);
                 break;
             }
         }
@@ -973,12 +984,12 @@ void PauseMenu::tick_open()
         resume:
             AnmManager::interrupt_tree(snapshot_id, 1);
             AnmManager::interrupt_tree(menu_anm_id, 1);
-            item_menu.set_cursor(0);
-            set_substate(16);
+            item_menu.set_cursor(PAUSE_ITEM_RESUME);
+            set_substate(PAUSE_SUB_CLOSE);
             return;
         }
         break;
-    case 8:
+    case PAUSE_SUB_CONFIRM_CLOSE:
         // Leaving the "Really?" question.
         if (time_in_current_menu.current < 20)
         {
@@ -989,28 +1000,28 @@ void PauseMenu::tick_open()
         case 0:
             AnmManager::interrupt_tree(menu_anm_id, 1);
             item_menu.pop();
-            set_substate(16);
+            set_substate(PAUSE_SUB_CLOSE);
             return;
         case 1:
             item_menu.pop();
             if (g_Globals.continues_used > 0)
             {
-                item_menu.disable(2);
+                item_menu.disable(PAUSE_ITEM_SAVE_REPLAY);
             }
             AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
-            set_substate(6);
+            set_substate(PAUSE_SUB_CHOOSE);
             return;
         }
         break;
-    case 10:
+    case PAUSE_SUB_OPEN_REPLAY_SLOTS:
         // Opening the replay slots.
         if (time_in_current_menu.current < 20)
         {
             break;
         }
-        menu_flags &= ~2;
-        menu_flags |= 1;
-        set_substate(11);
+        menu_flags &= ~PAUSE_SHOW_REPLAY_NAME;
+        menu_flags |= PAUSE_SHOW_REPLAY_SLOTS;
+        set_substate(PAUSE_SUB_REPLAY_SLOT_SELECT);
         menu_anm_id.clear_flag_lo_2_tree();
         item_menu.push();
         item_menu.num_choices = 25;
@@ -1022,8 +1033,8 @@ void PauseMenu::tick_open()
             replays[i - 1] = ReplayManager::create_from_file(path);
         }
         return;
-    case 12:
-    case 15:
+    case PAUSE_SUB_REPLAY_NAME_ENTRY:
+    case PAUSE_SUB_SCORE_NAME_ENTRY:
         // Entering the replay name (12) or the score name (15).
         if (time_in_current_menu.current < 10)
         {
@@ -1114,16 +1125,16 @@ void PauseMenu::tick_open()
             }
             else if (choice == 0x5a)
             {
-                if (substate == 12)
+                if (substate == PAUSE_SUB_REPLAY_NAME_ENTRY)
                 {
-                    menu_flags &= ~2;
-                    menu_flags |= 1;
+                    menu_flags &= ~PAUSE_SHOW_REPLAY_NAME;
+                    menu_flags |= PAUSE_SHOW_REPLAY_SLOTS;
                     g_SoundManager.play_sound_centered(SE_EXTEND, 0);
                     sprintf(path, "th16_%.2d.rpy", item_menu.next_selection + 1);
                     ReplayManager::destroy(replays[item_menu.next_selection]);
                     g_ReplayManager->save(path, name, 0, 1);
                     replays[item_menu.next_selection] = ReplayManager::create_from_file(path);
-                    set_substate(11);
+                    set_substate(PAUSE_SUB_REPLAY_SLOT_SELECT);
                     strcpy(g_Scorefile->last_replay_name, name);
                     g_SoundManager.play_sound_centered(SE_OK00, 0);
                     return;
@@ -1136,35 +1147,35 @@ void PauseMenu::tick_open()
                        name);
                 strcpy(g_Scorefile->last_replay_name, name);
             score_entered:
-                set_substate(6);
-                item_menu.num_choices = 5;
+                set_substate(PAUSE_SUB_CHOOSE);
+                item_menu.num_choices = PAUSE_ITEM_COUNT;
                 item_menu.wraps = 1;
-                if (!(menu_flags & 4) && g_Globals.game_mode == 0)
+                if (!(menu_flags & PAUSE_FROM_STAGE_END) && g_Globals.game_mode == 0)
                 {
                     menu_anm_id = front_anm->create_ui_vm_at_origin(0xa0, 0);
                     if (g_Globals.continues_used > 0)
                     {
-                        item_menu.disable(2);
+                        item_menu.disable(PAUSE_ITEM_SAVE_REPLAY);
                     }
                     if (g_continues_remaining <= 0)
                     {
-                        item_menu.disable(0);
-                        item_menu.set_cursor(1);
+                        item_menu.disable(PAUSE_ITEM_RESUME);
+                        item_menu.set_cursor(PAUSE_ITEM_QUIT);
                     }
                     else
                     {
-                        item_menu.set_cursor(0);
+                        item_menu.set_cursor(PAUSE_ITEM_RESUME);
                     }
                 }
                 else
                 {
                     menu_anm_id = front_anm->create_ui_vm_at_origin(0xa1, 0);
-                    item_menu.disable(0);
-                    item_menu.disable(3);
-                    item_menu.set_cursor(0);
-                    if (!(menu_flags & 4))
+                    item_menu.disable(PAUSE_ITEM_RESUME);
+                    item_menu.disable(PAUSE_ITEM_MANUAL);
+                    item_menu.set_cursor(PAUSE_ITEM_RESUME);
+                    if (!(menu_flags & PAUSE_FROM_STAGE_END))
                     {
-                        item_menu.set_cursor(4);
+                        item_menu.set_cursor(PAUSE_ITEM_RESTART);
                     }
                 }
                 AnmManager::interrupt_tree_and_run(menu_anm_id, 3);
@@ -1179,11 +1190,11 @@ void PauseMenu::tick_open()
             g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             if (name_cursor == 0)
             {
-                if (substate == 12)
+                if (substate == PAUSE_SUB_REPLAY_NAME_ENTRY)
                 {
-                    menu_flags &= ~2;
-                    menu_flags |= 1;
-                    set_substate(11);
+                    menu_flags &= ~PAUSE_SHOW_REPLAY_NAME;
+                    menu_flags |= PAUSE_SHOW_REPLAY_SLOTS;
+                    set_substate(PAUSE_SUB_REPLAY_SLOT_SELECT);
                     return;
                 }
                 break;
@@ -1193,7 +1204,7 @@ void PauseMenu::tick_open()
             return;
         }
         break;
-    case 11:
+    case PAUSE_SUB_REPLAY_SLOT_SELECT:
         // Choosing the replay slot.
         if (time_in_current_menu.current < 10)
         {
@@ -1214,9 +1225,9 @@ void PauseMenu::tick_open()
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
         {
-            menu_flags &= ~1;
-            menu_flags |= 2;
-            set_substate(12);
+            menu_flags &= ~PAUSE_SHOW_REPLAY_SLOTS;
+            menu_flags |= PAUSE_SHOW_REPLAY_NAME;
+            set_substate(PAUSE_SUB_REPLAY_NAME_ENTRY);
             name_entry_menu.set_cursor(0);
             name_entry_menu.num_choices = 0x5b;
             name_entry_menu.wraps = 1;
@@ -1248,9 +1259,9 @@ void PauseMenu::tick_open()
         }
         if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
         {
-            menu_flags &= ~3;
+            menu_flags &= ~(PAUSE_SHOW_REPLAY_SLOTS | PAUSE_SHOW_REPLAY_NAME);
             item_menu.pop();
-            item_menu.num_choices = 5;
+            item_menu.num_choices = PAUSE_ITEM_COUNT;
             item_menu.wraps = 1;
             AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
             for (i32 i = 0; i < 25; i++)
@@ -1258,25 +1269,25 @@ void PauseMenu::tick_open()
                 ReplayManager::destroy(replays[i]);
                 replays[i] = NULL;
             }
-            if (state == 1)
+            if (state == PAUSE_PAUSED)
             {
-                set_substate(16);
-                item_menu.set_cursor(1);
+                set_substate(PAUSE_SUB_CLOSE);
+                item_menu.set_cursor(PAUSE_ITEM_QUIT);
                 g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 return;
             }
-            set_substate(6);
+            set_substate(PAUSE_SUB_CHOOSE);
             menu_anm_id.set_flag_lo_2_tree();
             if (g_Globals.game_mode != 0)
             {
-                item_menu.disable(0);
-                item_menu.disable(3);
+                item_menu.disable(PAUSE_ITEM_RESUME);
+                item_menu.disable(PAUSE_ITEM_MANUAL);
             }
             g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             return;
         }
         break;
-    case 14:
+    case PAUSE_SUB_MANUAL:
         // The manual.
         if (time_in_current_menu.current == 20)
         {
@@ -1287,38 +1298,38 @@ void PauseMenu::tick_open()
         if (g_HelpManual != NULL && g_HelpManual->unk_124 != 0)
         {
             HelpManual::destroy();
-            set_substate(6);
+            set_substate(PAUSE_SUB_CHOOSE);
             menu_anm_id.set_flag_lo_2_tree();
             return;
         }
         break;
-    case 16:
+    case PAUSE_SUB_CLOSE:
         // Leaving the menu: resume, retry, quit or continue.
         if (time_in_current_menu.current < 12)
         {
             break;
         }
-        if (state == 1)
+        if (state == PAUSE_PAUSED)
         {
             leave_paused();
         }
-        else if (state == 2)
+        else if (state == PAUSE_GAME_OVER)
         {
             leave_game_over();
         }
-        else if (state == 3)
+        else if (state == PAUSE_STAGE_END)
         {
             leave_stage_end();
         }
         switch (item_menu.next_selection)
         {
-        case 0:
-            if (state == 1)
+        case PAUSE_ITEM_RESUME:
+            if (state == PAUSE_PAUSED)
             {
                 SoundManager::resume_sounds();
                 g_SoundManager.modify_bgm(BGM_UNPAUSE, 0, "UnPause");
             }
-            else if (state == 2)
+            else if (state == PAUSE_GAME_OVER)
             {
                 if (stage_finished != 0)
                 {
@@ -1377,18 +1388,18 @@ void PauseMenu::tick_open()
                 }
             }
             break;
-        case 1:
+        case PAUSE_ITEM_QUIT:
             AnmManager::interrupt_tree(snapshot_id, 1);
             AnmManager::interrupt_tree(menu_anm_id, 1);
             g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
             break;
-        case 4:
+        case PAUSE_ITEM_RESTART:
             delete_vm_and_clear(snapshot_id);
             delete_vm_and_clear(menu_anm_id);
             g_Supervisor.gamemode_to_switch_to = g_GameThread->replay_mode != 0 ? GAMEMODE_RESTART_REPLAY : GAMEMODE_RESTART;
             break;
         }
-        set_state(0);
+        set_state(PAUSE_CLOSED);
         break;
     }
 }

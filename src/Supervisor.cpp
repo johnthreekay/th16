@@ -220,6 +220,8 @@ void (*g_draw_hook_1a)();
 // GLOBAL: TH16 0x4a6eec
 void (*g_draw_hook_0f)();
 
+// The fog and z-write switches: each flushes the sprite batch and changes
+// the render state only if it differs from the cached one.
 // FUNCTION: TH16 0x43c4b0
 HRESULT Supervisor::enable_d3d_fog()
 {
@@ -1437,6 +1439,7 @@ HARNESS_CALLED i32 Supervisor::start_thread(ThreadStart start, void *arg)
     return 0;
 }
 
+// Debug output, empty in the release build.
 // FUNCTION: TH16 0x43dce0
 void supervisor_debug_log(const char *fmt, ...)
 {

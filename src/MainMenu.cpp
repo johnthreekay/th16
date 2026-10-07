@@ -47,6 +47,7 @@ u32 TitleInf::get_size()
     return sizeof(TitleInf);
 }
 
+// Switches to another TitleState, back to its first substate.
 // FUNCTION: TH16 0x44a560
 void TitleInf::set_state(i32 state)
 {
@@ -56,6 +57,7 @@ void TitleInf::set_state(i32 state)
     time_in_state.reset();
 }
 
+// Moves to another step of the current screen.
 // The dead double is not ZUN's code but stands in for whatever double math
 // the optimizer removed from his body: LTCG's double stack alignment pass
 // sees it at the IL level, so every caller (exactly the menu states that
@@ -114,6 +116,9 @@ TitleInf::TitleInf()
     flags |= 2;
 }
 
+// The menu's setup thread: initializes the menu, waits for the loading
+// screen to have run for 3 seconds, then turns the menu's tick on. If setup
+// fails the game quits.
 // FUNCTION: TH16 0x44abc0
 unsigned __stdcall TitleInf::thread_start()
 {
@@ -135,6 +140,8 @@ unsigned __stdcall TitleInf::thread_start()
     return 0;
 }
 
+// Registers the tick (priority 6) and draw (0x45) callbacks, inactive for
+// now, and loads title.anm and title_v.anm.
 // FUNCTION: TH16 0x44ac70
 HARNESS_CALLED i32 TitleInf::initialize()
 {
@@ -170,6 +177,8 @@ HARNESS_CALLED i32 TitleInf::initialize()
     return 0;
 }
 
+// Waits for the menu's thread, unregisters the callbacks, unloads the
+// menu's ANM files and frees the replay list and musiccmt.txt.
 // FUNCTION: TH16 0x44ad20
 TitleInf::~TitleInf()
 {
@@ -934,6 +943,8 @@ i32 g_demo_replay_index;
 // GLOBAL: TH16 0x49371c
 const char *const g_demo_replay_names[3] = {"demo/demo1.rpy", "demo/demo2.rpy", "demo/demo3.rpy"};
 
+// Plays a demo replay after 30 idle seconds on the title screen, starts the
+// title BGM a few frames after it appears, and runs the current screen.
 // TODO: the original computes the demo index as x % -3 would (imul 0x55555555; sub; sar 1); ours uses idiv, or the /3 magic through a local (also with % -3); it also calls the Supervisor members without this and keeps the replay info in ecx.
 // FUNCTION: TH16 0x44af80
 i32 TitleInf::on_tick()

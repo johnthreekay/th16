@@ -176,6 +176,9 @@ HARNESS_CALLED BOOL __stdcall resolve_shortcut(const char *link_path, char *out,
     return ok;
 }
 
+// The resolution dialog's procedure: checks the controls for the current
+// options when it opens; OK saves the choices, closing it cancels
+// (WINDOW_DIALOG_CANCELLED, and the game quits).
 // FUNCTION: TH16 0x45c110
 INT_PTR CALLBACK resolution_dialog_proc(HWND dialog, UINT message, WPARAM wparam, LPARAM lparam)
 {
