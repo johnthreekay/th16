@@ -169,7 +169,7 @@ int LoadingThread::on_tick()
         g_Supervisor.gamemode_to_switch_to = 4;
         flags &= ~2;
     }
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // Shows the sig.anm logo and then the "now loading" text.
@@ -192,7 +192,7 @@ int LoadingThread::on_draw()
         now_loading_step++;
     }
     draw_count++;
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // The original's callback is a jmp to the member function, most likely the

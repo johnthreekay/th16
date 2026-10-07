@@ -283,7 +283,7 @@ i32 __fastcall Gui::on_tick_callback(Gui *self)
 // FUNCTION: TH16 0x429b00
 i32 __fastcall Gui::on_draw_1_callback(Gui *self)
 {
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // FUNCTION: TH16 0x429b10
@@ -2202,7 +2202,7 @@ i32 Gui::on_tick_body()
         release_ready = 0;
     }
     time_in_stage.tick();
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // The original formats the percentage inline. Written out in on_draw_2_body,
@@ -2489,5 +2489,5 @@ i32 Gui::on_draw_2_body()
     ascii->group = 0;
     ascii->align_h = 1;
     ascii->align_v = 1;
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }

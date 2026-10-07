@@ -103,7 +103,7 @@ i32 __fastcall GameThread::on_draw_callback(GameThread *thread)
     anm->unk_c8 = 0;
     anm->unk_c0 = 0;
     anm->unk_cc = 0;
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // The store order decides how MSVC combines the byte and word stores: the
@@ -601,8 +601,10 @@ static inline void seek_bgm_to_stage_time()
     ((CStreamingSound *)g_SoundManager.bgm_stream)->seek(g_Globals.time_in_stage / 60.0);
 }
 
-// One frame of a game: the ending fade, the stage restart and intro
-// timing, the demo's end, the music restart after a pause and the timers.
+// One frame of a game: the ending fade, the stage start and transition,
+// the demo's end, the music restart and the timers. UPDATE_FUNC_BREAK
+// skips the rest of the frame's on_tick functions: that is how a menu or a
+// music restart stops the game.
 // TODO: the original keeps the return 3 epilogue at the top and a second null test around the inlined delete of g_Stage2.
 // FUNCTION: TH16 0x42d7b0
 HARNESS_CALLED i32 GameThread::on_tick_body()
@@ -613,7 +615,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
     {
         if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_IN_MENU)
         {
-            return 3;
+            return UPDATE_FUNC_BREAK;
         }
         fade_timer++;
         if (fade_timer == 180)
@@ -639,13 +641,13 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
     // The game waits for the stage clear bonus's first 120 frames.
     if ((g_Gui->hud_flags & GUI_STAGE_CLEAR_BONUS) && g_Gui->notice_timer.current < 120 && !flags.in_menu)
     {
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
     if (time_in_stage.current == 0)
     {
         if (begin_stage())
         {
-            return 1;
+            return UPDATE_FUNC_CONTINUE;
         }
     }
     else if (time_in_stage.current == 30)
@@ -664,7 +666,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
     if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_LOADING)
     {
         GAME_THREAD_FLAG_WORD(this) |= GAME_THREAD_TICKED_WHILE_LOADING;
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
     // The demo ends on a key press or a menu, or after 0xf3c frames (with a
     // fade from 0xf00), back to the title.
@@ -688,7 +690,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
     if ((GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_IN_MENU) || (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_5) ||
         (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_6))
     {
-        return 3;
+        return UPDATE_FUNC_BREAK;
     }
     // Before chapter 0x2b the stage music restarts and seeks back to the
     // stage time.
@@ -705,7 +707,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         music_restart_time++;
         if (music_restart_time < music_restart_delay && music_restart_time > 1)
         {
-            return 3;
+            return UPDATE_FUNC_BREAK;
         }
         if (music_restart_time >= music_restart_delay)
         {
@@ -735,7 +737,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         g_unk_4c0f40--;
     }
     time_in_stage++;
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // FUNCTION: TH16 0x418420

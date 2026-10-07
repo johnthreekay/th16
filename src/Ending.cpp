@@ -107,7 +107,7 @@ i32 Ending::on_tick_body()
     {
         g_Supervisor.gamemode_to_switch_to = g_Supervisor.flags & SUPERVISOR_FLAG_2000 ? 2 : 16;
     }
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // FUNCTION: TH16 0x4197a0
@@ -119,7 +119,7 @@ i32 __fastcall Ending::on_tick_callback(Ending *self)
 // FUNCTION: TH16 0x4197b0
 i32 __fastcall Ending::on_draw_callback(Ending *self)
 {
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // Indexed by Ending::ending_index.

@@ -307,7 +307,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
         break;
     }
     timer.tick();
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // FUNCTION: TH16 0x42ef90
@@ -319,7 +319,7 @@ i32 __fastcall HelpManual::on_tick_callback(HelpManual *manual)
 // FUNCTION: TH16 0x42efa0
 i32 __fastcall HelpManual::on_draw_callback(HelpManual *manual)
 {
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // Creates a VM running script at pos in the UI list (like create_ui_effect,

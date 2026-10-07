@@ -231,11 +231,11 @@ i32 Stage::on_tick()
 {
     if (stage_flags & STAGE_DISABLED)
     {
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
     if ((stage_flags & STAGE_ENTERING) && fade_timer.current >= 60)
     {
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
     inner.camera.shake_offset.x = 0.0f;
     inner.camera.shake_offset.y = 0.0f;
@@ -255,7 +255,7 @@ i32 Stage::on_tick()
     }
     inner.step_fog();
     frame_count++;
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // FUNCTION: TH16 0x40a7a0
@@ -316,7 +316,7 @@ i32 Stage::on_draw_03()
 {
     if (stage_flags & STAGE_DISABLED)
     {
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
     if (!(stage_flags & STAGE_ENTERING) || fade_timer.current < 60)
     {
@@ -374,7 +374,7 @@ i32 Stage::on_draw_03()
     g_AnmManager->unk_1c7fd88.d3d = 0x80808080;
     g_Supervisor.disable_zwrite_inline();
     stage_set_render_state(D3DRS_ZFUNC, D3DCMP_ALWAYS);
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // Draws layers 32 and 33 of the ANM manager and layers 8-11 of the stage,
@@ -384,7 +384,7 @@ i32 Stage::on_draw_06()
 {
     if (stage_flags & STAGE_DISABLED)
     {
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
     if (!(stage_flags & STAGE_ENTERING) || fade_timer.current < 60)
     {
@@ -433,7 +433,7 @@ i32 Stage::on_draw_06()
     g_Supervisor.disable_zwrite_inline();
     stage_set_render_state(D3DRS_ZFUNC, D3DCMP_ALWAYS);
     g_Supervisor.disable_d3d_fog_inline();
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // TODO: the float math and the corner stores are scheduled differently (the original reloads center.x and groups the stores by value).
