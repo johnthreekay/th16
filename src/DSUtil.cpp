@@ -954,7 +954,7 @@ HRESULT CStreamingSound::Reset(DWORD offset)
     return m_apDSBuffer[0]->SetCurrentPosition(0L);
 }
 
-// get_play_time's body, which LTCG also inlined into switch_track.
+// get_play_time's body as LTCG inlined it into switch_track.
 static __forceinline double play_time(CStreamingSound *sound)
 {
     double time = get_runtime() - (sound->m_start_time + sound->m_paused_total);
@@ -1029,11 +1029,23 @@ HRESULT CStreamingSound::switch_track(ThBgmFormat *track)
     return S_OK;
 }
 
-// TODO: the original aligns its frame to 8 bytes (whole-program double spill threshold, see README).
+// The body is spelled out: through the inline play_time helper its double
+// math belongs to the helper's call graph node, and the frame loses the
+// original's realignment (and esp, -8).
 // FUNCTION: TH16 0x471bd0
 HARNESS_CALLED double CStreamingSound::get_play_time()
 {
-    return play_time(this);
+    double time = get_runtime() - (m_start_time + m_paused_total);
+    ThBgmFormat *track = m_pWaveFile->m_track;
+    double end = track->total_size / (track->format.nSamplesPerSec / 8.0) / track->format.wBitsPerSample /
+                 track->format.nChannels;
+    double loop = (track->total_size - track->intro_size) / (double)track->format.nSamplesPerSec /
+                  (track->format.wBitsPerSample / 8.0) / track->format.nChannels;
+    while (time >= end)
+    {
+        time -= loop;
+    }
+    return time;
 }
 
 // FUNCTION: TH16 0x471c90
