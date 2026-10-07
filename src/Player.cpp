@@ -328,3 +328,39 @@ Player *Player::create()
     }
     return player;
 }
+
+// FUNCTION: TH16 0x441740
+HARNESS_CALLED void Player::reset()
+{
+    inner.state = 1;
+    inner.shoot_key_short_timer = -1;
+    inner.shoot_key_long_timer = -1;
+    inner.time_in_state.reset();
+    inner.time_in_stage.reset();
+    inner.timer_3c.reset();
+    inner.flags &= ~9;
+    delete_vm_and_clear(inner.anm_id_focused_hitbox);
+    inner.anm_id_focused_hitbox.id = 0;
+    delete_vm_and_clear(snapshot_inner.anm_id_focused_hitbox);
+    snapshot_inner.anm_id_focused_hitbox.id = 0;
+    delete_vm_and_clear(inner.anm_id_15fa0);
+    inner.anm_id_15fa0.id = 0;
+    delete_vm_and_clear(snapshot_inner.anm_id_15fa0);
+    snapshot_inner.anm_id_15fa0.id = 0;
+    g_Gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
+    interrupt_options();
+    inner.repopulate_options();
+    inner.flags &= ~4;
+    inner.speed_multiplier = 1.0f;
+    inner.unk_15fe8 = 0;
+    inner.unk_15fec = 0;
+    inner.laser_power_level = 0;
+    inner.unk_15ff4 = 0;
+    unk_2c7d0 = 0;
+    unk_2c7d4 = 0;
+    unk_2c7d8 = 0;
+    inner.last_created_damage_source_index = 0;
+    player_scale_i.end_time = 0;
+    player_scale = 1.0f;
+    damage_multiplier = 1.0f;
+}

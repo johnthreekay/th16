@@ -94,3 +94,9 @@ ShtFile *harness_w3d_cached_sht()
 {
     return (ShtFile *)((u8 *)g_cached_sht_file + (u32)g_cached_sht_file_subseason);
 }
+
+// GameThread's stage setup (0x42dcf3, 0x42df0b).
+void harness_w3d_player_reset()
+{
+    g_Player->reset();
+}

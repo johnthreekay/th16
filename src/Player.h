@@ -121,7 +121,12 @@ struct PlayerInner
     ZunTimer shoot_key_short_timer;
     ZunTimer shoot_key_long_timer;
     i32 num_main_options;
-    u8 unk_15fe8[0x16028 - 0x15fe8];
+    i32 unk_15fe8;
+    i32 unk_15fec;
+    // Marisa's laser power while it is on screen (ExpHP).
+    i32 laser_power_level;
+    i32 unk_15ff4;
+    u8 unk_15ff8[0x16028 - 0x15ff8];
     ZunTimer iframes;
     // 0x20: damage is multiplied this frame (EnemyManager::update).
     u32 flags;
@@ -237,7 +242,10 @@ struct Player
     f32 player_scale;
     // Set every frame by the winter release.
     f32 damage_multiplier;
-    u8 unk_2c7d0[0x2c828 - 0x2c7d0];
+    i32 unk_2c7d0;
+    i32 unk_2c7d4;
+    i32 unk_2c7d8;
+    u8 unk_2c7dc[0x2c828 - 0x2c7dc];
 
     Player()
     {
@@ -250,6 +258,9 @@ struct Player
     static Player *create();
     // 0x440fb0. Loads the shot type and sets up the player; 0 on success.
     i32 initialize();
+    // 0x441740 (ExpHP: Player::destroy). Puts the player back in its
+    // starting state for a new stage. Works on g_Player.
+    HARNESS_CALLED void reset();
 
     // 0x4449b0. Returns the index of the new damage source plus one.
     HARNESS_CALLED i32 create_damage_source(D3DXVECTOR3 *pos, f32 radius, f32 unk, i32 time, i32 damage);
