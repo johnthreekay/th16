@@ -790,7 +790,7 @@ HARNESS_CALLED void Scorefile::unlock_all()
 // The spell cards of each stage (Extra last) in spell practice: one row per
 // boss attack, one id per difficulty, -1 after the last.
 // GLOBAL: TH16 0x490ee0
-const i32 g_spell_practice_ids[7][13][5] = {
+extern const i32 g_spell_practice_ids[7][13][5] = {
     {{0, 1, 2, 3, -1}, {4, 5, 6, 7, -1}},
     {{8, 9, 10, 11, -1}, {12, 13, 14, 15, -1}, {16, 17, 18, 19, -1}},
     {{20, 21, -1}, {22, 23, 24, 25, -1}, {26, 27, 28, 29, -1}, {30, 31, 32, 33, -1}},

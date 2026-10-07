@@ -159,7 +159,7 @@ class TitleInf : public TaskInf
     // 0x4560b0. Fills spell_ids (and their VMs) with the spell cards of a
     // stage's boss attack. The last argument is the same at every call
     // site; LTCG folded it.
-    DECOMP_NOINLINE void load_spell_list(i32 stage, i32 row, i32 *ids, i32 unused);
+    HARNESS_CALLED i32 load_spell_list(i32 stage, i32 row, i32 *ids, i32 selected);
     i32 highlight_spell_row(i32 selected);
     // 0x452330 (ExpHP: sub_452330_replay_related). The player data.
     i32 do_player_data();

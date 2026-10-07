@@ -31,6 +31,7 @@ extern i32 g_practice_last_stage;
 extern i32 g_spell_practice_last_row;
 extern const char g_name_entry_chars[];
 BOOL __stdcall spell_practice_row_seen(i32 stage, i32 row);
+extern const i32 g_spell_practice_ids[7][13][5];
 
 static_assert(offsetof(TitleInf, menu_5cec) == 0x5cec, "TitleInf::menu_5cec");
 static_assert(offsetof(TitleInf, spell_stage) == 0x5dc4, "TitleInf::spell_stage");
@@ -2724,11 +2725,11 @@ i32 TitleInf::do_spell_practice_character()
         g_Globals.character = character_menu->next_selection;
         if (state == 18)
         {
-            load_spell_list(spell_stage, menu.next_selection, spell_ids, 0);
+            load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
         }
         else if (state == 19)
         {
-            load_spell_list(spell_stage, spell_row, spell_ids, 0);
+            load_spell_list(spell_stage, spell_row, spell_ids, -1);
             highlight_spell_row(menu.next_selection);
         }
     }
@@ -2741,11 +2742,11 @@ i32 TitleInf::do_spell_practice_character()
         g_Globals.character = character_menu->next_selection;
         if (state == 18)
         {
-            load_spell_list(spell_stage, menu.next_selection, spell_ids, 0);
+            load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
         }
         else if (state == 19)
         {
-            load_spell_list(spell_stage, spell_row, spell_ids, 0);
+            load_spell_list(spell_stage, spell_row, spell_ids, -1);
             highlight_spell_row(menu.next_selection);
         }
     }
@@ -2780,13 +2781,13 @@ i32 TitleInf::do_spell_practice_row()
         {
             menu.set_cursor(g_spell_practice_last_row);
             g_spell_practice_last_row = -1;
-            load_spell_list(spell_stage, menu.next_selection, spell_ids, 0);
+            load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd8], 3);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd8], (i16)(menu.next_selection + 7));
             AnmManager::interrupt_tree_and_run(anm_ids[0xd8], 6);
             goto start_list;
         }
-        load_spell_list(spell_stage, menu.next_selection, spell_ids, 0);
+        load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
     case 1:
         if (time_in_state.current > 10)
         {
@@ -2810,7 +2811,7 @@ i32 TitleInf::do_spell_practice_row()
             g_SoundManager.play_sound_centered(10, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd8], 3);
             AnmManager::interrupt_tree(anm_ids[0xd8], (i16)(menu.next_selection + 7));
-            load_spell_list(spell_stage, menu.next_selection, spell_ids, 0);
+            load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
         }
         do_spell_practice_character();
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
@@ -3102,6 +3103,192 @@ i32 TitleInf::do_spell_practice_difficulty()
         break;
     }
     return 1;
+}
+
+// AnmManager::interrupt_tree as LTCG inlined it into load_spell_list.
+static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
+{
+    AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+    if (vm == NULL)
+    {
+        return;
+    }
+    vm->interrupt(interrupt);
+    for (ZunList<AnmVm> *node = vm->list_of_children.next; node != NULL; node = node->next)
+    {
+        node->entry->interrupt(interrupt);
+    }
+}
+
+// Whether the first count spell cards of a row are captured (in any mode),
+// which unlocks the row's overdrive card.
+static __forceinline i32 spell_row_captured(const i32 *row, i32 count)
+{
+    for (i32 i = 0; i < count; i++, row++)
+    {
+        if (g_Scorefile->characters[4].spells[*row].captures[0] == 0 &&
+            g_Scorefile->characters[4].spells[*row].captures[1] == 0)
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+// Spell practice: lists the spell cards of a stage's boss attack, one row
+// per difficulty (Extra and the overdrive card share the last rows), with
+// their names once attempted and the chosen character's captures
+// highlighted. Rows are highlighted with interrupt 2 when they are the
+// selected one (-1 at every call site; LTCG folded it).
+// TODO: the original keeps g_AnmManager in edi across the first lookups (get_vm_with_id is an opaque stub here) and this in ebx in the main loop.
+// FUNCTION: TH16 0x4560b0
+HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 selected)
+{
+    char name[0xc1];
+    ids[0] = -2;
+    ids[1] = -2;
+    ids[2] = -2;
+    ids[3] = -2;
+    ids[4] = -2;
+    for (i32 i = 0; i < 7; i++)
+    {
+        g_AnmManager->delete_vm_inline(anm_ids[0x10d + i]);
+    }
+    for (i32 i = 0; i < 5; i++)
+    {
+        if (get_vm_or_clear(anm_ids_740[i]) == NULL)
+        {
+            anm_ids_740[i] = title_anm->create_vm_inline(i + 0xd2, NULL, 0.0f, -1);
+        }
+        interrupt_tree_inline(anm_ids_740[i], 2);
+        g_AnmManager->draw_text(get_vm_or_clear(anm_ids_740[i]), 0x808080, 0, 0, 0, 0, " Nothing ... ");
+    }
+    if (stage != 6)
+    {
+        for (i32 i = 0; i < 4; i++)
+        {
+            anm_ids[0x10d + i] = title_anm->create_effect(i + 0x10d, -1, NULL);
+            AnmManager::interrupt_tree_and_run(anm_ids[0x10d + i], 3);
+        }
+    }
+    i32 last_slot = 0;
+    const i32 *row_ids = g_spell_practice_ids[stage][row];
+    const i32 *next_id = row_ids;
+    for (i32 i = 0; i < 5; i++, next_id++)
+    {
+        i32 id = *next_id;
+        if (id < 0)
+        {
+            break;
+        }
+        i8 difficulty;
+        i32 slot;
+        if (stage == 6)
+        {
+            if (g_spell_difficulty[id] == 4)
+            {
+                anm_ids[0x111] = title_anm->create_effect(0x111, -1, NULL);
+            }
+            else if (g_spell_difficulty[id] == 5)
+            {
+                anm_ids[0x113] = title_anm->create_effect(0x113, -1, NULL);
+            }
+            difficulty = g_spell_difficulty[id];
+            slot = difficulty != 4;
+        }
+        else
+        {
+            if (g_spell_difficulty[id] >= 5)
+            {
+                anm_ids[0x112] = title_anm->create_effect(0x112, -1, NULL);
+                AnmManager::interrupt_tree_and_run(anm_ids[0x112], 3);
+            }
+            difficulty = g_spell_difficulty[id];
+            slot = difficulty >= 5 ? 4 : difficulty;
+        }
+        i32 overdrive_open = 0;
+        if (difficulty >= 5)
+        {
+            overdrive_open = spell_row_captured(row_ids, i);
+        }
+        if (g_Scorefile->characters[4].spells[id].attempts[0] == 0 && !overdrive_open)
+        {
+            ids[slot] = -1;
+            g_AnmManager->draw_text(get_vm_or_clear(anm_ids_740[slot]), 0xb0b0b0, 0, 0, 0, 0,
+                                    " No.%3d  \x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H", id + 1);
+        }
+        else
+        {
+            ids[slot] = id;
+            if (g_Scorefile->characters[4].spells[id].attempts[0] == 0 &&
+                g_Scorefile->characters[4].spells[id].attempts[1] == 0)
+            {
+                if (difficulty >= 5)
+                {
+                    // オーバードライブモード挑戦可能！ ("Overdrive mode open!")
+                    strcpy(name, "\x83I\x81[\x83o\x81[\x83h\x83\x89\x83"
+                                 "C\x83u\x83\x82\x81[\x83h\x92\xa7\x90\xed\x89\xc2\x94\\\x81I");
+                }
+                else
+                {
+                    // 挑戦可能！ ("Open!")
+                    strcpy(name, "\x92\xa7\x90\xed\x89\xc2\x94\\\x81I");
+                }
+            }
+            else
+            {
+                strcpy(name, g_Scorefile->characters[4].spells[id].name);
+            }
+            i32 len = strlen(name);
+            for (; len < 42; len++)
+            {
+                name[len] = ' ';
+            }
+            name[len] = '\0';
+            ScorefileCharacter *character = &g_Scorefile->characters[menu_5cec.next_selection];
+            AnmVm *vm = get_vm_or_clear(anm_ids_740[slot]);
+            g_AnmManager->draw_text(vm, character->spells[id].captures[1] != 0 ? 0xffff80 : 0xefefef, 0, 0, 0, 0,
+                                    " No.%3d  %s", id + 1, name);
+        }
+        interrupt_tree_inline(anm_ids_740[slot], 2);
+        if (last_slot < slot)
+        {
+            last_slot = slot;
+        }
+    }
+    if (stage != 6)
+    {
+        for (i32 i = 0; i < 5; i++)
+        {
+            if (i == selected)
+            {
+                interrupt_tree_inline(anm_ids_740[i], 2);
+            }
+            else
+            {
+                interrupt_tree_inline(anm_ids_740[i], 3);
+            }
+        }
+    }
+    else
+    {
+        for (i32 i = 0; i < 2; i++)
+        {
+            if (i == selected)
+            {
+                interrupt_tree_inline(anm_ids_740[i], 2);
+            }
+            else
+            {
+                interrupt_tree_inline(anm_ids_740[i], 3);
+            }
+        }
+    }
+    for (i32 i = last_slot + 1; i < 5; i++)
+    {
+        delete_vm_inline_and_clear(anm_ids_740[i]);
+    }
+    return 0;
 }
 
 // Highlights the selected row of the spell list (interrupt 2) and dims the
