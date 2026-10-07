@@ -3,21 +3,27 @@
 A matching decompilation of 東方天空璋 ～ Hidden Star in Four Seasons (TH16) v1.00a:
 C++ source that compiles back to the same bytes as `th16.exe`.
 
-This repository contains no game code or data. You need your own copy of the
-game; `th16.exe` must have SHA-256
+This repository does not include the game's executable or its data files
+(`th16.dat`, music, the manual); you need your own copy of the game. The
+source does reproduce what compiling back to the same bytes requires: the
+initial contents of the executable's data tables and its string literals.
+`th16.exe` must have SHA-256
 `c11776019f083978e66027e7394dafb1fb9543afca986f28049a49417e341929`.
 
 ## Status
 
-- Every function of the game is decompiled: reccmp reports 1222 of 1222
-  functions implemented, 945 of them byte-identical and 19 more that differ
-  only in instruction scheduling (94.00% overall similarity). The rest compile
-  to functionally equivalent code; each carries a one-line `// TODO:` saying
+- Every function of the game is decompiled: reccmp compares 1207 functions
+  (the 1214 annotated ones less 7 CRT library functions it skips), 905 of
+  them byte-identical and 19 more that differ only in instruction
+  scheduling. Its summary line, "1222 / 1222 implemented, 94.06% accuracy",
+  also counts 15 SIMD constants, which all match (93.99% over the functions
+  alone); all 26 vtables match too. The rest compile to functionally
+  equivalent code; each carries a one-line `// TODO:` saying
   what still differs (mostly whole-program register allocation and stack
   frame alignment, see "Things learned so far").
 - Every annotated global holds the original's data (`scripts/check_data.py`:
-  213 of 214 match; `g_Supervisor` differs only in defaults its initializer
-  clears at startup).
+  199 of 200 match; `g_Supervisor` differs only in defaults its initializer
+  clears at startup), and none is a field of another annotated object.
 - The source is readable: opcodes of the ECL, ANM, MSG and STD script
   interpreters, game modes, sound effects, flags and file formats are named
   enums, structs and functions carry doc comments, and ZUN's few inline
@@ -174,6 +180,13 @@ format arrays). Anything else is reported. The one global that still
 differs is `g_Supervisor`: our build folds the Config constructor's stores
 into static data, which the dynamic initializer's memset then clears (see
 the TODO there); the original's is all zero.
+
+It also checks that no global, at its size in our PDB, runs past the next
+annotated address in the original. Equal bytes do not show that: the
+window fields once annotated as separate globals, and two tables with an
+extra trailing NULL that was the next table's first entry, all compared
+equal. Such a global is really part of another object; a value written
+through one name is lost to code reading the other.
 
 Write tables as readable initializers: functions by name, strings as
 literals (`scripts/cstring.py` gives byte-exact Shift-JIS escapes), enums by

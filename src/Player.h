@@ -387,7 +387,7 @@ extern ShtBulletFunc const g_sht_on_init_funcs[7];
 extern ShtBulletFunc const g_sht_on_tick_funcs[8];
 extern ShtHitFunc const g_sht_on_hit_funcs[8];
 extern ShtBulletFunc g_sht_func_3_table[1];
-extern DamageSourceHitFunc const g_damage_source_hit_funcs[4];
+extern DamageSourceHitFunc const g_damage_source_hit_funcs[3];
 
 // ShtShooter::kind.
 enum ShtShooterKind

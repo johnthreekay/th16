@@ -3,10 +3,11 @@
 #include "Supervisor.h"
 
 // The speed multipliers a ZunTimer can follow, selected by its
-// speed_index: 0 is the game speed; entry 1 (NULL, a fixed speed of 1) is
-// never selected, since speed() resets any index of 1 or more to 0.
+// speed_index. The only entry is the game speed: speed() resets any index of
+// 1 or more to 0 (the original's next table, g_ecl_ext_damage_funcs, starts
+// 4 bytes later), so the NULL check for a fixed speed of 1 never succeeds.
 // GLOBAL: TH16 0x490eb0
-f32 *const g_timer_speed_ptrs[] = {&g_game_speed, NULL};
+f32 *const g_timer_speed_ptrs[] = {&g_game_speed};
 
 // TODO: the unscaled path adds current_f into the delta register instead of
 // loading current_f into xmm0 and adding the delta.

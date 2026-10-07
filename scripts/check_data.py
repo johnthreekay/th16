@@ -23,6 +23,11 @@ to corresponding things:
 Any other differing pair of in-image addresses is reported as an unmapped
 pointer.
 
+It also reports any global whose size in our PDB, placed at its original
+address, runs past the next annotated address: such a pair is really one
+object (a field annotated as a separate variable), which the byte comparison
+cannot see.
+
 Usage:
   scripts/check_data.py            # report the globals that differ
   scripts/check_data.py -v         # also list every global that matches
@@ -308,10 +313,30 @@ def main():
             print(f"    ... {len(diffs) - 8} more")
     for va, vb, name in comparer.by_contents:
         print(f"note: {vb:#x} ({name}) and the original's {va:#x} are unnamed data with equal contents")
+
+    # A global whose type, placed at its original address, runs into the
+    # next annotated address: one of the two is really part of the other
+    # (a field annotated as its own variable), and a value written through
+    # one name is never seen through the other. Only sizes from the PDB's
+    # types count; a size up to our next symbol says nothing.
+    placed = sorted((a for a in annotations if a[5] is not None), key=lambda x: x[1])
+    overlaps = unsized = 0
+    for (kind, orig_addr, name, src, sym, addr, size), nxt in zip(placed, placed[1:] + [None]):
+        if kind != "GLOBAL" or (args and name not in args):
+            continue
+        if (addr, name) not in sizes:
+            unsized += 1
+            continue
+        if nxt and orig_addr + size > nxt[1]:
+            overlaps += 1
+            print(f"{orig_addr:#x} {name} ({src.relative_to(ROOT)}): OVERLAPS {nxt[2]} at {nxt[1]:#x} "
+                  f"({size:#x} bytes, {nxt[1] - orig_addr:#x} to the next annotation)")
+
     total = sum(counts.values())
     print(f"{total} globals: {counts['match']} match, {counts['differ']} differ, "
           f"{counts['unmapped']} only through unmapped pointers, {counts['missing']} not found")
-    sys.exit(1 if total != counts["match"] else 0)
+    print(f"{total - unsized - counts['missing']} sized from the PDB: {overlaps} overlap the next annotation")
+    sys.exit(1 if total != counts["match"] or overlaps else 0)
 
 
 if __name__ == "__main__":
