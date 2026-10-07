@@ -1,10 +1,16 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "FileSystem.h"
 #include "CriticalSections.h"
 #include "GameErrorContext.h"
 #include "HelpManual.h"
+#include "SoundManager.h"
 #include "Supervisor.h"
+
+extern u32 g_hardware_input_pressed;
+extern u32 g_hardware_input_repeat;
 
 // GLOBAL: TH16 0x4a6dd8
 HelpManual *g_HelpManual;
@@ -103,11 +109,188 @@ void HelpManual::destroy()
     }
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x42eab0
+// input_pressed_or_repeating, inlined.
+static __forceinline i32 help_pressed_or_repeating(u32 mask)
+{
+    if (g_hardware_input_pressed & mask)
+    {
+        return 1;
+    }
+    if (g_hardware_input_repeat & mask)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+// Shows the page list with the cursor's page highlighted.
+static __forceinline void help_highlight_pages(HelpManual *manual)
+{
+    for (i32 i = 0; i < 9; i++)
+    {
+        if (manual->menu.next_selection == i)
+        {
+            AnmManager::interrupt_tree_and_run(manual->page_vms[i], 2);
+        }
+        else
+        {
+            AnmManager::interrupt_tree_and_run(manual->page_vms[i], 3);
+        }
+    }
+}
+
+// Creates the page list.
+static __forceinline void help_create_pages(HelpManual *manual, D3DXVECTOR3 *pos)
+{
+    for (i32 i = 0; i < 9; i++)
+    {
+        manual->page_vms[i] = manual->help_anm->create_ui_vm(i, pos, 0);
+        if (manual->menu.next_selection == i)
+        {
+            AnmManager::interrupt_tree_and_run(manual->page_vms[i], 2);
+        }
+        else
+        {
+            AnmManager::interrupt_tree_and_run(manual->page_vms[i], 3);
+        }
+    }
+}
+
+static __forceinline void help_hide_pages(HelpManual *manual)
+{
+    for (i32 i = 0; i < 9; i++)
+    {
+        AnmManager::interrupt_tree(manual->page_vms[i], 1);
+    }
+}
+
+// TODO: ours gets a /GS cookie where the original realigns the frame, and
+// reads the input globals in a different order.
+// FUNCTION: TH16 0x42eab0
 DECOMP_NOINLINE i32 HelpManual::on_tick_body()
 {
-    return state;
+    D3DXVECTOR3 pos;
+    pos.y = 0.0f;
+    pos.z = 0.0f;
+    pos.x = unk_128;
+    switch (state)
+    {
+    case 0:
+        state = 1;
+        break;
+    case 1:
+        switch (substate)
+        {
+        case 0:
+            menu.num_choices = 9;
+            menu.set_cursor(0);
+            menu.wraps = 1;
+            help_create_pages(this, &pos);
+            help_anm->d3d[1].clear_texture();
+            substate = 1;
+        case 1:
+            if (timer.current < 20)
+            {
+                break;
+            }
+            menu.current_selection = menu.next_selection;
+            if (help_pressed_or_repeating(0x10))
+            {
+                menu.move_cursor(-1);
+            }
+            if (help_pressed_or_repeating(0x20))
+            {
+                menu.move_cursor(1);
+            }
+            if (menu.current_selection != menu.next_selection)
+            {
+                g_SoundManager.play_sound_centered(10, 0);
+                help_highlight_pages(this);
+            }
+            if (g_hardware_input_pressed & 0x80001)
+            {
+                g_SoundManager.play_sound_centered(7, 0);
+                goto open_page;
+            }
+            if (g_hardware_input_pressed & 0x102)
+            {
+                g_SoundManager.play_sound_centered(9, 0);
+                help_hide_pages(this);
+                state = 2;
+                substate = 0;
+                timer.reset();
+            }
+            break;
+        case 2:
+            break;
+        case 3:
+            g_AnmManager->reload_texture(&help_anm->d3d[1], file_data, file_size, 0, 0, 0);
+            if (file_data != NULL)
+            {
+                free(file_data);
+                file_data = NULL;
+            }
+            file_data = NULL;
+            help_anm->d3d[1].texture->PreLoad();
+            page_vms[9] = help_anm->create_ui_vm(9, &pos, 0);
+            substate = 4;
+            timer.set_value(0);
+        case 4:
+            if (timer.current < 20)
+            {
+                break;
+            }
+            if ((g_hardware_input_pressed & 0x20) && menu.next_selection < 8)
+            {
+                substate = 5;
+                timer.set_value(0);
+                g_SoundManager.play_sound_centered(7, 0);
+                menu.move_cursor(1);
+                AnmManager::interrupt_tree_and_run(page_vms[9], 7);
+            }
+            else if ((g_hardware_input_pressed & 0x10) && menu.next_selection > 0)
+            {
+                substate = 5;
+                timer.set_value(0);
+                g_SoundManager.play_sound_centered(7, 0);
+                menu.move_cursor(-1);
+                AnmManager::interrupt_tree_and_run(page_vms[9], 8);
+            }
+            else
+            {
+                if (g_hardware_input_pressed & 0x80103)
+                {
+                    g_SoundManager.play_sound_centered(9, 0);
+                    substate = 1;
+                    timer.set_value(0);
+                    AnmManager::interrupt_tree(page_vms[9], 1);
+                    help_create_pages(this, &pos);
+                }
+                break;
+            }
+        case 5:
+            if (timer.current < 20)
+            {
+                break;
+            }
+        open_page:
+            substate = 2;
+            timer.set_value(0);
+            sprintf(file_name, "help_%.2d.png", menu.next_selection + 1);
+            g_Supervisor.start_thread((ThreadStart)help_manual_read_file, NULL);
+            help_hide_pages(this);
+            break;
+        }
+        break;
+    case 2:
+        if (timer.current >= 30)
+        {
+            unk_124 = 1;
+        }
+        break;
+    }
+    timer.tick();
+    return 1;
 }
 
 // FUNCTION: TH16 0x42ef90

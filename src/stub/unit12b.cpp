@@ -23,12 +23,6 @@ void StageInner::step_fog()
 {
 }
 
-// STUB: TH16 0x40fb00
-i32 BombMarisaAInf::on_tick()
-{
-    return 0;
-}
-
 // STUB: TH16 0x40fe80
 i32 BombMarisaAInf::method_10()
 {

@@ -5,6 +5,7 @@
 #include "AnmManager.h"
 #include "AnmVm.h"
 #include "UpdateFunc.h"
+#include "ZunAngle.h"
 #include "ZunList.h"
 #include "ZunTimer.h"
 #include "decomp.h"
@@ -71,13 +72,16 @@ struct Bullet
     f32 speed;
     f32 angle;
     f32 hitbox_diameter;
-    u8 unk_c44[4];
+    // With hitbox_diameter, the size of a rectangular hitbox.
+    f32 hitbox_height;
     // Position in BulletManager::bullets.
     i32 index;
     // 1 while the bullet is active; ECL's funcset 1 cancels bullets near
     // the player by setting 2.
     i32 unk_c4c;
-    u8 unk_c50[0xc5c - 0xc50];
+    u8 unk_c50[0xc58 - 0xc50];
+    // Counts down every tick; while positive the bullet may be offscreen.
+    i32 unk_c58;
     // Script of bullet.anm played where the bullet is cancelled (none if
     // negative).
     i32 cancel_script;
@@ -89,7 +93,9 @@ struct Bullet
     u8 unk_c74[0xc78 - 0xc74];
     // Next bullet drawn in the same layer.
     Bullet *next_in_layer;
-    u8 unk_c7c[0xc84 - 0xc7c];
+    i32 unk_c7c;
+    // Sound played when the bullet bounces off a wall (none if negative).
+    i32 bounce_sound;
     i32 layer;
     BulletEx et_ex[0x12];
     BulletExState ex_state[0xe];
@@ -110,13 +116,55 @@ struct Bullet
     ~Bullet();
 
     i32 on_tick();
-    i32 sub_4124b0(i32 arg);
+    // 0x4124b0. Tests the bullet against the player (graze_only is passed
+    // on): 1 if it hit (the bullet then starts its cancel animation), 2 if
+    // it grazed.
+    i32 sub_4124b0(i32 graze_only);
+    // 0x412670. Frees the bullet: back to the free list, off the tick list.
+    void sub_412670();
+    // 0x413860. Starts the et_ex transforms that are due.
+    i32 run_ex();
+    // 0x4162d0. Keeps the bullet going while it is off screen and still
+    // heading back towards it, for a number of frames at most.
+    i32 step_ex_08();
     // 0x414ec0. The first et_ex transform: a speed boost that fades over
     // 16 frames; 1 once it is over.
     i32 step_ex_00();
     // 0x416840. Turns the bullet into its cancel animation, dropping items
     // by mode.
     i32 cancel(i32 mode);
+    // The wall bounce transform (et_ex type 6) and its four walls: each
+    // reflects the bullet off its wall of the bounce rectangle and returns
+    // 1 if it was past it.
+    i32 step_ex_06();
+    i32 bounce_left();
+    i32 bounce_right();
+    i32 bounce_top();
+    i32 bounce_bottom();
+    // 0x4161f0. Moves by a fixed vector until the slot's timer reaches its
+    // duration.
+    i32 step_ex_19();
+    // 0x4153e0. Turns and accelerates for a number of frames.
+    i32 step_ex_03();
+    // 0x415570. Slows to a stop over a number of frames, then picks a new
+    // angle and speed, some number of times.
+    i32 step_ex_04();
+    // 0x414fb0 and 0x4151e0. Accelerate by a vector for a number of
+    // frames, steering the angle and speed to follow the velocity.
+    i32 step_ex_02();
+    i32 step_ex_21();
+    // 0x415d80. Wraps the bullet around to the other side once it has left
+    // the playfield, some number of times.
+    i32 step_ex_12();
+    // 0x415f90. Moves to a position along ex_move_i, then continues at the
+    // given speed.
+    i32 step_ex_17();
+
+    // ZUN's angle is a ZunAngle; some transforms call its operators.
+    ZunAngle &angle_ref()
+    {
+        return *(ZunAngle *)&angle;
+    }
 };
 
 // 0x417140. The sprite mapping callback of bullet VMs: picks the sprite for

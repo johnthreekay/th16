@@ -9,6 +9,23 @@
 #include "Rng.h"
 #include "ZunMath.h"
 
+// The copy of ZunMath.h's sincosmul that effect kind 3's object file has
+// (TH16 keeps one per object file). A static of its own so that it can be
+// annotated.
+// FUNCTION: TH16 0x406cc0
+static void __fastcall effect3_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
+
 // ins_508 data of effect kind 2.
 struct AnmEffect2Data
 {
@@ -107,15 +124,13 @@ int __fastcall anm_effect_2_on_copy_2(AnmVm *vm, const AnmVm *other, i32 mode)
 // Saves the child VMs into the snapshot buffer after the VM's own data
 // (mode 0) or reads them back (mode 1). The copy of the extra data in the
 // buffer keeps only a flag per child.
-// TODO: the original advances the buffer register in place for the cursor
-// and clears child_size later in mode 1 (scheduling).
 // FUNCTION: TH16 0x406040
 int __fastcall anm_effect_2_on_copy_1(AnmVm *vm, u8 *buffer, i32 *size, i32 mode)
 {
     AnmEffect2Data *data = (AnmEffect2Data *)vm->ins_508_extra_data;
     *size += sizeof(AnmEffect2Data);
     AnmEffect2Data *saved = (AnmEffect2Data *)buffer;
-    u8 *cursor = buffer + sizeof(AnmEffect2Data);
+    buffer += sizeof(AnmEffect2Data);
     i32 child_size;
     if (mode == 0)
     {
@@ -125,9 +140,9 @@ int __fastcall anm_effect_2_on_copy_1(AnmVm *vm, u8 *buffer, i32 *size, i32 mode
             AnmVm *child = g_AnmManager->get_snapshot_vm_with_id_inline(data->vm_ids[i]);
             if (child != NULL)
             {
-                g_AnmManager->save_vm_tree((AnmVm *)cursor, child, &child_size);
+                g_AnmManager->save_vm_tree((AnmVm *)buffer, child, &child_size);
                 *size += child_size;
-                cursor += child_size;
+                buffer += child_size;
                 saved->vm_ids[i].id = 0xff;
             }
             else
@@ -143,10 +158,10 @@ int __fastcall anm_effect_2_on_copy_1(AnmVm *vm, u8 *buffer, i32 *size, i32 mode
             if (saved->vm_ids[i].id != 0)
             {
                 child_size = 0;
-                AnmId id = g_AnmManager->load_vm_tree((AnmVm *)cursor, NULL, &child_size);
+                AnmId id = g_AnmManager->load_vm_tree((AnmVm *)buffer, NULL, &child_size);
                 data->vm_ids[i] = id;
                 *size += child_size;
-                cursor += child_size;
+                buffer += child_size;
             }
             else
             {
@@ -222,7 +237,7 @@ int __fastcall anm_effect_3_on_tick(AnmVm *vm)
                 }
             }
             Float2 *point = &data->offsets[n];
-            sincosmul((Float3 *)point, data->angle, g_replay_unsafe_rng.randf_0_to_1() * 5.0f + 4.0f);
+            effect3_sincosmul((Float3 *)point, data->angle, g_replay_unsafe_rng.randf_0_to_1() * 5.0f + 4.0f);
             point->x += point[-1].x;
             point->y += point[-1].y;
             data->angle = wrap_angle(g_replay_unsafe_rng.randf_neg_to(ZUN_PI) / 5.0f + data->angle);

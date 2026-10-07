@@ -79,7 +79,9 @@ struct GameThreadFlags
     u32 flag_7 : 1;
     u32 flag_8 : 2;
     u32 flag_10 : 1;
-    u32 flag_11 : 21;
+    // Set while the stage restarts after its intro (sub_42dc50/sub_42dee0).
+    u32 flag_11 : 1;
+    u32 flag_12 : 20;
 };
 
 // Runs a game in progress. Layout from ExpHP's th-re-data (zGameThread),
@@ -114,6 +116,13 @@ struct GameThread
     static i32 __fastcall on_draw_callback(GameThread *thread);
     // Adds the time since the last call to the scorefile's play time.
     static void update_play_time();
+    // 0x42dc50. Restarts the stage after its intro: 1 once the game
+    // should switch modes, otherwise resets the game objects (or leaves
+    // that to sub_42dee0 when there is a second stage).
+    i32 sub_42dc50();
+    // 0x42dee0. Finishes a stage restart that sub_42dc50 began: resets the
+    // game objects, reactivates every manager and restarts the music.
+    i32 sub_42dee0();
 };
 
 extern GameThread *g_GameThread;

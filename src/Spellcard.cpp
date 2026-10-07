@@ -4,9 +4,13 @@
 
 #include "AnmManager.h"
 #include "AsciiManager.h"
+#include "Bomb.h"
+#include "Enemy.h"
+#include "EnemyManager.h"
 #include "Globals.h"
 #include "GameThread.h"
 #include "Gui.h"
+#include "Player.h"
 #include "ReplayManager.h"
 #include "Scorefile.h"
 #include "SoundManager.h"
@@ -281,4 +285,73 @@ void Spellcard::measure_real_time()
         }
         sc->unk_88++;
     }
+}
+
+// TODO: the inlined timer tick keeps the frame in xmm0 (ours xmm1), the
+// boss smoothing is scheduled differently (boss_pos += (pos - boss_pos) *
+// 0.05f gives the original's code but a /GS cookie), and the original
+// duplicates the return.
+// FUNCTION: TH16 0x417930
+i32 Spellcard::on_tick_body()
+{
+    if (!(flags & SPELLCARD_ACTIVE))
+    {
+        return 1;
+    }
+    ticks++;
+    if (time.current >= 60 && !(flags & SPELLCARD_FLAG_200))
+    {
+        g_Stage->stage_flags &= ~STAGE_FLAG_1;
+    }
+    if (time.current >= 300 && !(flags & SPELLCARD_NO_BONUS_DECAY))
+    {
+        bonus = (bonus - (bonus_max - bonus_max / 3) / (timeout - 300)) / 10 * 10;
+    }
+    time.tick();
+    if (time.current >= 120)
+    {
+        Player *player = g_Player;
+        if (!(flags & SPELLCARD_TEXT_MOVED))
+        {
+            if ((!(flags & SPELLCARD_TEXT_AT_BOTTOM) && 96.0f > player->inner.pos.y) ||
+                ((flags & SPELLCARD_TEXT_AT_BOTTOM) && player->inner.pos.y > 352.0f))
+            {
+                for (i32 i = 0; i < 3; i++)
+                {
+                    AnmManager::interrupt_tree(text_anm_ids[i], 3);
+                }
+                flags |= SPELLCARD_TEXT_MOVED;
+            }
+        }
+        else if ((!(flags & SPELLCARD_TEXT_AT_BOTTOM) && player->inner.pos.y > 128.0f) ||
+                 ((flags & SPELLCARD_TEXT_AT_BOTTOM) && 320.0f > player->inner.pos.y))
+        {
+            for (i32 i = 0; i < 3; i++)
+            {
+                AnmManager::interrupt_tree(text_anm_ids[i], 2);
+            }
+            flags &= ~SPELLCARD_TEXT_MOVED;
+        }
+    }
+    EnemyInf *boss = g_EnemyManager->find_enemy_by_id(g_EnemyManager->inner.boss_ids[0]);
+    f32 x = (boss->enemy.final_pos.pos.x - boss_pos.x) * 0.05f + boss_pos.x;
+    f32 y = (boss->enemy.final_pos.pos.y - boss_pos.y) * 0.05f + boss_pos.y;
+    f32 z = (boss->enemy.final_pos.pos.z - boss_pos.z) * 0.05f + boss_pos.z;
+    boss_pos.x = x;
+    boss_pos.y = y;
+    boss_pos.z = z;
+    AnmVm *vm = g_AnmManager->get_vm_with_id(boss_anm_id);
+    if (vm != NULL)
+    {
+        vm->entity_pos = boss_pos;
+    }
+    if (flags & SPELLCARD_FLAG_20)
+    {
+        if (g_MainBomb->in_use == 1)
+        {
+            return 1;
+        }
+        flags &= ~SPELLCARD_FLAG_20;
+    }
+    return 1;
 }

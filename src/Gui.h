@@ -224,6 +224,9 @@ struct Gui
     HARNESS_CALLED void interrupt_spell_vms_3();
     // Creates the textbox VM (0x426780) and the stage clear bonus (0x42c070).
     static void create_vm_110();
+    // 0x426d70 (ExpHP: gui_426d70_initializes_many_anms). Creates the HUD's
+    // VMs for a stage.
+    static void sub_426d70();
     static void show_stage_clear_bonus();
     static void sub_42c580();
     static void sub_42c5c0();
