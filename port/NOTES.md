@@ -2,8 +2,9 @@
 
 The game sources in `src/` compile and link with GCC and Clang, 32-bit
 (`-m32`) and 64-bit, against stand-in Windows/DirectX headers. The platform
-layer is stubbed: the binary starts, runs WinMain's setup and exits on the
-first missing piece. The matching MSVC build is unaffected (see "Keeping the
+layer is stubbed: the binary starts, runs WinMain's setup until loading
+th16.cfg fails (CreateFileA is a stub), logs that and exits cleanly, in all
+four builds. The matching MSVC build is unaffected (see "Keeping the
 matching build").
 
 ## Building
@@ -32,12 +33,13 @@ Flags that matter for behaviour (CMakeLists.txt): `-fno-strict-aliasing`,
 and for `-m32` `-msse2 -mfpmath=sse` (the original does its float math in SSE;
 x87 would round differently).
 
-Warnings left (clean build): 31 `-Wdelete-non-virtual-dtor` (the game's
+Warnings left in a clean build (Clang 41/32, GCC 72/63 for 64/32-bit; no
+errors): 31 `-Wdelete-non-virtual-dtor` (the game's
 classes have virtual methods and non-virtual destructors, as in the
 original), 24 GCC `-Wuninitialized` (constructors that clear one bit of an
 uninitialised field: UpdateFunc.h:67, ZunTimer.h:33, written that way to
-match), 9 `-Wint-to-pointer-cast` (LaserXInf::method_1c, never called, see
-below), 5 `-Wmismatched-new-delete` (DSUtil.cpp's SAFE_DELETE on arrays,
+match), 9 `-Wint-to-pointer-cast` on 64-bit (LaserXInf::method_1c, never
+called, see below), 5 `-Wmismatched-new-delete` (DSUtil.cpp's SAFE_DELETE on arrays,
 SupervisorSetup.cpp:166 `delete` of a `new[]`), 2 GCC `-Waddress`
 (Stage.cpp:610, 631: comparing `&sprites[i]` with NULL), 1 GCC
 `-Wformat-overflow` (GameWindow.cpp:415, a 4 KiB save path into a 256-byte
@@ -92,6 +94,8 @@ buffer, as in the original).
     IDirectSoundNotify. DirectSoundCreate8 fails (the game runs silent).
   - `game_tables.cpp`: the game globals the matching build defines in
     `src/stub/` (see "Game data in src/stub/").
+  - `layout_checks.cpp`: compile-time layout checks that stay on in the
+    64-bit build (`TH16_PORT_CHECK`, defined in port_prelude.h).
 
 The interfaces in `include/` are C++ abstract classes with only the methods
 the game calls (plus a few obvious companions), in an order of our own: the
@@ -189,18 +193,98 @@ reports the duplicate.
 ## Keeping the matching build
 
 - Edits to game files are either inside `#ifdef TH16_PORT` or produce the
-  same code for MSVC (types that are typedefs of the same type, scoping,
-  declaration split from assignment). After each change:
+  same code for MSVC (types that are typedefs of the same type, sizes
+  written as `sizeof` of what they measure, scoping, a declaration split
+  from its assignment). After each change:
   `.venv/bin/python scripts/build.py`, `scripts/check_unchanged.py` (all
   1214 functions unchanged) and `scripts/quickdiff.py | grep -c MATCH`
-  (842 at the start of this branch). `check_unchanged` always reports
-  `.rdata` as different: the linker writes a new timestamp and PDB id each
-  time, even for identical builds.
+  (842 at the start of this branch and after it). `check_unchanged` always
+  reports `.rdata` as different: the linker writes a new timestamp and PDB
+  id each time, even for identical builds.
 - Edited game files (expect merge conflicts with main's renames on these
-  lines): decomp.h, types.h, AnmManager.h, Supervisor.h (`unk_0`), Player.h,
-  PlayerShot.cpp, Player.cpp, AnmDraw.cpp, AnmManagerVms.cpp, Stage.cpp,
+  lines): decomp.h, types.h, AnmManager.h, Supervisor.h (`unk_0`),
+  Scorefile.h, SoundManager.h, Player.h, Player.cpp, PlayerShot.cpp,
+  AnmDraw.cpp, AnmManagerVms.cpp, BombMain.cpp, Stage.cpp,
   BulletManager.cpp, PauseMenu.cpp, and the 19 files with `__asm` blocks.
+- The game's `static_assert`s are off in the 64-bit build. Layout facts that
+  must hold there too go in `port/src/layout_checks.cpp` as
+  `TH16_PORT_CHECK(...)` (file structures, the Scorefile and BgmStream
+  views, CSound::m_desc).
 
 ## 64-bit problems
 
-(See below.)
+Found by compiling (pointer/int casts are errors in GCC and Clang), by size
+probes at both pointer sizes and by reading the loaders. ANM, ECL, MSG and
+ending scripts keep 4-byte offsets in the file and pointers in separate
+arrays or locals, so they are fine; so are replays (`RpyInfo`,
+`RpyGamestate`), th16.cfg (`Config`), thbgm.fmt (`ThBgmFormat`), the archive
+directory and the score file sections, which hold no pointers.
+
+### Fixed (MSVC output unchanged)
+
+- Pointers passed or stored as `i32`/`u32`, now `iptr`/`uptr` (types.h):
+  the sht hit callbacks' position and size arguments (Player.h:210-211
+  typedefs, PlayerShot.cpp, Player.cpp:891 call; sht_on_hit_446870 casts
+  them back to `Float3 *`), `AnmManager::render_cache_184fbc0` (a sprite
+  pointer used as a cache key, AnmManager.h:316, AnmDraw.cpp:657-660),
+  `BombInf::method_c` arguments (Player.cpp:823), the null `AnmId` returns in
+  AnmManagerVms.cpp:970,1017.
+- `Supervisor::unk_0` holds the HINSTANCE (WinMain.cpp:445 writes it through
+  `*(HINSTANCE *)`); was `u8[4]`, which overwrote `d3d` on 64-bit and
+  crashed at shutdown. Now `u8[sizeof(void *)]`.
+- STD (Stage.cpp `load_std`): the `StdHeader::objects` table of 4-byte
+  offsets was rewritten into pointers in place. The port builds its own
+  table (freed in `~Stage`).
+- SHT (Player.cpp `read_sht_file`): `ShtFile::shooter_arrays` holds offsets
+  and `ShtShooter`'s four callbacks hold table indices, both 4 bytes in the
+  file; with 8-byte pointers `ShtShooter` is 0x68 bytes, not 0x58, and the
+  shooters start at 0x1e0, not 0x1b8. The port converts the file to the
+  in-memory layout first (`port_convert_sht_file`), then the original loop
+  resolves offsets and indices.
+- Scorefile (Scorefile.h): `ScorefileData` (the real layout) starts with
+  two pointers, `Scorefile` (the view most code uses) assumes 8 bytes for
+  them. The view gets 8 bytes of padding on 64-bit and `ScorefileData` is
+  packed to 4, so both views and `sizeof` agree.
+- `CSound::m_desc` (SoundManager.h:212) was `u8[0x24]`; DSUtil.cpp:140,215
+  copy a whole `DSBUFFERDESC` (0x28 bytes on 64-bit) into it, clobbering
+  `m_manager`. Now `u8[0x20 + sizeof(void *)]`.
+- `BgmStream` (SoundManager.h:111), a hand-laid-out view of
+  `CStreamingSound`: packed to 4 like `CSound` and its gap before
+  `refilling` widened on 64-bit.
+- Reimu's bomb orbs (BombMain.cpp:321) were allocated as 0x6c0 bytes; they
+  hold an `EnemyInf *` each and need 0x700 on 64-bit. Now
+  `sizeof(BombReimuAOrbs)`.
+
+### Open
+
+- `LaserXInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)`
+  (Laser.h:70,167,235,350,413; Laser.cpp:1110-1115, 1197-1202, 1271-1276;
+  LaserBeam.cpp:22) takes pointers in a, b and f and casts them back
+  (the 9 `-Wint-to-pointer-cast` warnings). Nothing calls it; if something
+  does, make those three `iptr`.
+- Function pointer types that do not match the function (also in the
+  original, harmless on x86-64 and ARM64 since the mismatched argument is
+  unused or of the same size class): `g_effect_table[1].init` is
+  `anm_effect_2_init(AnmVm *, i32)` called as `(AnmVm *, D3DXVECTOR3 *)`;
+  `g_anm_serialize_funcs[1]` takes `u8 *` for `void *`;
+  `SoundManager::thread_init`/`thread_load_sound_files` return void but are
+  started as `LPTHREAD_START_ROUTINE` (WinMain.cpp:401, Supervisor.cpp:994;
+  only the exit code is garbage).
+- `#pragma pack(4)` structs hold 8-byte pointers at 4-aligned offsets
+  (Supervisor, GameWindow, CSound, PauseMenu, Spellcard, Scorefile,
+  RpyInfo): fine for plain loads and stores on x86-64 and ARM64, wrong for
+  atomics.
+- AnmVm snapshots (AnmManagerVms.cpp:788-878, AnmVmCallbacks.cpp:269-310)
+  copy pointer-holding `AnmVm` records by `sizeof`. Consistent within one
+  build; they stay in memory (not in replays), so nothing to do.
+
+### Not 64-bit, but noticed
+
+- Fog.cpp:27 allocates one byte too few
+  (`sizeof(AnmVm *) * FOG_STRIP_COUNT - 1`): the original's bug, in both
+  builds.
+- MainMenu.cpp:782 writes `clears[5]` of an `i32[5]` (into the next field,
+  as in the original); GCC needs `-fno-aggressive-loop-optimizations`.
+- GameWindow.cpp:415 formats a 4 KiB `save_dir` into a 256-byte path
+  buffer; keep the host save path short or the original overflow happens.
+- `delete` on `new[]` memory (DSUtil.cpp SAFE_DELETE, SupervisorSetup.cpp:166).
