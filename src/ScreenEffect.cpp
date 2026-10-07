@@ -9,7 +9,7 @@
 #include "Rng.h"
 #include "Supervisor.h"
 
-extern i32 g_unk_4c0f40;
+extern i32 g_cancel_screen_effects;
 
 struct ZunRect
 {
@@ -63,7 +63,7 @@ HARNESS_CALLED void screen_effect_draw_rect(ZunRect *rect, D3DCOLOR color)
 // FUNCTION: TH16 0x45c630
 i32 __fastcall ScreenEffect::on_tick_fade_in(ScreenEffect *self)
 {
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
         return UPDATE_FUNC_CLEANUP;
     }
@@ -98,7 +98,7 @@ i32 __fastcall ScreenEffect::on_draw_viewport(ScreenEffect *self)
 // FUNCTION: TH16 0x45c900
 i32 __fastcall ScreenEffect::on_tick_fade_out(ScreenEffect *self)
 {
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
         return UPDATE_FUNC_CLEANUP;
     }
@@ -199,7 +199,7 @@ i32 __fastcall ScreenEffect::on_draw_arcade(ScreenEffect *self)
 i32 __fastcall ScreenEffect::on_tick_pulse(ScreenEffect *self)
 {
     u32 start_alpha = (u32)self->arg_20 >> 24;
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
         return UPDATE_FUNC_CLEANUP;
     }
@@ -241,7 +241,7 @@ i32 __fastcall ScreenEffect::on_draw_arcade_2(ScreenEffect *self)
 // FUNCTION: TH16 0x45cd30
 i32 __fastcall ScreenEffect::on_tick_shake(ScreenEffect *self)
 {
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
         return UPDATE_FUNC_CLEANUP;
     }
@@ -290,7 +290,7 @@ i32 __fastcall ScreenEffect::on_tick_shake_with_ramp(ScreenEffect *self)
 {
     f32 t;
 
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
         return UPDATE_FUNC_CLEANUP;
     }

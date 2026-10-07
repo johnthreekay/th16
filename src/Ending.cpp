@@ -20,8 +20,8 @@
 // GLOBAL: TH16 0x4a6dbc
 Ending *g_Ending;
 
-// Cleared when the ending goes away; also used by the screen effects.
-extern i32 g_unk_4c0f40;
+// Defined in GameThread.cpp.
+extern i32 g_cancel_screen_effects;
 
 // The ending's anm files go in ANM manager slots 20-23.
 #define ENDING_ANM_SLOT 20
@@ -41,7 +41,7 @@ Ending::Ending()
     flags_0 |= 2;
 }
 
-// Unloads the ending's anm files and script; clears g_unk_4c0f40.
+// Unloads the ending's anm files and script; clears g_cancel_screen_effects.
 // FUNCTION: TH16 0x419450
 Ending::~Ending()
 {
@@ -60,7 +60,7 @@ Ending::~Ending()
     }
     script_file = NULL;
     g_Ending = NULL;
-    g_unk_4c0f40 = 0;
+    g_cancel_screen_effects = 0;
 }
 
 // FUNCTION: TH16 0x419640
@@ -391,7 +391,7 @@ i32 EndingScriptVm::run()
             }
             wait_timer.set_value(0);
             line_index = 0;
-            g_unk_4c0f40 = 0;
+            g_cancel_screen_effects = 0;
             break;
         case ENDING_LOAD_ANM:
         {

@@ -36,9 +36,12 @@ double LTCG_VECTORCALL get_runtime();
 
 i32 unit5_placeholder(void *object);
 
-// Set to 1 when a game ends and counted down each frame of one; the screen
-// effects check it.
-extern i32 g_unk_4c0f40;
+// While nonzero, the fade and pulse screen effects end at once. Set when a
+// game ends (so its effects do not carry over), counted down by the game's
+// frames and cleared when the next game, the title or an ending page
+// starts.
+// GLOBAL: TH16 0x4c0f40
+i32 g_cancel_screen_effects;
 // Credits left (the pause menu's continue counter).
 extern i32 g_continues_remaining;
 // The practice menu's starting lives choice: 0 for the default (9),
@@ -426,7 +429,7 @@ i32 GameThread::thread_start()
     GLOBALS_FLAGS_45C &= ~(GLOBALS_SAME_STAGE_AGAIN | GLOBALS_NEXT_STAGE | GLOBALS_CONTINUED);
     g_Supervisor.thread.should_run = FALSE;
     g_Supervisor.thread.stop_requested = TRUE;
-    g_unk_4c0f40 = 0;
+    g_cancel_screen_effects = 0;
     g_draw_hook_4a6eec = NULL;
     g_draw_hook_4a6ee8 = NULL;
     anm_vm_interrupt_2(g_Supervisor.vm_1bc);
@@ -587,7 +590,7 @@ DECOMP_NOINLINE GameThread::~GameThread()
         g_SoundManager.bgm_name[0] = '\0';
     }
     SoundManager::pause_sounds();
-    g_unk_4c0f40 = 1;
+    g_cancel_screen_effects = 1;
     g_Supervisor.background_color = (GLOBALS_FLAGS_45C & GLOBALS_SAME_STAGE_AGAIN) ? 0 : 0xff000000;
 }
 
@@ -732,9 +735,9 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
     g_Supervisor.vm_1c8->run();
     g_Globals.time_in_stage++;
     g_Globals.time_in_chapter++;
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
-        g_unk_4c0f40--;
+        g_cancel_screen_effects--;
     }
     time_in_stage++;
     return UPDATE_FUNC_CONTINUE;

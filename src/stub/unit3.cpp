@@ -10,9 +10,6 @@
 // GLOBAL: TH16 0x491b0c
 AnmVmSwitchFunc g_anm_on_switch_funcs[4];
 
-// GLOBAL: TH16 0x4c0f40
-i32 g_unk_4c0f40;
-
 // GLOBAL: TH16 0x491700
 i8 g_spell_difficulty[0x78];
 
