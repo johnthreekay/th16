@@ -20,7 +20,6 @@ i32 harness_get_keyboard_state(u8 *keys)
 void harness_stage(const char *path, i32 n, CameraSky *sky)
 {
     Stage::create(path);
-    g_Stage->start_std_vms();
     g_Stage->jump_to_label(n);
     g_Stage->start_fade_out();
     g_Stage2->start_fade_in();

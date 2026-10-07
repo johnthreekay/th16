@@ -232,21 +232,11 @@ DECOMP_NOINLINE GameThread::~GameThread()
     g_Supervisor.background_color = (GLOBALS_FLAGS_45C & 1) ? 0 : 0xff000000;
 }
 
-// Placeholder: the decompiled body below is parked. With it, LTCG sees a
-// call to sub_42dc50 and Stage::start_std_vms (0x40add0, sub_42dc50's
-// callee) stops matching (edi is saved in the prologue instead of after the
-// loop guard). Its best version (80.6%) is kept under #if 0.
-// STUB: TH16 0x42d7b0
-DECOMP_NOINLINE i32 GameThread::on_tick_body()
-{
-    return unit5_placeholder(this);
-}
-
-#if 0
 // One frame of a game: the ending fade, the stage restart and intro
 // timing, the demo's end, the music restart after a pause and the timers.
 // TODO: the original keeps the return 3 epilogue at the top and a second null test around the inlined delete of g_Stage2.
-DECOMP_NOINLINE i32 GameThread::on_tick_body()
+// FUNCTION: TH16 0x42d7b0
+HARNESS_CALLED i32 GameThread::on_tick_body()
 {
     if (*(u32 *)&flags & 0x4000)
     {
@@ -368,7 +358,6 @@ DECOMP_NOINLINE i32 GameThread::on_tick_body()
     time_in_stage++;
     return 1;
 }
-#endif
 
 // FUNCTION: TH16 0x418420
 void GameThread::enable_update_funcs()
@@ -506,7 +495,7 @@ static __forceinline void restart_stage_objects()
 // more bytes of locals, and folds allocate_new_enemy's unused argument
 // (push ecx).
 // FUNCTION: TH16 0x42dc50
-i32 GameThread::sub_42dc50()
+HARNESS_CALLED i32 GameThread::sub_42dc50()
 {
     g_Gui->sub_42c1b0();
     if (flags.flag_3)

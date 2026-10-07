@@ -115,7 +115,7 @@ struct GameThread
     static void destroy();
     static void thread_start();
     static void thread_start_callback();
-    i32 on_tick_body();
+    HARNESS_CALLED i32 on_tick_body();
     // 0x418420. Reactivates on_tick and on_draw.
     void enable_update_funcs();
     static i32 __fastcall on_tick_callback(GameThread *thread);
@@ -125,7 +125,7 @@ struct GameThread
     // 0x42dc50. Restarts the stage after its intro: 1 once the game
     // should switch modes, otherwise resets the game objects (or leaves
     // that to sub_42dee0 when there is a second stage).
-    i32 sub_42dc50();
+    HARNESS_CALLED i32 sub_42dc50();
     // 0x42dee0. Finishes a stage restart that sub_42dc50 began: resets the
     // game objects, reactivates every manager and restarts the music.
     i32 sub_42dee0();

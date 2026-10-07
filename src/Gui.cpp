@@ -1391,7 +1391,7 @@ void __fastcall anm_vm_interrupt_2(AnmVm *vm)
 // TODO: same frame difference as create_vm (4 more bytes, esi saved
 // before the critical section).
 // FUNCTION: TH16 0x42c920
-AnmId AnmLoaded::create_ui_effect(i32 script, i32 unused, AnmVm **out)
+HARNESS_CALLED AnmId AnmLoaded::create_ui_effect(i32 script, i32 unused, AnmVm **out)
 {
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;
@@ -1539,6 +1539,146 @@ void Gui::start_dialogue(i32 script)
         }
         msg = new GuiMsgVm((u8 *)msg_file + msg_file->scripts[script].offset);
         msg->script_num = script;
+    }
+}
+
+// AnmLoaded::create_effect as LTCG inlined it into sub_426d70.
+static __forceinline AnmId create_effect_inline(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    anm->vm_count++;
+    AnmVm *vm = g_AnmManager->allocate_vm();
+    if (out != NULL)
+    {
+        *out = vm;
+    }
+    anm->copy_vm(vm, script);
+    vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+    if (layer >= 0)
+    {
+        vm->layer = layer;
+        if (layer <= 23)
+        {
+            vm->flags_hi &= ~ANM_VM_LAYER_UI;
+            vm->flags_hi |= ANM_VM_LAYER_SET;
+        }
+    }
+    vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    vm->rotation.z = 0.0f;
+    vm->run();
+    vm->mode_of_create_child = 0;
+    AnmId id;
+    id = g_AnmManager->insert_in_world_list_back(vm);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return id;
+}
+
+// AnmManager::interrupt_tree as LTCG inlined it into sub_426d70.
+static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
+{
+    AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+    if (vm == NULL)
+    {
+        return;
+    }
+    vm->interrupt(interrupt);
+    for (ZunList<AnmVm> *node = vm->list_of_children.next; node != NULL; node = node->next)
+    {
+        node->entry->interrupt(interrupt);
+    }
+}
+
+// Sets the HUD up for a stage: the life and bomb counters, the spell VMs,
+// the stage logo, the demo and difficulty markers and the season gauge.
+// FUNCTION: TH16 0x426d70
+void Gui::sub_426d70()
+{
+    Gui *gui = g_Gui;
+    if (gui->on_tick != NULL)
+    {
+        gui->on_tick->flags |= UPDATE_FUNC_ACTIVE;
+    }
+    if (gui->on_draw_1 != NULL)
+    {
+        gui->on_draw_1->flags |= UPDATE_FUNC_ACTIVE;
+    }
+    if (gui->on_draw_2 != NULL)
+    {
+        gui->on_draw_2->flags |= UPDATE_FUNC_ACTIVE;
+    }
+    if (gui->id_150.id == 0)
+    {
+        gui->id_150 = gui->front_anm->create_ui_vm_at_origin(0, 0);
+    }
+    if (gui->life_counter_vms[0] == NULL)
+    {
+        for (u32 i = 0; i < 8; i++)
+        {
+            gui->life_counter_ids[i] = gui->front_anm->create_ui_effect(i + 0x1e, 0, &gui->life_counter_vms[i]);
+        }
+        for (u32 i = 0; i < 8; i++)
+        {
+            gui->bomb_counter_ids[i] = gui->front_anm->create_ui_effect(i + 0x26, 0, &gui->bomb_counter_vms[i]);
+        }
+        for (i32 i = 0; i < 2; i++)
+        {
+            (&gui->id_4c)[i] = create_effect_inline(g_AsciiManager->ascii_anm, i + 2, -1, &(&gui->vm_94)[i]);
+            (&gui->vm_94)[i]->clear_flag_lo_2_tree_inline();
+            (&gui->vm_94)[i]->flags_hi &= ~ANM_VM_LAYER_KIND_MASK;
+        }
+    }
+    gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
+    gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
+    if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & 1) && g_Globals.game_mode != 2)
+    {
+        create_effect_inline(gui->stage_logo_anm, 1, -1, NULL);
+    }
+    if (g_Globals.flags_hi_45c & 1)
+    {
+        create_effect_inline(gui->front_anm, 0x77, -1, NULL);
+    }
+    if (gui->id_9c.id == 0)
+    {
+        gui->id_9c = create_effect_inline(gui->front_anm, 0x70, -1, NULL);
+    }
+    if (g_Globals.stage_num == 1 && g_GameThread->replay_mode == 0 && g_Globals.continues_used == 0)
+    {
+        AnmId id = create_effect_inline(gui->front_anm, 0x45, -1, NULL);
+        Float3 pos(0.0f, g_Globals.character == 3 ? 148 : 128, 0.0f);
+        AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+        if (vm != NULL)
+        {
+            vm->entity_pos = pos;
+        }
+    }
+    if (g_Supervisor.unk_700 != 0)
+    {
+        gui->id_104 = create_effect_inline(gui->front_anm, g_Globals.difficulty + 0x51, -1, NULL);
+        AnmManager::interrupt_tree(gui->id_104, 3);
+    }
+    gui->difficulty_id = create_effect_inline(gui->front_anm, g_Globals.difficulty + 0x57, -1, NULL);
+    interrupt_tree_inline(gui->id_104, 3);
+    gui->boss_star_count = 0;
+    for (i32 i = 0; i < 3; i++)
+    {
+        gui->boss_bars[i].unk_4c = 0;
+    }
+    if (g_Supervisor.unk_700 != 0)
+    {
+        gui->season_gauge_has_level = 0;
+        gui->season_gauge_id = create_effect_inline(gui->front_anm, 0x71, -1, NULL);
+        AnmManager *anm = g_AnmManager;
+        AnmVm *vm = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, 0x75));
+        if (vm != NULL)
+        {
+            anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, g_Globals.subseason + 0x52);
+        }
+    }
+    update_season_gauge();
+    if (gui->id_110.id != 0)
+    {
+        AnmManager::interrupt_tree(gui->id_110, 1);
+        gui->id_110.id = 0;
     }
 }
 
