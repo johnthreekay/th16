@@ -290,7 +290,8 @@ HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
     }
 }
 
-// TODO: register allocation differs in the inlined ZunTimer::tick (the original keeps 1.0f in xmm2).
+// TODO: register allocation differs in the inlined ZunTimer::tick: the original loads 1.0f into
+// xmm2 at the damage_multiplier store and keeps 1.01f in xmm1 (tick_mixed does not change it).
 // FUNCTION: TH16 0x41b3d0
 int EnemyManager::update()
 {

@@ -266,7 +266,8 @@ HARNESS_CALLED i32 *EclRunContext::get_int_arg_ptr(int index)
     return NULL;
 }
 
-// TODO: register allocation differs.
+// TODO: ours hoists (i32)value above the sign test (both paths convert it); the original
+// converts in each path and adds the frame base before the stack address.
 // FUNCTION: TH16 0x4743a0
 f32 *EclRunContext::get_float_arg_ptr(int index)
 {

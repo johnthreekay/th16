@@ -537,7 +537,8 @@ D3DXVECTOR3 InterpStrange1::step()
     return current;
 }
 
-// TODO: the timer tick adds current_f and the speed the other way round, and one lea swaps its operands.
+// TODO: the timer tick (tick_mixed) adds current_f and the speed the other way round and stores
+// current_f before current on the unscaled path, and one lea swaps its operands.
 // FUNCTION: TH16 0x464590
 Int3 InterpInt3::step()
 {
