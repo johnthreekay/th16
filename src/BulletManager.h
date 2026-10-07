@@ -385,6 +385,24 @@ static_assert(sizeof(BulletTypeInfo) == 0x114, "BulletTypeInfo layout");
 #define BULLET_TYPE_COUNT 44
 extern BulletTypeInfo g_bullet_types[BULLET_TYPE_COUNT];
 
+// What a cancelled bullet or laser segment leaves (gen_items_from_cancel);
+// the cancel functions pass it on.
+enum BulletCancelMode
+{
+    CANCEL_NO_ITEMS = 0,
+    // Counted in cancel_count, nothing dropped (1 and 3).
+    CANCEL_COUNT_ONLY = 1,
+    // A cancel item, plus a power item every fifth cancel outside spells.
+    CANCEL_ITEMS = 2,
+    CANCEL_COUNT_ONLY_3 = 3,
+    // A season item, plus a cancel item of the release's level during a
+    // season release.
+    CANCEL_RELEASE = 4,
+    // Bombs: a season item every third bullet.
+    CANCEL_BOMB = 5,
+};
+
 // 0x416a00. Drops the items a cancelled bullet or laser segment leaves at
-// pos, by cancel mode. LTCG passes pos in ecx and mode in edx.
+// pos (BulletCancelMode), only near the playfield. LTCG passes pos in ecx
+// and mode in edx.
 HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode);

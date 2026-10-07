@@ -425,13 +425,10 @@ HARNESS_CALLED i32 BulletManager::cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3D
     return 0;
 }
 
-// Modes: 0 nothing; 1 and 3 count only; 2 cancel items (a power item every
-// fifth outside spells); 4 a season item (plus a cancel item during a
-// season release); 5 (bombs) a season item every third.
 // FUNCTION: TH16 0x416a00
 HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
 {
-    if (mode == 0)
+    if (mode == CANCEL_NO_ITEMS)
     {
         return;
     }
@@ -441,11 +438,11 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
     }
     BulletManager *mgr = g_BulletManager;
     mgr->cancel_count++;
-    if (mode == 1 || mode == 3)
+    if (mode == CANCEL_COUNT_ONLY || mode == CANCEL_COUNT_ONLY_3)
     {
         return;
     }
-    if (mode == 2)
+    if (mode == CANCEL_ITEMS)
     {
         if (mgr->cancel_counter_multiple_of(5) && !(g_Spellcard->flags & SPELLCARD_ACTIVE))
         {
@@ -457,7 +454,7 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
                                       2.2f, 0, 0);
         }
     }
-    else if (mode == 5)
+    else if (mode == CANCEL_BOMB)
     {
         if (mgr->bomb_cancel_count_multiple_of(3))
         {
@@ -466,7 +463,7 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
         }
         g_BulletManager->bullet_count_canceled_by_bombs++;
     }
-    else if (mode == 4)
+    else if (mode == CANCEL_RELEASE)
     {
         g_ItemManager->spawn_item(ITEM_SEASON, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f, 2.2f,
                                   0, 1);
