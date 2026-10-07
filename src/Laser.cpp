@@ -2227,7 +2227,7 @@ i32 LaserCurveInf::on_draw()
         vertex->pos.z = 0.0f;
         u += 1.0f / (f32)(inner.segment_count - 1);
     }
-    g_AnmManager->draw_vm__mode_9(&vm_92c, (RenderVertex144 *)unk_1528, inner.segment_count * 2);
+    g_AnmManager->draw_vertex_strip(&vm_92c, (RenderVertex144 *)unk_1528, inner.segment_count * 2);
     if (inner.segment_count >= timer_40.current)
     {
         vm_f28.pos = ((LaserCurveSegment *)unk_1524)[inner.segment_count - 1].pos;

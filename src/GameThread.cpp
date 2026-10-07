@@ -88,9 +88,9 @@ i32 __fastcall GameThread::on_draw_callback(GameThread *thread)
 {
     AnmManager *anm = g_AnmManager;
     anm->unk_c4 = 0;
-    anm->unk_c8 = 0;
-    anm->unk_c0 = 0;
-    anm->unk_cc = 0;
+    anm->stat_render_state_setups = 0;
+    anm->stat_scripts_started = 0;
+    anm->stat_draw_calls = 0;
     return 1;
 }
 

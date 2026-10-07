@@ -484,7 +484,7 @@ void AnmLoaded::load_sprite(i32 index, AnmLoadedSprite *sprite)
 }
 
 // FUNCTION: TH16 0x46d690
-HARNESS_CALLED i32 AnmManager::sub_46d690()
+HARNESS_CALLED i32 AnmManager::service_pending_loads()
 {
     for (u32 i = 0; i < 0x1f; i++)
     {
@@ -569,7 +569,7 @@ struct AnmQuadXyzTex
 void AnmManager::setup_vertex_buffer()
 {
     AnmManager *mgr = g_AnmManager;
-    RenderVertexXyzTex *quad = mgr->quad_184fbc8;
+    RenderVertexXyzTex *quad = mgr->fog_unit_quad;
     quad[0].pos.x = quad[2].pos.x = -128.0f;
     quad[1].pos.x = quad[3].pos.x = 128.0f;
     quad[0].pos.y = quad[1].pos.y = -128.0f;
@@ -580,20 +580,20 @@ void AnmManager::setup_vertex_buffer()
     quad[1].uv.x = quad[3].uv.x = 1.0f;
     quad[0].uv.y = quad[1].uv.y = 0.0f;
     quad[2].uv.y = quad[3].uv.y = 1.0f;
-    g_quad_vertices_4df8a0[0].pos = quad[0].pos;
-    g_quad_vertices_4df8a0[1].pos = quad[1].pos;
-    g_quad_vertices_4df8a0[2].pos = quad[2].pos;
-    g_quad_vertices_4df8a0[3].pos = quad[3].pos;
-    g_quad_vertices_4df8a0[0].uv.x = quad[0].uv.x;
-    g_quad_vertices_4df8a0[0].uv.y = quad[0].uv.y;
-    g_quad_vertices_4df8a0[1].uv.x = quad[1].uv.x;
-    g_quad_vertices_4df8a0[1].uv.y = quad[1].uv.y;
-    g_quad_vertices_4df8a0[2].uv.x = quad[2].uv.x;
-    g_quad_vertices_4df8a0[2].uv.y = quad[2].uv.y;
-    g_quad_vertices_4df8a0[3].uv.x = quad[3].uv.x;
-    g_quad_vertices_4df8a0[3].uv.y = quad[3].uv.y;
+    g_unit_quad_xyz[0].pos = quad[0].pos;
+    g_unit_quad_xyz[1].pos = quad[1].pos;
+    g_unit_quad_xyz[2].pos = quad[2].pos;
+    g_unit_quad_xyz[3].pos = quad[3].pos;
+    g_unit_quad_xyz[0].uv.x = quad[0].uv.x;
+    g_unit_quad_xyz[0].uv.y = quad[0].uv.y;
+    g_unit_quad_xyz[1].uv.x = quad[1].uv.x;
+    g_unit_quad_xyz[1].uv.y = quad[1].uv.y;
+    g_unit_quad_xyz[2].uv.x = quad[2].uv.x;
+    g_unit_quad_xyz[2].uv.y = quad[2].uv.y;
+    g_unit_quad_xyz[3].uv.x = quad[3].uv.x;
+    g_unit_quad_xyz[3].uv.y = quad[3].uv.y;
     IDirect3DDevice9 *device = g_Supervisor.d3d_device;
-    device->CreateVertexBuffer(sizeof(mgr->quad_184fbc8) * 9, 0, D3DFVF_XYZ | D3DFVF_TEX1, D3DPOOL_MANAGED,
+    device->CreateVertexBuffer(sizeof(mgr->fog_unit_quad) * 9, 0, D3DFVF_XYZ | D3DFVF_TEX1, D3DPOOL_MANAGED,
                                &mgr->vertex_buffer, NULL);
     AnmQuadXyzTex *buffer;
     mgr->vertex_buffer->Lock(0, 0, (void **)&buffer, 0);

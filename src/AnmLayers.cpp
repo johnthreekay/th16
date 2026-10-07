@@ -260,8 +260,8 @@ int __fastcall AnmManager::on_draw_3a_layer_24(AnmManager *mgr)
 {
     use_camera(2);
     disable_depth_test();
-    g_AnmManager->camera_unk_fc.x = 0.0f;
-    g_AnmManager->camera_unk_fc.y = 0.0f;
+    g_AnmManager->camera_2d_offset.x = 0.0f;
+    g_AnmManager->camera_2d_offset.y = 0.0f;
     return mgr->render_layer(24);
 }
 

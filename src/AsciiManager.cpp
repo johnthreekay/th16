@@ -540,8 +540,8 @@ i32 AsciiInf::draw_group(i32 group)
     g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &g_Supervisor.cameras[2].projection_matrix);
     if (g_AnmManager != NULL)
     {
-        g_AnmManager->camera_unk_fc.x = g_Supervisor.cameras[2].unk_fc.x;
-        g_AnmManager->camera_unk_fc.y = g_Supervisor.cameras[2].unk_fc.y;
+        g_AnmManager->camera_2d_offset.x = g_Supervisor.cameras[2].unk_fc.x;
+        g_AnmManager->camera_2d_offset.y = g_Supervisor.cameras[2].unk_fc.y;
     }
     g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
     g_Supervisor.current_camera_index = 2;

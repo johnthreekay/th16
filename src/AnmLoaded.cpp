@@ -69,7 +69,7 @@ void AnmLoaded::set_vm_script(AnmVm *vm, i32 script)
     vm->script_time.reset();
     vm->flags_lo &= ~ANM_VM_VISIBLE;
     vm->run();
-    g_AnmManager->unk_c0++;
+    g_AnmManager->stat_scripts_started++;
     if ((vm->flags_hi & (ANM_VM_FREEZES_WITH_WORLD | ANM_VM_FREEZES_AFTER_FIRST_RUN)) == ANM_VM_FREEZES_AFTER_FIRST_RUN)
     {
         vm->flags_hi &= ~ANM_VM_FREEZES_AFTER_FIRST_RUN;

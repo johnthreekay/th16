@@ -5,7 +5,7 @@
 #include "Supervisor.h"
 
 static_assert(offsetof(AnmManager, last_texture_factor) == 0x184fbac, "AnmManager layout");
-static_assert(offsetof(AnmManager, quad_184fbc8) == 0x184fbc8, "AnmManager layout");
+static_assert(offsetof(AnmManager, fog_unit_quad) == 0x184fbc8, "AnmManager layout");
 static_assert(sizeof(RenderVertexXyzTex) == 0x14, "RenderVertexXyzTex layout");
 static_assert(sizeof(RenderVertexXyzDiffuseTex) == 0x18, "RenderVertexXyzDiffuseTex layout");
 
@@ -66,15 +66,15 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
 {
     static const f32 half = 0.5f;
 
-    g_sprite_temp_buffer[0].pos.x += camera_unk_fc.x;
-    g_sprite_temp_buffer[0].pos.y += camera_unk_fc.y;
-    g_sprite_temp_buffer[1].pos.x += camera_unk_fc.x;
-    g_sprite_temp_buffer[1].pos.y += camera_unk_fc.y;
-    g_sprite_temp_buffer[2].pos.x += camera_unk_fc.x;
-    g_sprite_temp_buffer[2].pos.y += camera_unk_fc.y;
-    g_sprite_temp_buffer[3].pos.x += camera_unk_fc.x;
-    g_sprite_temp_buffer[3].pos.y += camera_unk_fc.y;
-    if (flags & 1)
+    g_sprite_temp_buffer[0].pos.x += camera_2d_offset.x;
+    g_sprite_temp_buffer[0].pos.y += camera_2d_offset.y;
+    g_sprite_temp_buffer[1].pos.x += camera_2d_offset.x;
+    g_sprite_temp_buffer[1].pos.y += camera_2d_offset.y;
+    g_sprite_temp_buffer[2].pos.x += camera_2d_offset.x;
+    g_sprite_temp_buffer[2].pos.y += camera_2d_offset.y;
+    g_sprite_temp_buffer[3].pos.x += camera_2d_offset.x;
+    g_sprite_temp_buffer[3].pos.y += camera_2d_offset.y;
+    if (flags & ANM_SPRITE_SNAP_TO_PIXELS)
     {
         __asm {
             fld g_sprite_temp_buffer[0 * TYPE g_sprite_temp_buffer].pos.x
@@ -141,21 +141,21 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
         return 0;
     }
     i32 texture = g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].image_file_num_in_all;
-    if (render_cache_184fbb0 != texture)
+    if (last_texture_id != texture)
     {
-        render_cache_184fbb0 = texture;
+        last_texture_id = texture;
         flush_sprites();
         g_Supervisor.d3d_device->SetTexture(
-            0, loaded_anms[render_cache_184fbb0 >> 8]->d3d[(u8)render_cache_184fbb0].texture);
+            0, loaded_anms[last_texture_id >> 8]->d3d[(u8)last_texture_id].texture);
     }
-    if (render_cache_184fbb6 != 1)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
         flush_sprites();
-        render_cache_184fbb6 = 1;
+        last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
-    if (!(flags & 2))
+    if (!(flags & ANM_SPRITE_KEEP_COLORS))
     {
-        switch ((vm->flags_lo >> 17) & 3)
+        switch ((vm->flags_lo >> ANM_VM_COLOR_MODE_SHIFT) & 3)
         {
         case 0:
         case 1: {
@@ -178,12 +178,12 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
                 a = color.a;
             }
             vm->mixed_inherited_color = color;
-            if (unk_1c7fd8c != 0)
+            if (global_tint_enabled != 0)
             {
-                color.r = color_mul(r, unk_1c7fd88.r);
-                color.g = color_mul(g, unk_1c7fd88.g);
-                color.b = color_mul(b, unk_1c7fd88.b);
-                color.a = color_mul(a, unk_1c7fd88.a);
+                color.r = color_mul(r, global_tint.r);
+                color.g = color_mul(g, global_tint.g);
+                color.b = color_mul(b, global_tint.b);
+                color.a = color_mul(a, global_tint.a);
             }
             g_sprite_temp_buffer[2].diffuse = color.d3d;
             g_sprite_temp_buffer[3].diffuse = color.d3d;
@@ -195,16 +195,16 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
         case 3: {
             ZunColor color_1 = vm->color_1;
             ZunColor color_2 = vm->color_2;
-            if (unk_1c7fd8c != 0)
+            if (global_tint_enabled != 0)
             {
-                color_1.r = color_mul(color_1.r, unk_1c7fd88.r);
-                color_1.g = color_mul(color_1.g, unk_1c7fd88.g);
-                color_1.b = color_mul(color_1.b, unk_1c7fd88.b);
-                color_1.a = color_mul(color_1.a, unk_1c7fd88.a);
-                color_2.r = color_mul(color_2.r, unk_1c7fd88.r);
-                color_2.g = color_mul(color_2.g, unk_1c7fd88.g);
-                color_2.b = color_mul(color_2.b, unk_1c7fd88.b);
-                color_2.a = color_mul(color_2.a, unk_1c7fd88.a);
+                color_1.r = color_mul(color_1.r, global_tint.r);
+                color_1.g = color_mul(color_1.g, global_tint.g);
+                color_1.b = color_mul(color_1.b, global_tint.b);
+                color_1.a = color_mul(color_1.a, global_tint.a);
+                color_2.r = color_mul(color_2.r, global_tint.r);
+                color_2.g = color_mul(color_2.g, global_tint.g);
+                color_2.b = color_mul(color_2.b, global_tint.b);
+                color_2.a = color_mul(color_2.a, global_tint.a);
             }
             g_sprite_temp_buffer[3].diffuse = color_2.d3d;
             if ((vm->flags_lo & ANM_VM_COLOR_MODE_MASK) == ANM_VM_COLOR_MODE_2)
@@ -373,7 +373,7 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
 
 // TODO: 74%; register allocation of the corner offsets differs.
 // FUNCTION: TH16 0x466390
-i32 __stdcall AnmManager::write_sprite_corners__mode_4(AnmVm *vm)
+i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
 {
     f32 angle = vm->get_total_rotation()->z;
     f32 sine;
@@ -462,9 +462,9 @@ i32 __stdcall AnmManager::write_sprite_corners__mode_4(AnmVm *vm)
 
 // TODO: 46%; the original keeps the scaled color channels in dword stack slots.
 // FUNCTION: TH16 0x466820
-i32 AnmManager::draw_vm__mode_6(AnmVm *vm)
+i32 AnmManager::draw_billboard_fog(AnmVm *vm)
 {
-    if (write_sprite_corners__mode_4(vm) != 0)
+    if (write_billboard_corners(vm) != 0)
     {
         return -1;
     }
@@ -481,18 +481,18 @@ i32 AnmManager::draw_vm__mode_6(AnmVm *vm)
         diff.y += (g_resolution_y - 448.0f) * 0.5f;
     }
     f32 distance = D3DXVec3Length(&diff);
-    switch ((vm->flags_lo >> 17) & 3)
+    switch ((vm->flags_lo >> ANM_VM_COLOR_MODE_SHIFT) & 3)
     {
     case 0:
     case 1: {
         ZunColor color;
         color.d3d = (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d;
-        if (unk_1c7fd8c != 0)
+        if (global_tint_enabled != 0)
         {
-            color.r = color_mul(color.r, unk_1c7fd88.r);
-            color.g = color_mul(color.g, unk_1c7fd88.g);
-            color.b = color_mul(color.b, unk_1c7fd88.b);
-            color.a = color_mul(color.a, unk_1c7fd88.a);
+            color.r = color_mul(color.r, global_tint.r);
+            color.g = color_mul(color.g, global_tint.g);
+            color.b = color_mul(color.b, global_tint.b);
+            color.a = color_mul(color.a, global_tint.a);
         }
         if (distance > fog_begin)
         {
@@ -509,27 +509,27 @@ i32 AnmManager::draw_vm__mode_6(AnmVm *vm)
             g_sprite_temp_buffer[1].diffuse = g_sprite_temp_buffer[0].diffuse;
             g_sprite_temp_buffer[2].diffuse = g_sprite_temp_buffer[0].diffuse;
             g_sprite_temp_buffer[3].diffuse = g_sprite_temp_buffer[0].diffuse;
-            return render_sprite_2d(vm, 2);
+            return render_sprite_2d(vm, ANM_SPRITE_KEEP_COLORS);
         }
         g_sprite_temp_buffer[0].diffuse = color.d3d;
         g_sprite_temp_buffer[1].diffuse = color.d3d;
         g_sprite_temp_buffer[2].diffuse = color.d3d;
         g_sprite_temp_buffer[3].diffuse = color.d3d;
-        return render_sprite_2d(vm, 2);
+        return render_sprite_2d(vm, ANM_SPRITE_KEEP_COLORS);
     }
     default: {
         ZunColor color_1 = vm->color_1;
         ZunColor color_2 = vm->color_2;
-        if (unk_1c7fd8c != 0)
+        if (global_tint_enabled != 0)
         {
-            color_1.r = color_mul(color_1.r, unk_1c7fd88.r);
-            color_1.g = color_mul(color_1.g, unk_1c7fd88.g);
-            color_1.b = color_mul(color_1.b, unk_1c7fd88.b);
-            color_1.a = color_mul(color_1.a, unk_1c7fd88.a);
-            color_2.r = color_mul(color_2.r, unk_1c7fd88.r);
-            color_2.g = color_mul(color_2.g, unk_1c7fd88.g);
-            color_2.b = color_mul(color_2.b, unk_1c7fd88.b);
-            color_2.a = color_mul(color_2.a, unk_1c7fd88.a);
+            color_1.r = color_mul(color_1.r, global_tint.r);
+            color_1.g = color_mul(color_1.g, global_tint.g);
+            color_1.b = color_mul(color_1.b, global_tint.b);
+            color_1.a = color_mul(color_1.a, global_tint.a);
+            color_2.r = color_mul(color_2.r, global_tint.r);
+            color_2.g = color_mul(color_2.g, global_tint.g);
+            color_2.b = color_mul(color_2.b, global_tint.b);
+            color_2.a = color_mul(color_2.a, global_tint.a);
         }
         if (distance > fog_begin)
         {
@@ -563,23 +563,23 @@ i32 AnmManager::draw_vm__mode_6(AnmVm *vm)
             g_sprite_temp_buffer[1].diffuse = g_sprite_temp_buffer[0].diffuse;
             g_sprite_temp_buffer[2].diffuse = g_sprite_temp_buffer[3].diffuse;
         }
-        return render_sprite_2d(vm, 2);
+        return render_sprite_2d(vm, ANM_SPRITE_KEEP_COLORS);
     }
     }
 }
 
 // TODO: the y and z differences trade xmm0/xmm1; the loop end compares with g_sprite_temp_buffer's end, which our data layout follows with another global.
 // FUNCTION: TH16 0x467200
-i32 AnmManager::draw_vm__mode_7(AnmVm *vm)
+i32 AnmManager::draw_sprite_fog(AnmVm *vm)
 {
-    render_sub_466f00(vm);
+    build_world_matrix(vm);
     f32 fog_range = g_Supervisor.current_camera->sky.begin_distance - g_Supervisor.current_camera->sky.end_distance;
     ZunColor color;
     color.d3d = (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d;
     D3DXVECTOR4 transformed[4];
     for (i32 i = 0; i < 4; i++)
     {
-        D3DXVec3Transform(&transformed[i], &quad_184fbc8[i].pos, (D3DXMATRIX *)&matrix_184f56c);
+        D3DXVec3Transform(&transformed[i], &fog_unit_quad[i].pos, (D3DXMATRIX *)&current_world_matrix);
         D3DXVECTOR3 diff;
         diff.y = transformed[i].y - g_Supervisor.current_camera->position.y;
         diff.x = transformed[i].x - g_Supervisor.current_camera->position.x;
@@ -607,7 +607,7 @@ i32 AnmManager::draw_vm__mode_7(AnmVm *vm)
             diffuse->d3d = color.d3d;
         }
     }
-    i32 result = render_sprite_2d(vm, 2);
+    i32 result = render_sprite_2d(vm, ANM_SPRITE_KEEP_COLORS);
     g_sprite_temp_buffer[0].pos.w = g_sprite_temp_buffer[1].pos.w = g_sprite_temp_buffer[2].pos.w =
         g_sprite_temp_buffer[3].pos.w = 1.0f;
     return result;
@@ -617,12 +617,12 @@ i32 AnmManager::draw_vm__mode_7(AnmVm *vm)
 static inline AnmLoadedSprite *set_texture_of_vm(AnmManager *mgr, AnmVm *vm)
 {
     AnmLoadedSprite *sprite = &g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id];
-    if (mgr->render_cache_184fbb0 != sprite->image_file_num_in_all)
+    if (mgr->last_texture_id != sprite->image_file_num_in_all)
     {
-        mgr->render_cache_184fbb0 = sprite->image_file_num_in_all;
+        mgr->last_texture_id = sprite->image_file_num_in_all;
         mgr->flush_sprites();
         g_Supervisor.d3d_device->SetTexture(
-            0, mgr->loaded_anms[mgr->render_cache_184fbb0 >> 8]->d3d[(u8)mgr->render_cache_184fbb0].texture);
+            0, mgr->loaded_anms[mgr->last_texture_id >> 8]->d3d[(u8)mgr->last_texture_id].texture);
     }
     return sprite;
 }
@@ -631,10 +631,10 @@ static inline AnmLoadedSprite *set_texture_of_vm(AnmManager *mgr, AnmVm *vm)
 // last one set is still right.
 static inline void set_texture_transform_of_vm(AnmManager *mgr, AnmVm *vm, AnmLoadedSprite *sprite)
 {
-    if (mgr->render_cache_184fbc0 != (i32)sprite || vm->uv_scroll_pos.x != 0.0f || vm->uv_scroll_pos.x != 0.0f ||
+    if (mgr->last_texture_matrix_sprite != (i32)sprite || vm->uv_scroll_pos.x != 0.0f || vm->uv_scroll_pos.x != 0.0f ||
         vm->uv_scale.x != 1.0f || vm->uv_scale.y != 1.0f)
     {
-        mgr->render_cache_184fbc0 = (i32)sprite;
+        mgr->last_texture_matrix_sprite = (i32)sprite;
         D3DXMATRIX texture_matrix = vm->texture_matrix;
         texture_matrix._31 = vm->uv_quad_of_sprite[0].x + vm->uv_scroll_pos.x;
         texture_matrix._32 = vm->uv_quad_of_sprite[0].y + vm->uv_scroll_pos.y;
@@ -646,17 +646,17 @@ static inline void set_texture_transform_of_vm(AnmManager *mgr, AnmVm *vm, AnmLo
 
 static inline void set_color_op_modulate()
 {
-    if (g_AnmManager->last_color_op != 1)
+    if (g_AnmManager->last_color_op != ANM_COLOR_OP_MODULATE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-        g_AnmManager->last_color_op = 1;
+        g_AnmManager->last_color_op = ANM_COLOR_OP_MODULATE;
     }
 }
 
 // TODO: 44%; the rotation order cases and the texture matrix copy are laid out differently.
 // FUNCTION: TH16 0x467410
-i32 AnmManager::draw_vm__mode_8(AnmVm *vm)
+i32 AnmManager::draw_3d(AnmVm *vm)
 {
     if (!(vm->flags_lo & ANM_VM_VISIBLE))
     {
@@ -815,12 +815,12 @@ i32 AnmManager::draw_vm__mode_8(AnmVm *vm)
     setup_render_state_for_vm(vm);
     ZunColor color;
     color.d3d = (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d;
-    if (unk_1c7fd8c != 0)
+    if (global_tint_enabled != 0)
     {
-        color.r = color_mul(color.r, unk_1c7fd88.r);
-        color.g = color_mul(color.g, unk_1c7fd88.g);
-        color.b = color_mul(color.b, unk_1c7fd88.b);
-        color.a = color_mul(color.a, unk_1c7fd88.a);
+        color.r = color_mul(color.r, global_tint.r);
+        color.g = color_mul(color.g, global_tint.g);
+        color.b = color_mul(color.b, global_tint.b);
+        color.a = color_mul(color.a, global_tint.a);
     }
     if (last_texture_factor != color.d3d)
     {
@@ -832,13 +832,13 @@ i32 AnmManager::draw_vm__mode_8(AnmVm *vm)
     g_Supervisor.d3d_device->SetTransform(D3DTS_WORLD, &world);
     AnmLoadedSprite *sprite = set_texture_of_vm(this, vm);
     set_texture_transform_of_vm(this, vm, sprite);
-    if (render_cache_184fbb6 != 2)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_3D_QUAD)
     {
         g_Supervisor.d3d_device->SetStreamSource(0, vertex_buffer, 0, sizeof(RenderVertexXyzTex));
         g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZ | D3DFVF_TEX1);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
-        render_cache_184fbb6 = 2;
+        last_vertex_setup = ANM_VERTEX_SETUP_3D_QUAD;
     }
     set_color_op_modulate();
     g_Supervisor.d3d_device->DrawPrimitive(
@@ -848,7 +848,7 @@ i32 AnmManager::draw_vm__mode_8(AnmVm *vm)
 
 // TODO: 39%; the identity matrix stores and the texture matrix copy are scheduled differently.
 // FUNCTION: TH16 0x467d00
-i32 AnmManager::draw_vm__mode_24(AnmVm *vm, RenderVertexXyzDiffuseTex *vertices, i32 vertex_count)
+i32 AnmManager::draw_3d_vertex_strip(AnmVm *vm, RenderVertexXyzDiffuseTex *vertices, i32 vertex_count)
 {
     if (!(vm->flags_lo & ANM_VM_VISIBLE))
     {
@@ -904,12 +904,12 @@ i32 AnmManager::draw_vm__mode_24(AnmVm *vm, RenderVertexXyzDiffuseTex *vertices,
     setup_render_state_for_vm(vm);
     AnmLoadedSprite *sprite = set_texture_of_vm(this, vm);
     set_texture_transform_of_vm(this, vm, sprite);
-    if (render_cache_184fbb6 != 5)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_3D_STRIP)
     {
         g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-        render_cache_184fbb6 = 5;
+        last_vertex_setup = ANM_VERTEX_SETUP_3D_STRIP;
     }
     set_color_op_modulate();
     g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, vertex_count - 2, vertices,
@@ -955,7 +955,7 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
         AnmVm::write_sprite_corners__without_rot(
             vm, (Float3 *)&g_sprite_temp_buffer[0].pos, (Float3 *)&g_sprite_temp_buffer[1].pos,
             (Float3 *)&g_sprite_temp_buffer[2].pos, (Float3 *)&g_sprite_temp_buffer[3].pos);
-        return render_sprite_2d(vm, 1);
+        return render_sprite_2d(vm, ANM_SPRITE_SNAP_TO_PIXELS);
     case ANM_RENDER_SPRITE_ROTATED:
     case ANM_RENDER_SPRITE_ROTATED_3:
         if (is_transparent(vm))
@@ -971,7 +971,7 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
         {
             return -1;
         }
-        if (write_sprite_corners__mode_4(vm) != 0)
+        if (write_billboard_corners(vm) != 0)
         {
             return -1;
         }
@@ -981,44 +981,44 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
         {
             return -1;
         }
-        return draw_vm__mode_5(vm);
+        return draw_mode_5(vm);
     case ANM_RENDER_BILLBOARD_FOG:
         if (is_transparent(vm))
         {
             return -1;
         }
-        return draw_vm__mode_6(vm);
+        return draw_billboard_fog(vm);
     case ANM_RENDER_SPRITE_FOG:
         if (is_transparent(vm))
         {
             return -1;
         }
-        return draw_vm__mode_7(vm);
+        return draw_sprite_fog(vm);
     case ANM_RENDER_3D:
         if (is_transparent(vm))
         {
             return -1;
         }
-        return draw_vm__mode_8(vm);
+        return draw_3d(vm);
     case ANM_RENDER_3D_FOG:
         if (is_transparent(vm))
         {
             return -1;
         }
         g_Supervisor.enable_d3d_fog();
-        draw_vm__mode_8(vm);
+        draw_3d(vm);
         g_Supervisor.disable_d3d_fog();
         return 0;
     case ANM_RENDER_TEX_CIRCLE:
     case ANM_RENDER_MODE_12:
     case ANM_RENDER_TEX_ARC_EVEN:
     case ANM_RENDER_TEX_ARC:
-        return draw_vm__mode_9(vm, (RenderVertex144 *)vm->extra_data, vm->int_vars[0] * 2);
+        return draw_vertex_strip(vm, (RenderVertex144 *)vm->extra_data, vm->int_vars[0] * 2);
     case ANM_RENDER_TRIANGLE_FAN:
-        return draw_vm__mode_11(vm, (RenderVertex144 *)vm->extra_data, vm->int_vars[0] * 2);
+        return draw_vertex_fan(vm, (RenderVertex144 *)vm->extra_data, vm->int_vars[0] * 2);
     case ANM_RENDER_TEX_CYLINDER_3D:
     case ANM_RENDER_TEX_RING_3D:
-        return draw_vm__mode_24(vm, (RenderVertexXyzDiffuseTex *)vm->extra_data, vm->int_vars[0] * 2);
+        return draw_3d_vertex_strip(vm, (RenderVertexXyzDiffuseTex *)vm->extra_data, vm->int_vars[0] * 2);
     case ANM_RENDER_SPRITE_UNSNAPPED:
         if (is_transparent(vm))
         {

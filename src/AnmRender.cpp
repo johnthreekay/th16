@@ -7,10 +7,10 @@
 #include "Supervisor.h"
 #include "UpdateFunc.h"
 
-static_assert(offsetof(AnmManager, render_cache_184fbb0) == 0x184fbb0, "AnmManager layout");
+static_assert(offsetof(AnmManager, last_texture_id) == 0x184fbb0, "AnmManager layout");
 static_assert(offsetof(AnmManager, last_blend_mode) == 0x184fbb4, "AnmManager layout");
 static_assert(offsetof(AnmManager, last_color_op) == 0x184fbbb, "AnmManager layout");
-static_assert(offsetof(AnmManager, render_cache_184fbc0) == 0x184fbc0, "AnmManager layout");
+static_assert(offsetof(AnmManager, last_texture_matrix_sprite) == 0x184fbc0, "AnmManager layout");
 static_assert(offsetof(AnmManager, unrendered_sprite_count) == 0x184fc18, "AnmManager layout");
 static_assert(offsetof(AnmManager, sprite_write_cursor) == 0x1bcfc1c, "AnmManager layout");
 static_assert(offsetof(AnmManager, primitive_write_cursor) == 0x1c6fc28, "AnmManager layout");
@@ -28,18 +28,20 @@ static_assert(sizeof(RenderVertex144) == 0x1c, "RenderVertex144 layout");
 // RenderVertexXyzDiffuseTex::RenderVertexXyzDiffuseTex
 
 // GLOBAL: TH16 0x4df4a8
-RenderVertexXyzrhwTex g_quad_vertices_4df4a8[4];
+RenderVertexXyzrhwTex g_unit_quad_rhw[4];
 // SYNTHETIC: TH16 0x4011f0
-// ??__Eg_quad_vertices_4df4a8@@YAXXZ
+// ??__Eg_unit_quad_rhw@@YAXXZ
 // GLOBAL: TH16 0x4df830
 RenderVertex144 g_sprite_temp_buffer[4];
 // SYNTHETIC: TH16 0x401220
 // ??__Eg_sprite_temp_buffer@@YAXXZ
 // GLOBAL: TH16 0x4df8a0
-RenderVertexXyzDiffuseTex g_quad_vertices_4df8a0[4];
+RenderVertexXyzDiffuseTex g_unit_quad_xyz[4];
 // SYNTHETIC: TH16 0x401250
-// ??__Eg_quad_vertices_4df8a0@@YAXXZ
+// ??__Eg_unit_quad_xyz@@YAXXZ
 
+// Sets blending, filtering and texture addressing for a VM, flushing the
+// sprite batch first when any of them changes.
 // FUNCTION: TH16 0x464f10
 void AnmManager::setup_render_state_for_vm(AnmVm *vm)
 {
@@ -50,53 +52,53 @@ void AnmManager::setup_render_state_for_vm(AnmVm *vm)
         g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
         switch (last_blend_mode)
         {
-        case 0:
+        case ANM_BLEND_ALPHA:
             g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
             break;
-        case 1:
+        case ANM_BLEND_ADD:
             g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
             break;
-        case 2:
+        case ANM_BLEND_SUBTRACT:
             g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_REVSUBTRACT);
             break;
-        case 3:
+        case ANM_BLEND_REPLACE:
             g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ZERO);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
             break;
-        case 4:
+        case ANM_BLEND_SCREEN:
             g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_INVDESTCOLOR);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCCOLOR);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
             break;
-        case 6:
+        case ANM_BLEND_6:
             g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_INVSRCCOLOR);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
             break;
-        case 5:
+        case ANM_BLEND_MULTIPLY:
             g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ZERO);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
             break;
-        case 7:
+        case ANM_BLEND_DEST_ALPHA:
             g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTALPHA);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVDESTALPHA);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
             break;
-        case 8:
+        case ANM_BLEND_MIN:
             g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_MIN);
             break;
-        case 9:
+        case ANM_BLEND_MAX:
             g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
             g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_MAX);
@@ -152,7 +154,7 @@ void AnmManager::setup_render_state_for_vm(AnmVm *vm)
             break;
         }
     }
-    unk_c8++;
+    stat_render_state_setups++;
 }
 
 // FUNCTION: TH16 0x465a30
@@ -173,11 +175,11 @@ void AnmManager::flush_sprites()
     {
         return;
     }
-    if (g_AnmManager->last_color_op != 1)
+    if (g_AnmManager->last_color_op != ANM_COLOR_OP_MODULATE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-        g_AnmManager->last_color_op = 1;
+        g_AnmManager->last_color_op = ANM_COLOR_OP_MODULATE;
     }
     g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
     g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
@@ -185,7 +187,7 @@ void AnmManager::flush_sprites()
     IDirect3DDevice9 *device = g_Supervisor.d3d_device;
     device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, unrendered_sprite_count * 2, sprite_render_cursor,
                             sizeof(RenderVertex144));
-    unk_cc++;
+    stat_draw_calls++;
     sprite_render_cursor = sprite_write_cursor;
     unrendered_sprite_count = 0;
 }
@@ -208,11 +210,11 @@ i32 AnmManager::write_sprite(RenderVertex144 *vertices)
     return 0;
 }
 
-// Render mode 9: like draw_vm__mode_11 for visible VMs only, with the
+// Render mode 9: like draw_vertex_fan for visible VMs only, with the
 // texture set first and color ops reset to modulate.
 // TODO: the original keeps this in ebx and vm in esi (edi only around SetTexture); ours spills this.
 // FUNCTION: TH16 0x4681f0
-i32 AnmManager::draw_vm__mode_9(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count)
+i32 AnmManager::draw_vertex_strip(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count)
 {
     if (!(vm->flags_lo & ANM_VM_VISIBLE))
     {
@@ -231,24 +233,24 @@ i32 AnmManager::draw_vm__mode_9(AnmVm *vm, RenderVertex144 *vertices, i32 vertex
         flush_sprites();
     }
     i32 texture = g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].image_file_num_in_all;
-    if (render_cache_184fbb0 != texture)
+    if (last_texture_id != texture)
     {
-        render_cache_184fbb0 = texture;
+        last_texture_id = texture;
         g_Supervisor.d3d_device->SetTexture(0, loaded_anms[texture >> 8]->d3d[texture & 0xff].texture);
     }
-    if (render_cache_184fbb6 != 3)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_SCREEN_TEXTURED)
     {
         g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-        render_cache_184fbb6 = 3;
+        last_vertex_setup = ANM_VERTEX_SETUP_SCREEN_TEXTURED;
     }
     setup_render_state_for_vm(vm);
-    if (g_AnmManager->last_color_op != 1)
+    if (g_AnmManager->last_color_op != ANM_COLOR_OP_MODULATE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-        g_AnmManager->last_color_op = 1;
+        g_AnmManager->last_color_op = ANM_COLOR_OP_MODULATE;
     }
     g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, vertex_count - 2, vertices,
                                              sizeof(RenderVertex144));
@@ -257,30 +259,30 @@ i32 AnmManager::draw_vm__mode_9(AnmVm *vm, RenderVertex144 *vertices, i32 vertex
 
 // TODO: the original keeps this in edi with a stack copy; ours uses ebx.
 // FUNCTION: TH16 0x468350
-i32 AnmManager::draw_vm__mode_11(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count)
+i32 AnmManager::draw_vertex_fan(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count)
 {
     if (unrendered_sprite_count != 0)
     {
         flush_sprites();
     }
-    if (render_cache_184fbb6 != 3)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_SCREEN_TEXTURED)
     {
         g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
-        render_cache_184fbb6 = 3;
+        last_vertex_setup = ANM_VERTEX_SETUP_SCREEN_TEXTURED;
     }
     setup_render_state_for_vm(vm);
     i32 texture = g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].image_file_num_in_all;
-    if (render_cache_184fbb0 != texture)
+    if (last_texture_id != texture)
     {
-        render_cache_184fbb0 = texture;
+        last_texture_id = texture;
         g_Supervisor.d3d_device->SetTexture(0, loaded_anms[texture >> 8]->d3d[texture & 0xff].texture);
     }
     g_Supervisor.disable_zwrite();
-    if (render_cache_184fbb6 != 1)
+    if (last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-        render_cache_184fbb6 = 1;
+        last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
     g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, vertex_count - 2, vertices, sizeof(RenderVertex144));
     return 0;
@@ -310,23 +312,23 @@ HARNESS_CALLED void AnmManager::draw_triangle_fan(i32 count, Float3 *center, Flo
         offsets++;
         colors++;
     }
-    if (g_AnmManager->last_color_op != 0)
+    if (g_AnmManager->last_color_op != ANM_COLOR_OP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
-        g_AnmManager->last_color_op = 0;
+        g_AnmManager->last_color_op = ANM_COLOR_OP_DIFFUSE;
     }
-    if (mgr->render_cache_184fbb6 != 1)
+    if (mgr->last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
         g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-        mgr->render_cache_184fbb6 = 1;
+        mgr->last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
     g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
     g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_LINESTRIP, count - 1, mgr->primitive_write_cursor,
                                              sizeof(RenderVertex044));
     mgr->primitive_write_cursor += count;
-    mgr->unk_cc++;
+    mgr->stat_draw_calls++;
 }
 
 // The extra data of VMs drawn by anm_on_draw_masked (ExpHP:
@@ -601,15 +603,15 @@ i32 __fastcall anm_on_tick_fan(AnmVm *vm)
 // FUNCTION: TH16 0x46a330
 i32 __fastcall anm_on_draw_fan(AnmVm *vm)
 {
-    g_AnmManager->draw_vm__mode_11(vm, (RenderVertex144 *)vm->extra_data, 0x21);
+    g_AnmManager->draw_vertex_fan(vm, (RenderVertex144 *)vm->extra_data, 0x21);
     return 0;
 }
 
 // Rebuilds the VM's world matrix (scale, then rotation) when needed and
-// puts it, moved to the VM's position, in matrix_184f56c.
+// puts it, moved to the VM's position, in current_world_matrix.
 // TODO: ours aligns the frame to 16 for the spilled translation row (movaps); the original keeps an ebp frame with movups.
 // FUNCTION: TH16 0x466f00
-void AnmManager::render_sub_466f00(AnmVm *vm)
+void AnmManager::build_world_matrix(AnmVm *vm)
 {
     D3DXMATRIX m;
     if (!(vm->flags_lo & ANM_VM_KEEP_WORLD_MATRIX))
@@ -653,13 +655,13 @@ void AnmManager::render_sub_466f00(AnmVm *vm)
         m._42 = parent->entity_pos.y + parent->pos.y + parent->pos_2.y + m._42;
         m._43 = parent->entity_pos.z + parent->pos.z + parent->pos_2.z + m._43;
     }
-    matrix_184f56c = m;
+    current_world_matrix = m;
 }
 
 // FUNCTION: TH16 0x4671b0
-i32 AnmManager::draw_vm__mode_5(AnmVm *vm)
+i32 AnmManager::draw_mode_5(AnmVm *vm)
 {
-    render_sub_466f00(vm);
+    build_world_matrix(vm);
     i32 result = render_sprite_2d(vm, 0);
     g_sprite_temp_buffer[3].pos.w = 1.0f;
     g_sprite_temp_buffer[2].pos.w = 1.0f;
@@ -709,16 +711,16 @@ AnmManager::AnmManager()
 {
     last_discriminator = 0;
     memset(this, 0, sizeof(AnmManager));
-    g_quad_vertices_4df4a8[0].pos.w = g_quad_vertices_4df4a8[1].pos.w = g_quad_vertices_4df4a8[2].pos.w =
-        g_quad_vertices_4df4a8[3].pos.w = 1.0f;
-    g_quad_vertices_4df4a8[0].uv.x = 0.0f;
-    g_quad_vertices_4df4a8[0].uv.y = 0.0f;
-    g_quad_vertices_4df4a8[1].uv.x = 1.0f;
-    g_quad_vertices_4df4a8[1].uv.y = 0.0f;
-    g_quad_vertices_4df4a8[2].uv.x = 0.0f;
-    g_quad_vertices_4df4a8[2].uv.y = 1.0f;
-    g_quad_vertices_4df4a8[3].uv.x = 1.0f;
-    g_quad_vertices_4df4a8[3].uv.y = 1.0f;
+    g_unit_quad_rhw[0].pos.w = g_unit_quad_rhw[1].pos.w = g_unit_quad_rhw[2].pos.w =
+        g_unit_quad_rhw[3].pos.w = 1.0f;
+    g_unit_quad_rhw[0].uv.x = 0.0f;
+    g_unit_quad_rhw[0].uv.y = 0.0f;
+    g_unit_quad_rhw[1].uv.x = 1.0f;
+    g_unit_quad_rhw[1].uv.y = 0.0f;
+    g_unit_quad_rhw[2].uv.x = 0.0f;
+    g_unit_quad_rhw[2].uv.y = 1.0f;
+    g_unit_quad_rhw[3].uv.x = 1.0f;
+    g_unit_quad_rhw[3].uv.y = 1.0f;
     g_sprite_temp_buffer[0].pos.w = g_sprite_temp_buffer[1].pos.w = g_sprite_temp_buffer[2].pos.w =
         g_sprite_temp_buffer[3].pos.w = 1.0f;
     g_sprite_temp_buffer[0].uv.x = 0.0f;
@@ -730,11 +732,11 @@ AnmManager::AnmManager()
     g_sprite_temp_buffer[3].uv.x = 1.0f;
     g_sprite_temp_buffer[3].uv.y = 1.0f;
     vertex_buffer = NULL;
-    render_cache_184fbb0 = -1;
+    last_texture_id = -1;
     last_blend_mode = 0;
     render_cache_184fbb5 = 0;
     last_texture_factor = 1;
-    render_cache_184fbb6 = 0;
+    last_vertex_setup = ANM_VERTEX_SETUP_UNSET;
     render_cache_184fbb7 = 0;
     render_cache_184fbb8 = 0xff;
     screen_copies[0].anm_slot = -1;

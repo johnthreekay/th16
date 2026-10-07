@@ -311,7 +311,7 @@ HARNESS_CALLED void Supervisor::swap_transform_matrices(Camera *camera)
     g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &camera->projection_matrix);
     if (g_AnmManager != NULL)
     {
-        g_AnmManager->camera_unk_fc = camera->unk_fc;
+        g_AnmManager->camera_2d_offset = camera->unk_fc;
     }
 }
 
@@ -355,7 +355,7 @@ void __stdcall camera_apply_43c940(Camera *camera)
     D3DXVec3Normalize(&camera->unk_30, &camera->unk_30);
     if (g_AnmManager != NULL)
     {
-        g_AnmManager->camera_unk_fc = camera->unk_fc;
+        g_AnmManager->camera_2d_offset = camera->unk_fc;
     }
 }
 
@@ -582,19 +582,19 @@ int __fastcall Supervisor::on_draw_01(void *arg)
                                        1.0f, 0);
     }
     AnmManager *anm = g_AnmManager;
-    anm->render_cache_184fbc0 = 0;
-    anm->render_cache_184fbb0 = -1;
+    anm->last_texture_matrix_sprite = 0;
+    anm->last_texture_id = -1;
     anm->last_blend_mode = 10;
     anm->render_cache_184fbb5 = 0xff;
     anm->render_cache_184fbb7 = 0xff;
     anm->render_cache_184fbb8 = 0xff;
-    anm->unk_1c7fd8c = 0;
-    anm->unk_1c7fd88.d3d = 0x80808080;
+    anm->global_tint_enabled = 0;
+    anm->global_tint.d3d = 0x80808080;
     anm->last_filter_point = 0xff;
-    anm->last_color_op = 0xff;
-    anm->camera_unk_fc.y = 0.0f;
-    anm->camera_unk_fc.x = 0.0f;
-    anm->render_cache_184fbb6 = 0xff;
+    anm->last_color_op = ANM_COLOR_OP_NONE;
+    anm->camera_2d_offset.y = 0.0f;
+    anm->camera_2d_offset.x = 0.0f;
+    anm->last_vertex_setup = ANM_VERTEX_SETUP_NONE;
     s->current_camera = &s->cameras[2];
     s->swap_transform_matrices(&s->cameras[2]);
     s->d3d_device->SetViewport(&s->current_camera->viewport);
@@ -934,7 +934,7 @@ int __fastcall Supervisor::on_tick(void *arg)
     SoundManager::update_sound_thread();
     SoundManager::tick_bgm_fade();
     read_keyboard_input();
-    if (g_AnmManager->sub_46d690())
+    if (g_AnmManager->service_pending_loads())
     {
         return UPDATE_FUNC_EXIT_SUCCESS;
     }

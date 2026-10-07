@@ -417,8 +417,8 @@ void Supervisor::reset_render_state()
     {
         g_AnmManager->last_blend_mode = 10;
         g_AnmManager->render_cache_184fbb5 = 0xff;
-        g_AnmManager->render_cache_184fbb6 = 0xff;
-        g_AnmManager->render_cache_184fbb0 = -1;
+        g_AnmManager->last_vertex_setup = ANM_VERTEX_SETUP_NONE;
+        g_AnmManager->last_texture_id = -1;
         g_AnmManager->render_cache_184fbb8 = 0xff;
     }
 }
