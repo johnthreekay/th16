@@ -1394,7 +1394,7 @@ i32 LaserInfiniteInf::on_draw()
 // Hits or grazes the player: a hit cancels the laser around the player, a
 // graze counts every third frame at the point of the laser nearest the
 // player.
-// TODO: the original adds position.x to the loaded start.x (operand order) and calls cancel_as_bomb_rectangle without speculative devirtualization.
+// TODO: the original adds position.x to the loaded start.x (operand order).
 // FUNCTION: TH16 0x433510
 i32 LaserLineInf::check_graze_or_kill(i32 graze_only)
 {
@@ -1404,9 +1404,7 @@ i32 LaserLineInf::check_graze_or_kill(i32 graze_only)
         if (!(inner.flags & 2))
         {
             laser_sincosmul(&start, angle, unk_70 / 10.0f);
-            start.x += position.x;
-            start.y = position.y + start.y;
-            start.z = position.z + start.z;
+            start += position;
         }
         else
         {
@@ -1452,7 +1450,6 @@ i32 LaserLineInf::check_graze_or_kill(i32 graze_only)
 }
 
 // The same for infinite lasers, once they are out (states 2 and 4).
-// TODO: the original keeps angle in xmm3 across normalize_angle and calls cancel_as_bomb_rectangle without speculative devirtualization.
 // FUNCTION: TH16 0x435610
 i32 LaserInfiniteInf::check_graze_or_kill(i32 graze_only)
 {

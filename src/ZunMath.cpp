@@ -27,7 +27,7 @@ f32 LTCG_VECTORCALL add_normalize_angle(f32 a, f32 b)
 }
 
 // FUNCTION: TH16 0x402d90
-DECOMP_NOINLINE f32 LTCG_VECTORCALL normalize_angle(f32 a)
+HARNESS_CALLED f32 LTCG_VECTORCALL normalize_angle(f32 a)
 {
     i32 i = 0;
     while (a > ZUN_PI)
