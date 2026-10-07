@@ -725,8 +725,8 @@ HARNESS_CALLED void Player::do_graze(Float3 *pos)
                               1.9f, 0, 0);
 }
 
-// TODO: the original realigns its frame (and esp, -8) and orders the
-// rotation and the bounds differently (same convention and logic).
+// TODO: d.x and d.y take swapped stack slots and the scaled hurtbox bounds
+// are computed in a different order (frame and convention match).
 // FUNCTION: TH16 0x443af0
 HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only)
 {

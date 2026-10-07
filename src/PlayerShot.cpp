@@ -268,15 +268,15 @@ i32 __fastcall sht_on_tick_447480(PlayerBullet *bullet)
     return 0;
 }
 
-// TODO: register allocation: the original loads the player into ecx and
-// the scaled index into edx, reading the old value straight into eax.
+// TODO: the original loads g_Player into ecx before scaling the index and
+// reads the old value straight into eax; ours loads g_Player into eax after
+// the scaling and moves the value over from ecx.
 // FUNCTION: TH16 0x4474a0
 i32 __fastcall damage_source_on_hit_4474a0(PlayerDamageSource *source, i32 unk, i32 enemy, f32 x, f32 y)
 {
     i32 index = source->bullet_index;
-    Player *player = g_Player;
-    i32 was_hit = player->inner.bullets[index].unk_9c;
-    player->inner.bullets[index].unk_9c = 1;
+    i32 was_hit = g_Player->inner.bullets[index].unk_9c;
+    g_Player->inner.bullets[index].unk_9c = 1;
     return was_hit;
 }
 
