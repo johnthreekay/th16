@@ -165,6 +165,11 @@ extern AnmVmFunc g_anm_on_destroy_funcs[4];
 // extra data is copied (ExpHP: ANM_ON_COPY_FUNC_2).
 typedef i32(__fastcall *AnmVmCopyFunc)(AnmVm *vm, const AnmVm *other, i32 arg);
 extern AnmVmCopyFunc g_anm_on_copy_funcs[2];
+// Write (load 0) or read back (load 1) a VM's extra data in a save buffer,
+// adding the bytes used to *size; selected by index_of_on_copy_2 (ExpHP:
+// ANM_ON_COPY_FUNC_1).
+typedef i32(__fastcall *AnmVmSerializeFunc)(AnmVm *vm, void *data, i32 *size, i32 load);
+extern AnmVmSerializeFunc g_anm_serialize_funcs[2];
 
 // One running ANM script (layout: ExpHP's zAnmVm, flattened, 0x5fc bytes).
 struct AnmVm
@@ -371,6 +376,10 @@ struct AnmVm
     // 0x46fd50 (ExpHP: AnmVm::constructor(const AnmVm&, int)). Copies
     // another VM's state, but not its place in any list.
     void copy_from(const AnmVm &other, i32 arg);
+    // 0x46ffb0 (ExpHP: AnmVm::constructor(const AnmVm&, uhh, erm)). The same
+    // for a VM written by AnmManager::save_vm_tree, whose extra data follows
+    // it; adds the bytes read to *size.
+    void load_from(const AnmVm *src, i32 *size);
 };
 
 // out = in / (640, 480), clamped at 0.

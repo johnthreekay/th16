@@ -787,6 +787,149 @@ void AnmVm::copy_from(const AnmVm &other, i32 arg)
     }
 }
 
+// FUNCTION: TH16 0x46fac0
+void AnmManager::save_vm_tree(AnmVm *dst, AnmVm *src, i32 *size)
+{
+    if (src == NULL)
+    {
+        return;
+    }
+    memcpy(dst, src, sizeof(AnmVm));
+    u8 *cursor = (u8 *)(dst + 1);
+    dst->node_as_child.entry = dst;
+    dst->node_as_child.next = NULL;
+    dst->node_as_child.prev = NULL;
+    dst->node_as_child.unk_c = NULL;
+    *size += sizeof(AnmVm);
+    dst->list_of_children.entry = dst;
+    dst->list_of_children.next = NULL;
+    dst->list_of_children.prev = NULL;
+    dst->list_of_children.unk_c = NULL;
+    if (src->ins_508_extra_data_size != 0)
+    {
+        memcpy(cursor, src->ins_508_extra_data, src->ins_508_extra_data_size);
+        dst->ins_508_extra_data = cursor;
+        if (src->index_of_on_copy_2 != 0)
+        {
+            i32 written = 0;
+            g_anm_serialize_funcs[src->index_of_on_copy_2](src, cursor, &written, 0);
+            cursor += written;
+            *size += written;
+        }
+        else
+        {
+            cursor += src->ins_508_extra_data_size;
+            *size += src->ins_508_extra_data_size;
+        }
+    }
+    for (ZunList<AnmVm> *node = src->list_of_children.next; node != NULL; node = node->next)
+    {
+        i32 child_size = 0;
+        save_vm_tree((AnmVm *)cursor, node->entry, &child_size);
+        dst->list_of_children.append(&((AnmVm *)cursor)->node_as_child);
+        dst = (AnmVm *)cursor;
+        cursor += child_size;
+        *size += child_size;
+    }
+}
+
+// FUNCTION: TH16 0x46fc30
+AnmId AnmManager::load_vm_tree(AnmVm *src, AnmVm *parent, i32 *size)
+{
+    AnmVm *tree = src;
+    if (src == NULL)
+    {
+        AnmId none;
+        none.id = 0;
+        return none;
+    }
+    i32 id;
+    AnmVm *vm = allocate_snapshot_vm(&id);
+    if (src->ins_508_extra_data_size != 0)
+    {
+        src->ins_508_extra_data = src + 1;
+    }
+    i32 read = 0;
+    vm->load_from(src, &read);
+    *size += read;
+    src = (AnmVm *)((u8 *)src + read);
+    vm->flags_hi |= ANM_VM_FLAG_HI_4000000;
+    vm->id.id = id;
+    snapshot_list_head.insert_after(&vm->node_in_global_list);
+    if (parent != NULL)
+    {
+        ((ZunList<void> *)&parent->list_of_children)->append((ZunList<void> *)&vm->node_as_child);
+    }
+    if (tree->list_of_children.next != NULL)
+    {
+        AnmVm *child;
+        i32 child_size;
+        do
+        {
+            child = src;
+            load_vm_tree(src, vm, &child_size);
+            src = (AnmVm *)((u8 *)src + child_size);
+            *size += child_size;
+        } while (child->node_as_child.next != NULL);
+    }
+    AnmId result;
+    result.id = id;
+    return result;
+}
+
+// FUNCTION: TH16 0x46ffb0
+void AnmVm::load_from(const AnmVm *src, i32 *size)
+{
+    memcpy(this, src, offsetof(AnmVm, id));
+    ZunTimer timer = src->script_time;
+    script_time = timer.current;
+    timer = src->timer_1c;
+    timer_1c = timer.current;
+    *size += sizeof(AnmVm);
+    node_in_global_list.entry = this;
+    node_in_global_list.next = NULL;
+    node_in_global_list.prev = NULL;
+    node_in_global_list.unk_c = NULL;
+    node_as_child.entry = this;
+    node_as_child.next = NULL;
+    node_as_child.prev = NULL;
+    node_as_child.unk_c = NULL;
+    list_of_children.entry = this;
+    list_of_children.next = NULL;
+    list_of_children.prev = NULL;
+    list_of_children.unk_c = NULL;
+    next_in_layer = NULL;
+    parent = NULL;
+    slowdown = src->slowdown;
+    entity_pos = src->entity_pos;
+    associated_game_entity = src->associated_game_entity;
+    index_of_sprite_mapping_func = src->index_of_sprite_mapping_func;
+    index_of_on_wait = src->index_of_on_wait;
+    index_of_on_tick = src->index_of_on_tick;
+    index_of_on_draw = src->index_of_on_draw;
+    index_of_on_destroy = src->index_of_on_destroy;
+    index_of_on_interrupt = src->index_of_on_interrupt;
+    index_of_on_copy_1 = src->index_of_on_copy_1;
+    index_of_on_copy_2 = src->index_of_on_copy_2;
+    const u8 *extra = (const u8 *)(src + 1);
+    if (src->ins_508_extra_data != NULL)
+    {
+        ins_508_extra_data_size = src->ins_508_extra_data_size;
+        ins_508_extra_data = malloc(ins_508_extra_data_size);
+        memcpy(ins_508_extra_data, extra, ins_508_extra_data_size);
+        if (src->index_of_on_copy_2 != 0)
+        {
+            i32 read = 0;
+            g_anm_serialize_funcs[src->index_of_on_copy_2](this, (void *)extra, &read, 1);
+            *size += read;
+        }
+        else
+        {
+            *size += ins_508_extra_data_size;
+        }
+    }
+}
+
 // TODO: the original copies the new discriminator to ecx before storing it (slow path).
 // FUNCTION: TH16 0x46f720
 AnmVm *AnmManager::allocate_snapshot_vm(i32 *id)
