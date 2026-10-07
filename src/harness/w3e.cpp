@@ -76,8 +76,3 @@ i32 harness_w3e_startup()
     return check_startup_shortcut();
 }
 
-// Like the replay menu (0x451844), which starts the thread.
-void harness_w3e_replay_thread(ThreadInf *thread, void *arg)
-{
-    thread->restart((ThreadStart)TitleInf::replay_list_thread, arg);
-}

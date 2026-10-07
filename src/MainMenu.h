@@ -39,10 +39,12 @@ class TitleInf : public TaskInf
     i32 replay_name_cursor;
     i32 unk_5a58;
     MenuHelper menu_5a5c;
-    u8 unk_5b34[0x5b48 - 0x5b34];
-    // The replay slot being saved to.
+    u8 unk_5b34[0x5b44 - 0x5b34];
+    i32 unk_5b44;
+    // The replay slot being saved to or played.
     i32 replay_slot;
-    u8 unk_5b4c[0x5b50 - 0x5b4c];
+    // The stage picked to start a replay from (minus one).
+    i32 replay_stage;
     ReplayManager *replays[100];
     // Allocated with malloc.
     void *unk_5ce0;
@@ -107,6 +109,7 @@ class TitleInf : public TaskInf
     i32 do_subseason_select();
     i32 do_practice_stage_select();
     i32 do_manual();
+    i32 do_replay_menu();
     i32 do_replay_save();
     i32 do_spell_practice_stage_select();
     i32 do_spell_practice_character();

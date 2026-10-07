@@ -817,6 +817,207 @@ const char *const g_character_names[4] = {"Reimu  ", "Cirno  ", "Aya    ", "Mari
 // GLOBAL: TH16 0x492840
 const char g_name_entry_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-=.,!?@:;[]()_/{}|~^#$%&*   ";
 
+// The replay slot last played, where the replay menu starts.
+// GLOBAL: TH16 0x4a6f28
+i32 g_last_replay_slot;
+
+// The replay menu: picking a replay (pages of 25) while the list loads on
+// the menu's thread, then the stage to start from.
+// TODO: the original realigns its frame (and esp, -8) and keeps the repeat input word in eax for the cursor tests.
+// FUNCTION: TH16 0x451750
+i32 TitleInf::do_replay_menu()
+{
+    switch (substate)
+    {
+    case 0:
+    {
+        i32 last = g_last_replay_slot;
+        menu.num_choices = 25;
+        menu.set_cursor(last % 25);
+        menu_1d4.num_choices = 3;
+        menu_1d4.set_cursor(last / 25);
+        menu_1d4.wraps = 1;
+        g_last_replay_slot = 0;
+        if (anm_id_73c.id == 0)
+        {
+            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+        }
+        anm_ids[0x6c] = title_anm->create_effect(0x6c, -1, NULL);
+        set_substate(1);
+        memset(replays, 0, sizeof(replays));
+        flags_5ce8 &= ~0xc;
+        unk_5b44 = 0;
+        thread.restart((ThreadStart)replay_list_thread, this);
+        if (get_vm_or_clear(anm_ids[0x61]) == NULL)
+        {
+            anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
+            AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
+        }
+    }
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        menu.current_selection = menu.next_selection;
+        menu_1d4.current_selection = menu_1d4.next_selection;
+        if ((g_hardware_input_pressed & INPUT_UP) || (g_hardware_input_repeat & INPUT_UP))
+        {
+            menu.move_cursor(-1);
+        }
+        if ((g_hardware_input_pressed & INPUT_DOWN) || (g_hardware_input_repeat & INPUT_DOWN))
+        {
+            menu.move_cursor(1);
+        }
+        if ((g_hardware_input_pressed & INPUT_LEFT) || (g_hardware_input_repeat & INPUT_LEFT))
+        {
+            menu_1d4.move_cursor(-1);
+        }
+        if ((g_hardware_input_pressed & INPUT_RIGHT) || (g_hardware_input_repeat & INPUT_RIGHT))
+        {
+            menu_1d4.move_cursor(1);
+        }
+        if (menu_1d4.current_selection != menu_1d4.next_selection)
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+        }
+        if (menu.current_selection != menu.next_selection)
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            set_substate(5);
+            g_SoundManager.play_sound_centered(9, 0);
+            flags_5ce8 |= 4;
+            return 1;
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            if (replays[menu_1d4.next_selection * 25 + menu.next_selection] == NULL)
+            {
+                break;
+            }
+            set_substate(4);
+            replay_slot = menu_1d4.next_selection * 25 + menu.next_selection;
+            menu.push();
+            g_SoundManager.play_sound_centered(7, 0);
+            menu.num_choices = 7;
+            menu.set_cursor(0);
+            for (i32 i = 0; i < 7; i++)
+            {
+                if (replays[replay_slot]->stages[i + 1].gamestate_at_stage_begin == NULL)
+                {
+                    menu.disable(i);
+                }
+            }
+            menu.move_cursor(-1);
+            menu.move_cursor(1);
+            if (replays[replay_slot]->info->unk_0[0xa] & 2)
+            {
+                goto start;
+            }
+            return 1;
+        }
+        break;
+    case 4:
+        if (time_in_state.current >= 15)
+        {
+            menu.current_selection = menu.next_selection;
+            if (input_pressed_or_repeating(INPUT_UP))
+            {
+                menu.move_cursor(-1);
+            }
+            if (input_pressed_or_repeating(INPUT_DOWN))
+            {
+                menu.move_cursor(1);
+            }
+            if (menu.current_selection != menu.next_selection)
+            {
+                g_SoundManager.play_sound_centered(10, 0);
+            }
+            if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+            {
+                menu.pop();
+                menu.num_choices = 25;
+                menu.num_disabled = 0;
+                set_substate(2);
+                g_SoundManager.play_sound_centered(9, 0);
+                return 1;
+            }
+            if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+            {
+            start:
+                replay_stage = menu.next_selection;
+                set_substate(3);
+                flags_5ce8 |= 4;
+                g_SoundManager.play_sound_centered(50, 0);
+                g_Supervisor.fade_out_bgm(0.05f);
+                return 1;
+            }
+        }
+        break;
+    case 3:
+        if (time_in_state.current == 2)
+        {
+            AnmId id;
+            id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+            g_Supervisor.config.unk_0 = id.id;
+            AnmManager::interrupt_tree(id, 7);
+            g_AsciiManager->show_now_loading(480.0f, 392.0f);
+        }
+        if (time_in_state.current >= 32 && (flags_5ce8 & 8))
+        {
+            set_state(2);
+            i32 stage = replay_stage + 1;
+            g_Supervisor.gamemode_to_switch_to = 13;
+            g_Globals.stage_num = stage;
+            g_Globals.weird_stage_num = stage;
+            g_stage_data = &g_stage_table[stage];
+            strcpy(g_current_replay_filename, replays[replay_slot]->filename);
+            RpyInfo *info = replays[replay_slot]->info;
+            g_Globals.character = info->character;
+            g_Globals.subshot = info->subshot;
+            g_Globals.subseason = info->subseason;
+            g_Globals.difficulty = info->difficulty;
+            if (info->unk_0[0xa] & 2)
+            {
+                g_Globals.set_game_mode(2);
+                g_Globals.spell_id = info->spell_id;
+            }
+            else
+            {
+                g_Globals.set_game_mode(0);
+                g_Globals.spell_id = -1;
+            }
+            g_last_replay_slot = replay_slot;
+            g_unk_4a6f1c = 2;
+            return 1;
+        }
+        break;
+    case 5:
+        if (time_in_state.current >= 6 && (flags_5ce8 & 8))
+        {
+            for (i32 i = 0; i < 100; i++)
+            {
+                delete replays[i];
+            }
+            memset(replays, 0, sizeof(replays));
+            AnmManager::interrupt_tree(anm_ids[0x6c], 1);
+            anm_ids[0x6c].id = 0;
+            AnmManager::interrupt_tree(anm_id_73c, 1);
+            anm_id_73c.id = 0;
+            set_state(1);
+            menu.pop();
+        }
+        break;
+    }
+    return 1;
+}
+
 // Line formats of the replay list: numbered and user replays, each with
 // and without a replay in the slot.
 // GLOBAL: TH16 0x493700
