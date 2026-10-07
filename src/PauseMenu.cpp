@@ -644,9 +644,7 @@ int __fastcall PauseMenu::on_draw_thunk(void *arg)
 extern double g_play_time_runtime;
 double LTCG_VECTORCALL get_runtime();
 
-// TODO: the original saves ecx and edi on entry (most likely an LTCG
-// convention its caller, the undecompiled pause menu tick, asks for); ours
-// saves edi only around the dialogue part.
+// TODO: the original pads its frame (push ecx) for the alignment its only caller, tick_open, provides; ours does not, even HARNESS_CALLED (also with GuiMsgVm::show or get_runtime HARNESS_CALLED).
 // FUNCTION: TH16 0x43f6a0
 void PauseMenu::leave_state_1()
 {

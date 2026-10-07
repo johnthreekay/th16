@@ -594,7 +594,6 @@ HARNESS_CALLED Int3 InterpInt3::step()
     return current;
 }
 
-// TODO: the original frame is 4 bytes bigger (sub esp, 0x20); the code is otherwise identical.
 // FUNCTION: TH16 0x464080
 HARNESS_CALLED ZunAngle InterpAngle::step()
 {

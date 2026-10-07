@@ -75,9 +75,14 @@ HARNESS_CALLED ZunAngle &ZunAngle::operator=(f32 value)
     return *this;
 }
 
+// The dead double makes LTCG's double stack alignment pass count this as
+// wanting an 8-aligned stack, so InterpAngle::step, its only caller, pads its
+// frame for it like the original (see TitleInf::set_substate).
 // FUNCTION: TH16 0x4475f0
 HARNESS_CALLED ZunAngle ZunAngle::operator*(f32 factor) const
 {
+    double unused = factor;
+    (void)unused;
     ZunAngle result;
     result.value = wrap(value * factor);
     return result;
