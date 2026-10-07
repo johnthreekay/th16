@@ -81,7 +81,9 @@ struct Supervisor
     struct AnmLoaded *text_anm;
     u8 unk_72c[0x730 - 0x72c];
     u32 flags;
-    u8 unk_734[0x998 - 0x734];
+    // timeGetTime() when on_registration ran; also the RNG seed.
+    u32 start_time;
+    u8 unk_738[0x998 - 0x738];
     ThreadInf thread;
     i32 unk_9b4;
     i32 unk_9b8;
@@ -190,6 +192,8 @@ extern AnmId g_anm_ids_4c0f4c[3];
 extern i32 g_unk_4a6ef0;
 // When set, Supervisor::on_draw_1a calls it instead of drawing.
 extern void (*g_draw_hook_4a6ee8)();
+// Cleared with g_draw_hook_4a6ee8; read by on_draw_01.
+extern i32 g_unk_4a6eec;
 // Set once the loading screen is done.
 extern i32 g_unk_4d9d90;
 // Counted down once per frame by Supervisor::on_tick.

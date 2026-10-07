@@ -20,10 +20,11 @@ void harness_w3c_expose_screen_globals()
     w3c_stub_sink(&g_unk_4d9d1c);
 }
 
-// The HUD code reads these; without a reader LTCG drops the stores.
+// The HUD code reads these, and Supervisor::on_draw_01 g_unk_4a6eec;
+// without a reader LTCG drops the stores.
 i32 harness_w3c_read_hud_origin()
 {
-    return g_arcade_hud_origin_x + g_arcade_hud_origin_y;
+    return g_arcade_hud_origin_x + g_arcade_hud_origin_y + g_unk_4a6eec;
 }
 
 // Like Fog's initialize at 0x418d8a.

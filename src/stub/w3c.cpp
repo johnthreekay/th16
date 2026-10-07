@@ -6,3 +6,13 @@
 void w3c_stub_sink(void *p)
 {
 }
+
+// STUB: TH16 0x46b900
+void anm_manager_46b900()
+{
+}
+
+// STUB: TH16 0x458db0
+void supervisor_458db0()
+{
+}

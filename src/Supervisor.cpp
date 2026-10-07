@@ -13,6 +13,8 @@
 #include "Input.h"
 
 #include "CriticalSections.h"
+#include "FpsCounter.h"
+#include "Rng.h"
 #include "Scorefile.h"
 #include "SoundManager.h"
 #include "UpdateFunc.h"
@@ -139,6 +141,8 @@ AnmId g_anm_ids_4c0f4c[3];
 i32 g_unk_4a6ef0;
 // GLOBAL: TH16 0x4a6ee8
 void (*g_draw_hook_4a6ee8)();
+// GLOBAL: TH16 0x4a6eec
+i32 g_unk_4a6eec;
 
 // FUNCTION: TH16 0x43c4b0
 HRESULT Supervisor::enable_d3d_fog()
@@ -234,6 +238,11 @@ HARNESS_CALLED void Supervisor::swap_transform_matrices(Camera *camera)
         g_AnmManager->camera_unk_fc = camera->unk_fc;
     }
 }
+
+// Not decompiled yet (src/stub/w3c.cpp). 0x46b900 sets up AnmManager
+// vertex data through g_AnmManager, 0x458db0 creates a font.
+void anm_manager_46b900();
+void supervisor_458db0();
 
 // The tanf from the CRT headers stays out of line (0x43dc90).
 DECOMP_NOINLINE float __CRTDECL tanf(float);
@@ -570,6 +579,39 @@ i32 Supervisor::open_data_files()
     }
     g_GameErrorContext.fatal("error : \x83" "f\x81[\x83^\x83t\x83@\x83" "C\x83\x8b\x82\xaa\x91\xb6\x8d\xdd\x82\xb5\x82\xdc\x82\xb9\x82\xf1\r\n");
     return -1;
+}
+
+// FUNCTION: TH16 0x43b520
+int __fastcall Supervisor::on_registration(void *arg)
+{
+    open_data_files();
+    g_game_speed = 1.0f;
+    g_Supervisor.background_color = 0xff000000;
+    g_Supervisor.setup_cameras();
+    g_Supervisor.start_time = timeGetTime();
+    g_replay_safe_rng.seed = g_Supervisor.start_time;
+    g_replay_unsafe_rng.seed = g_Supervisor.start_time;
+    {
+        DWORD thread_id;
+        g_SoundManager.load_thread = CreateThread(
+            NULL, 0, (LPTHREAD_START_ROUTINE)SoundManager::thread_load_sound_files, &g_SoundManager, 0, &thread_id);
+    }
+    FpsCounter *fps = new FpsCounter;
+    g_FpsCounter = fps;
+    UpdateFunc *f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)FpsCounter::on_draw_callback);
+    f->flags |= UPDATE_FUNC_ACTIVE;
+    f->arg = fps;
+    g_UpdateFuncRegistry->register_on_draw(f, 0x4b);
+    fps->on_draw = f;
+    anm_manager_46b900();
+    supervisor_458db0();
+    g_Supervisor.vm_1bc = new AnmVm;
+    g_Supervisor.vm_1c0 = new AnmVm;
+    g_Supervisor.vm_1c4 = new AnmVm;
+    g_Supervisor.vm_1c8 = new AnmVm;
+    g_unk_4a6eec = 0;
+    g_draw_hook_4a6ee8 = NULL;
+    return 0;
 }
 
 // FUNCTION: TH16 0x43ba40

@@ -31,12 +31,6 @@ int Supervisor::switch_gamemodes()
     return 0;
 }
 
-// STUB: TH16 0x43b520
-int __fastcall Supervisor::on_registration(void *arg)
-{
-    return 0;
-}
-
 // STUB: TH16 0x43d140
 int __fastcall Supervisor::on_draw_01(void *arg)
 {
