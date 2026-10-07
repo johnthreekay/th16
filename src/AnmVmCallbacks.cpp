@@ -297,6 +297,27 @@ struct AnmEffect1Data
     i32 frame_count;
 };
 
+// FUNCTION: TH16 0x4071a0
+int __fastcall anm_effect_1_init(AnmVm *vm, D3DXVECTOR3 *pos)
+{
+    vm->alloc_extra_data(sizeof(AnmEffect1Data));
+    AnmEffect1Data *data = (AnmEffect1Data *)vm->ins_508_extra_data;
+    memset(data, 0, sizeof(AnmEffect1Data));
+    vm->set_layer(0);
+    D3DXVECTOR3 center(320.0f, 240.0f, 0.0f);
+    for (i32 i = 0; i < 4; i++)
+    {
+        g_EffectManager->effect_anm->copy_vm_and_run(&data->vms[i], i + 3);
+        data->vms[i].entity_pos = center;
+    }
+    data->unk_1dec = 0;
+    vm->set_layer(40);
+    data->vms[3].entity_pos = data->vms[2].entity_pos = data->vms[1].entity_pos = data->vms[0].entity_pos =
+        D3DXVECTOR3(320.0f, 240.0f, 0.0f);
+    g_EffectManager->effect_anm->copy_vm_and_run(&data->vms[4], 0xc5);
+    return 0;
+}
+
 // TODO: the original aligns its frame to 8 bytes (LTCG; AnmVm::run is
 // still a stub here).
 // FUNCTION: TH16 0x407330
