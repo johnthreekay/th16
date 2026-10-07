@@ -23,6 +23,8 @@
 #include <string>
 #include <thread>
 
+#include <SDL.h>
+
 #include <mmsystem.h>
 #include <process.h>
 #include <windows.h>
@@ -169,11 +171,20 @@ HANDLE start_thread(std::function<DWORD()> body, LPDWORD thread_id, bool self_cl
     return handle;
 }
 
-int64_t now_ns()
+// The game's clocks (QueryPerformanceCounter, timeGetTime, GetTickCount)
+// are SDL's performance counter, so they agree with SDL's own timing (the
+// audio mixer, event timestamps).
+uint64_t counter_frequency()
 {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-               std::chrono::steady_clock::now().time_since_epoch())
-        .count();
+    static const uint64_t frequency = SDL_GetPerformanceFrequency();
+    return frequency;
+}
+
+uint64_t now_ms()
+{
+    uint64_t counter = SDL_GetPerformanceCounter();
+    uint64_t frequency = counter_frequency();
+    return counter / frequency * 1000 + counter % frequency * 1000 / frequency;
 }
 
 } // namespace
@@ -337,8 +348,7 @@ void DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection)
 }
 
 // ---------------------------------------------------------------------------
-// Time. One clock (steady, nanoseconds) for every timer; SDL_GetTicks uses
-// the same monotonic clock on Linux.
+// Time: SDL's performance counter for every clock.
 
 void Sleep(DWORD dwMilliseconds)
 {
@@ -352,24 +362,24 @@ void Sleep(DWORD dwMilliseconds)
 
 BOOL QueryPerformanceCounter(LARGE_INTEGER *lpPerformanceCount)
 {
-    lpPerformanceCount->QuadPart = now_ns();
+    lpPerformanceCount->QuadPart = (LONGLONG)SDL_GetPerformanceCounter();
     return TRUE;
 }
 
 BOOL QueryPerformanceFrequency(LARGE_INTEGER *lpFrequency)
 {
-    lpFrequency->QuadPart = 1000000000;
+    lpFrequency->QuadPart = (LONGLONG)counter_frequency();
     return TRUE;
 }
 
 DWORD GetTickCount(void)
 {
-    return (DWORD)(now_ns() / 1000000);
+    return (DWORD)now_ms();
 }
 
 DWORD timeGetTime(void)
 {
-    return (DWORD)(now_ns() / 1000000);
+    return (DWORD)now_ms();
 }
 
 MMRESULT timeBeginPeriod(UINT uPeriod)

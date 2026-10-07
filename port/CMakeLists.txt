@@ -50,7 +50,9 @@ endif()
 add_executable(th16 ${TH16_GAME_SOURCES} ${TH16_PORT_SOURCES})
 
 target_include_directories(th16 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${TH16_ROOT}/src)
-target_compile_definitions(th16 PRIVATE TH16_PORT)
+# 64-bit file offsets on 32-bit hosts too (thbgm.dat is 388 MB; seeking
+# past 2 GB needs them).
+target_compile_definitions(th16 PRIVATE TH16_PORT _FILE_OFFSET_BITS=64)
 
 target_compile_options(th16 PRIVATE
     # MSVC-isms the game source relies on without including anything.
@@ -178,7 +180,7 @@ add_executable(th16_platform_test tests/platform_test.cpp
     src/port_vfs.cpp src/port_text.cpp src/input_sdl.cpp src/dinput_sdl.cpp src/gdi_text.cpp)
 target_include_directories(th16_platform_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_compile_definitions(th16_platform_test PRIVATE TH16_PORT)
+target_compile_definitions(th16_platform_test PRIVATE TH16_PORT _FILE_OFFSET_BITS=64)
 target_compile_options(th16_platform_test PRIVATE
     -include ${CMAKE_CURRENT_SOURCE_DIR}/include/port_prelude.h -Wall -Wno-unknown-pragmas)
 if(TH16_M32)
