@@ -11,9 +11,6 @@
 #include "../Spellcard.h"
 #include "../ZunTimer.h"
 
-// GLOBAL: TH16 0x4a6ef8
-Player *g_Player;
-
 
 // Opaque sink for the /GL placeholders in src/placeholder/unit2.cpp.
 void placeholder_sink(int a, float b)
