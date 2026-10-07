@@ -68,11 +68,10 @@ i32 *harness_w3d_unk_4d9d90()
     return &g_unk_4d9d90;
 }
 
-// The title and difficulty menus (0x44b621, 0x44ff93) and the character
-// select (0x45031d), which keeps edx across has_cleared.
-i32 harness_w3d_scorefile(i32 difficulty, Scorefile *scorefile, i32 character)
+// The title menu (0x44b621).
+i32 harness_w3d_scorefile()
 {
-    return g_Scorefile->any_cleared() + g_Scorefile->all_cleared(difficulty) + scorefile->has_cleared(character);
+    return g_Scorefile->any_cleared();
 }
 
 // GameThread creates the player (0x42ce15) and deletes it in its
