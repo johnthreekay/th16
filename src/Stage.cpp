@@ -773,7 +773,7 @@ i32 Stage::load_std(const char *path)
     }
     std = (StdHeader *)malloc(std_file_size);
     memcpy(std, std_file, std_file_size);
-    stage_anm = AnmManager::preload_anm(3 + (stage_num & 1), std->anm_path);
+    stage_anm = AnmManager::preload_anm(ANM_SLOT_STAGE + (stage_num & 1), std->anm_path);
     if (stage_anm == NULL)
     {
         // ステージデータが見つかりません。データが壊れています

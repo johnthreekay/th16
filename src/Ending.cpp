@@ -46,10 +46,10 @@ Ending::~Ending()
     g_UpdateFuncRegistry->unregister_locked(on_draw);
     delete child;
     child = NULL;
-    g_AnmManager->unload_anm(20);
-    g_AnmManager->unload_anm(21);
-    g_AnmManager->unload_anm(22);
-    g_AnmManager->unload_anm(23);
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST);
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST + 1);
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST + 2);
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST + 3);
     if (script_file != NULL)
     {
         free(script_file);
@@ -249,7 +249,7 @@ EndingChildF0::EndingChildF0(void *script)
 i32 ending_load_anm()
 {
     EndingChildF0 *child = g_Ending->child;
-    child->anms[child->anm_index] = AnmManager::preload_anm(child->anm_index + 20, child->anm_filename);
+    child->anms[child->anm_index] = AnmManager::preload_anm(child->anm_index + ANM_SLOT_ENDING_FIRST, child->anm_filename);
     child->flags &= ~ENDING_CHILD_WAITING;
     g_AsciiManager->hide_now_loading_inline();
     return 0;

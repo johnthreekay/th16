@@ -74,7 +74,7 @@ static inline UpdateFuncCallback gui_on_draw_2_callback()
 // FUNCTION: TH16 0x426b00
 i32 Gui::initialize()
 {
-    front_anm = AnmManager::preload_anm(5, "front.anm");
+    front_anm = AnmManager::preload_anm(ANM_SLOT_FRONT, "front.anm");
     if (front_anm == NULL)
     {
         // "The data is corrupt."
@@ -115,7 +115,7 @@ i32 Gui::initialize()
 // FUNCTION: TH16 0x426c10
 i32 Gui::load_stage_files()
 {
-    stage_logo_anm = AnmManager::preload_anm(6, g_stage_data->logo_anm_filename);
+    stage_logo_anm = AnmManager::preload_anm(ANM_SLOT_STAGE_LOGO, g_stage_data->logo_anm_filename);
     if (stage_logo_anm == NULL)
     {
         // "The data is corrupt."
@@ -151,7 +151,7 @@ void Gui::release_stage_files()
 {
     if (!(g_Globals.flags_lo_45c & 9))
     {
-        g_AnmManager->unload_anm(6);
+        g_AnmManager->unload_anm(ANM_SLOT_STAGE_LOGO);
     }
     else
     {
@@ -213,7 +213,7 @@ HARNESS_CALLED void Gui::release_msg()
     }
     if (!(g_Globals.flags_lo_45c & 9))
     {
-        g_AnmManager->unload_anm(6);
+        g_AnmManager->unload_anm(ANM_SLOT_STAGE_LOGO);
         stage_logo_anm = NULL;
         if (msg_file != NULL)
         {

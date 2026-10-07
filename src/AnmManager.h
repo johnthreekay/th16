@@ -13,6 +13,31 @@
 // VM pool and lists, and the Direct3D drawing state. Layouts from ExpHP's
 // th-re-data.
 
+// The AnmManager::loaded_anms slot each .anm file is loaded into.
+enum AnmSlot
+{
+    ANM_SLOT_TEXT = 0,
+    ANM_SLOT_SIG = 1,
+    // ascii.anm, ascii_960.anm or ascii_1280.anm by window size.
+    ANM_SLOT_ASCII = 2,
+    // The stage's own file: 3 for odd stages, 4 for even ones.
+    ANM_SLOT_STAGE = 3,
+    ANM_SLOT_FRONT = 5,
+    ANM_SLOT_STAGE_LOGO = 6,
+    ANM_SLOT_BULLET = 7,
+    ANM_SLOT_EFFECT = 8,
+    ANM_SLOT_PLAYER = 9,
+    // The stage's enemy files (SptInf), from 10 on.
+    ANM_SLOT_ENEMY_FIRST = 10,
+    ANM_SLOT_TITLE = 0x10,
+    ANM_SLOT_TITLE_V = 0x11,
+    ANM_SLOT_HELP = 0x13,
+    // The ending's files, from 20 on.
+    ANM_SLOT_ENDING_FIRST = 20,
+    ANM_SLOT_SUBSEASON = 0x1e,
+    ANM_SLOT_COUNT = 0x1f,
+};
+
 // A sprite of a loaded .anm file (ExpHP: zAnmLoadedSprite).
 struct AnmLoadedSprite
 {

@@ -12,13 +12,13 @@ EffectManager *g_EffectManager;
 // FUNCTION: TH16 0x418790
 i32 preload_bullet_and_effect_anm()
 {
-    if (AnmManager::preload_anm(8, "effect.anm") == NULL)
+    if (AnmManager::preload_anm(ANM_SLOT_EFFECT, "effect.anm") == NULL)
     {
         // "Effect data not found. The data is corrupt."
         g_GameErrorContext.log("\x83G\x83t\x83" "F\x83N\x83g\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
-    if (AnmManager::preload_anm(7, "bullet.anm") == NULL)
+    if (AnmManager::preload_anm(ANM_SLOT_BULLET, "bullet.anm") == NULL)
     {
         g_GameErrorContext.log("\x83G\x83t\x83" "F\x83N\x83g\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
@@ -29,14 +29,14 @@ i32 preload_bullet_and_effect_anm()
 // FUNCTION: TH16 0x4187d0
 i32 EffectManager::initialize()
 {
-    bullet_anm = AnmManager::preload_anm(7, "bullet.anm");
+    bullet_anm = AnmManager::preload_anm(ANM_SLOT_BULLET, "bullet.anm");
     if (bullet_anm == NULL)
     {
         // "Screen layout data not found. The data is corrupt."
         g_GameErrorContext.log("\x89\xe6\x96\xca\x8d\\\x90\xac\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
-    effect_anm = AnmManager::preload_anm(8, "effect.anm");
+    effect_anm = AnmManager::preload_anm(ANM_SLOT_EFFECT, "effect.anm");
     if (effect_anm == NULL)
     {
         g_GameErrorContext.log("\x89\xe6\x96\xca\x8d\\\x90\xac\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
@@ -73,8 +73,8 @@ EffectManager::~EffectManager()
     g_AnmManager->disable_vms_from_anm_file(bullet_anm);
     g_UpdateFuncRegistry->unregister_locked(on_tick);
     g_UpdateFuncRegistry->unregister_locked(on_draw);
-    g_AnmManager->unload_anm(8);
-    g_AnmManager->unload_anm(7);
+    g_AnmManager->unload_anm(ANM_SLOT_EFFECT);
+    g_AnmManager->unload_anm(ANM_SLOT_BULLET);
     g_EffectManager = NULL;
 }
 

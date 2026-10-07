@@ -26,7 +26,7 @@ HelpManual::HelpManual()
 // FUNCTION: TH16 0x42e760
 void help_manual_load_anm()
 {
-    g_HelpManual->help_anm = AnmManager::preload_anm(0x13, "help.anm");
+    g_HelpManual->help_anm = AnmManager::preload_anm(ANM_SLOT_HELP, "help.anm");
     if (g_HelpManual->help_anm == NULL)
     {
         // "Screen layout data not found. The data is corrupted."
@@ -81,11 +81,11 @@ HelpManual::~HelpManual()
     g_UpdateFuncRegistry->unregister_locked(on_tick);
     g_UpdateFuncRegistry->unregister_locked(on_draw);
     AnmManager *anm = g_AnmManager;
-    if (anm->loaded_anms[0x13] != NULL)
+    if (anm->loaded_anms[ANM_SLOT_HELP] != NULL)
     {
-        anm->loaded_anms[0x13]->release();
-        delete anm->loaded_anms[0x13];
-        anm->loaded_anms[0x13] = NULL;
+        anm->loaded_anms[ANM_SLOT_HELP]->release();
+        delete anm->loaded_anms[ANM_SLOT_HELP];
+        anm->loaded_anms[ANM_SLOT_HELP] = NULL;
     }
     g_HelpManual = NULL;
 }

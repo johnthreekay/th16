@@ -114,7 +114,7 @@ static inline UpdateFuncCallback bullet_on_tick_callback()
 // FUNCTION: TH16 0x411a30
 i32 BulletManager::initialize()
 {
-    bullet_anm = AnmManager::preload_anm(7, "bullet.anm");
+    bullet_anm = AnmManager::preload_anm(ANM_SLOT_BULLET, "bullet.anm");
     if (bullet_anm == NULL)
     {
         // "Enemy bullet data not found. The data is corrupt."

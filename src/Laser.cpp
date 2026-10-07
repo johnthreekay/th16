@@ -271,7 +271,7 @@ void LaserBeamInf::method_8(i32 arg)
 // FUNCTION: TH16 0x431330
 i32 LaserManager::initialize()
 {
-    bullet_anm = AnmManager::preload_anm(7, "bullet.anm");
+    bullet_anm = AnmManager::preload_anm(ANM_SLOT_BULLET, "bullet.anm");
     if (bullet_anm == NULL)
     {
         // "Enemy bullet data not found. The data is corrupted."

@@ -41,7 +41,7 @@ i32 AsciiInf::initialize()
 {
     const char *anm_names[3] = {"ascii.anm", "ascii_960.anm", "ascii_1280.anm"};
 
-    ascii_anm = AnmManager::preload_anm(2, anm_names[g_Supervisor.config.window_size % 3]);
+    ascii_anm = AnmManager::preload_anm(ANM_SLOT_ASCII, anm_names[g_Supervisor.config.window_size % 3]);
     if (ascii_anm == NULL)
     {
         // データが壊れています
@@ -85,8 +85,8 @@ AsciiInf::~AsciiInf()
     g_UpdateFuncRegistry->unregister_locked(on_draw_func_1);
     g_UpdateFuncRegistry->unregister_locked(on_draw_func_2);
     g_UpdateFuncRegistry->unregister_locked(on_draw_func_3);
-    g_AnmManager->unload_anm(2);
-    g_AnmManager->unload_anm(0);
+    g_AnmManager->unload_anm(ANM_SLOT_ASCII);
+    g_AnmManager->unload_anm(ANM_SLOT_TEXT);
     g_AsciiManager = NULL;
 }
 
