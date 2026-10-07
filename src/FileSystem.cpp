@@ -6,6 +6,10 @@
 #include "FileSystem.h"
 #include "Log.h"
 
+#ifdef TH16_PORT
+#include "port_thcrap.h"
+#endif
+
 // The file that file_create or file_open opened, until file_close.
 // GLOBAL: TH16 0x49f270
 HANDLE g_file = INVALID_HANDLE_VALUE;
@@ -27,6 +31,17 @@ u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size, i32 not_in_archive)
         name = name == NULL ? path : name + 1;
         ArcfileEntry *entry = g_Arcfile.find_entry_inline(name);
         file_size = entry != NULL ? entry->size : 0;
+#ifdef TH16_PORT
+        // thcrap (port/include/port_thcrap.h; the file_size, file_load and
+        // file_loaded breakpoints): a patch's file replaces the archive's
+        // or adds one it lacks, and the format patchers run on the result.
+        u32 replacement_size = 0;
+        u8 *replacement = port_thcrap_file_replacement(name, &replacement_size);
+        if (replacement != NULL)
+        {
+            file_size = replacement_size;
+        }
+#endif
         if (size != NULL)
         {
             *size = file_size;
@@ -36,12 +51,33 @@ u8 *LTCG_FASTCALL file_read_all(const char *path, i32 *size, i32 not_in_archive)
             goto fail;
         }
         zun_log("%s Decode ... \r\n", name);
+#ifdef TH16_PORT
+        if (replacement != NULL)
+        {
+            data = replacement;
+        }
+        else
+        {
+            data = (u8 *)malloc(file_size);
+            if (data == NULL)
+            {
+                goto fail;
+            }
+            g_Arcfile.read_file(name, data);
+        }
+        data = port_thcrap_patch_file(name, data, &file_size);
+        if (size != NULL)
+        {
+            *size = file_size;
+        }
+#else
         data = (u8 *)malloc(file_size);
         if (data == NULL)
         {
             goto fail;
         }
         g_Arcfile.read_file(name, data);
+#endif
         g_CriticalSections.leave(CS_FILE);
         return data;
     }

@@ -42,6 +42,9 @@
 
 #include "port_platform.h"
 #include "port_stub.h"
+#ifdef TH16_THCRAP
+#include "thcrap/thcrap.h"
+#endif
 
 namespace
 {
@@ -102,6 +105,11 @@ struct GdiFont : GdiObject
 {
     LOGFONTA logfont;
     LoadedFace *face = NULL;
+    // With thcrap fonts (Latin faces): the Japanese face for characters
+    // the face does not have, as GDI's font linking would give them.
+    LoadedFace *fallback = NULL;
+    // A real font's own advances (proportional); else MS Gothic's cells.
+    bool proportional = false;
     // Pixels: the em size glyphs are rendered at, the cell's ascent and
     // height, the advance of a half-width character.
     int em = 16;
@@ -234,8 +242,9 @@ LoadedFace *load_face(const std::string &file, int index, const std::string &fam
 }
 
 // Matches a fontconfig pattern; with `exact_family`, only a font of that
-// family counts. The font must have Japanese kana and kanji.
-LoadedFace *match_font(const std::string &pattern_text, int weight, bool exact_family)
+// family counts. The font must have Japanese kana and kanji unless
+// `any_script` (thcrap's Latin fonts).
+LoadedFace *match_font(const std::string &pattern_text, int weight, bool exact_family, bool any_script = false)
 {
     FcPattern *pattern = FcNameParse((const FcChar8 *)pattern_text.c_str());
     if (pattern == NULL)
@@ -278,7 +287,7 @@ LoadedFace *match_font(const std::string &pattern_text, int weight, bool exact_f
             }
             FcPatternGetString(match, FC_FAMILY, 0, &family);
         }
-        if (file != NULL && japanese && family_ok)
+        if (file != NULL && (japanese || any_script) && family_ok)
         {
             face = load_face((const char *)file, index, family != NULL ? (const char *)family : "", matched_weight);
         }
@@ -288,14 +297,15 @@ LoadedFace *match_font(const std::string &pattern_text, int weight, bool exact_f
     return face;
 }
 
-// Whether the system has this face (a Shift-JIS name) itself.
-LoadedFace *find_real_face(const std::string &name_utf8, int weight)
+// Whether the system has this face itself (a registered thcrap font counts:
+// port_gdi_add_font_file). Japanese faces only, unless `any_script`.
+LoadedFace *find_real_face(const std::string &name_utf8, int weight, bool any_script = false)
 {
     if (!init_freetype() || !g_fontconfig_ready || name_utf8.empty())
     {
         return NULL;
     }
-    return match_font(name_utf8, weight, true);
+    return match_font(name_utf8, weight, true, any_script);
 }
 
 bool contains(const std::string &text, const char *part)
@@ -303,20 +313,56 @@ bool contains(const std::string &text, const char *part)
     return strcasestr(text.c_str(), part) != NULL;
 }
 
-void setup_font(GdiFont *font)
+// Whether strings are taken as UTF-8 when they are valid UTF-8 (thcrap's
+// patches are UTF-8; the game's own strings Shift-JIS), as thcrap's
+// win32_utf8 does. Off without a thcrap stack.
+bool g_utf8_text;
+
+// Whether `text` is valid UTF-8 (shortest forms, no surrogates).
+bool valid_utf8(const uint8_t *s, int length)
 {
-    std::lock_guard<std::recursive_mutex> guard(g_lock);
-    const LOGFONTA &lf = font->logfont;
-    std::string face_name = port_sjis_to_utf8(lf.lfFaceName);
-    int weight = FcWeightFromOpenType(lf.lfWeight == FW_DONTCARE ? FW_NORMAL : lf.lfWeight);
-    bool mincho = contains(face_name, "\xe6\x98\x8e\xe6\x9c\x9d") || contains(face_name, "mincho") ||
-                  contains(face_name, "serif");
-    if (!init_freetype())
+    for (int i = 0; i < length;)
     {
-        return;
+        uint8_t c = s[i];
+        int n = c < 0x80 ? 1 : (c & 0xe0) == 0xc0 ? 2 : (c & 0xf0) == 0xe0 ? 3 : (c & 0xf8) == 0xf0 ? 4 : 0;
+        if (n == 0 || i + n > length || (n == 2 && c < 0xc2))
+        {
+            return false;
+        }
+        uint32_t cp = n == 1 ? c : c & (0x7f >> n);
+        for (int k = 1; k < n; k++)
+        {
+            if ((s[i + k] & 0xc0) != 0x80)
+            {
+                return false;
+            }
+            cp = (cp << 6) | (s[i + k] & 0x3f);
+        }
+        if ((n == 3 && cp < 0x800) || (n == 4 && (cp < 0x10000 || cp > 0x10ffff)) || (cp >= 0xd800 && cp < 0xe000))
+        {
+            return false;
+        }
+        i += n;
     }
+    return true;
+}
+
+// A face name: UTF-8 (thcrap's "font") or Shift-JIS (the game's).
+std::string face_name_utf8(const char *name)
+{
+    size_t length = strnlen(name, LF_FACESIZE);
+    if (g_utf8_text && valid_utf8((const uint8_t *)name, (int)length))
+    {
+        return std::string(name, length);
+    }
+    return port_sjis_to_utf8(name, (int)length);
+}
+
+// TH16_FONT_GOTHIC or TH16_FONT_MINCHO (a file or a fontconfig pattern),
+// if set and found.
+LoadedFace *override_face(bool mincho, int weight)
+{
     LoadedFace *face = NULL;
-    bool emulate_metrics = true;
     const char *override_name = getenv(mincho ? "TH16_FONT_MINCHO" : "TH16_FONT_GOTHIC");
     if (override_name != NULL && override_name[0] != '\0')
     {
@@ -333,12 +379,14 @@ void setup_font(GdiFont *font)
             port_log("font %s not found", override_name);
         }
     }
-    if (face == NULL && !face_name.empty())
-    {
-        face = find_real_face(face_name, weight);
-        emulate_metrics = face == NULL;
-    }
-    if (face == NULL && g_fontconfig_ready)
+    return face;
+}
+
+// The first substitute for MS Gothic or MS Mincho the system has.
+LoadedFace *substitute_face(bool mincho, int weight)
+{
+    LoadedFace *face = NULL;
+    if (g_fontconfig_ready)
     {
         static const char *const gothic[] = {"MS Gothic", "Noto Sans Mono CJK JP", "Source Han Code JP",
                                              "Noto Sans CJK JP", "Source Han Sans JP", "IPAGothic",
@@ -352,12 +400,51 @@ void setup_font(GdiFont *font)
             face = match_font(names[i], weight, strchr(names[i], ':') == NULL);
         }
     }
+    return face;
+}
+
+void setup_font(GdiFont *font)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_lock);
+    const LOGFONTA &lf = font->logfont;
+    std::string face_name = face_name_utf8(lf.lfFaceName);
+    int weight = FcWeightFromOpenType(lf.lfWeight == FW_DONTCARE ? FW_NORMAL : lf.lfWeight);
+    bool mincho = contains(face_name, "\xe6\x98\x8e\xe6\x9c\x9d") || contains(face_name, "mincho") ||
+                  contains(face_name, "serif");
+    if (!init_freetype())
+    {
+        return;
+    }
+    LoadedFace *face = override_face(mincho, weight);
+    bool emulate_metrics = true;
+    if (face == NULL && !face_name.empty())
+    {
+        face = find_real_face(face_name, weight);
+        emulate_metrics = face == NULL;
+        if (face == NULL && g_utf8_text)
+        {
+            // A thcrap font without Japanese (Touhou Biolinum): its own
+            // metrics, Japanese characters from the substitute.
+            face = find_real_face(face_name, weight, true);
+            if (face != NULL)
+            {
+                emulate_metrics = false;
+                LoadedFace *japanese = override_face(mincho, weight);
+                font->fallback = japanese != NULL ? japanese : substitute_face(mincho, weight);
+            }
+        }
+    }
+    if (face == NULL)
+    {
+        face = substitute_face(mincho, weight);
+    }
     font->face = face;
     if (face == NULL)
     {
         port_log("no Japanese font for \"%s\"; text stays empty", face_name.c_str());
         return;
     }
+    font->proportional = !emulate_metrics && g_utf8_text;
     // CreateFontA's height: > 0 the cell height, < 0 the em size.
     int height = lf.lfHeight == 0 ? 16 : lf.lfHeight;
     TT_OS2 *os2 = (TT_OS2 *)FT_Get_Sfnt_Table(face->face, FT_SFNT_OS2);
@@ -380,6 +467,10 @@ void setup_font(GdiFont *font)
     font->synthetic_bold = lf.lfWeight >= FW_SEMIBOLD && face->weight < FC_WEIGHT_DEMIBOLD;
     static std::set<std::string> logged;
     std::string description = face_name + " -> " + face->family;
+    if (font->fallback != NULL)
+    {
+        description += " (Japanese from " + font->fallback->family + ")";
+    }
     if (logged.insert(description).second)
     {
         port_log("font %s%s", description.c_str(), emulate_metrics ? " (MS Gothic metrics)" : "");
@@ -440,22 +531,108 @@ uint32_t code_point(const uint8_t *s, int length)
     return c;
 }
 
-// The characters of a Shift-JIS string with their byte lengths.
+// The characters of a string: its code point, and whether it takes a full
+// (em-wide) cell in MS Gothic's metrics. Shift-JIS, or UTF-8 when the
+// string is valid UTF-8 and g_utf8_text is on.
 template <typename F> void for_each_char(const char *text, int length, F f)
 {
     const uint8_t *s = (const uint8_t *)text;
+    if (g_utf8_text && valid_utf8(s, length))
+    {
+        for (int i = 0; i < length;)
+        {
+            uint8_t c = s[i];
+            int n = c < 0x80 ? 1 : (c & 0xe0) == 0xc0 ? 2 : (c & 0xf0) == 0xe0 ? 3 : 4;
+            uint32_t cp = n == 1 ? c : c & (0x7f >> n);
+            for (int k = 1; k < n; k++)
+            {
+                cp = (cp << 6) | (s[i + k] & 0x3f);
+            }
+            // Half-width: what Shift-JIS has as single bytes (ASCII,
+            // half-width katakana) and Latin-1, as MS Gothic draws them.
+            f(cp, !(cp < 0x100 || (cp >= 0xff61 && cp <= 0xff9f)));
+            i += n;
+        }
+        return;
+    }
     for (int i = 0; i < length;)
     {
         int n = is_lead_byte(s[i]) && i + 1 < length ? 2 : 1;
-        f(s + i, n);
+        f(code_point(s + i, n), n == 2);
         i += n;
     }
+}
+
+// The face that draws `c`: the font's own, or its Japanese fallback.
+LoadedFace *face_for(GdiFont *font, uint32_t c)
+{
+    if (font->fallback != NULL && FT_Get_Char_Index(font->face->face, c) == 0 &&
+        FT_Get_Char_Index(font->fallback->face, c) != 0)
+    {
+        return font->fallback;
+    }
+    return font->face;
+}
+
+// Loads `c` at the font's size into the face's glyph slot, with the
+// synthetic styles; false if the face has no such glyph.
+bool load_glyph(GdiFont *font, LoadedFace *face, uint32_t c)
+{
+    FT_Face ft = face->face;
+    FT_Set_Pixel_Sizes(ft, 0, font->em);
+    FT_UInt glyph = FT_Get_Char_Index(ft, c);
+    if (glyph == 0)
+    {
+        return false;
+    }
+    bool mono = font->logfont.lfQuality == NONANTIALIASED_QUALITY;
+    if (FT_Load_Glyph(ft, glyph, FT_LOAD_DEFAULT | (mono ? FT_LOAD_TARGET_MONO : FT_LOAD_TARGET_LIGHT)) != 0)
+    {
+        return false;
+    }
+    if (font->logfont.lfItalic && !(ft->style_flags & FT_STYLE_FLAG_ITALIC))
+    {
+        FT_GlyphSlot_Oblique(ft->glyph);
+    }
+    if (font->synthetic_bold || (face != font->face && font->logfont.lfWeight >= FW_SEMIBOLD &&
+                                 face->weight < FC_WEIGHT_DEMIBOLD))
+    {
+        FT_GlyphSlot_Embolden(ft->glyph);
+    }
+    return true;
+}
+
+// How far a character moves the pen: its cell in MS Gothic's metrics, or
+// the glyph's own (rounded) advance for a real font.
+int char_advance(GdiFont *font, uint32_t c, bool full_width)
+{
+    if (!font->proportional)
+    {
+        return full_width ? font->em : font->half_advance;
+    }
+    static std::map<std::string, int> cache;
+    LoadedFace *face = face_for(font, c);
+    char key[96];
+    snprintf(key, sizeof(key), "%p/%d/%d/%d/%d/%u", (void *)face, font->em, font->logfont.lfItalic,
+             font->logfont.lfWeight, font->logfont.lfQuality, c);
+    auto found = cache.find(key);
+    if (found != cache.end())
+    {
+        return found->second;
+    }
+    int advance = full_width ? font->em : font->half_advance;
+    if (load_glyph(font, face, c))
+    {
+        advance = (int)((face->face->glyph->advance.x + 32) >> 6);
+    }
+    cache[key] = advance;
+    return advance;
 }
 
 int text_width(GdiFont *font, const char *text, int length)
 {
     int width = 0;
-    for_each_char(text, length, [&](const uint8_t *s, int n) { width += n == 2 ? font->em : font->half_advance; });
+    for_each_char(text, length, [&](uint32_t c, bool full) { width += char_advance(font, c, full); });
     return width;
 }
 
@@ -574,28 +751,24 @@ bool drawable(GdiDC *dc)
 
 void draw_glyph(GdiDC *dc, GdiFont *font, uint32_t c, int cell_x, int cell_width, int baseline)
 {
-    FT_Face face = font->face->face;
-    FT_Set_Pixel_Sizes(face, 0, font->em);
-    FT_UInt glyph = FT_Get_Char_Index(face, c);
-    if (glyph == 0)
+    LoadedFace *loaded = face_for(font, c);
+    if (!load_glyph(font, loaded, c))
     {
         return;
     }
-    if (FT_Load_Glyph(face, glyph, FT_LOAD_DEFAULT | FT_LOAD_TARGET_LIGHT) != 0)
-    {
-        return;
-    }
-    if (font->synthetic_bold)
-    {
-        FT_GlyphSlot_Embolden(face->glyph);
-    }
-    if (face->glyph->format != FT_GLYPH_FORMAT_BITMAP && FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL) != 0)
+    FT_Face face = loaded->face;
+    bool mono = font->logfont.lfQuality == NONANTIALIASED_QUALITY;
+    if (face->glyph->format != FT_GLYPH_FORMAT_BITMAP &&
+        FT_Render_Glyph(face->glyph, mono ? FT_RENDER_MODE_MONO : FT_RENDER_MODE_NORMAL) != 0)
     {
         return;
     }
     const FT_Bitmap &bitmap = face->glyph->bitmap;
     int advance = (int)(face->glyph->advance.x >> 6);
-    int x0 = cell_x + (cell_width - advance) / 2 + face->glyph->bitmap_left;
+    // A real font's glyph starts at the pen; a substitute's is centred in
+    // MS Gothic's cell.
+    int x0 = font->proportional ? cell_x + face->glyph->bitmap_left
+                                : cell_x + (cell_width - advance) / 2 + face->glyph->bitmap_left;
     int y0 = baseline - face->glyph->bitmap_top;
     for (unsigned row = 0; row < bitmap.rows; row++)
     {
@@ -653,6 +826,9 @@ HFONT CreateFontIndirectA(const LOGFONTA *lplf)
     std::lock_guard<std::recursive_mutex> guard(g_lock);
     GdiFont *font = new GdiFont();
     font->logfont = *lplf;
+#ifdef TH16_THCRAP
+    port_thcrap_font_rules(&font->logfont);
+#endif
     setup_font(font);
     g_objects.insert(font);
     return (HFONT)font;
@@ -681,6 +857,9 @@ HFONT CreateFontA(int cHeight, int cWidth, int cEscapement, int cOrientation, in
     {
         strncpy(lf.lfFaceName, pszFaceName, LF_FACESIZE - 1);
     }
+#ifdef TH16_THCRAP
+    port_thcrap_font_face(lf.lfFaceName);
+#endif
     return CreateFontIndirectA(&lf);
 }
 
@@ -899,9 +1078,11 @@ int SetBkMode(HDC hdc, int mode)
     return previous;
 }
 
-// Draws Shift-JIS text with its cell's top-left corner at (x, y)
-// (TA_TOP | TA_LEFT, the default alignment).
-BOOL TextOutA(HDC hdc, int x, int y, LPCSTR lpString, int c)
+// Draws Shift-JIS text (or UTF-8, see g_utf8_text) with its cell's
+// top-left corner at (x, y) (TA_TOP | TA_LEFT, the default alignment).
+// With a thcrap stack, TextOutA first goes through thcrap's layout
+// (port/src/thcrap/text.cpp), which calls this for each run.
+BOOL port_gdi_text_out_raw(HDC hdc, int x, int y, const char *lpString, int c)
 {
     std::lock_guard<std::recursive_mutex> guard(g_lock);
     GdiDC *dc = as<GdiDC>(hdc, GDI_DC);
@@ -927,16 +1108,49 @@ BOOL TextOutA(HDC hdc, int x, int y, LPCSTR lpString, int c)
     }
     int pen = x;
     int baseline = y + font->ascent;
-    for_each_char(lpString, c, [&](const uint8_t *s, int n) {
-        int cell = n == 2 ? font->em : font->half_advance;
-        uint32_t ch = code_point(s, n);
+    for_each_char(lpString, c, [&](uint32_t ch, bool full) {
+        int cell = char_advance(font, ch, full);
         if (ch != ' ' && ch != 0x3000 && ch != 0)
         {
             draw_glyph(dc, font, ch, pen, cell, baseline);
         }
         pen += cell;
     });
+    if (font->logfont.lfUnderline)
+    {
+        int thickness = font->em / 14 > 1 ? font->em / 14 : 1;
+        int top = baseline + (font->cell_height - font->ascent) / 3;
+        for (int row = top; row < top + thickness; row++)
+        {
+            for (int col = x; col < pen; col++)
+            {
+                blend_pixel(dc->bitmap, col, row, dc->text_color, 255);
+            }
+        }
+    }
     return TRUE;
+}
+
+BOOL TextOutA(HDC hdc, int x, int y, LPCSTR lpString, int c)
+{
+#ifdef TH16_THCRAP
+    if (port_thcrap_text_out(hdc, x, y, lpString, c))
+    {
+        return TRUE;
+    }
+#endif
+    return port_gdi_text_out_raw(hdc, x, y, lpString, c);
+}
+
+int port_gdi_text_width(HDC hdc, const char *text, int length)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_lock);
+    GdiDC *dc = as<GdiDC>(hdc, GDI_DC);
+    if (dc == NULL || dc->font == NULL || dc->font->face == NULL || length <= 0)
+    {
+        return 0;
+    }
+    return text_width(dc->font, text, length);
 }
 
 BOOL GetTextExtentPoint32A(HDC hdc, LPCSTR lpString, int c, LPSIZE psizl)
@@ -950,6 +1164,48 @@ BOOL GetTextExtentPoint32A(HDC hdc, LPCSTR lpString, int c, LPSIZE psizl)
     psizl->cx = text_width(dc->font, lpString, c);
     psizl->cy = dc->font->cell_height;
     return TRUE;
+}
+
+int port_gdi_bitmap_width(HDC hdc)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_lock);
+    GdiDC *dc = as<GdiDC>(hdc, GDI_DC);
+    return dc != NULL && dc->bitmap != NULL && dc->bitmap->bits != NULL ? dc->bitmap->width : 0;
+}
+
+HFONT port_gdi_current_font(HDC hdc)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_lock);
+    GdiDC *dc = as<GdiDC>(hdc, GDI_DC);
+    return dc != NULL ? (HFONT)dc->font : NULL;
+}
+
+bool port_gdi_font_logfont(HFONT font, LOGFONTA *lf)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_lock);
+    GdiFont *f = as<GdiFont>(font, GDI_FONT);
+    if (f == NULL)
+    {
+        return false;
+    }
+    *lf = f->logfont;
+    return true;
+}
+
+void port_gdi_set_utf8(bool on)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_lock);
+    g_utf8_text = on;
+}
+
+bool port_gdi_add_font_file(const char *path)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_lock);
+    if (!init_freetype() || !g_fontconfig_ready)
+    {
+        return false;
+    }
+    return FcConfigAppFontAddFile(FcConfigGetCurrent(), (const FcChar8 *)path) == FcTrue;
 }
 
 BOOL GetTextMetricsA(HDC hdc, LPTEXTMETRICA lptm)

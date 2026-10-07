@@ -5,6 +5,10 @@
 #include "Rng.h"
 #include "TextHelper.h"
 
+#ifdef TH16_PORT
+#include "port_thcrap.h"
+#endif
+
 // GLOBAL: TH16 0x4a2980
 FormatInfo g_format_info[7] = {
     {D3DFMT_X8R8G8B8, 32, 0x00000000, 0x00ff0000, 0x0000ff00, 0x000000ff},
@@ -421,6 +425,11 @@ void create_fonts()
 {
     HDC dc = GetDC(NULL);
     LOGFONTA font = {0, 0, 0, 0, 0, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, MEIRYO};
+#ifdef TH16_PORT
+    // thcrap's meiryo_disable (script_latin): no Meiryo, so that the fonts
+    // are the ones the patches' font rules are written for.
+    if (!port_thcrap_binhack("meiryo_disable"))
+#endif
     EnumFontFamiliesExA(dc, &font, find_meiryo, 0, 0);
     ReleaseDC(NULL, dc);
     if (!g_TextHelper.try_allocate_buffer(1024, 128, D3DFMT_A4R4G4B4))

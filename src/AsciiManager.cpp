@@ -7,6 +7,10 @@
 #include "GameErrorContext.h"
 #include "Supervisor.h"
 
+#ifdef TH16_PORT
+#include "port_thcrap.h"
+#endif
+
 // The original keeps this UCRT header function out of line (0x405540).
 // Every caller is vsprintf, so LTCG folds the count (-1) away entirely and
 // leaves the NULL locale's slot filled with junk (push ecx).
@@ -156,7 +160,12 @@ void AsciiInf::create_stringf(Float3 *pos, const char *fmt, ...)
     char buf[0x104];
     va_list args;
     va_start(args, fmt);
+#ifdef TH16_PORT
+    // thcrap's sprintf hacks: the format and %s arguments translated.
+    port_thcrap_vsnprintf(buf, sizeof(buf), fmt, args);
+#else
     _vsprintf_l(buf, fmt, NULL, args);
+#endif
     create_string(pos, buf);
     va_end(args);
 }

@@ -23,6 +23,10 @@
 #include "StageData.h"
 #include "Supervisor.h"
 
+#ifdef TH16_PORT
+#include "port_thcrap.h"
+#endif
+
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 extern i32 g_spell_practice_last_stage;
 extern i32 g_practice_last_stage;
@@ -86,7 +90,11 @@ void TitleInf::load_replay_list()
 
     for (i32 i = 1; i <= REPLAY_SLOTS; i++)
     {
+#ifdef TH16_PORT
+        port_thcrap_snprintf(filename, sizeof(filename), "th16_%.2d.rpy", i);
+#else
         sprintf(filename, "th16_%.2d.rpy", i);
+#endif
         menu->replays[i - 1] = create_replay_inline(filename);
         if (menu->menu_flags & TITLE_STOP_REPLAY_LOADING)
         {
@@ -136,7 +144,11 @@ i32 TitleInf::do_replay_save()
         g_Globals.weird_stage_num = 8;
         for (i32 i = 1; i <= REPLAY_SLOTS; i++)
         {
+#ifdef TH16_PORT
+            port_thcrap_snprintf(path, sizeof(path), "th16_%.2d.rpy", i);
+#else
             sprintf(path, "th16_%.2d.rpy", i);
+#endif
             replays[i - 1] = ReplayManager::create_from_file(path);
         }
         if (g_AnmManager->get_vm_with_id(anm_ids[0x61]) == NULL)
@@ -278,7 +290,11 @@ i32 TitleInf::do_replay_save()
             else if (choice == NAME_ENTRY_END)
             {
                 g_SoundManager.play_sound_centered(SE_EXTEND, 0);
+#ifdef TH16_PORT
+                port_thcrap_snprintf(path, sizeof(path), "th16_%.2d.rpy", menu.next_selection + 1);
+#else
                 sprintf(path, "th16_%.2d.rpy", menu.next_selection + 1);
+#endif
                 ReplayManager::destroy(replays[menu.next_selection]);
                 g_ReplayManager->save(path, replay_name, 0, 0);
                 replays[menu.next_selection] = ReplayManager::create_from_file(path);
@@ -1284,9 +1300,19 @@ i32 TitleInf::draw_spell_card_page()
             const char *tens = id / 10 % 10 == 0 && id / 100 == 0 ? "\x81\x40" : digits[id / 10 % 10];
             const char *hundreds = id / 100 != 0 ? digits[id / 100] : "\x81\x40";
             ScorefileSpell *spell = &g_Scorefile->characters[menu.next_selection].spells[id - 1];
+#ifdef TH16_PORT
+            // thcrap's spell_name#result: spells.js's name, by the id and
+            // its difficulty.
+            g_AnmManager->draw_text_centered(
+                get_vm_or_clear(*row_id), spell->captures[0] != 0 ? 0xffff80 : 0xefefef, 0, 0, 0,
+                "No.%s%s%s %s %4d/%4d", hundreds, tens, ones,
+                port_thcrap_spell_name_ranked(id - 1, g_spell_difficulty[id - 1], name), spell->captures[0],
+                spell->attempts[0]);
+#else
             g_AnmManager->draw_text_centered(get_vm_or_clear(*row_id), spell->captures[0] != 0 ? 0xffff80 : 0xefefef, 0,
                                              0, 0, "No.%s%s%s %s %4d/%4d", hundreds, tens, ones, name,
                                              spell->captures[0], spell->attempts[0]);
+#endif
         }
         else
         {
@@ -2356,8 +2382,16 @@ static __forceinline void music_room_comment_step(TitleInf *menu)
         }
         else
         {
+#ifdef TH16_PORT
+            // thcrap's music_cmt: musiccmt.js's lines.
+            g_AnmManager->draw_text(
+                vm, 0xffffff, 0, 0, 0, 0,
+                port_thcrap_music_comment(menu->music_comment_track, menu->music_comment_line,
+                                          menu->music_comments[menu->music_comment_track][menu->music_comment_line]));
+#else
             g_AnmManager->draw_text(vm, 0xffffff, 0, 0, 0, 0,
                                     menu->music_comments[menu->music_comment_track][menu->music_comment_line]);
+#endif
         }
         vm->interrupt_out_of_line(2);
         menu->music_comment_line++;
@@ -2443,7 +2477,12 @@ i32 TitleInf::do_music_room()
                 AnmVm *vm = get_vm_or_clear(text_row_ids[0x10 + i]);
                 if (g_Scorefile->bgm_unlocked[i])
                 {
+#ifdef TH16_PORT
+                    // thcrap's music_title: themes.js's titles.
+                    g_AnmManager->draw_text(vm, 0xffffff, 0, 0, 0, 0, port_thcrap_music_title(i, music_titles[i]));
+#else
                     g_AnmManager->draw_text(vm, 0xffffff, 0, 0, 0, 0, music_titles[i]);
+#endif
                 }
                 else
                 {
@@ -3273,8 +3312,15 @@ HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 s
             name[len] = '\0';
             ScorefileCharacter *character = &g_Scorefile->characters[spell_character_menu.next_selection];
             AnmVm *vm = get_vm_or_clear(text_row_ids[slot]);
+#ifdef TH16_PORT
+            // thcrap's spell_name#practice: spells.js's name, by the id and
+            // its row.
+            g_AnmManager->draw_text(vm, character->spells[id].captures[1] != 0 ? 0xffff80 : 0xefefef, 0, 0, 0, 0,
+                                    " No.%3d  %s", id + 1, port_thcrap_spell_name_ranked(id, slot, name));
+#else
             g_AnmManager->draw_text(vm, character->spells[id].captures[1] != 0 ? 0xffff80 : 0xefefef, 0, 0, 0, 0,
                                     " No.%3d  %s", id + 1, name);
+#endif
         }
         interrupt_tree_inline(text_row_ids[slot], 2);
         if (last_slot < slot)

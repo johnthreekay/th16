@@ -25,6 +25,10 @@
 #include "UpdateFunc.h"
 #include "ZunAsm.h"
 
+#ifdef TH16_PORT
+#include "port_thcrap.h"
+#endif
+
 // GLOBAL: TH16 0x4a6dcc
 Gui *g_Gui;
 
@@ -401,8 +405,15 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                 const char *text = decode_msg_string(instr()->args.s);
                 if (text[0] == '|')
                 {
+#ifdef TH16_PORT
+                    // thcrap's ruby_offset: the furigana placed by text width.
+                    const char *params = text + 1;
+                    i32 x = port_thcrap_ruby_offset(&params, atoi(params));
+                    const char *rest = strchr(params, ',') + 1;
+#else
                     i32 x = atoi(text + 1);
                     const char *rest = strchr(text + 1, ',') + 1;
+#endif
                     i32 y = atoi(rest);
                     rest = strchr(rest, ',');
                     furigana_1.find_or_clear()->flags_hi |= 0x1000;
@@ -413,6 +424,10 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                 else
                 {
                     f32 width = (strlen(text) / 2 * 16 - 28) * 2.0f;
+#ifdef TH16_PORT
+                    // thcrap's th15_textbox_size: the bubble fits the text.
+                    width = port_thcrap_textbox_width(text, width);
+#endif
                     bubble_width = width > bubble_width ? width : bubble_width;
                     set_textbox(bubble_x, bubble_y, bubble_width, MSG_TEXTBOX_KIND());
                     set_textbox_width(bubble_width, MSG_TEXTBOX_KIND());
@@ -440,8 +455,15 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                 const char *text = decode_msg_string(instr()->args.s);
                 if (text[0] == '|')
                 {
+#ifdef TH16_PORT
+                    // thcrap's ruby_offset: the furigana placed by text width.
+                    const char *params = text + 1;
+                    i32 x = port_thcrap_ruby_offset(&params, atoi(params));
+                    const char *rest = strchr(params, ',') + 1;
+#else
                     i32 x = atoi(text + 1);
                     const char *rest = strchr(text + 1, ',') + 1;
+#endif
                     i32 y = atoi(rest);
                     rest = strchr(rest, ',');
                     furigana_2.find_or_clear()->flags_hi |= 0x1000;
@@ -452,6 +474,10 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                 else
                 {
                     f32 width = (strlen(text) / 2 * 16 - 28) * 2.0f;
+#ifdef TH16_PORT
+                    // thcrap's th15_textbox_size: the bubble fits the text.
+                    width = port_thcrap_textbox_width(text, width);
+#endif
                     bubble_width = width > bubble_width ? width : bubble_width;
                     set_textbox(bubble_x, bubble_y, bubble_width, MSG_TEXTBOX_KIND() + 8);
                     set_textbox_width(bubble_width, MSG_TEXTBOX_KIND() + 8);

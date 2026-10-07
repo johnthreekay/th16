@@ -2,14 +2,17 @@
 // starts SDL and hands over to the game's WinMain the way the Windows
 // startup code would.
 //
-//   th16 [--game-dir DIR] [--save-dir DIR] [DIR]
+//   th16 [--game-dir DIR] [--save-dir DIR] [--thcrap DIR]
+//        [--thcrap-config NAME] [--no-thcrap] [DIR]
 //
 // The game folder (th16.dat, thbgm.dat; never written to) is DIR or
 // --game-dir, else $TH16_DATA_DIR, else the current directory if it has
 // th16.dat, else the executable's directory. The save folder (th16.cfg,
 // scoreth16.dat, replays, snapshots, log.txt) is --save-dir, else
 // $TH16_SAVE_DIR, else SDL's preference path (~/.local/share/th16-port on
-// Linux, ~/Library/Application Support/th16-port on macOS).
+// Linux, ~/Library/Application Support/th16-port on macOS). With thcrap
+// support (TH16_THCRAP), a thcrap folder's patch stack is loaded: see
+// thcrap/thcrap.h and NOTES.md, "thcrap".
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +26,9 @@
 
 #include "port_platform.h"
 #include "port_vfs.h"
+#ifdef TH16_THCRAP
+#include "thcrap/thcrap.h"
+#endif
 
 static std::string absolute(const std::string &path)
 {
@@ -48,9 +54,15 @@ static bool has_game_data(const std::string &dir)
 static void usage(const char *program)
 {
     fprintf(stderr,
-            "usage: %s [--game-dir DIR] [--save-dir DIR] [DIR]\n"
+            "usage: %s [--game-dir DIR] [--save-dir DIR] [--thcrap DIR] [--thcrap-config NAME]\n"
+            "          [--no-thcrap] [DIR]\n"
             "  DIR, --game-dir  the game's folder (th16.dat); also $TH16_DATA_DIR\n"
-            "  --save-dir       where settings, scores and replays go; also $TH16_SAVE_DIR\n",
+            "  --save-dir       where settings, scores and replays go; also $TH16_SAVE_DIR\n"
+            "  --thcrap         a thcrap folder whose patches to apply; also $TH16_THCRAP_DIR\n"
+            "                   (default: ~/.local/share/thcrap if it exists)\n"
+            "  --thcrap-config  its run configuration (a name in config/ or a path); also\n"
+            "                   $TH16_THCRAP_CONFIG (default: the newest one)\n"
+            "  --no-thcrap      no patches (also TH16_THCRAP=0)\n",
             program);
 }
 
@@ -58,6 +70,9 @@ int main(int argc, char **argv)
 {
     std::string game_dir;
     std::string save_dir;
+    std::string thcrap_dir;
+    std::string thcrap_config;
+    bool no_thcrap = false;
     std::string command_line;
     for (int i = 1; i < argc; i++)
     {
@@ -69,6 +84,18 @@ int main(int argc, char **argv)
         else if (arg == "--save-dir" && i + 1 < argc)
         {
             save_dir = argv[++i];
+        }
+        else if (arg == "--thcrap" && i + 1 < argc)
+        {
+            thcrap_dir = argv[++i];
+        }
+        else if (arg == "--thcrap-config" && i + 1 < argc)
+        {
+            thcrap_config = argv[++i];
+        }
+        else if (arg == "--no-thcrap")
+        {
+            no_thcrap = true;
         }
         else if (arg == "--help" || arg == "-h")
         {
@@ -144,6 +171,18 @@ int main(int argc, char **argv)
         return 1;
     }
     port_log("game folder %s, save folder %s", game_dir.c_str(), save_dir.c_str());
+#ifdef TH16_THCRAP
+    if (!no_thcrap)
+    {
+        port_thcrap_init(thcrap_dir.c_str(), thcrap_config.c_str());
+    }
+#else
+    if (!thcrap_dir.empty() || !thcrap_config.empty())
+    {
+        port_log("this build has no thcrap support (TH16_THCRAP); no patches");
+    }
+    (void)no_thcrap;
+#endif
 
 
     // DirectInput reads the pad with DISCL_BACKGROUND.

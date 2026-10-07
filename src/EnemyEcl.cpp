@@ -24,6 +24,10 @@
 #include "ZunAsm.h"
 #include "ZunMath.h"
 
+#ifdef TH16_PORT
+#include "port_thcrap.h"
+#endif
+
 // create_vm, inserted at the front of the world list like create_vm_front
 // (0x426160, which is a copy with pos and rotation folded). LTCG inlined
 // this into the anmPlay instructions.
@@ -1812,7 +1816,14 @@ int EnemyData::ecl_run_over_300()
             }
             else
             {
+#ifdef TH16_PORT
+                // thcrap's fix_satono_1/2 (base_tsa, "Fix Spell Practice bugs
+                // for Stage 5"): the second boss ends its card in BossDeadB.
+                set_next(full, get_int_arg(0), 0, get_int_arg(2),
+                         port_thcrap_binhack("fix_satono_1") ? "BossDeadB" : "BossDead");
+#else
                 set_next(full, get_int_arg(0), 0, get_int_arg(2), "BossDead");
+#endif
             }
             full->set_timeout(get_int_arg(0), "BossEscape");
         }
@@ -1895,6 +1906,10 @@ int EnemyData::ecl_run_over_300()
         // The original inlines these three getters (0x473c90 through
         // full), unlike the cases around.
         i32 spell_id = full->context.current_context->get_int_arg(0);
+#ifdef TH16_PORT
+        // thcrap's spell_id: spells.js names count down to this id.
+        port_thcrap_spell_id(spell_id);
+#endif
         switch ((i16)instr->opcode)
         {
         case ECL_OP_SPELL_537:

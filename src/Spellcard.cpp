@@ -22,6 +22,10 @@
 #include "UpdateFunc.h"
 #include "ZunAsm.h"
 
+#ifdef TH16_PORT
+#include "port_thcrap.h"
+#endif
+
 // GLOBAL: TH16 0x4a6db0
 Spellcard *g_Spellcard;
 
@@ -258,7 +262,14 @@ void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_i
     text_anm_ids[1] = g_Supervisor.text_anm->create_effect(2, -1, NULL);
     text_anm_ids[2] = g_AsciiManager->ascii_anm->create_effect(1, -1, NULL);
     AnmManager *anm = g_AnmManager;
+#ifdef TH16_PORT
+    // thcrap's spell_name: the translated name is only shown (the score
+    // file keeps the original).
+    g_AnmManager->draw_text_right(get_vm_or_clear(text_anm_ids[1]), 0xffffff, 0, 0, 0,
+                                  port_thcrap_spell_name(spell_id, name));
+#else
     g_AnmManager->draw_text_right(get_vm_or_clear(text_anm_ids[1]), 0xffffff, 0, 0, 0, name);
+#endif
     g_SoundManager.play_sound_centered(SE_CAT00, 0);
     boss_anm_id = g_EffectManager->effect_anm->create_effect(0xd, -1, NULL);
     EnemyInf *boss = NULL;

@@ -13,6 +13,10 @@
 #include "SoundManager.h"
 #include "Supervisor.h"
 
+#ifdef TH16_PORT
+#include "port_thcrap.h"
+#endif
+
 static_assert(offsetof(PauseMenu, name) == 0x2d4, "PauseMenu::name");
 static_assert(offsetof(PauseMenu, saved_bgm_time) == 0x2e4, "PauseMenu::saved_bgm_time");
 static_assert(offsetof(PauseMenu, menu_flags) == 0x3ec, "PauseMenu::menu_flags");
@@ -1032,7 +1036,12 @@ void PauseMenu::tick_open()
         item_menu.set_cursor(0);
         for (i32 i = 1; i <= REPLAY_SLOTS; i++)
         {
+#ifdef TH16_PORT
+            // thcrap's sprintf_replay hacks.
+            port_thcrap_snprintf(path, sizeof(path), "th16_%.2d.rpy", i);
+#else
             sprintf(path, "th16_%.2d.rpy", i);
+#endif
             replays[i - 1] = ReplayManager::create_from_file(path);
         }
         return;
@@ -1137,7 +1146,12 @@ void PauseMenu::tick_open()
                     menu_flags &= ~PAUSE_SHOW_REPLAY_NAME;
                     menu_flags |= PAUSE_SHOW_REPLAY_SLOTS;
                     g_SoundManager.play_sound_centered(SE_EXTEND, 0);
+#ifdef TH16_PORT
+                    // thcrap's sprintf_replay hacks.
+                    port_thcrap_snprintf(path, sizeof(path), "th16_%.2d.rpy", item_menu.next_selection + 1);
+#else
                     sprintf(path, "th16_%.2d.rpy", item_menu.next_selection + 1);
+#endif
                     ReplayManager::destroy(replays[item_menu.next_selection]);
                     g_ReplayManager->save(path, name, 0, 1);
                     replays[item_menu.next_selection] = ReplayManager::create_from_file(path);

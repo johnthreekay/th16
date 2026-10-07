@@ -154,6 +154,54 @@ if(APPLE)
     target_link_libraries(th16 PRIVATE ${ICONV_LIBRARY})
 endif()
 
+# thcrap support (src/thcrap/, NOTES.md "thcrap"): reads the user's thcrap
+# folder and patch stack (patched files, translated strings, fonts). Needs
+# jansson and libpng; on by default when pkg-config finds both (for -m32
+# often not: there is rarely a 32-bit jansson). With it, the D3DX image
+# functions also decode PNG (the help manual's pages, th16.dat's
+# help_NN.png, and their patched versions).
+pkg_check_modules(TH16_JANSSON IMPORTED_TARGET jansson)
+pkg_check_modules(TH16_PNG IMPORTED_TARGET libpng)
+if(TH16_JANSSON_FOUND AND TH16_PNG_FOUND)
+    set(TH16_THCRAP_DEFAULT ON)
+else()
+    set(TH16_THCRAP_DEFAULT OFF)
+endif()
+option(TH16_THCRAP "Load thcrap patch stacks (needs jansson and libpng)" ${TH16_THCRAP_DEFAULT})
+if(TH16_THCRAP)
+    if(NOT TH16_JANSSON_FOUND OR NOT TH16_PNG_FOUND)
+        message(FATAL_ERROR "TH16_THCRAP needs jansson and libpng (pkg-config modules jansson, libpng)")
+    endif()
+    file(GLOB TH16_THCRAP_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/thcrap/*.cpp)
+    target_sources(th16 PRIVATE ${TH16_THCRAP_SOURCES})
+    target_compile_definitions(th16 PRIVATE TH16_THCRAP TH16_PNG)
+    target_link_libraries(th16 PRIVATE PkgConfig::TH16_JANSSON PkgConfig::TH16_PNG)
+    # The game's strings at their original addresses (for stringlocs.js),
+    # made from the sources and the original executable when it is there
+    # (the decompilation's orig/), else the copy in src/thcrap/.
+    find_package(Python3 COMPONENTS Interpreter)
+    set(TH16_ORIG_EXE "${TH16_ROOT}/orig/th16.exe" CACHE FILEPATH
+        "The original th16.exe v1.00a, for the thcrap string table")
+    if(Python3_Interpreter_FOUND AND EXISTS "${TH16_ORIG_EXE}")
+        set(TH16_STRINGS_DIR ${CMAKE_CURRENT_BINARY_DIR}/thcrap_generated)
+        set(TH16_STRINGS ${TH16_STRINGS_DIR}/th16_strings_generated.inc)
+        file(GLOB_RECURSE TH16_STRING_SOURCES CONFIGURE_DEPENDS ${TH16_ROOT}/src/*.cpp ${TH16_ROOT}/src/*.h)
+        add_custom_command(OUTPUT ${TH16_STRINGS}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${TH16_STRINGS_DIR}
+            COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/thcrap_strings.py
+                    ${TH16_ORIG_EXE} ${TH16_ROOT}/src ${TH16_STRINGS}
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/thcrap_strings.py ${TH16_STRING_SOURCES} ${TH16_ORIG_EXE}
+            COMMENT "thcrap string table from the game sources and ${TH16_ORIG_EXE}")
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/thcrap/strings.cpp PROPERTIES
+            OBJECT_DEPENDS ${TH16_STRINGS})
+        target_include_directories(th16 PRIVATE ${TH16_STRINGS_DIR})
+        target_compile_definitions(th16 PRIVATE TH16_THCRAP_GENERATED_STRINGS)
+    endif()
+    message(STATUS "thcrap support: on")
+else()
+    message(STATUS "thcrap support: off (jansson found: ${TH16_JANSSON_FOUND}, libpng found: ${TH16_PNG_FOUND})")
+endif()
+
 # Tests of the DirectSound mixer (see NOTES.md, "Audio"):
 # - th16_dsound_test (tests/dsound_test.cpp) drives dsound_sdl.cpp directly;
 # - th16_dsound_game_test (tests/dsound_game_test.cpp) runs the game's own

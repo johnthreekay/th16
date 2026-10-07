@@ -85,6 +85,27 @@ std::string port_sjis_to_utf8(const char *text, int length = -1);
 // UTF-8 to Shift-JIS; false when some character has no Shift-JIS form.
 bool port_utf8_to_sjis(const char *text, std::string *out);
 
+// The GDI text renderer (gdi_text.cpp), for thcrap's text layout
+// (port/src/thcrap/text.cpp), which TextOutA goes through when a patch
+// stack is loaded:
+extern "C" {
+// TextOutA without the layout: one run of text in the DC's font.
+BOOL port_gdi_text_out_raw(HDC hdc, int x, int y, const char *text, int length);
+// The width in pixels of a run in the DC's font.
+int port_gdi_text_width(HDC hdc, const char *text, int length);
+// The width of the DIB section selected into the DC (0 without one).
+int port_gdi_bitmap_width(HDC hdc);
+// The font selected into the DC, and a font's LOGFONT (GetObject).
+HFONT port_gdi_current_font(HDC hdc);
+bool port_gdi_font_logfont(HFONT font, LOGFONTA *lf);
+// Take strings as UTF-8 where they are valid UTF-8 (else Shift-JIS), as
+// thcrap's win32_utf8 does; real fonts then also keep their own
+// (proportional) advances. Off by default.
+void port_gdi_set_utf8(bool on);
+// Makes a font file's faces available by family name (patch.js "fonts").
+bool port_gdi_add_font_file(const char *path);
+}
+
 // ---------------------------------------------------------------------------
 // Logging
 

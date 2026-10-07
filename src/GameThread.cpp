@@ -25,6 +25,10 @@
 #include "StageData.h"
 #include "ZunAsm.h"
 
+#ifdef TH16_PORT
+#include "port_thcrap.h"
+#endif
+
 // GLOBAL: TH16 0x4a6dd4
 GameThread *g_GameThread;
 
@@ -627,6 +631,14 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
     {
         if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_IN_MENU)
         {
+#ifdef TH16_PORT
+            // thcrap's score_force_visual_update (base_tsa): the score
+            // display catches up while the game-over menu is open.
+            if (port_thcrap_binhack("score_force_visual_update"))
+            {
+                Gui::update_score();
+            }
+#endif
             return UPDATE_FUNC_BREAK;
         }
         fade_timer++;
