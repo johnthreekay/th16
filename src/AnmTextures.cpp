@@ -15,7 +15,7 @@ HARNESS_CALLED void AnmManager::release_textures()
         }
         for (i32 j = 0; j < (*anm)->entry_count; j++)
         {
-            if (((*anm)->d3d[j].flags & 1) && (*anm)->d3d[j].texture != NULL)
+            if (((*anm)->d3d[j].flags & ANM_D3D_RENDER_TARGET) && (*anm)->d3d[j].texture != NULL)
             {
                 (*anm)->d3d[j].texture->Release();
                 (*anm)->d3d[j].texture = NULL;
@@ -46,7 +46,7 @@ HARNESS_CALLED void AnmManager::create_d3d_textures_for_loaded_anms()
         for (i32 j = 0; j < (*anm)->entry_count; j++)
         {
             AnmLoadedD3D *d3d = &(*anm)->d3d[j];
-            if (*(u8 *)&d3d->flags & 1)
+            if (*(u8 *)&d3d->flags & ANM_D3D_RENDER_TARGET)
             {
                 AnmRawEntry *entry = (AnmRawEntry *)d3d->entry;
                 d3d->create_render_target(entry->width, entry->height);

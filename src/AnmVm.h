@@ -31,7 +31,7 @@ struct AnmId
     // 0x46f300 and 0x46f340. AnmVm::set/hide_tree.
     void show_tree();
     void hide_tree();
-    // 0x46f3e0
+    // 0x46f3e0. Sets the entity_pos of the VM, if it still exists.
     void set_entity_pos(D3DXVECTOR3 *pos);
     // 0x46f440. Stops the VM and replaces it with a new effect VM running
     // the given script of the same file.
@@ -405,6 +405,37 @@ enum AnmOpcode
     ANM_OP_DRAW_RING = 611,
     ANM_OP_DRAW_RECT_BORDER = 612,
     ANM_OP_DRAW_LINE = 613,
+};
+
+// Draw layers (AnmVm::layer). Each has an AnmManager::on_draw_* callback;
+// AnmLayers.cpp lists the draw order and the camera each group uses.
+enum AnmLayer
+{
+    // 0-2: drawn before the stage camera is set up.
+    // 3-19: the game area, drawn with the stage camera (camera 3);
+    // set_layer gives them ANM_VM_ORIGIN_GAME.
+    ANM_LAYER_GAME_FIRST = 3,
+    ANM_LAYER_GAME_LAST = 19,
+    // 20-23: in front of the game area with the game area's 2D camera
+    // (camera 1), placed from the arcade HUD origin (ANM_VM_ORIGIN_HUD).
+    ANM_LAYER_HUD_FIRST = 20,
+    ANM_LAYER_HUD_LAST = 23,
+    // 24-31: the interface, with the full screen camera (camera 2), except
+    // 28 which uses camera 0. 20-31 are scaled with the resolution
+    // (ANM_VM_RESOLUTION_SCALED).
+    ANM_LAYER_UI_FIRST = 24,
+    ANM_LAYER_UI_LAST = 31,
+    // 36-42: layers 24-30 for VMs in the manager's UI list, each drawn
+    // right after its world list twin. 32-35 are never drawn.
+    ANM_LAYER_UI_LIST_FIRST = 36,
+    ANM_LAYER_UI_LIST_LAST = 42,
+    ANM_LAYER_UI_LIST_COUNT = ANM_LAYER_UI_LIST_LAST - ANM_LAYER_UI_LIST_FIRST + 1,
+    // What tick_ui adds to a UI list VM's layer 24-31 (and tick_world
+    // takes off a world VM's 36-42).
+    ANM_LAYER_UI_LIST_OFFSET = ANM_LAYER_UI_LIST_FIRST - ANM_LAYER_UI_FIRST,
+    // Where tick_ui puts UI list VMs on any other layer.
+    ANM_LAYER_UI_LIST_DEFAULT = 38,
+    ANM_LAYER_COUNT = 43,
 };
 
 // AnmVm::mode_of_create_child: where AnmLoaded::create_managed_child and

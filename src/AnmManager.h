@@ -9,34 +9,53 @@
 #include "decomp.h"
 #include "types.h"
 
-// Only the parts decompiled code needs so far. Layouts from ExpHP's
+// The ANM loader and runtime: loaded files, their sprites and textures, the
+// VM pool and lists, and the Direct3D drawing state. Layouts from ExpHP's
 // th-re-data.
 
 // A sprite of a loaded .anm file (ExpHP: zAnmLoadedSprite).
 struct AnmLoadedSprite
 {
-    i32 unk_0;
+    // The AnmLoaded slot of the file.
+    i32 anm_slot;
+    // The entry (texture) it is on, in its file and as slot * 256 + entry.
     i32 image_file_num_in_anm;
     i32 image_file_num_in_all;
+    // Its rectangle in texture pixels.
     Float2 start_pixel_inclusive;
     Float2 end_pixel_exclusive;
+    // The size of the texture as created.
     f32 bitmap_height;
     f32 bitmap_width;
     Float2 uv_start;
     Float2 uv_end;
+    // Its size in the entry's own pixels.
     f32 sprite_height;
     f32 sprite_width;
-    Float2 unk_3c;
+    // Texture pixels per entry pixel (ExpHP: __unknown__usually_1_1): not 1
+    // when the texture was created at another size than the entry says.
+    Float2 pixel_scale;
+};
+
+// AnmLoadedD3D::flags.
+enum AnmLoadedD3DFlags
+{
+    // The texture is a render target (an "@R" entry), released before a
+    // device reset and created again after it.
+    ANM_D3D_RENDER_TARGET = 1 << 0,
 };
 
 // The texture of one entry of a loaded .anm file (ExpHP: zAnmLoadedD3D).
 struct AnmLoadedD3D
 {
     IDirect3DTexture9 *texture;
+    // The image file read by AnmLoaded::load_entry, kept for reloading.
     void *src_data;
     u32 src_data_size;
     i32 bytes_per_pixel;
+    // The AnmRawEntry.
     void *entry;
+    // AnmLoadedD3DFlags.
     i32 flags;
 
     // 0x46f490. Fills the top level of the texture with zeroes.
@@ -71,7 +90,8 @@ struct AnmRawEntry
     u32 unused[6];
 };
 
-// One loaded ANM file.
+// One loaded ANM file: its entries (textures), sprites and scripts, and one
+// prototype VM per script that new VMs are copied from.
 struct AnmLoaded
 {
     i32 slot_num;
@@ -95,6 +115,7 @@ struct AnmLoaded
     i32 texture_memory;
     // Counts VMs created from this file.
     i32 vm_count;
+    // Freed by release; nothing in TH16 sets it.
     void *unk_138;
 
     AnmLoaded()
@@ -493,13 +514,17 @@ struct AnmManager
     // 0x459700. Serves the queued screen copies, once per frame.
     HARNESS_CALLED void take_screenshots();
 
-    // 0x46f270 (ExpHP: AnmBehemoth::disable_vms_from_anm_file).
+    // 0x46f270 (ExpHP: AnmBehemoth::disable_vms_from_anm_file). Marks every
+    // VM running a script of the file for deletion, before it is unloaded.
     void disable_vms_from_anm_file(AnmLoaded *anm);
 
     // Members that do not use this; LTCG dropped it (ret N, no ecx).
+    // 0x46f0b0. Sends an interrupt to the VM and its direct children.
     DECOMP_NOINLINE static void __stdcall interrupt_tree(AnmId id, i32 interrupt);
     // 0x46f130. Like interrupt_tree, also running each VM once.
     DECOMP_NOINLINE static void __stdcall interrupt_tree_and_run(AnmId id, i32 interrupt);
+    // 0x46d020. Loads an .anm file into a slot (or returns the one already
+    // there) and waits for the loading thread to create its textures.
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *path);
     // 0x46d990. Renders printf-style text into the VM's texture (the
     // ending and dialogue lines). Variadic, so __cdecl with this pushed
@@ -629,6 +654,8 @@ struct AnmManager
     // per-layer draw lists.
     DECOMP_NOINLINE static i32 __fastcall tick_world(AnmManager *mgr);
     DECOMP_NOINLINE static i32 __fastcall tick_ui(AnmManager *mgr);
+    // The tick callbacks (priorities 0x21 and 9): tick_world, skipped while
+    // the game is paused with the world frozen, and tick_ui.
     static i32 __fastcall on_tick_21(AnmManager *mgr);
     static i32 __fastcall on_tick_09(AnmManager *mgr);
     // Moves the VM and its children onto delete_list, once each.
@@ -687,7 +714,8 @@ struct AnmManager
     // 0x46c8b0. Loads an image file in memory into the top level of an
     // existing texture. The last three arguments are the same at every call
     // site; LTCG folded them. Does not use this.
-    HARNESS_CALLED i32 reload_texture(AnmLoadedD3D *d3d, void *data, u32 size, i32 unk_3, i32 unk_4, i32 unk_5);
+    HARNESS_CALLED i32 reload_texture(AnmLoadedD3D *d3d, void *data, u32 size, i32 unused_3, i32 unused_4,
+                                       i32 unused_5);
 
     // Frees the ANM file in a slot, if one is loaded there.
     void unload_anm(i32 slot)
@@ -717,7 +745,7 @@ __forceinline AnmId AnmLoaded::create_vm_inline(i32 script, Float3 *pos, f32 rot
     if (layer >= 0)
     {
         vm->layer = layer;
-        if (layer <= 23)
+        if (layer <= ANM_LAYER_HUD_LAST)
         {
             vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
             vm->flags_hi |= ANM_VM_ORIGIN_GAME;

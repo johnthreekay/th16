@@ -21,8 +21,8 @@ i32 AnmLoaded::set_sprite(AnmVm *vm, i32 sprite)
     D3DXMatrixIdentity(&vm->texture_matrix);
     vm->sprite_matrix.m[0][0] = vm->sprite_size.x / 256.0f;
     vm->sprite_matrix.m[1][1] = vm->sprite_size.y / 256.0f;
-    vm->texture_matrix.m[0][0] = vm->sprite_size.x / s->bitmap_width * s->unk_3c.x;
-    vm->texture_matrix.m[1][1] = vm->sprite_size.y / s->bitmap_height * s->unk_3c.y;
+    vm->texture_matrix.m[0][0] = vm->sprite_size.x / s->bitmap_width * s->pixel_scale.x;
+    vm->texture_matrix.m[1][1] = vm->sprite_size.y / s->bitmap_height * s->pixel_scale.y;
     vm->world_matrix = vm->sprite_matrix;
     return 0;
 }

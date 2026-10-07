@@ -75,7 +75,7 @@ HARNESS_CALLED AnmId AnmLoaded::create_vm_front(i32 script, i32 layer, i32 unuse
     if (layer >= 0)
     {
         vm->layer = layer;
-        if (layer <= 23)
+        if (layer <= ANM_LAYER_HUD_LAST)
         {
             vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
             vm->flags_hi |= ANM_VM_ORIGIN_GAME;

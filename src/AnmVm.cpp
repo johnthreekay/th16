@@ -120,11 +120,11 @@ void AnmVm::alloc_extra_data(u32 size)
 void AnmVm::set_layer(i32 layer)
 {
     this->layer = layer;
-    if (this->layer >= 3 && this->layer <= 19)
+    if (this->layer >= ANM_LAYER_GAME_FIRST && this->layer <= ANM_LAYER_GAME_LAST)
     {
         flags_hi = flags_hi & ~ANM_VM_ORIGIN_MODE_MASK | ANM_VM_ORIGIN_GAME;
     }
-    else if (this->layer >= 20 && this->layer <= 23)
+    else if (this->layer >= ANM_LAYER_HUD_FIRST && this->layer <= ANM_LAYER_HUD_LAST)
     {
         flags_hi = flags_hi & ~ANM_VM_ORIGIN_MODE_MASK | ANM_VM_ORIGIN_HUD;
     }
@@ -132,7 +132,8 @@ void AnmVm::set_layer(i32 layer)
     {
         flags_hi &= ~ANM_VM_ORIGIN_MODE_MASK;
     }
-    if (this->layer >= 20 && this->layer <= 31 || this->layer >= 36 && this->layer <= 42)
+    if (this->layer >= ANM_LAYER_HUD_FIRST && this->layer <= ANM_LAYER_UI_LAST ||
+        this->layer >= ANM_LAYER_UI_LIST_FIRST && this->layer <= ANM_LAYER_UI_LIST_LAST)
     {
         flags_hi = flags_hi & ~ANM_VM_RESOLUTION_MODE_MASK | ANM_VM_RESOLUTION_SCALED;
     }

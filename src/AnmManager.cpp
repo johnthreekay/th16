@@ -51,7 +51,7 @@ DECOMP_NOINLINE AnmId AnmLoaded::create_effect(i32 script, i32 layer, AnmVm **ou
     if (layer >= 0)
     {
         vm->layer = layer;
-        if (layer <= 23)
+        if (layer <= ANM_LAYER_HUD_LAST)
         {
             vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
             vm->flags_hi |= ANM_VM_ORIGIN_GAME;
@@ -78,7 +78,7 @@ HARNESS_CALLED AnmId AnmLoaded::create_vm(i32 script, D3DXVECTOR3 *pos, f32 rota
     if (layer >= 0)
     {
         vm->layer = layer;
-        if (layer <= 23)
+        if (layer <= ANM_LAYER_HUD_LAST)
         {
             vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
             vm->flags_hi |= ANM_VM_ORIGIN_GAME;

@@ -464,8 +464,8 @@ i32 __fastcall AnmManager::tick_world(AnmManager *mgr)
     delete_list.next = NULL;
     delete_list.prev = NULL;
     delete_list.unk_c = NULL;
-    AnmVm *layer_tails[43];
-    for (i32 i = 0; i < 36; i++)
+    AnmVm *layer_tails[ANM_LAYER_COUNT];
+    for (i32 i = 0; i < ANM_LAYER_UI_LIST_FIRST; i++)
     {
         AnmVm *head = &mgr->layer_list_dummy_heads[i];
         layer_tails[i] = head;
@@ -490,9 +490,9 @@ i32 __fastcall AnmManager::tick_world(AnmManager *mgr)
             else
             {
                 // World VMs on the UI copies of layers 24-30 move back.
-                if (vm->layer >= 36 && vm->layer <= 42)
+                if (vm->layer >= ANM_LAYER_UI_LIST_FIRST && vm->layer <= ANM_LAYER_UI_LIST_LAST)
                 {
-                    vm->layer -= 12;
+                    vm->layer -= ANM_LAYER_UI_LIST_OFFSET;
                 }
                 layer_tails[vm->layer]->next_in_layer = vm;
                 layer_tails[vm->layer] = vm;
@@ -518,11 +518,11 @@ i32 __fastcall AnmManager::tick_ui(AnmManager *mgr)
 {
     ENTER_CS(CS_ANM_MANAGER);
     // The UI list only uses layers 36-42.
-    AnmVm *layer_tails[7];
-    for (i32 i = 0; i < 7; i++)
+    AnmVm *layer_tails[ANM_LAYER_UI_LIST_COUNT];
+    for (i32 i = 0; i < ANM_LAYER_UI_LIST_COUNT; i++)
     {
-        layer_tails[i] = &mgr->layer_list_dummy_heads[36 + i];
-        mgr->layer_list_dummy_heads[36 + i].next_in_layer = NULL;
+        layer_tails[i] = &mgr->layer_list_dummy_heads[ANM_LAYER_UI_LIST_FIRST + i];
+        mgr->layer_list_dummy_heads[ANM_LAYER_UI_LIST_FIRST + i].next_in_layer = NULL;
     }
     mgr->useless_count = 0;
     ZunList<AnmVm> delete_list;
@@ -549,16 +549,16 @@ i32 __fastcall AnmManager::tick_ui(AnmManager *mgr)
             else
             {
                 // UI VMs on layers 24-31 move to their UI copies.
-                if (vm->layer >= 24 && vm->layer <= 31)
+                if (vm->layer >= ANM_LAYER_UI_FIRST && vm->layer <= ANM_LAYER_UI_LAST)
                 {
-                    vm->layer += 12;
+                    vm->layer += ANM_LAYER_UI_LIST_OFFSET;
                 }
-                else if (vm->layer < 36 || vm->layer > 42)
+                else if (vm->layer < ANM_LAYER_UI_LIST_FIRST || vm->layer > ANM_LAYER_UI_LIST_LAST)
                 {
-                    vm->layer = 38;
+                    vm->layer = ANM_LAYER_UI_LIST_DEFAULT;
                 }
-                layer_tails[vm->layer - 36]->next_in_layer = vm;
-                layer_tails[vm->layer - 36] = vm;
+                layer_tails[vm->layer - ANM_LAYER_UI_LIST_FIRST]->next_in_layer = vm;
+                layer_tails[vm->layer - ANM_LAYER_UI_LIST_FIRST] = vm;
                 vm->next_in_layer = NULL;
                 mgr->useless_count++;
             }
