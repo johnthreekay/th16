@@ -321,6 +321,9 @@ struct Player
     }
     // 0x443f10
     void die();
+    // 0x443cd0. Getting hit: costs a life, refills the bombs, drops the
+    // options and starts the death state with 180 frames of invincibility.
+    void lose_life();
     // 0x445360. Fires one shooter if a bullet is free (and the option's
     // laser is not out); -1 if creating the bullet failed.
     i32 shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner);

@@ -8,6 +8,7 @@
 #include "Bomb.h"
 #include "FileSystem.h"
 #include "EffectManager.h"
+#include "EnemyManager.h"
 #include "Gui.h"
 #include "AnmManager.h"
 #include "SoundManager.h"
@@ -228,6 +229,58 @@ HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_o
 }
 
 // TODO: the original reserves 8 bytes of locals where ours has 4.
+// TODO: the original realigns its frame to 8 bytes (ebx-based form); the body matches.
+// FUNCTION: TH16 0x443cd0
+void Player::lose_life()
+{
+    EffectManager *effects = g_EffectManager;
+    i32 index = effects->next_index();
+    if (index != -1)
+    {
+        effects->anm_ids[index] = effects->effect_anm->create_vm(0x1c, &inner.pos, 0.0f, -1, 0);
+    }
+    g_Globals.lives--;
+    g_Globals.bombs = 3;
+    if (g_Gui != NULL)
+    {
+        g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
+    }
+    if (g_Globals.lives >= 0)
+    {
+        g_Gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
+    }
+    g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
+    inner.state = 2;
+    inner.time_in_state.reset();
+    inner.iframes = 180;
+    anm_file->copy_vm_and_run(&vm, 0);
+    for (i32 i = 0; i < 4; i++)
+    {
+        inner.main_options[i].active = 0;
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b0, 1);
+        AnmManager::interrupt_tree(inner.main_options[i].anm_id_b4, 1);
+    }
+    inner.num_main_options = 0;
+    if (g_Spellcard->flags & 1)
+    {
+        if (g_Spellcard->time.current >= 60)
+        {
+            g_Spellcard->bonus = 0;
+            g_Spellcard->flags &= ~0x22;
+        }
+        else if (g_MainBomb->in_use == 1)
+        {
+            g_Spellcard->flags |= 0x20;
+        }
+    }
+    g_EnemyManager->inner.miss_count++;
+    g_EnemyManager->inner.can_still_capture_spell = 0;
+    if (g_Globals.miss_count < 999999)
+    {
+        g_Globals.miss_count++;
+    }
+}
+
 // FUNCTION: TH16 0x443f10
 void Player::die()
 {
