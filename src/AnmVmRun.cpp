@@ -414,8 +414,17 @@ __forceinline i32 AnmVm::run_script()
             break;
         // isetAdd ... fsetMod
         case 112:
-            *ANM_INT_PTR(0) = ANM_INT(1) + ANM_INT(2);
+        {
+            i32 a = ANM_INT(1);
+            i32 b = ANM_INT(2);
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p = a + b;
             break;
+        }
         case 113:
             *ANM_FLOAT_PTR(0) = ANM_FLOAT(1) + ANM_FLOAT(2);
             break;
@@ -432,14 +441,32 @@ __forceinline i32 AnmVm::run_script()
             *ANM_FLOAT_PTR(0) = ANM_FLOAT(1) * ANM_FLOAT(2);
             break;
         case 118:
-            *ANM_INT_PTR(0) = ANM_INT(1) / ANM_INT(2);
+        {
+            i32 a = ANM_INT(1);
+            i32 b = ANM_INT(2);
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p = a / b;
             break;
+        }
         case 119:
             *ANM_FLOAT_PTR(0) = ANM_FLOAT(1) / ANM_FLOAT(2);
             break;
         case 120:
-            *ANM_INT_PTR(0) = ANM_INT(1) % ANM_INT(2);
+        {
+            i32 a = ANM_INT(1);
+            i32 b = ANM_INT(2);
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p = a % b;
             break;
+        }
         case 121:
             anm_store_float(this, ins, 0, fmodf(ANM_FLOAT(1), ANM_FLOAT(2)));
             break;
@@ -471,7 +498,12 @@ __forceinline i32 AnmVm::run_script()
         case 106:
         {
             i32 value = ANM_INT(1);
-            *ANM_INT_PTR(0) *= value;
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p *= value;
             break;
         }
         case 107:
@@ -483,7 +515,12 @@ __forceinline i32 AnmVm::run_script()
         case 108:
         {
             i32 value = ANM_INT(1);
-            *ANM_INT_PTR(0) /= value;
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p /= value;
             break;
         }
         case 109:
@@ -495,7 +532,12 @@ __forceinline i32 AnmVm::run_script()
         case 110:
         {
             i32 value = ANM_INT(1);
-            *ANM_INT_PTR(0) %= value;
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p %= value;
             break;
         }
         case 111:
