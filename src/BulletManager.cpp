@@ -507,8 +507,8 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
     f32 x;
     switch ((u16)props->aim_type)
     {
-    case 0:
-    case 1:
+    case ET_AIM_AT:
+    case ET_AIM_ST:
         if (props->count & 1)
         {
             angle += (f32)((i + 1) / 2) * props->ang_bullet_dist;
@@ -521,39 +521,39 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
         {
             angle *= -1.0f;
         }
-        if ((u16)props->aim_type == 0)
+        if ((u16)props->aim_type == ET_AIM_AT)
         {
             angle += angle_to_player;
         }
         angle += props->ang_aim;
         break;
-    case 2:
+    case ET_AIM_AT_RING:
         angle += angle_to_player;
-    case 3:
+    case ET_AIM_ST_RING:
         angle += (f32)i * ZUN_2PI / (f32)props->count;
         angle += (f32)layer * props->ang_bullet_dist + props->ang_aim;
         break;
-    case 4:
+    case ET_AIM_AWAY_RING:
         angle += angle_to_player;
-    case 5:
+    case ET_AIM_ST_RING2:
         angle += ZUN_PI / (f32)props->count;
         angle += (f32)i * ZUN_2PI / (f32)props->count;
         angle += (f32)layer * props->ang_bullet_dist + props->ang_aim;
         break;
-    case 6:
+    case ET_AIM_RAND:
         angle = props->ang_aim + g_replay_safe_rng.randf_neg_to(props->ang_bullet_dist);
         break;
-    case 7:
+    case ET_AIM_RAND_SPEED_RING:
         speed = g_replay_safe_rng.randf_0_to(props->spd2) + props->spd1;
         angle += (f32)i * ZUN_2PI / (f32)props->count;
         angle += (f32)layer * props->ang_bullet_dist + props->ang_aim;
         break;
-    case 8:
+    case ET_AIM_MEEK:
         angle = props->ang_aim + g_replay_safe_rng.randf_neg_to(props->ang_bullet_dist);
         speed = g_replay_safe_rng.randf_0_to(props->spd2) + props->spd1;
         break;
-    case 9:
-    case 10:
+    case ET_AIM_AT_PYRAMID:
+    case ET_AIM_ST_PYRAMID:
         x = (f32)i * ZUN_2PI / (f32)props->count;
         if (props->layers & 1)
         {
@@ -576,18 +576,18 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
         {
             angle *= -1.0f;
         }
-        if ((u16)props->aim_type == 9)
+        if ((u16)props->aim_type == ET_AIM_AT_PYRAMID)
         {
             angle += angle_to_player;
         }
         angle += props->ang_aim;
         break;
-    case 11:
+    case ET_AIM_PEANUT:
         x = (f32)i * ZUN_2PI / (f32)props->count;
         angle += props->ang_aim + x;
         speed *= 1.0f - (f32)fabs(sinf(x)) * props->spd2;
         break;
-    case 12:
+    case ET_AIM_PEANUT2:
         x = (f32)i * ZUN_2PI / (f32)props->count + ZUN_PI / (f32)props->count;
         angle += props->ang_aim + x;
         speed *= 1.0f - (f32)fabs(sinf(x)) * props->spd2;

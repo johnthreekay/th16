@@ -18,6 +18,34 @@ class EnemyInf;
 // ExpHP: zEnemyList.
 typedef ZunList<EnemyInf> EnemyList;
 
+// EnemyBulletShooter::aim_type (ECL etAim), thecl's names. count bullets per
+// layer, layers from spd1 to spd2; AT forms add the angle to the player.
+enum EtAimMode
+{
+    // A fan of count bullets, ang_bullet_dist apart, around ang_aim.
+    ET_AIM_AT = 0,
+    ET_AIM_ST = 1,
+    // A ring of count bullets; each layer turns by ang_bullet_dist.
+    ET_AIM_AT_RING = 2,
+    ET_AIM_ST_RING = 3,
+    // The ring turned by half a step, so no bullet goes at the aim.
+    ET_AIM_AWAY_RING = 4,
+    ET_AIM_ST_RING2 = 5,
+    // Random angle within ang_bullet_dist of ang_aim.
+    ET_AIM_RAND = 6,
+    // A ring with random speeds between spd1 and spd1 + spd2.
+    ET_AIM_RAND_SPEED_RING = 7,
+    // Random angle and speed.
+    ET_AIM_MEEK = 8,
+    // Rings whose layers fan out alternately left and right.
+    ET_AIM_AT_PYRAMID = 9,
+    ET_AIM_ST_PYRAMID = 10,
+    // A ring slowed by spd2 times |sin| of each bullet's angle.
+    ET_AIM_PEANUT = 11,
+    // The same turned by half a step.
+    ET_AIM_PEANUT2 = 12,
+};
+
 // ExpHP: zEnemyBulletShooter.
 struct EnemyBulletShooter
 {
@@ -45,6 +73,7 @@ struct EnemyBulletShooter
     // Bullets per layer and layers per shot.
     i16 count;
     i16 layers;
+    // An EtAimMode (only the low 16 bits count).
     i32 aim_type;
     // 0x20: play shot_sfx.
     u32 sfx_flags;
