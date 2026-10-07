@@ -463,7 +463,7 @@ void SoundBufferEntry::play(i32 pan)
     buffer->Play(0, 0, data->play_flags);
 }
 
-// TODO: the stubbed refill call keeps its argument (the original pushes junk for the folded one) and PeekMessageA/MsgWaitForMultipleObjects are cached differently.
+// TODO: PeekMessageA and MsgWaitForMultipleObjects are cached in registers differently.
 // FUNCTION: TH16 0x45ec50
 DWORD WINAPI SoundManager::bgm_thread_proc(void *arg)
 {

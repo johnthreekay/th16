@@ -421,7 +421,7 @@ i32 __stdcall AnmManager::setup_entry(AnmLoaded *anm, i32 index, i32 first_sprit
     return 1;
 }
 
-// TODO: the inlined timer resets address [vms + offset] where ours uses [offset + vms].
+// TODO: the inlined timer resets address [vms + offset] where ours uses [offset + vms] (reccmp: 100%*).
 // FUNCTION: TH16 0x46d1c0
 AnmLoaded *__stdcall AnmManager::load_next_entry(AnmLoaded *anm)
 {
