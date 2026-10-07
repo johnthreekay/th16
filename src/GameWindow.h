@@ -148,7 +148,40 @@ struct GameWindow
 
 #pragma pack(pop)
 
-extern GameWindow g_GameWindow;
+extern DECOMP_ALIGN16 GameWindow g_GameWindow;
+
+// GameWindow's fields from flags on (0x4d9d1c to 0x4d9dc4 in the original)
+// are what the rest of the game addresses as globals: code outside the
+// window methods names them directly. They are the same memory, so these
+// names are aliases of the fields, not variables of their own.
+#define g_window_flags (g_GameWindow.flags)
+#define g_device_reset_frames (g_GameWindow.device_reset_frames)
+#define g_resolution_x (g_GameWindow.resolution_x)
+#define g_resolution_y (g_GameWindow.resolution_y)
+#define g_screen_coord_scale (g_GameWindow.screen_coord_scale)
+#define g_early_arcade_offset_x (g_GameWindow.early_arcade_offset_x)
+#define g_early_arcade_offset_y (g_GameWindow.early_arcade_offset_y)
+#define g_arcade_height (g_GameWindow.arcade_height)
+#define g_arcade_width (g_GameWindow.arcade_width)
+#define g_arcade_hud_origin_x (g_GameWindow.arcade_hud_origin_x)
+#define g_arcade_hud_origin_y (g_GameWindow.arcade_hud_origin_y)
+#define g_game_2d_origin_x (g_GameWindow.game_2d_origin_x)
+#define g_game_2d_origin_y (g_GameWindow.game_2d_origin_y)
+
+// pacing_mode and the pacing table (0x4d9d90), as code outside the window
+// methods addresses them. 16-byte aligned like g_GameWindow (0x20b0 is a
+// multiple of 16), so the compiler may use aligned SSE stores.
+struct DECOMP_ALIGN16 FramePacingTable
+{
+    i32 mode;
+    struct
+    {
+        i32 max_sleep_ms;
+        i32 sleep_ms;
+        i32 late_frames;
+    } pacing[4];
+};
+#define g_frame_pacing (*(FramePacingTable *)&g_GameWindow.pacing_mode)
 
 // Seconds since startup, from the performance counter if there is one.
 double LTCG_VECTORCALL get_runtime();
