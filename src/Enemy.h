@@ -214,6 +214,8 @@ struct EnemyData
     int ecl_anm_set_sprite();
     // 0x423050. The enmCreate family.
     int ecl_enm_create();
+    // 0x41dcb0. The enemy-specific ECL instructions (300 and up).
+    int ecl_run_over_300();
     i32 get_int_arg(int index);
     i32 *get_int_arg_ptr(int index);
     f32 get_float_arg(int index);

@@ -1795,3 +1795,9 @@ f32 EnemyInf::get_float_global(int var)
     }
     return 0.0f;
 }
+
+// FUNCTION: TH16 0x41dca0
+int EnemyInf::run_over_300()
+{
+    return enemy.ecl_run_over_300();
+}
