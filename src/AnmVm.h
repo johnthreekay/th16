@@ -279,6 +279,9 @@ struct AnmVm
     // Inlined into every owner's destructor; the original also has an
     // out-of-line copy at 0x4093b0.
     ~AnmVm();
+    // 0x43b900. `delete vm` as the original's out-of-line scalar deleting
+    // destructor (flags folded to 1), which our build would inline.
+    HARNESS_CALLED void *scalar_delete(u32 flags);
     // Resets the VM, keeping layer, fast_id and entity_pos (ExpHP:
     // AnmVm::initialize).
     void wipe();

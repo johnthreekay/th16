@@ -617,7 +617,6 @@ i32 __fastcall AnmManager::on_tick_09(AnmManager *mgr)
     return tick_ui(mgr);
 }
 
-// TODO: LTCG inlines the scalar deleting destructor here; the original calls 0x43b900.
 // FUNCTION: TH16 0x46eab0
 i32 AnmManager::destroy_possibly_managed_vm(AnmVm *vm)
 {
@@ -660,11 +659,10 @@ i32 AnmManager::destroy_possibly_managed_vm(AnmVm *vm)
         vm->id.id = 0;
         return 0;
     }
-    delete vm;
+    vm->scalar_delete(1);
     return 0;
 }
 
-// TODO: LTCG inlines the scalar deleting destructor here; the original calls 0x43b900.
 // FUNCTION: TH16 0x46ec90
 i32 AnmManager::destroy_possibly_managed_snapshot_vm(AnmVm *vm)
 {
@@ -679,7 +677,7 @@ i32 AnmManager::destroy_possibly_managed_snapshot_vm(AnmVm *vm)
         vm->~AnmVm();
         return 0;
     }
-    delete vm;
+    vm->scalar_delete(1);
     return 0;
 }
 

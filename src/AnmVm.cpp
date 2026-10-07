@@ -27,6 +27,17 @@ AnmVm::~AnmVm()
     instr_offset = -1;
 }
 
+// FUNCTION: TH16 0x43b900
+HARNESS_CALLED void *AnmVm::scalar_delete(u32 flags)
+{
+    this->~AnmVm();
+    if (flags & 1)
+    {
+        operator delete(this, sizeof(AnmVm));
+    }
+    return this;
+}
+
 // TODO: the flags_hi and/or and one pop are scheduled one store later in the original.
 // FUNCTION: TH16 0x4090f0
 void AnmVm::wipe()
