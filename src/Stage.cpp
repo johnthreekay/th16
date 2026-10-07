@@ -558,7 +558,7 @@ i32 Stage::draw_layer(i32 layer)
         if (object->is_culled(&pos, inner.draw_distance_sq, &g_Supervisor.cameras[3]))
         {
             instances_culled++;
-            instance->unk_2 &= 0xfffe;
+            instance->flags &= 0xfffe;
             continue;
         }
         object->flags |= 2;
@@ -607,7 +607,7 @@ i32 Stage::draw_layer(i32 layer)
             g_AnmManager->draw_vm(vm);
             quads_drawn++;
         }
-        instance->unk_2 |= 1;
+        instance->flags |= 1;
         instances_drawn++;
     }
     g_Supervisor.disable_zwrite_inline();

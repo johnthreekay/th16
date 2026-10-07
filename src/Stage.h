@@ -72,7 +72,7 @@ struct StdInstance
 {
     i16 object_id;
     // Bit 0: drawn this frame.
-    u16 unk_2;
+    u16 flags;
     D3DXVECTOR3 pos;
 };
 

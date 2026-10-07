@@ -84,7 +84,10 @@ enum GlobalsFlagsHi
 struct Globals
 {
     i32 stage_num;
+    // Set to the stage number while a stage loads; replays set it back to
+    // 1 (ExpHP). A retry or continue compares it with stage_num.
     i32 weird_stage_num;
+    // Set by ECL as the stage goes on (0x29, 0x2b and others are tested).
     i32 chapter;
     i32 time_in_stage;
     i32 time_in_chapter;
@@ -99,12 +102,14 @@ struct Globals
     // Difficulty.
     i32 difficulty;
     i32 continues_used;
+    // Never written (ExpHP).
     i32 rank;
     i32 graze;
     i32 graze_in_chapter;
     // The card being practiced in spell practice.
     i32 spell_id;
     i32 miss_count;
+    // Not used.
     i32 unk_40;
     i32 num_point_items_collected;
     // Point item value.
@@ -115,6 +120,7 @@ struct Globals
     i32 max_power;
     // Always 100.
     i32 power_per_level;
+    // Not used.
     i32 unk_60;
     i32 lives;
     i32 life_fragments;
@@ -132,10 +138,12 @@ struct Globals
     // The score and number of items collected at full value (above the
     // collection line or by autocollection), a leftover of DDC's bonus.
     i32 full_value_item_score;
+    // Zeroed for a new game; not otherwise used.
     i32 unk_d4;
     i32 full_value_item_count;
     // Set to 8 when an item starts flying to the player; not read.
     i32 unk_dc;
+    // Where the player was when the last full value item was collected.
     Float3 last_collect_pos;
     i32 item_spawn_count;
     i32 enemies_spawned_in_chapter;
