@@ -6,8 +6,9 @@ Matching decomp of TH16 1.00a. See README.md for the toolchain evidence and work
 
 - Build: `.venv/bin/python scripts/build.py` (about 3 s; Wine runs MSVC 19.10.25017)
 - Compare: `.venv/bin/python scripts/compare.py`, one function: `-v 0x<orig addr>`
-- Fast iteration: `.venv/bin/python scripts/quickdiff.py 0x<orig addr>` (seconds; addresses
-  all count as equal, so confirm with compare.py)
+- Fast iteration: `.venv/bin/python scripts/quickdiff.py 0x<orig addr>` (seconds; globals
+  compare as symbol+offset where the original address is known, other addresses
+  count as equal, so confirm with compare.py)
 - Toolchain sanity check: `.venv/bin/python scripts/check_toolchain.py`
 
 ## Decompiling a function
