@@ -14,6 +14,7 @@
 #include "Gui.h"
 #include "Rng.h"
 #include "SoundManager.h"
+#include "ZunAsm.h"
 
 i32 __fastcall sht_on_init_445ed0(PlayerBullet *bullet);
 i32 __fastcall sht_on_init_446200(PlayerBullet *bullet);
@@ -401,19 +402,11 @@ i32 __fastcall sht_on_hit_447320(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     return bullet->hit();
 }
 
-// This file's copy of ZunMath.h's sincosmul.
+// This file's copy of sincosmul (ZunAsm.h).
 // FUNCTION: TH16 0x4476b0
 static void __fastcall player_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // ZunAngle's subtraction (shortest signed difference) as the laser code

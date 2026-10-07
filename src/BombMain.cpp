@@ -16,38 +16,23 @@
 #include "ScreenEffect.h"
 #include "SoundManager.h"
 #include "Spellcard.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
-// The copy of ZunMath.h's sincosmul in Cirno's bomb's object file (TH16
+// The copy of sincosmul (ZunAsm.h) in Cirno's bomb's object file (TH16
 // keeps one per object file). A static of its own so that it can be
 // annotated.
 // FUNCTION: TH16 0x40f570
 static void __fastcall cirno_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // The same for Marisa's bomb.
 // FUNCTION: TH16 0x410130
 static void __fastcall marisa_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // A bomb ends a spell card's bonus once the card has run a second.

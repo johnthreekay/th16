@@ -23,6 +23,7 @@
 #include "StageData.h"
 #include "Supervisor.h"
 #include "UpdateFunc.h"
+#include "ZunAsm.h"
 
 // GLOBAL: TH16 0x4a6dcc
 Gui *g_Gui;
@@ -1486,7 +1487,7 @@ GuiMsgVm::GuiMsgVm(void *script)
 // FUNCTION: TH16 0x429ff0
 void Gui::start_dialogue(i32 script)
 {
-    __asm finit;
+    ZUN_ASM_FINIT();
     if (script == -1 || script == -3)
     {
         i32 boss = script == -1;

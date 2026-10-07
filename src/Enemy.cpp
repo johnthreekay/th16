@@ -20,6 +20,7 @@
 #include "SoundManager.h"
 #include "Supervisor.h"
 #include "UpdateFunc.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
 static_assert(sizeof(PosVel) == 0x44, "PosVel size");
@@ -860,15 +861,7 @@ EnemyInf::~EnemyInf()
 // FUNCTION: TH16 0x426240
 static void __fastcall sincosmul_ellipse(Float3 *dst, f32 angle, f32 rx, f32 ry)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul rx
-        fstp [eax]
-        fmul ry
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL_XY(dst, angle, rx, ry);
 }
 
 // FUNCTION: TH16 0x41a720

@@ -7,23 +7,16 @@
 #include "AnmVm.h"
 #include "EffectManager.h"
 #include "Rng.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
-// The copy of ZunMath.h's sincosmul that effect kind 3's object file has
+// The copy of sincosmul (ZunAsm.h) that effect kind 3's object file has
 // (TH16 keeps one per object file). A static of its own so that it can be
 // annotated.
 // FUNCTION: TH16 0x406cc0
 static void __fastcall effect3_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // ins_508 data of effect kind 2.
@@ -54,19 +47,11 @@ int __fastcall anm_effect_2_init(AnmVm *vm, i32 arg)
     return 0;
 }
 
-// The copy of ZunMath.h's sincosmul that effect kind 2's object file has.
+// The copy of sincosmul (ZunAsm.h) that effect kind 2's object file has.
 // FUNCTION: TH16 0x406470
 static void __fastcall effect2_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // Gives a new child VM its color and flight time.

@@ -14,6 +14,7 @@
 #include "Laser.h"
 #include "Player.h"
 #include "SoundManager.h"
+#include "ZunAsm.h"
 
 static_assert(offsetof(LaserLineInner, ex) == 0x38, "LaserLineInner::ex");
 static_assert(offsetof(LaserLineInner, shot_sfx) == 0x350, "LaserLineInner::shot_sfx");
@@ -24,7 +25,7 @@ LaserManager *g_LaserManager;
 // GLOBAL: TH16 0x49f2e0
 BulletTypeInfo g_bullet_types[BULLET_TYPE_COUNT];
 
-// This file's copy of ZunMath.h's sincosmul, which TH16 keeps once per
+// This file's copy of sincosmul (ZunAsm.h), which TH16 keeps once per
 // object file. A static of its own so that it can be annotated. ZUN's laser
 // code was one file; the laser methods that call it are kept here so that
 // they call this copy (LTCG knows it leaves ecx and edx alone, which it
@@ -32,15 +33,7 @@ BulletTypeInfo g_bullet_types[BULLET_TYPE_COUNT];
 // FUNCTION: TH16 0x43ad00
 static void __fastcall laser_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // FUNCTION: TH16 0x42cb00

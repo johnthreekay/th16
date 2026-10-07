@@ -7,6 +7,7 @@
 
 #include "Ecl.h"
 #include "Rng.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
 static_assert(sizeof(EclRunContext) == 0x11e8, "EclRunContext size");
@@ -480,19 +481,11 @@ HARNESS_CALLED void ecl_log(const char *fmt, ...)
 {
 }
 
-// This file's copy of ZunMath.h's sincosmul.
+// This file's copy of sincosmul (ZunAsm.h).
 // FUNCTION: TH16 0x474510
 static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // FUNCTION: TH16 0x471db0

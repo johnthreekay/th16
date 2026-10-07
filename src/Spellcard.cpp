@@ -20,6 +20,7 @@
 #include "Supervisor.h"
 #include "Stage.h"
 #include "UpdateFunc.h"
+#include "ZunAsm.h"
 
 // GLOBAL: TH16 0x4a6db0
 Spellcard *g_Spellcard;
@@ -185,7 +186,7 @@ HARNESS_CALLED void Spellcard::decode_time_code(i32 *seconds, i32 *hundredths)
 // FUNCTION: TH16 0x417f00
 void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
 {
-    __asm finit;
+    ZUN_ASM_FINIT();
     time = 0;
     this->spell_id = spell_id;
     strcpy(this->name, name);

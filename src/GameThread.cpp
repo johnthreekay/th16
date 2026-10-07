@@ -23,6 +23,7 @@
 #include "Stage.h"
 #include "Spellcard.h"
 #include "StageData.h"
+#include "ZunAsm.h"
 
 // GLOBAL: TH16 0x4a6dd4
 GameThread *g_GameThread;
@@ -135,7 +136,7 @@ i32 GameThread::thread_start()
 {
     GameThread *thread = g_GameThread;
     *(u32 *)&thread->flags |= 4;
-    __asm finit;
+    ZUN_ASM_FINIT();
     while (g_AnmManager->screen_copies[0].anm_slot >= 0)
     {
         if (g_Supervisor.flags & 0x180)

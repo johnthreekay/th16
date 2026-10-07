@@ -21,6 +21,7 @@
 #include "Stage.h"
 #include "Supervisor.h"
 #include "ZunAngle.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
 // create_vm, inserted at the front of the world list like create_vm_front
@@ -90,20 +91,12 @@ extern EnemyExtDamageFunc const g_ecl_ext_damage_funcs[3] = {NULL, ecl_ext_damag
 // The hooks ECL 634 installs; only entry 0 (NULL).
 extern void *g_ecl_unknown_634_funcs[1];
 
-// This file's copy of ZunMath.h's sincosmul (TH16 keeps one per object
+// This file's copy of sincosmul (ZunAsm.h; TH16 keeps one per object
 // file).
 // FUNCTION: TH16 0x426260
 static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // Where shooter i fires from: its absolute origin plus the offset when the

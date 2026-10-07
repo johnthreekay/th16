@@ -1,5 +1,6 @@
 #include "CriticalSections.h"
 #include "Rng.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
 // FUNCTION: TH16 0x402b70
@@ -32,21 +33,21 @@ u32 Rng::rand_u32()
 // FUNCTION: TH16 0x402c70
 f32 Rng::randf_0_to_1()
 {
-    __asm finit;
+    ZUN_ASM_FINIT();
     return (f32)rand_u32() / (f32)0xffffffff;
 }
 
 // FUNCTION: TH16 0x402cb0
 f32 Rng::randf_neg_1_to_1()
 {
-    __asm finit;
+    ZUN_ASM_FINIT();
     return (f32)rand_u32() / (f32)0x7fffffff - 1.0f;
 }
 
 // FUNCTION: TH16 0x402cf0
 f32 Rng::randf_neg_pi_to_pi()
 {
-    __asm finit;
+    ZUN_ASM_FINIT();
     return (f32)rand_u32() / ((f32)0xffffffff / ZUN_2PI) - ZUN_PI;
 }
 

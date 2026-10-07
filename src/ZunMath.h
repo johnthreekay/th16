@@ -57,25 +57,11 @@ struct Int3
     }
 };
 
-// out->x, out->y = radius * (cos angle, sin angle). TH06 equivalent:
-// sincosmul. TH16 keeps a separate out-of-line copy in each object file
-// that uses it (0x430df0, 0x43ad00, ...), which static reproduces. Those
-// copies cannot be annotated yet: build.py only finds external symbols.
-static void __fastcall sincosmul(Float3 *dst, f32 angle, f32 radius)
-{
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
-}
-
-// The same as an external function: the copy at 0x4054d0, which PosVel's
-// code calls. Unit 1 had it as Float3::from_polar.
+// dst->x = radius * cosf(angle); dst->y = radius * sinf(angle) (ZUN's
+// sincosmul, see ZunAsm.h). TH16 keeps a copy of it in each object file
+// that uses it; this is the one at 0x4054d0, which PosVel and the collision
+// code call. The other copies are statics in their own files
+// (bullet_sincosmul, laser_sincosmul, ...).
 void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius);
 
 // Small inline helpers around the UCRT's inline sinf, cosf and floorf. The

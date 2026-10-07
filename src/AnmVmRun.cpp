@@ -9,6 +9,7 @@
 #include "GameThread.h"
 #include "Rng.h"
 #include "Supervisor.h"
+#include "ZunAsm.h"
 
 static_assert(offsetof(AnmVm, rotation_related) == 0x5f0, "AnmVm layout");
 static_assert(sizeof(AnmVm) == 0x5fc, "AnmVm layout");
@@ -226,35 +227,18 @@ void LTCG_FASTCALL divide_vec2_by_640_480(Float2 *out, Float2 *in)
     }
 }
 
-// This file's copies of ZunMath.h's sincosmul (TH16 keeps one per object
+// This file's copies of sincosmul (ZunAsm.h) (TH16 keeps one per object
 // file): the first writes the two results through separate pointers.
 // FUNCTION: TH16 0x464930
 static void __fastcall anm_sincosmul_xy(f32 *x, f32 *y, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, x
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        mov eax, y
-        fstp [eax]
-    }
+    ZUN_ASM_SINCOSMUL_PTRS(x, y, angle, radius);
 }
 
 // FUNCTION: TH16 0x464d60
 static void __fastcall anm_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // Rebuilds the vertices that render modes 9, 13, 14, 24 and 25 draw from

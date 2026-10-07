@@ -3,6 +3,7 @@
 
 #include "AnmManager.h"
 #include "Supervisor.h"
+#include "ZunAsm.h"
 
 static_assert(offsetof(AnmManager, last_texture_factor) == 0x184fbac, "AnmManager layout");
 static_assert(offsetof(AnmManager, quad_184fbc8) == 0x184fbc8, "AnmManager layout");
@@ -76,28 +77,7 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
     g_sprite_temp_buffer[3].pos.y += camera_unk_fc.y;
     if (flags & 1)
     {
-        __asm {
-            fld g_sprite_temp_buffer[0 * TYPE g_sprite_temp_buffer].pos.x
-            frndint
-            fsub half
-            fld g_sprite_temp_buffer[1 * TYPE g_sprite_temp_buffer].pos.x
-            frndint
-            fsub half
-            fld g_sprite_temp_buffer[0 * TYPE g_sprite_temp_buffer].pos.y
-            frndint
-            fsub half
-            fld g_sprite_temp_buffer[2 * TYPE g_sprite_temp_buffer].pos.y
-            frndint
-            fsub half
-            fst g_sprite_temp_buffer[2 * TYPE g_sprite_temp_buffer].pos.y
-            fstp g_sprite_temp_buffer[3 * TYPE g_sprite_temp_buffer].pos.y
-            fst g_sprite_temp_buffer[0 * TYPE g_sprite_temp_buffer].pos.y
-            fstp g_sprite_temp_buffer[1 * TYPE g_sprite_temp_buffer].pos.y
-            fst g_sprite_temp_buffer[1 * TYPE g_sprite_temp_buffer].pos.x
-            fstp g_sprite_temp_buffer[3 * TYPE g_sprite_temp_buffer].pos.x
-            fst g_sprite_temp_buffer[0 * TYPE g_sprite_temp_buffer].pos.x
-            fstp g_sprite_temp_buffer[2 * TYPE g_sprite_temp_buffer].pos.x
-        }
+        ZUN_ASM_SNAP_QUAD_TO_PIXEL_CENTERS(g_sprite_temp_buffer, half);
     }
     vm->last_rendered_quad_in_surface_space[0] = *(Float3 *)&g_sprite_temp_buffer[0].pos;
     vm->last_rendered_quad_in_surface_space[1] = *(Float3 *)&g_sprite_temp_buffer[1].pos;
@@ -315,12 +295,7 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
     f32 angle = vm->get_total_rotation()->z;
     f32 sine;
     f32 cosine;
-    __asm {
-        fld angle
-        fsincos
-        fstp cosine
-        fstp sine
-    }
+    ZUN_ASM_SINCOS(angle, sine, cosine);
     AnmAnchorCorners xs = g_anchor_corners_x[(vm->flags_lo >> 21) & 3];
     AnmAnchorCorners ys = g_anchor_corners_y[(vm->flags_lo >> 23) & 3];
     i32 i;
@@ -378,12 +353,7 @@ i32 __stdcall AnmManager::write_sprite_corners__mode_4(AnmVm *vm)
     f32 angle = vm->get_total_rotation()->z;
     f32 sine;
     f32 cosine;
-    __asm {
-        fld angle
-        fsincos
-        fstp cosine
-        fstp sine
-    }
+    ZUN_ASM_SINCOS(angle, sine, cosine);
     D3DXVECTOR3 world_pos(vm->entity_pos.x + vm->pos.x + vm->pos_2.x, vm->entity_pos.y + vm->pos.y + vm->pos_2.y,
                           vm->entity_pos.z + vm->pos.z + vm->pos_2.z);
     D3DXMATRIX world;
@@ -411,12 +381,7 @@ i32 __stdcall AnmManager::write_sprite_corners__mode_4(AnmVm *vm)
     f32 height = vm->sprite_size.y * scale * vm->scale.y * vm->scale_2.y;
     g_sprite_temp_buffer[0].pos.z = g_sprite_temp_buffer[1].pos.z = g_sprite_temp_buffer[2].pos.z =
         g_sprite_temp_buffer[3].pos.z = screen.z;
-    __asm {
-        fld angle
-        fsincos
-        fstp cosine
-        fstp sine
-    }
+    ZUN_ASM_SINCOS(angle, sine, cosine);
     f32 x0, x1, x2, x3;
     f32 y0, y1, y2, y3;
     switch ((vm->flags_lo >> 21) & 3)
