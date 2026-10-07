@@ -182,7 +182,7 @@ HARNESS_CALLED f32 InterpFloat::step()
 }
 
 // FUNCTION: TH16 0x425530
-void InterpFloat2::reset_timer()
+DECOMP_NOINLINE void InterpFloat2::reset_timer()
 {
     time = 0;
 }
