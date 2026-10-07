@@ -18,28 +18,6 @@
 // zShtRawFile, zShtShooter). Positions in the *_subpixel and scaled_*
 // fields are in 1/128 pixels.
 
-// The playable characters (Globals::character). TH16 has no subshots
-// (Globals::subshot is always 0), so character + subshot, which indexes the
-// per-shot-type tables, is the character.
-enum Character
-{
-    CHARACTER_REIMU = 0,
-    CHARACTER_CIRNO = 1,
-    CHARACTER_AYA = 2,
-    CHARACTER_MARISA = 3,
-};
-
-// The subseasons (Globals::subseason): each has its own release, options
-// and pl0Xsub.sht/.anm files.
-enum Season
-{
-    SEASON_SPRING = 0,
-    SEASON_SUMMER = 1,
-    SEASON_AUTUMN = 2,
-    SEASON_WINTER = 3,
-    SEASON_DOYOU = 4,
-};
-
 // PlayerInner::state.
 enum PlayerState
 {

@@ -77,7 +77,7 @@ struct Item
 // everything is being auto-collected (state 4), are worth the most.
 inline i32 item_collect_line()
 {
-    return g_Globals.character == 3 ? 148 : 128;
+    return g_Globals.character == CHARACTER_MARISA ? 148 : 128;
 }
 
 // ANM scripts of each item type: the item and its offscreen arrow.

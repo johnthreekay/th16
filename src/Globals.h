@@ -13,6 +13,28 @@ enum Difficulty
     DIFFICULTY_EXTRA = 4,
 };
 
+// The playable characters (Globals::character). TH16 has no subshots
+// (Globals::subshot is always 0), so character + subshot, which indexes the
+// per-shot-type tables, is the character.
+enum Character
+{
+    CHARACTER_REIMU = 0,
+    CHARACTER_CIRNO = 1,
+    CHARACTER_AYA = 2,
+    CHARACTER_MARISA = 3,
+};
+
+// The subseasons (Globals::subseason): each has its own release, options
+// and pl0Xsub.sht/.anm files.
+enum Season
+{
+    SEASON_SPRING = 0,
+    SEASON_SUMMER = 1,
+    SEASON_AUTUMN = 2,
+    SEASON_WINTER = 3,
+    SEASON_DOYOU = 4,
+};
+
 #define MAX_LIVES 8
 #define MAX_BOMBS 8
 #define BOMB_FRAGMENTS_PER_BOMB 5

@@ -765,7 +765,7 @@ i32 TitleInf::do_subseason_select()
             }
             else
             {
-                g_Globals.subseason = 4;
+                g_Globals.subseason = SEASON_DOYOU;
             }
             menu.push();
             g_Globals.spell_id = -1;
@@ -3095,7 +3095,7 @@ i32 TitleInf::do_spell_practice_difficulty()
                 g_Globals.character = menu_5cec.next_selection;
                 g_Globals.subshot = 0;
                 g_Globals.difficulty = g_spell_difficulty[spell_ids[menu.next_selection]];
-                g_Globals.subseason = 4;
+                g_Globals.subseason = SEASON_DOYOU;
                 g_Supervisor.gamemode_to_switch_to = 7;
                 g_spell_practice_last_stage = spell_stage;
                 g_spell_practice_last_row = spell_row;
