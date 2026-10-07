@@ -31,9 +31,3 @@ i32 harness_w4f_practice_key()
 {
     return g_unk_4a5bf8;
 }
-
-// The pause menu (0x4403f1) saves replays too, with 1 as the last argument.
-i32 harness_w4f_save_replay(const char *path, const char *name)
-{
-    return g_ReplayManager->save(path, name, 0, 1);
-}
