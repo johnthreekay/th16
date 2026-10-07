@@ -44,7 +44,7 @@ i32 AsciiInf::initialize()
     ascii_anm = AnmManager::preload_anm(ANM_SLOT_ASCII, anm_names[g_Supervisor.config.window_size % 3]);
     if (ascii_anm == NULL)
     {
-        // データが壊れています
+        // "The data is corrupt."
         g_GameErrorContext.log("\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }

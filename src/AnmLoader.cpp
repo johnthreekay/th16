@@ -56,6 +56,7 @@ i32 AnmLoaded::load(const char *path)
     {
         if (entry == NULL)
         {
+            // "Cannot load the animation. The data is missing or corrupt."
             g_GameErrorContext.fatal("\x83" "A\x83j\x83\x81\x82\xaa\x93\xc7\x82\xdd\x8d\x9e\x82\xdf\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x8e\xb8\x82\xed\x82\xea\x82\xc4\x82\xe9\x82\xa9\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
             break;
         }
@@ -80,6 +81,7 @@ AnmLoaded *AnmManager::do_preload_anm(i32 slot, const char *path)
     anm_log("::preloadAnim : %s\n", path);
     if (slot >= 0x1f)
     {
+        // "Out of texture slots."
         g_GameErrorContext.fatal("\x83" "e\x83N\x83X\x83`\x83\x83\x8ai\x94[\x90\xe6\x82\xaa\x91\xab\x82\xe8\x82\xdc\x82\xb9\x82\xf1\r\n");
         return NULL;
     }
@@ -132,6 +134,7 @@ i32 AnmLoaded::load_entry(i32 index, AnmRawEntry *entry)
     i32 size;
     if (entry->version != 8)
     {
+        // "Wrong animation version."
         g_GameErrorContext.fatal("\x83" "A\x83j\x83\x81\x82\xcc\x83o\x81[\x83W\x83\x87\x83\x93\x82\xaa\x88\xe1\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
@@ -145,6 +148,7 @@ i32 AnmLoaded::load_entry(i32 index, AnmRawEntry *entry)
             void *image = file_read_all(buf, &size, 1);
             if (image == NULL)
             {
+                // "Cannot load texture %s. The data is missing or corrupt."
                 g_GameErrorContext.fatal("\x83" "e\x83N\x83X\x83`\x83\x83 %s \x82\xaa\x93\xc7\x82\xdd\x8d\x9e\x82\xdf\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x8e\xb8\x82\xed\x82\xea\x82\xc4\x82\xe9\x82\xa9\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n", image_path);
                 return -1;
             }
@@ -345,11 +349,13 @@ HARNESS_CALLED i32 AnmManager::setup_entry(AnmLoaded *anm, i32 index, i32 first_
 
     if (entry == NULL)
     {
+        // "Cannot load the animation. The data is missing or corrupt."
         g_GameErrorContext.fatal("\x83" "A\x83j\x83\x81\x82\xaa\x93\xc7\x82\xdd\x8d\x9e\x82\xdf\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x8e\xb8\x82\xed\x82\xea\x82\xc4\x82\xe9\x82\xa9\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
     if (entry->version != 8)
     {
+        // "Wrong animation version."
         g_GameErrorContext.fatal("\x83" "A\x83j\x83\x81\x82\xcc\x83o\x81[\x83W\x83\x87\x83\x93\x82\xaa\x88\xe1\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
@@ -377,6 +383,7 @@ HARNESS_CALLED i32 AnmManager::setup_entry(AnmLoaded *anm, i32 index, i32 first_
                                                             entry->height, (i16)entry->offset_x, (i16)entry->offset_y);
             if (size < 0)
             {
+                // "Cannot create texture %s. The data is missing or corrupt."
                 g_GameErrorContext.fatal("\x83" "e\x83N\x83X\x83`\x83\x83 %s \x82\xaa\x8d\xec\x90\xac\x82\xc5\x82\xab\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x8e\xb8\x82\xed\x82\xea\x82\xc4\x82\xe9\x82\xa9\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n", image_path);
                 return -1;
             }
@@ -389,6 +396,7 @@ HARNESS_CALLED i32 AnmManager::setup_entry(AnmLoaded *anm, i32 index, i32 first_
                                           entry->format, entry->width, entry->height);
         if (size < 0)
         {
+            // "Cannot create the texture. The data is missing or corrupt."
             g_GameErrorContext.fatal("\x83" "e\x83N\x83X\x83`\x83\x83\x82\xaa\x8d\xec\x90\xac\x82\xc5\x82\xab\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x8e\xb8\x82\xed\x82\xea\x82\xc4\x82\xe9\x82\xa9\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
             return -1;
         }

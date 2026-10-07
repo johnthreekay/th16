@@ -763,8 +763,8 @@ AnmManager::AnmManager()
         snapshot_fast_array[i].fast_id = i;
         snapshot_fast_array[i].is_alive = false;
     }
-    ANM_REGISTER_ON_TICK(on_tick_21, 0x21);
-    ANM_REGISTER_ON_TICK(on_tick_09, 9);
+    ANM_REGISTER_ON_TICK(on_tick_21_world, 0x21);
+    ANM_REGISTER_ON_TICK(on_tick_09_ui, 9);
     ANM_REGISTER_ON_DRAW(on_draw_05_layer_00, 5);
     ANM_REGISTER_ON_DRAW(on_draw_07_layer_01, 7);
     ANM_REGISTER_ON_DRAW(on_draw_09_layer_02, 9);

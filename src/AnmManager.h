@@ -681,8 +681,8 @@ struct AnmManager
     DECOMP_NOINLINE static i32 __fastcall tick_ui(AnmManager *mgr);
     // The tick callbacks (priorities 0x21 and 9): tick_world, skipped while
     // the game is paused with the world frozen, and tick_ui.
-    static i32 __fastcall on_tick_21(AnmManager *mgr);
-    static i32 __fastcall on_tick_09(AnmManager *mgr);
+    static i32 __fastcall on_tick_21_world(AnmManager *mgr);
+    static i32 __fastcall on_tick_09_ui(AnmManager *mgr);
     // Moves the VM and its children onto delete_list, once each.
     void remove_tree(AnmVm *vm, ZunList<AnmVm> *delete_list);
     // 0x46eab0. Unlinks a VM and returns it to the pool or frees it.

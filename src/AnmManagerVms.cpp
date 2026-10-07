@@ -598,7 +598,7 @@ void AnmManager::remove_tree(AnmVm *vm, ZunList<AnmVm> *delete_list)
 }
 
 // FUNCTION: TH16 0x46e710
-i32 __fastcall AnmManager::on_tick_21(AnmManager *mgr)
+i32 __fastcall AnmManager::on_tick_21_world(AnmManager *mgr)
 {
     if (g_GameThread != NULL && (g_GameThread->flags.flag_0 | g_GameThread->flags.paused) &&
         g_GameThread->flags.flag_1)
@@ -609,7 +609,7 @@ i32 __fastcall AnmManager::on_tick_21(AnmManager *mgr)
 }
 
 // FUNCTION: TH16 0x46e740
-i32 __fastcall AnmManager::on_tick_09(AnmManager *mgr)
+i32 __fastcall AnmManager::on_tick_09_ui(AnmManager *mgr)
 {
     return tick_ui(mgr);
 }
