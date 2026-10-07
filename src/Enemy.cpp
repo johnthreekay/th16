@@ -694,7 +694,7 @@ int EnemyData::step_logic()
                 while (drop_season.damage_accounted_for_season_drops < life.total_damage_including_ignored)
                 {
                     drop_season.damage_accounted_for_season_drops += drop_season.damage_per_season_drop;
-                    g_ItemManager->spawn_item(0x10, &final_pos.pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
+                    g_ItemManager->spawn_item(ITEM_SEASON, &final_pos.pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
                                               g_replay_safe_rng.randf_0_to_1() + 1.2f, 0, 0);
                 }
             }
@@ -911,7 +911,7 @@ void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
         {
             for (i32 j = 0; j < extra_counts[15]; j++)
             {
-                g_ItemManager->spawn_item(0x10, pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
+                g_ItemManager->spawn_item(ITEM_SEASON, pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
                                           g_replay_safe_rng.randf_0_to_1() * 1.9f + 0.2f, 0, 0);
             }
         }

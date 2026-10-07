@@ -154,7 +154,7 @@ void BulletManager::destroy_all()
     mgr->reset_lists();
     mgr->ecl_unknown_560.x = 0.0f;
     mgr->ecl_unknown_560.y = 0.0f;
-    mgr->unk_cancel_counter = 0;
+    mgr->cancel_count = 0;
     mgr->bullet_count_canceled_by_bombs = 0;
 }
 
@@ -306,7 +306,7 @@ int __fastcall bullet_map_sprite(AnmVm *vm, i32 sprite)
 static_assert(offsetof(Bullet, cancel_script) == 0xc5c, "Bullet layout");
 static_assert(offsetof(Bullet, state_time) == 0x144c, "Bullet layout");
 static_assert(offsetof(BulletManager, anm_ids) == 0x13ffc8c, "BulletManager layout");
-static_assert(offsetof(BulletManager, unk_cancel_counter) == 0x1403b14, "BulletManager layout");
+static_assert(offsetof(BulletManager, cancel_count) == 0x1403b14, "BulletManager layout");
 
 // Bullet::cancel's body, which clear_all has inlined.
 static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
@@ -435,7 +435,7 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
         return;
     }
     BulletManager *mgr = g_BulletManager;
-    mgr->unk_cancel_counter++;
+    mgr->cancel_count++;
     if (mode == 1 || mode == 3)
     {
         return;
@@ -444,11 +444,11 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
     {
         if (mgr->cancel_counter_multiple_of(5) && !(g_Spellcard->flags & SPELLCARD_ACTIVE))
         {
-            g_ItemManager->spawn_item(1, pos, 0, -ZUN_PI / 2.0f, 2.2f, 0, 0);
+            g_ItemManager->spawn_item(ITEM_POWER, pos, 0, -ZUN_PI / 2.0f, 2.2f, 0, 0);
         }
         if (!(g_Spellcard->flags & SPELLCARD_ACTIVE))
         {
-            g_ItemManager->spawn_item(10, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f,
+            g_ItemManager->spawn_item(ITEM_PIV_10, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f,
                                       2.2f, 0, 0);
         }
     }
@@ -456,14 +456,14 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
     {
         if (mgr->bomb_cancel_count_multiple_of(3))
         {
-            g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f,
+            g_ItemManager->spawn_item(ITEM_SEASON, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f,
                                       2.2f, 0, 1);
         }
         g_BulletManager->bullet_count_canceled_by_bombs++;
     }
     else if (mode == 4)
     {
-        g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f, 2.2f,
+        g_ItemManager->spawn_item(ITEM_SEASON, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f, 2.2f,
                                   0, 1);
         if (g_SubseasonBomb->in_use == 1)
         {
@@ -633,13 +633,13 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
     bullet->vm0.flags_hi = (bullet->vm0.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
     bullet->vm1.wipe();
     bullet->vm1.flags_lo &= ~1;
-    if (g_bullet_types[props->type].unk_110 != 0)
+    if (g_bullet_types[props->type].overlay_script != 0)
     {
         bullet->vm1.flags_lo |= 1;
-        g_BulletManager->bullet_anm->set_vm_script(&bullet->vm1, g_bullet_types[props->type].unk_110);
+        g_BulletManager->bullet_anm->set_vm_script(&bullet->vm1, g_bullet_types[props->type].overlay_script);
         bullet->vm1.flags_hi = (bullet->vm1.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
     }
-    switch (g_bullet_types[props->type].unk_10c)
+    switch (g_bullet_types[props->type].cancel_kind)
     {
     case 0:
         bullet->cancel_script = props->color * 2 + 4;
@@ -678,7 +678,7 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
         bullet->flags |= BULLET_FLAG_ROUND_HITBOX;
         break;
     }
-    bullet->layer = g_bullet_types[props->type].unk_108;
+    bullet->layer = g_bullet_types[props->type].layer;
     bullet->bounce_sound = props->shot_transform_sfx;
     bullet->offscreen_grace = 5;
     bullet->hitbox_diameter = bullet->hitbox_height = g_bullet_types[props->type].hitbox_radius;
@@ -864,7 +864,7 @@ void Bullet::run_ex()
             sprite = ex->a;
             color = ex->b & 0x7fff;
             hitbox_diameter = hitbox_height = g_bullet_types[ex->a].hitbox_radius;
-            layer = g_bullet_types[sprite].unk_108;
+            layer = g_bullet_types[sprite].layer;
             vm0.wipe();
             vm0.index_of_sprite_mapping_func = 1;
             vm0.associated_game_entity = this;
@@ -873,13 +873,13 @@ void Bullet::run_ex()
             vm0.flags_hi = (vm0.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
             vm1.wipe();
             vm1.flags_lo &= ~1;
-            if (g_bullet_types[ex->a].unk_110 != 0)
+            if (g_bullet_types[ex->a].overlay_script != 0)
             {
                 vm1.flags_lo |= 1;
-                g_BulletManager->bullet_anm->set_vm_script(&vm1, g_bullet_types[ex->a].unk_110);
+                g_BulletManager->bullet_anm->set_vm_script(&vm1, g_bullet_types[ex->a].overlay_script);
                 vm1.flags_hi = (vm1.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
             }
-            switch (g_bullet_types[sprite].unk_10c)
+            switch (g_bullet_types[sprite].cancel_kind)
             {
             case 0:
                 cancel_script = color * 2 + 4;

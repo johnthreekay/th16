@@ -18,6 +18,50 @@ struct ItemList
     ItemList *unk_c;
 };
 
+// Item::item_type (ExpHP's zItemType).
+enum ItemType
+{
+    ITEM_POWER = 1,
+    ITEM_POINT = 2,
+    ITEM_BIG_POWER = 3,
+    ITEM_LIFE_PIECE = 4,
+    ITEM_LIFE = 5,
+    ITEM_BOMB_PIECE = 6,
+    ITEM_BOMB = 7,
+    // Full power.
+    ITEM_F = 8,
+    // The cancel items: small point items worth g_cancel_item_piv[type - 9]
+    // of PIV, flying to the player on their own.
+    ITEM_PIV_5 = 9,
+    ITEM_PIV_10 = 10,
+    ITEM_PIV_20 = 11,
+    ITEM_PIV_30 = 12,
+    ITEM_PIV_40 = 13,
+    ITEM_PIV_50 = 14,
+    // Spawns as a bomb piece and counts Globals::item_spawn_count.
+    ITEM_DDC = 15,
+    // Season items (the season gauge); drawn on their own layer.
+    ITEM_SEASON = 16,
+};
+
+// Item::state.
+enum ItemState
+{
+    ITEM_STATE_FREE = 0,
+    ITEM_STATE_FALLING = 1,
+    // Cancel items: thrown up, then auto-collected once they fall.
+    ITEM_STATE_RISING = 2,
+    // Season items: thrown out, slowing down.
+    ITEM_STATE_SEASON = 3,
+    // Flying to the player (above the collection line, or forced).
+    ITEM_STATE_AUTOCOLLECT = 4,
+    // Pulled in by the player's attraction box.
+    ITEM_STATE_ATTRACTED = 5,
+    // Waits intangibility_frames before appearing (cancel and season
+    // items, staggered when many spawn at once).
+    ITEM_STATE_DELAYED = 6,
+};
+
 // One item (power, point, season...). Layout from ExpHP's th-re-data.
 struct Item
 {
@@ -30,11 +74,16 @@ struct Item
     f32 angle;
     ZunTimer time;
     ZunTimer timer_c3c;
+    // An ItemState.
     i32 state;
+    // An ItemType.
     i32 item_type;
+    // The type for cancel and season items, 0 for others; on_draw_body
+    // then sets 1 while the offscreen arrow (vm_2) is drawn, else 0.
     i32 unk_c58;
     f32 speed_towards_player;
     i32 intangibility_frames;
+    // ItemManager::unk_1c972e8 (always 0) when spawned.
     i32 unk_c64;
     i32 force_autocollect;
     u8 unk_c6c[0xc78 - 0xc6c];
@@ -74,7 +123,8 @@ struct Item
 };
 
 // The point of collection: items collected above this line, or while
-// everything is being auto-collected (state 4), are worth the most.
+// everything is being auto-collected (ITEM_STATE_AUTOCOLLECT), are worth
+// the most.
 inline i32 item_collect_line()
 {
     return g_Globals.character == 3 ? 148 : 128;
@@ -104,7 +154,10 @@ struct ItemManager
     ItemManagerInner snapshot;
     i32 num_items_onscreen;
     i32 total_items_created;
-    i32 unk_1c972e4;
+    // Cleared every tick and never counted up, so cancel items always get
+    // the shortest spawn delay.
+    i32 num_cancel_items_this_frame;
+    // Always 0.
     i32 unk_1c972e8;
 
     ItemManager();
@@ -113,7 +166,7 @@ struct ItemManager
     i32 initialize();
     void destroy_all();
     i32 on_tick_body();
-    // Layer 0 draws the season items (type 16), 1 everything else.
+    // Layer 0 draws the season items (ITEM_SEASON), 1 everything else.
     DECOMP_NOINLINE i32 on_draw_body(i32 layer);
     static i32 __fastcall on_tick_callback(ItemManager *mgr);
     static i32 __fastcall on_draw_1_callback(ItemManager *mgr);

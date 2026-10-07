@@ -290,8 +290,8 @@ struct BulletManager
     Bullet snapshot_bullets[BULLET_COUNT + 1];
     AnmId anm_ids[BULLET_COUNT + 1];
     AnmId snapshot_anm_ids[BULLET_COUNT + 1];
-    i32 unk_cancel_counter;
-    i32 snapshot_unk_cancel_counter;
+    i32 cancel_count;
+    i32 snapshot_cancel_count;
     ZunList<Bullet> *iter_current;
     ZunList<Bullet> *iter_next;
     AnmLoaded *bullet_anm;
@@ -327,7 +327,7 @@ struct BulletManager
     // keep their idiv even when LTCG inlines them with a constant n.
     i32 cancel_counter_multiple_of(i32 n)
     {
-        return unk_cancel_counter % n == 0;
+        return cancel_count % n == 0;
     }
     i32 bomb_cancel_count_multiple_of(i32 n)
     {
@@ -368,9 +368,14 @@ struct BulletTypeInfo
     // sprites[0][0] is negative keep the script's sprites.
     i32 sprites[16][4];
     f32 hitbox_radius;
-    i32 unk_108;
-    i32 unk_10c;
-    i32 unk_110;
+    // Draw layer of the bullet (0 to BULLET_LAYER_COUNT - 1).
+    i32 layer;
+    // Picks the cancel animation script: 0 by color, 1 from
+    // g_bullet_cancel_scripts, 2 none, 6 the color's fourth sprite, others
+    // a fixed script.
+    i32 cancel_kind;
+    // Script of the second VM (vm1) drawn over the bullet; 0 for none.
+    i32 overlay_script;
 };
 static_assert(offsetof(BulletTypeInfo, hitbox_radius) == 0x104, "BulletTypeInfo layout");
 static_assert(sizeof(BulletTypeInfo) == 0x114, "BulletTypeInfo layout");
