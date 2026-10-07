@@ -9,6 +9,7 @@
 #include "GameThread.h"
 #include "Globals.h"
 #include "Gui.h"
+#include "Input.h"
 #include "Item.h"
 #include "Laser.h"
 #include "PauseMenu.h"
@@ -16,6 +17,7 @@
 #include "PopupManager.h"
 #include "ReplayManager.h"
 #include "Scorefile.h"
+#include "ScreenEffect.h"
 #include "SoundManager.h"
 #include "Stage.h"
 #include "Spellcard.h"
@@ -107,11 +109,133 @@ DECOMP_NOINLINE GameThread::~GameThread()
     unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x42d7b0
+extern i32 g_unk_4c0f40;
+
+// One frame of a game: the ending fade, the stage restart and intro
+// timing, the demo's end, the music restart after a pause and the timers.
+// TODO: the original keeps the return 3 epilogue at the top and a second null test around the inlined delete of g_Stage2.
+// FUNCTION: TH16 0x42d7b0
 DECOMP_NOINLINE i32 GameThread::on_tick_body()
 {
-    return unit5_placeholder(this);
+    if (*(u32 *)&flags & 0x4000)
+    {
+        if (*(u32 *)&flags & 0x10)
+        {
+            return 3;
+        }
+        fade_timer++;
+        if (fade_timer == 180)
+        {
+            ScreenEffect::create_inline(5, 200, 0, 0, 0, 0x54);
+        }
+        if (fade_timer >= 380)
+        {
+            if (replay_mode != 0)
+            {
+                replay_ended_43f240();
+            }
+            else if (g_Globals.difficulty != 4)
+            {
+                g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 15;
+            }
+            else
+            {
+                g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 16;
+            }
+        }
+    }
+    if ((g_Gui->flags_1ac & 0x100) && g_Gui->timer_1b0.current < 120 && !flags.flag_4)
+    {
+        return 1;
+    }
+    if (time_in_stage.current == 0)
+    {
+        if (sub_42dc50())
+        {
+            return 1;
+        }
+    }
+    else if (time_in_stage.current == 30)
+    {
+        sub_42dee0();
+    }
+    if (g_Stage2 != NULL && (g_Stage2->stage_flags & 8))
+    {
+        delete g_Stage2;
+    }
+    if (time_in_stage.current == 5)
+    {
+        g_unk_4d9d90 = 2;
+    }
+    if (*(u32 *)&flags & 4)
+    {
+        *(u32 *)&flags |= 0x80;
+        return 1;
+    }
+    if (g_Globals.flags_hi_45c & 1)
+    {
+        if ((g_hardware_input & 0x80103) || (*(u32 *)&flags & 0x70))
+        {
+            g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+        }
+        if (time_in_stage.current == 0xf00)
+        {
+            ScreenEffect::create(5, 60, 0, 0, 0, 0x33);
+        }
+        else if (time_in_stage.current == 0xf3c)
+        {
+            g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+        }
+    }
+    Gui::update_score();
+    if ((*(u32 *)&flags & 0x10) || (*(u32 *)&flags & 0x20) || (*(u32 *)&flags & 0x40))
+    {
+        return 3;
+    }
+    if (*(u32 *)&flags & 0x10000)
+    {
+        if (unk_8c == 0)
+        {
+            if (g_Globals.chapter < 0x2b)
+            {
+                g_Supervisor.stop_bgm();
+            }
+            AnmManager::interrupt_tree(*(AnmId *)&g_Supervisor.config.unk_0, 1);
+        }
+        unk_8c++;
+        if (unk_8c < unk_90 && unk_8c > 1)
+        {
+            return 3;
+        }
+        if (unk_8c >= unk_90)
+        {
+            if (g_Globals.chapter < 0x2b)
+            {
+                g_Supervisor.play_bgm(0, g_stage_data->music_ids[0]);
+                while (SoundManager::update_sound_thread() != 0)
+                {
+                }
+            }
+            if (g_Globals.chapter < 0x2b)
+            {
+                ((CStreamingSound *)g_SoundManager.bgm_stream)->seek(g_Globals.time_in_stage / 60.0);
+            }
+            *(u32 *)&flags &= ~0x10000;
+            unk_8c = 0;
+        }
+    }
+    g_Supervisor.vm_1bc->run();
+    g_Supervisor.vm_1c0->run();
+    g_Supervisor.vm_1c4->run();
+    g_Supervisor.vm_1c8->run();
+    g_Globals.time_in_stage++;
+    g_Globals.time_in_chapter++;
+    if (g_unk_4c0f40 != 0)
+    {
+        g_unk_4c0f40--;
+    }
+    time_in_stage++;
+    return 1;
 }
 
 // FUNCTION: TH16 0x418420
