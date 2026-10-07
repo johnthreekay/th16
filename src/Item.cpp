@@ -134,6 +134,58 @@ i32 __fastcall ItemManager::on_draw_1_callback(ItemManager *mgr)
     return mgr->on_draw_body(1);
 }
 
+// Items above the top of the screen show their arrow instead, fading in
+// over the 32 pixels above it.
+// FUNCTION: TH16 0x4307a0
+i32 ItemManager::on_draw_body(i32 layer)
+{
+    Item *item = inner.items;
+    for (i32 i = 0; i < 0x1258; i++, item++)
+    {
+        if (item->state == 0 || !(item->vm.flags_lo & ANM_VM_VISIBLE) || item->intangibility_frames > 0)
+        {
+            continue;
+        }
+        if (layer == 0)
+        {
+            if (item->item_type != 16)
+            {
+                continue;
+            }
+        }
+        else if (layer == 1 && item->item_type == 16)
+        {
+            continue;
+        }
+        item->vm.entity_pos = item->position;
+        item->vm_2.entity_pos = item->position;
+        if (item->vm.pos.y < -8.0f)
+        {
+            if (item->vm_2.flags_lo & ANM_VM_VISIBLE)
+            {
+                f32 distance = item->vm_2.pos.y + 8.0f;
+                item->vm_2.pos.y = 8.0f;
+                if (distance >= 32.0f)
+                {
+                    item->vm_2.color_1.a = 0xff;
+                }
+                else
+                {
+                    item->vm_2.color_1.a = distance * (1.0f / 32.0f) * 255.0f;
+                }
+                g_AnmManager->draw_vm(&item->vm_2);
+            }
+            item->unk_c58 = 1;
+        }
+        else
+        {
+            g_AnmManager->draw_vm(&item->vm);
+            item->unk_c58 = 0;
+        }
+    }
+    return 1;
+}
+
 // FUNCTION: TH16 0x430940
 i32 __fastcall ItemManager::on_draw_2_callback(ItemManager *mgr)
 {

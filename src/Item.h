@@ -113,7 +113,8 @@ struct ItemManager
     i32 initialize();
     void destroy_all();
     i32 on_tick_body();
-    i32 on_draw_body(i32 layer);
+    // Layer 0 draws the season items (type 16), 1 everything else.
+    DECOMP_NOINLINE i32 on_draw_body(i32 layer);
     static i32 __fastcall on_tick_callback(ItemManager *mgr);
     static i32 __fastcall on_draw_1_callback(ItemManager *mgr);
     static i32 __fastcall on_draw_2_callback(ItemManager *mgr);
