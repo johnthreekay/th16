@@ -14,8 +14,7 @@ DECOMP_NOINLINE int __CRTDECL _vsnprintf_l(char *buffer, size_t count, const cha
 // GLOBAL: TH16 0x491b68
 const i32 g_text_font_heights[10] = {17, 17, 17, 17, 21, 21, 21, 21, 14, 12};
 
-// TODO: scheduling only: the original loads font into edi before saving this and indexes the
-// height table between the vsprintf pushes.
+// TODO: scheduling only: the original indexes the height table between the vsprintf pushes.
 // FUNCTION: TH16 0x46d990
 void AnmManager::draw_text(AnmVm *vm, D3DCOLOR color, i32 shadow_color, i32 font, i32 x, i32 spacing,
                            const char *fmt, ...)

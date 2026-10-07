@@ -41,7 +41,12 @@ class TitleInf : public TaskInf
     void *unk_5ce0;
     u8 unk_5ce4[0x5cec - 0x5ce4];
     MenuHelper menu_5cec;
-    u8 unk_5dc4[0x5de4 - 0x5dc4];
+    // Spell practice: the stage and boss attack whose spell cards are
+    // listed, and the spell card ids of the listed rows.
+    i32 spell_stage;
+    i32 spell_row;
+    u8 unk_5dcc[0x5dd0 - 0x5dcc];
+    i32 spell_ids[5];
     ThreadInf thread;
 
     TitleInf();
@@ -87,6 +92,15 @@ class TitleInf : public TaskInf
     i32 on_draw__4538b0();
     i32 on_draw__4541b0();
     i32 on_draw__spell_practice_histories();
+
+    // States of on_tick (ExpHP: do_*).
+    i32 do_manual();
+    i32 do_spell_practice_character();
+    // 0x4560b0. Fills spell_ids (and their VMs) with the spell cards of a
+    // stage's boss attack. The last argument is the same at every call
+    // site; LTCG folded it.
+    DECOMP_NOINLINE void load_spell_list(i32 stage, i32 row, i32 *ids, i32 unused);
+    i32 highlight_spell_row(i32 selected);
 };
 
 extern TitleInf *g_MainMenu;
