@@ -45,7 +45,8 @@ class TitleInf : public TaskInf
     // listed, and the spell card ids of the listed rows.
     i32 spell_stage;
     i32 spell_row;
-    u8 unk_5dcc[0x5dd0 - 0x5dcc];
+    // The row of spell_ids picked.
+    i32 spell_index;
     i32 spell_ids[5];
     ThreadInf thread;
 
@@ -96,6 +97,7 @@ class TitleInf : public TaskInf
     // States of on_tick (ExpHP: do_*).
     i32 do_manual();
     i32 do_spell_practice_character();
+    i32 do_spell_practice_subseason();
     // 0x4560b0. Fills spell_ids (and their VMs) with the spell cards of a
     // stage's boss attack. The last argument is the same at every call
     // site; LTCG folded it.
