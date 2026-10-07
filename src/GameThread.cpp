@@ -74,23 +74,7 @@ i32 __fastcall GameThread::on_draw_callback(GameThread *thread)
 // FUNCTION: TH16 0x42e630
 void ConfigData::set_defaults()
 {
-    memset(this, 0, sizeof(ConfigData));
-    flags |= 0x100;
-    unk_1c = 0;
-    unk_1d = 1;
-    version = 0x160002;
-    deadzone_x = deadzone_y = 600;
-    unk_1e = 1;
-    unk_1f = 5;
-    unk_20 = 0;
-    memcpy(pad_mapping, g_pad_mapping, sizeof(pad_mapping));
-    unk_21 = 2;
-    unk_22 = 100;
-    unk_24 = 0;
-    unk_25 = 2;
-    unk_23 = 80;
-    unk_2c = 0x80000000;
-    unk_30 = 0x80000000;
+    set_defaults_inline();
 }
 
 // Placeholder (not decompiled yet).

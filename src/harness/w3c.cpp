@@ -79,3 +79,12 @@ void harness_w3c_player_resume_options()
 {
     g_Player->resume_options();
 }
+
+Supervisor *w3c_stub_supervisor();
+
+// Like the startup code at 0x459ac8. LTCG kept this there though it is
+// always g_Supervisor; an opaque pointer keeps ours from folding it.
+int harness_w3c_load_game_config()
+{
+    return w3c_stub_supervisor()->load_game_config("th16.cfg");
+}

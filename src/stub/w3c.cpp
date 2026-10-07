@@ -76,3 +76,10 @@ void TitleInf::destroy()
 
 // GLOBAL: TH16 0x4a22d0
 StageData g_stage_table[8];
+
+#include "../Supervisor.h"
+
+Supervisor *w3c_stub_supervisor()
+{
+    return &g_Supervisor;
+}

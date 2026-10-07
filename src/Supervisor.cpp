@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <direct.h>
 #include <process.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +11,7 @@
 #include "Arcfile.h"
 #include "FileSystem.h"
 #include "Fog.h"
+#include "GameWindow.h"
 #include "GameErrorContext.h"
 #include "Input.h"
 #include "EffectManager.h"
@@ -1225,6 +1227,90 @@ int Supervisor::initialize()
 
 // TODO: the original stores ".wav" as an immediate (no literal in .rdata);
 // ours copies it from a literal.
+// TODO: the original pops call arguments right after each call and restores ebx/esi/edi only at the end; ours merges the pops and restores early.
+// FUNCTION: TH16 0x43c050
+HARNESS_CALLED int Supervisor::load_game_config(const char *path)
+{
+    ConfigData *data = (ConfigData *)&g_Supervisor.config.unk_4;
+    data->set_defaults_inline();
+    _chdir(g_GameWindow.save_dir);
+    i32 size;
+    ConfigData *file = (ConfigData *)file_read_all(path, &size, 1);
+    _chdir(g_GameWindow.exe_dir);
+    if (file == NULL)
+    {
+        // "Config data not found, so it was initialized"
+        g_GameErrorContext.log("\x83R\x83\x93\x83t\x83" "B\x83O\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe7\x82\xc8\x82\xa2\x82\xcc\x82\xc5\x8f\x89\x8a\xfa\x89\xbb\x82\xb5\x82\xdc\x82\xb5\x82\xbd\r\n");
+        goto reset;
+    }
+    else
+    {
+        *data = *file;
+        free(file);
+        if (data->unk_1c >= 2 || data->unk_1d >= 3 || data->unk_1e >= 2 || data->unk_1f >= 6 || data->unk_20 >= 3 ||
+            data->unk_21 >= 3 || data->version != 0x160002 || size != sizeof(ConfigData))
+        {
+            // "Config data was broken, so it was reinitialized"
+            g_GameErrorContext.log("\x83R\x83\x93\x83t\x83" "B\x83O\x83" "f\x81[\x83^\x82\xaa\x88\xd9\x8f\xed\x82\xc5\x82\xb5\x82\xbd\x82\xcc\x82\xc5\x8d\xc4\x8f\x89\x8a\xfa\x89\xbb\x82\xb5\x82\xdc\x82\xb5\x82\xbd\r\n");
+        reset:
+            data->set_defaults_inline();
+        }
+        else
+        {
+            memcpy(g_pad_mapping, data->pad_mapping, sizeof(g_pad_mapping));
+        }
+    }
+    unk_71c = 0;
+    if (config.flags_2c & 4)
+    {
+        // "Fog is suppressed"
+        g_GameErrorContext.log("\x83t\x83H\x83O\x82\xcc\x8eg\x97p\x82\xf0\x97}\x90\xa7\x82\xb5\x82\xdc\x82\xb7\r\n");
+    }
+    if (present_params.Windowed)
+    {
+        // "Starting in window mode"
+        g_GameErrorContext.log("\x83" "E\x83" "B\x83\x93\x83h\x83" "E\x83\x82\x81[\x83h\x82\xc5\x8bN\x93\xae\x82\xb5\x82\xdc\x82\xb7\r\n");
+    }
+    if (config.flags_2c & 2)
+    {
+        // "Forcing the reference rasterizer"
+        g_GameErrorContext.log("\x83\x8a\x83t\x83@\x83\x8c\x83\x93\x83X\x83\x89\x83X\x83^\x83\x89\x83" "C\x83U\x82\xf0\x8b\xad\x90\xa7\x82\xb5\x82\xdc\x82\xb7\r\n");
+    }
+    if (config.flags_2c & 8)
+    {
+        // "Not using DirectInput for pad and keyboard input"
+        g_GameErrorContext.log("\x83p\x83" "b\x83h\x81" "A\x83L\x81[\x83{\x81[\x83h\x82\xcc\x93\xfc\x97\xcd\x82\xc9 DirectInput \x82\xf0\x8eg\x97p\x82\xb5\x82\xdc\x82\xb9\x82\xf1\r\n");
+    }
+    if (config.flags_2c & 0x10)
+    {
+        // "Loading the BGM into memory"
+        g_GameErrorContext.log("\x82" "a\x82" "f\x82l\x82\xf0\x83\x81\x83\x82\x83\x8a\x82\xc9\x93\xc7\x82\xdd\x8d\x9e\x82\xdd\x82\xdc\x82\xb7\r\n");
+    }
+    if (config.flags_2c & 0x20)
+    {
+        // "Not waiting for vsync"
+        g_GameErrorContext.log("\x90\x82\x92\xbc\x93\xaf\x8a\xfa\x82\xf0\x8e\xe6\x82\xe8\x82\xdc\x82\xb9\x82\xf1\r\n");
+        g_Supervisor.unk_71c = 1;
+    }
+    if (config.flags_2c & 0x40)
+    {
+        // "Not detecting the text rendering environment"
+        g_GameErrorContext.log("\x95\xb6\x8e\x9a\x95`\x89\xe6\x82\xcc\x8a\xc2\x8b\xab\x82\xf0\x8e\xa9\x93\xae\x8c\x9f\x8fo\x82\xb5\x82\xdc\x82\xb9\x82\xf1\r\n");
+    }
+    _chdir(g_GameWindow.save_dir);
+    if (file_write(path, data, sizeof(ConfigData)) != 0)
+    {
+        // "Cannot write the file %s"
+        g_GameErrorContext.fatal("\x83t\x83@\x83" "C\x83\x8b\x82\xaa\x8f\x91\x82\xab\x8fo\x82\xb9\x82\xdc\x82\xb9\x82\xf1 %s\r\n", path);
+        // "Is the folder write-protected, or the disk full?"
+        g_GameErrorContext.fatal("\x83t\x83@\x83" "C\x83\x8b\x83_\x82\xaa\x8f\x91\x8d\x9e\x82\xdd\x8b\xd6\x8e~\x91\xae\x90\xab\x82\xc9\x82\xc8\x82\xc1\x82\xc4\x82\xa2\x82\xe9\x82\xa9\x81" "A\x83" "f\x83" "B\x83X\x83N\x82\xaa\x82\xa2\x82\xc1\x82\xcf\x82\xa2\x82\xa2\x82\xc1\x82\xcf\x82\xa2\x82\xc9\x82\xc8\x82\xc1\x82\xc4\x82\xdc\x82\xb9\x82\xf1\x82\xa9\x81H\r\n");
+        _chdir(g_GameWindow.exe_dir);
+        return -1;
+    }
+    _chdir(g_GameWindow.exe_dir);
+    return 0;
+}
+
 // FUNCTION: TH16 0x43c370
 i32 Supervisor::play_bgm_wav(i32 arg, const char *name)
 {

@@ -97,7 +97,10 @@ struct Supervisor
     // restart).
     i32 unk_700;
     i32 unk_704;
-    u8 unk_708[0x728 - 0x708];
+    u8 unk_708[0x71c - 0x708];
+    // Set by load_game_config for config flag 0x20.
+    i32 unk_71c;
+    u8 unk_720[0x728 - 0x720];
     // text.anm: dialogue text and furigana lines.
     struct AnmLoaded *text_anm;
     u8 unk_72c[0x730 - 0x72c];
@@ -137,6 +140,9 @@ struct Supervisor
     // 0x43be40. The screenshot thread: converts and saves g_Supervisor's
     // screenshot.
     static void __cdecl write_screenshot(void *arg);
+    // 0x43c050. Loads th16.cfg (the only path passed, which LTCG folds),
+    // falling back to the defaults, and writes it back.
+    HARNESS_CALLED int load_game_config(const char *path);
     // 0x43cb10. Sets up the four cameras for the window size.
     void setup_cameras();
 
