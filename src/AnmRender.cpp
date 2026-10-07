@@ -556,7 +556,6 @@ i32 AnmManager::draw_vm__mode_5(AnmVm *vm)
     return result;
 }
 
-// TODO: the original reserves a dead 4-byte local (push ecx/pop ecx).
 // FUNCTION: TH16 0x468c00
 void AnmVm::write_sprite_corners(Float3 *corners)
 {
