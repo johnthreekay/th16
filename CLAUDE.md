@@ -10,6 +10,10 @@ Matching decomp of TH16 1.00a. See README.md for the toolchain evidence and work
   compare as symbol+offset where the original address is known, other addresses
   count as equal, so confirm with compare.py)
 - Toolchain sanity check: `.venv/bin/python scripts/check_toolchain.py`
+- Readability edits (renames, comments, enums) must not change code: build, then
+  `.venv/bin/python scripts/check_unchanged.py --save`; edit; build;
+  `.venv/bin/python scripts/check_unchanged.py` (every function's quickdiff result
+  must be unchanged)
 
 ## Decompiling a function
 
