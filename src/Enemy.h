@@ -3,6 +3,7 @@
 #include <d3dx9math.h>
 
 #include "AnmVm.h"
+#include "BulletManager.h"
 #include "Ecl.h"
 #include "Interp.h"
 #include "PosVel.h"
@@ -24,7 +25,23 @@ struct EnemyBulletShooter
     u32 color;
     // Where the bullets come from.
     D3DXVECTOR3 pos;
-    u8 unk_14[0x364 - 0x14];
+    // Aim angle and the angle between the bullets of a layer.
+    f32 ang_aim;
+    f32 ang_bullet_dist;
+    // Speed of the first and the last layer.
+    f32 spd1;
+    f32 spd2;
+    // Distance from pos at which bullets appear.
+    f32 distance;
+    // The etEx transforms the next shot gets.
+    BulletEx ex[0x12];
+    // laserNew's fourth argument; the first three go into pos.
+    f32 laser_new_arg_4;
+    u8 unk_344[0x350 - 0x344];
+    // laserTiming's first four arguments.
+    i32 laser_timing[4];
+    // laserTiming's fifth argument; the laser instructions add a bit.
+    u32 flags;
     // Bullets per layer and layers per shot.
     i16 count;
     i16 layers;
@@ -122,7 +139,10 @@ struct EnemyFlagsLow
     // Stays alive off screen horizontally / vertically.
     u32 no_offscreen_delete_x : 1;
     u32 no_offscreen_delete_y : 1;
-    u32 unk_4 : 12;
+    u32 unk_4 : 8;
+    // Set by ECL 563.
+    u32 flag_1000 : 1;
+    u32 unk_13 : 3;
     // Has been on screen; leaving it then deletes the enemy.
     u32 was_on_screen : 1;
     u32 unk_17 : 2;

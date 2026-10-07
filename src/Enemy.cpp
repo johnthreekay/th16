@@ -631,7 +631,7 @@ HARNESS_CALLED LaserDataInf *LaserManager::find_by_id(i32 id, i32 unused)
 }
 
 // GLOBAL: TH16 0x4917b8
-EnemyFuncSetFunc const g_ecl_func_sets[3] = {NULL, ecl_funcset_cancel_near_player, ecl_funcset_zero_power};
+extern EnemyFuncSetFunc const g_ecl_func_sets[3] = {NULL, ecl_funcset_cancel_near_player, ecl_funcset_zero_power};
 
 // FUNCTION: TH16 0x41d1e0
 int EnemyInf::on_tick()
