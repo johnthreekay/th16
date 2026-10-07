@@ -8,6 +8,15 @@
 #
 # The matching MSVC build (scripts/build.py) never reads this file.
 cmake_minimum_required(VERSION 3.16)
+
+option(TH16_M32 "Build a 32-bit x86 binary (keeps the original's struct layout)" OFF)
+if(TH16_M32)
+    # In the flags CMake starts from, so that its compiler checks see a
+    # 32-bit target (CMAKE_SIZEOF_VOID_P 4) and find_package picks the
+    # 32-bit libraries (lib32/cmake/SDL2).
+    set(CMAKE_CXX_FLAGS_INIT "-m32")
+endif()
+
 project(th16_port CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -17,8 +26,6 @@ set(CMAKE_CXX_EXTENSIONS ON)
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
-
-option(TH16_M32 "Build a 32-bit x86 binary (keeps the original's struct layout)" OFF)
 
 set(TH16_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
@@ -103,4 +110,27 @@ else()
 endif()
 
 find_package(Threads REQUIRED)
-target_link_libraries(th16 PRIVATE Threads::Threads m)
+# SDL2 (or sdl2-compat), whose CMake package defines SDL2::SDL2: audio output
+# (dsound_sdl.cpp).
+find_package(SDL2 REQUIRED CONFIG)
+target_link_libraries(th16 PRIVATE SDL2::SDL2 Threads::Threads m)
+
+# The DirectSound mixer's test harness (tests/dsound_test.cpp): drives
+# dsound_sdl.cpp directly, without the game. See NOTES.md, "Audio".
+add_executable(th16_dsound_test tests/dsound_test.cpp src/dsound_sdl.cpp)
+target_include_directories(th16_dsound_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(th16_dsound_test PRIVATE TH16_PORT)
+target_compile_options(th16_dsound_test PRIVATE
+    -include ${CMAKE_CURRENT_SOURCE_DIR}/include/port_prelude.h
+    -Wall -Wno-unknown-pragmas)
+if(TH16_M32)
+    target_compile_options(th16_dsound_test PRIVATE -m32 -msse2 -mfpmath=sse)
+    target_link_options(th16_dsound_test PRIVATE -m32)
+endif()
+target_link_libraries(th16_dsound_test PRIVATE SDL2::SDL2 Threads::Threads m)
+
+# `ctest` runs the mixer tests that need no game data, on SDL's dummy driver
+# (tests/run_dsound_tests.sh runs the rest).
+enable_testing()
+add_test(NAME dsound COMMAND th16_dsound_test)
+set_tests_properties(dsound PROPERTIES ENVIRONMENT "SDL_AUDIODRIVER=dummy;SDL_AUDIO_DRIVER=dummy")
