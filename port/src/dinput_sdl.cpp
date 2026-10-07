@@ -5,6 +5,7 @@
 // The states come from port_input.h; see there for the controller layout.
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <string>
@@ -113,6 +114,25 @@ struct PortKeyboard : public PortComObject<IDirectInputDevice8A>
             return DIERR_INVALIDPARAM;
         }
         port_input_get_dik_state((BYTE *)data);
+        static const bool debug = getenv("TH16_DEBUG_EVENTS") != NULL;
+        if (debug)
+        {
+            // Logs each change of the set of held keys.
+            static BYTE last[256];
+            if (memcmp(last, data, 256) != 0)
+            {
+                memcpy(last, data, 256);
+                std::string held;
+                for (int i = 0; i < 256; i++)
+                {
+                    if (last[i] & 0x80)
+                    {
+                        held += " " + std::to_string(i);
+                    }
+                }
+                port_log("DirectInput keyboard: held%s", held.empty() ? " nothing" : held.c_str());
+            }
+        }
         return DI_OK;
     }
     HRESULT SetDataFormat(LPCDIDATAFORMAT format) override

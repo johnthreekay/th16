@@ -178,6 +178,23 @@ bool position_on_screen(int x, int y, int width, int height)
 // SDL events to window messages.
 void translate_event(const SDL_Event &event)
 {
+    static const bool debug = getenv("TH16_DEBUG_EVENTS") != NULL;
+    if (debug)
+    {
+        if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)
+        {
+            port_log("event: key %s scancode %d", event.type == SDL_KEYDOWN ? "down" : "up",
+                     (int)event.key.keysym.scancode);
+        }
+        else if (event.type == SDL_WINDOWEVENT)
+        {
+            port_log("event: window %d", (int)event.window.event);
+        }
+        else
+        {
+            port_log("event: 0x%x", (unsigned)event.type);
+        }
+    }
     port_input_handle_event(event);
     if (g_game_window == NULL)
     {

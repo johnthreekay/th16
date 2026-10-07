@@ -622,6 +622,27 @@ void draw_glyph(GdiDC *dc, GdiFont *font, uint32_t c, int cell_x, int cell_width
 
 } // namespace
 
+// Whether `bits` lies in a DIB section's memory (the null renderer's text
+// dump uses it to tell text from other uploads).
+bool port_gdi_is_dib_memory(const void *bits)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_lock);
+    for (GdiObject *object : g_objects)
+    {
+        if (object->kind != GDI_BITMAP)
+        {
+            continue;
+        }
+        GdiBitmap *bitmap = (GdiBitmap *)object;
+        const uint8_t *p = (const uint8_t *)bits;
+        if (p >= bitmap->bits && p < bitmap->bits + (size_t)bitmap->stride * bitmap->height)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 extern "C" {
 
 HFONT CreateFontIndirectA(const LOGFONTA *lplf)

@@ -555,10 +555,18 @@ HRESULT copy_rect(IDirect3DSurface9 *dst_surface, const RECT *dst_rect, const ui
     return D3D_OK;
 }
 
+} // namespace
+
+bool port_gdi_is_dib_memory(const void *bits);
+
+namespace
+{
+
 void dump_text(const uint8_t *src, D3DFORMAT format, UINT pitch, const RECT *rect)
 {
     const char *dir = getenv("TH16_NULL_DUMP_TEXT");
-    if (dir == NULL || rect == NULL || (format != D3DFMT_A4R4G4B4 && format != D3DFMT_A8R8G8B8))
+    if (dir == NULL || rect == NULL || (format != D3DFMT_A4R4G4B4 && format != D3DFMT_A8R8G8B8) ||
+        !port_gdi_is_dib_memory(src))
     {
         return;
     }
