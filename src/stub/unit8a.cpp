@@ -3,12 +3,6 @@
 #include "../Interp.h"
 #include "../SoundManager.h"
 
-// STUB: TH16 0x45d510
-i32 SoundManager::initialize(HWND window)
-{
-    return 0;
-}
-
 // STUB: TH16 0x4718a0
 HRESULT CWaveFile::open_bgm(ThBgmFormat *track, i32 unk)
 {

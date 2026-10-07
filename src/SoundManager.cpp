@@ -201,6 +201,122 @@ void SoundManager::thread_init(void *arg)
     g_SoundManager.init_done = 1;
 }
 
+// The sample's CSoundManager::Initialize.
+inline HRESULT CSoundManager::initialize(HWND window, DWORD coop_level, DWORD channels, DWORD frequency,
+                                         DWORD bits)
+{
+    if (m_pDS != NULL)
+    {
+        m_pDS->Release();
+        m_pDS = NULL;
+    }
+    HRESULT hr;
+    if (FAILED(hr = DirectSoundCreate8(NULL, &m_pDS, NULL)))
+    {
+        return hr;
+    }
+    if (FAILED(hr = m_pDS->SetCooperativeLevel(window, coop_level)))
+    {
+        return hr;
+    }
+    set_primary_buffer_format(channels, frequency, bits);
+    return S_OK;
+}
+
+inline CSoundManager::~CSoundManager()
+{
+    if (m_pDS != NULL)
+    {
+        m_pDS->Release();
+        m_pDS = NULL;
+    }
+}
+
+// FUNCTION: TH16 0x45d510
+i32 SoundManager::initialize(HWND window)
+{
+    DSBUFFERDESC desc;
+    WAVEFORMATEX format;
+    void *p1;
+    DWORD n1;
+    void *p2;
+    DWORD n2;
+
+    for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
+    {
+        sound_buffers[i].unk_4 = -1;
+        SoundEffectData *data;
+        for (data = g_sound_effect_table; data != NULL; data++)
+        {
+            if (data->id == i)
+            {
+                break;
+            }
+        }
+        sound_buffers[i].id = i;
+        sound_buffers[i].data = data;
+    }
+    for (i32 i = 0; i < SOUND_QUEUE_SIZE; i++)
+    {
+        queued_ids[i] = -1;
+    }
+    manager = new CSoundManager;
+    if (manager->initialize(window, DSSCL_PRIORITY, 2, 44100, 16) < 0)
+    {
+        g_GameErrorContext.log("DirectSound \x83I\x83u\x83W\x83" "F\x83N\x83g\x82\xcc\x8f\x89\x8a\xfa\x89\xbb\x82\xaa\x8e\xb8\x94s\x82\xb5\x82\xbd\x82\xe6\r\n");
+        if (manager != NULL)
+        {
+            delete manager;
+            manager = NULL;
+        }
+        return -1;
+    }
+    dsound = manager->m_pDS;
+    bgm_thread = NULL;
+    memset(&desc, 0, sizeof(DSBUFFERDESC));
+    desc.dwSize = sizeof(DSBUFFERDESC);
+    desc.dwFlags = DSBCAPS_LOCSOFTWARE | DSBCAPS_GLOBALFOCUS;
+    desc.dwBufferBytes = 0x8000;
+    memset(&format, 0, sizeof(WAVEFORMATEX));
+    format.cbSize = 0;
+    format.wFormatTag = WAVE_FORMAT_PCM;
+    format.nChannels = 2;
+    format.nSamplesPerSec = 44100;
+    format.nAvgBytesPerSec = 176400;
+    format.nBlockAlign = 4;
+    format.wBitsPerSample = 16;
+    desc.lpwfxFormat = &format;
+    if (dsound->CreateSoundBuffer(&desc, &init_sound_buffer, NULL) < 0)
+    {
+        return -1;
+    }
+    if (init_sound_buffer->Lock(0, 0x8000, &p1, &n1, &p2, &n2, 0) < 0)
+    {
+        return -1;
+    }
+    memset(p1, 0, 0x8000);
+    init_sound_buffer->Unlock(p1, n1, p2, n2);
+    init_sound_buffer->Play(0, 0, DSBPLAY_LOOPING);
+    bgm_volume = 100;
+    se_volume = 100;
+    SetTimer(window, 0, 250, NULL);
+    game_window = window;
+    for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
+    {
+        if (g_SoundManager.thread_state == SOUND_THREAD_QUIT)
+        {
+            return -1;
+        }
+        if (g_SoundManager.sound_buffers[i].load(g_sound_file_names[g_sound_effect_table[i].file_index]) != 0)
+        {
+            g_GameErrorContext.log("error : Sound \x83t\x83@\x83" "C\x83\x8b\x82\xaa\x93\xc7\x82\xdd\x8d\x9e\x82\xdf\x82\xc8\x82\xa2 \x83" "f\x81[\x83^\x82\xf0\x8am\x94" "F %s\r\n", g_sound_file_names[g_sound_effect_table[i].file_index]);
+            return -1;
+        }
+    }
+    g_GameErrorContext.log("DirectSound \x82\xcd\x90\xb3\x8f\xed\x82\xc9\x8f\x89\x8a\xfa\x89\xbb\x82\xb3\x82\xea\x82\xdc\x82\xb5\x82\xbd\r\n");
+    return 0;
+}
+
 // FUNCTION: TH16 0x45d7e0
 void SoundManager::thread_load_sound_files(void *arg)
 {
@@ -220,15 +336,6 @@ void SoundManager::thread_load_sound_files(void *arg)
     while (g_SoundManager.thread_state == SOUND_THREAD_RUNNING)
     {
         Sleep(1);
-    }
-}
-
-inline CSoundManager::~CSoundManager()
-{
-    if (m_pDS != NULL)
-    {
-        m_pDS->Release();
-        m_pDS = NULL;
     }
 }
 

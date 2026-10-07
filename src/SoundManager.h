@@ -138,11 +138,19 @@ struct CSoundManager
 {
     struct IDirectSound8 *m_pDS;
 
+    CSoundManager()
+    {
+        m_pDS = NULL;
+    }
     ~CSoundManager();
+    HRESULT initialize(HWND window, DWORD coop_level, DWORD channels, DWORD frequency, DWORD bits);
     // 0x470320 and 0x470680: the sample's CreateStreaming, adapted to read
     // a thbgm.fmt track from thbgm.dat or from memory. The file name, the
     // creation flags and the notification count are constant at every call
     // site and LTCG folded them.
+    // 0x470250. The arguments (2 channels, 44100 Hz, 16 bits) are constant
+    // and folded.
+    HRESULT set_primary_buffer_format(DWORD channels, DWORD frequency, DWORD bits);
     HRESULT create_streaming(BgmStream **out, const char *name, DWORD flags, GUID guid, DWORD notify_count,
                              DWORD notify_size, HANDLE event, ThBgmFormat *format);
     HRESULT create_streaming_from_memory(BgmStream **out, u8 *data, i32 size, ThBgmFormat *format, DWORD flags,

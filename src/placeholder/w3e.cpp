@@ -5,6 +5,12 @@
 
 int w3e_placeholder_sink(void *object, int value);
 
+// STUB: TH16 0x470250
+DECOMP_NOINLINE HRESULT CSoundManager::set_primary_buffer_format(DWORD channels, DWORD frequency, DWORD bits)
+{
+    return w3e_placeholder_sink(this, 0);
+}
+
 // The name, flags and notification count are unused here, as they are
 // constant (folded) in the original.
 
