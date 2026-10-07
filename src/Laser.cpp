@@ -1682,3 +1682,79 @@ void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
     }
     }
 }
+
+// TODO: register allocation differs (the original keeps the stepped position in xmm registers and stack shadows; the frame is aligned to 64).
+// FUNCTION: TH16 0x437ee0
+void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, f32 time)
+{
+    time -= unk_8;
+    switch (mode)
+    {
+    case 0:
+        *out_pos = start_pos + velocity * time * speed;
+        *out_speed = speed;
+        *out_angle = angle;
+        break;
+    case 1:
+        if (-990.0f > angle_delta)
+        {
+            *out_pos = start_pos + velocity * (speed + speed + speed_delta * time) * (time + 1.0f) * 0.5f;
+            *out_speed = speed_delta * time + speed;
+            *out_angle = angle;
+        }
+        else
+        {
+            Float3 start = start_pos;
+            Float3 a;
+            Float3 b;
+            a.z = 0.0f;
+            b.z = 0.0f;
+            laser_sincosmul(&a, angle, speed);
+            laser_sincosmul(&b, angle_delta, speed_delta);
+            Float3 sum = b + a;
+            *out_pos = start + sum * time;
+            *out_speed = (f32)sqrt(sum.x * sum.x + sum.y * sum.y);
+            *out_angle = atan2(sum.y, sum.x);
+        }
+        break;
+    case 2:
+    {
+        Float3 pos = start_pos;
+        f32 a = angle;
+        f32 s = speed;
+        Float3 d;
+        d.z = 0.0f;
+        for (i32 n = (i32)time; n > 0; n--)
+        {
+            laser_sincosmul(&d, a, s);
+            i32 i = 0;
+            a += angle_delta;
+            while (a > ZUN_PI)
+            {
+                a -= ZUN_2PI;
+                if (i++ > 32)
+                {
+                    break;
+                }
+            }
+            while (a < -ZUN_PI)
+            {
+                a += ZUN_2PI;
+                if (i++ > 32)
+                {
+                    break;
+                }
+            }
+            pos.x += d.x;
+            s += speed_delta;
+            pos.y += d.y;
+            pos.z += d.z;
+        }
+        laser_sincosmul(&d, a, s);
+        *out_pos = pos + d * (time - (f32)floor(time));
+        *out_speed = s;
+        *out_angle = a;
+        break;
+    }
+    }
+}
