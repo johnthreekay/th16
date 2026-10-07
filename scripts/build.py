@@ -51,7 +51,7 @@ LIBS = [
 ]
 
 ANNOTATION = re.compile(r"//\s*FUNCTION:\s*TH16\s+(0x[0-9a-fA-F]+)")
-SYNTHETIC = re.compile(r"//\s*SYNTHETIC:\s*TH16\s+(0x[0-9a-fA-F]+)")
+NAME_MARKER = re.compile(r"//\s*(SYNTHETIC|LIBRARY):\s*TH16\s+(0x[0-9a-fA-F]+)")
 
 
 def sources():
@@ -336,22 +336,45 @@ def keepalive_symbols():
 
 
 def synthetic_functions():
-    """[(address, decorated symbol)] for // SYNTHETIC: annotations, whose next
-    line names a compiler-generated function. Only scalar deleting
-    destructors so far."""
+    """[(address, symbol, exact)] for name-based annotations: // SYNTHETIC:
+    (compiler-generated functions) and // LIBRARY: (CRT code such as UCRT
+    inline functions with C linkage). The next line names the function:
+
+      // `scalar deleting destructor' and other X::`...' names by prefix:
+      //   X::`scalar deleting destructor'      -> ??_GX@@...
+      //   `dynamic initializer for 'g_x''      -> ??__Eg_x@@...
+      //   `dynamic atexit destructor for 'g_x'' -> ??__Fg_x@@...
+      //   X::X / X::~X (implicit ctor/dtor)    -> ??0X@@... / ??1X@@...
+      // or the linker symbol itself (starts with ? or _), with the marker's
+      // SYMBOL option for reccmp: // LIBRARY: TH16 0x4090d0 SYMBOL
+    """
+    def mangle_scope(qualified):
+        return "@".join(reversed(qualified.split("::")))
+
     found = []
     for src in sources():
         lines = src.read_text(errors="replace").splitlines()
         for i, line in enumerate(lines):
-            m = SYNTHETIC.search(line)
+            m = NAME_MARKER.search(line)
             if not m:
                 continue
+            addr = int(m.group(2), 16)
             name = lines[i + 1].strip().lstrip("/").strip()
             sdd = re.fullmatch(r"((?:\w+::)*\w+)::`scalar deleting destructor'", name)
-            if not sdd:
-                sys.exit(f"{rel(src)}:{i + 2}: unsupported synthetic function {name!r}")
-            mangled = "@".join(reversed(sdd.group(1).split("::")))
-            found.append((int(m.group(1), 16), f"??_G{mangled}@@"))
+            init = re.fullmatch(r"`dynamic (initializer|atexit destructor) for '((?:\w+::)*\w+)''", name)
+            ctor = re.fullmatch(r"((?:\w+::)*)(\w+)::(~?)(\w+)", name)
+            if name.startswith(("?", "_")):
+                found.append((addr, name, True))
+            elif sdd:
+                found.append((addr, f"??_G{mangle_scope(sdd.group(1))}@@", False))
+            elif init:
+                code = "E" if init.group(1) == "initializer" else "F"
+                found.append((addr, f"??__{code}{mangle_scope(init.group(2))}@@", False))
+            elif ctor and ctor.group(2) == ctor.group(4):
+                code = "1" if ctor.group(3) else "0"
+                found.append((addr, f"??{code}{mangle_scope(ctor.group(1) + ctor.group(2))}@@", False))
+            else:
+                sys.exit(f"{rel(src)}:{i + 2}: unsupported {m.group(1)} name {name!r}")
     return found
 
 
@@ -374,10 +397,13 @@ def write_function_map(include, map_path, out_path):
                 va = ours.get(sym)
             if va is not None:
                 f.write(f"{addr:#x} {va:#x} {sym}\n")
-        for addr, prefix in synthetic_functions():
-            for sym, va in ours.items():
-                if sym.startswith(prefix):
-                    f.write(f"{addr:#x} {va:#x} {sym}\n")
+        for addr, name, exact in synthetic_functions():
+            matches = [name] if exact and name in ours else [] if exact else \
+                [sym for sym in ours if sym.startswith(name)]
+            if not matches:
+                print(f"warning: {addr:#x}: no symbol for {name}")
+            for sym in matches:
+                f.write(f"{addr:#x} {ours[sym]:#x} {sym}\n")
 
 
 def main():

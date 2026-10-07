@@ -9,6 +9,11 @@
 Arcfile g_Arcfile;
 // GLOBAL: TH16 0x4d7ba0
 Arcfile g_arcfiles[0x14];
+// Its dynamic initializer and atexit destructor:
+// SYNTHETIC: TH16 0x401110
+// ??__Eg_arcfiles@@YAXXZ
+// SYNTHETIC: TH16 0x48ac60
+// ??__Fg_arcfiles@@YAXXZ
 
 // Decryption parameters, picked by the sum of an entry name's bytes.
 struct ArcfileKey

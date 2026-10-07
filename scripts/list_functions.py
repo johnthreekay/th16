@@ -52,7 +52,7 @@ def main():
             names[int(row["addr"], 16)] = row["name"]
     status = {}
     for src in (ROOT / "src").rglob("*.cpp"):
-        for m in re.finditer(r"//\s*(FUNCTION|SYNTHETIC|STUB):\s*TH16\s+(0x[0-9a-fA-F]+)", src.read_text(errors="replace")):
+        for m in re.finditer(r"//\s*(FUNCTION|SYNTHETIC|LIBRARY|STUB):\s*TH16\s+(0x[0-9a-fA-F]+)", src.read_text(errors="replace")):
             addr = int(m.group(2), 16)
             if m.group(1) == "STUB":
                 status.setdefault(addr, "stub")

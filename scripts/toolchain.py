@@ -1,5 +1,6 @@
 """Paths and Wine invocation for the MSVC 14.10.25017 toolchain in prefix/."""
 
+import hashlib
 import os
 import subprocess
 import tempfile
@@ -50,6 +51,11 @@ def env():
     e["LIB"] = ";".join(winpath(p) for p in LIB)
     # Keep cl from looking for a shared PDB server between invocations.
     e["_CL_"] = ""
+    # Checkouts (agent worktrees) share one Wine prefix and so one wineserver;
+    # with the default endpoint their builds also share one mspdbsrv, and a
+    # link can then fail with LNK1201 (cannot write the PDB). Give each
+    # checkout its own server.
+    e["_MSPDBSRV_ENDPOINT_"] = "th16_" + hashlib.sha1(str(ROOT).encode()).hexdigest()[:12]
     return e
 
 

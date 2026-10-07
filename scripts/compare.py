@@ -12,6 +12,8 @@ Runs reccmp-reccmp in-process with two adjustments for this project:
   begins earlier with a stack cookie check (`mov edx,[esp+8];
   lea eax,[edx+N]; mov ecx,[edx-M]; xor ecx,eax; call
   __security_check_cookie`), and code refers to that start.
+- static functions named by their decorated string in the PDB (dynamic
+  initializers and atexit destructors) get that string as their symbol.
 - vtables stay vtables. VS2017 PDBs also list each vtable among the global
   variables, and reccmp's handling of those retypes it as plain data, so it
   never pairs with the // VTABLE: annotation. And a vtable is taken to end at
@@ -109,6 +111,21 @@ def patch_reccmp():
         return original_compare_vtable(self, match)
 
     Compare._compare_vtable = compare_vtable
+
+    # Static functions have no public symbol, and the PDB names some of them
+    # by their decorated string (dynamic initializers ??__E, atexit
+    # destructors ??__F). Treat that as their symbol so the // SYNTHETIC:
+    # annotations that name them by symbol can pair.
+    import reccmp.compare.core as core
+    original_load_cvdump = core.load_cvdump
+
+    def load_cvdump(analysis, db, recomp_bin):
+        for node in analysis.nodes:
+            if node.decorated_name is None and (node.friendly_name or "").startswith("?"):
+                node.decorated_name = node.friendly_name
+        return original_load_cvdump(analysis, db, recomp_bin)
+
+    core.load_cvdump = load_cvdump
 
 
 def main():

@@ -315,6 +315,26 @@ decompiled code the surroundings it had in the original:
   subexpression reuse. Fall-through case order shows in jump table tail
   merges.
 
+### Compiler-generated and CRT functions
+
+Name-based annotations: the marker, then a comment line naming the function.
+
+- Scalar deleting destructors: `// SYNTHETIC: TH16 0x...` then
+  ``// X::`scalar deleting destructor'``.
+- Dynamic initializers (0x401000-0x401250 in the original) and the atexit
+  destructors they register (0x48ac10-0x48acd0): name them by symbol, e.g.
+  `// SYNTHETIC: TH16 0x401110` then `// ??__Eg_arcfiles@@YAXXZ`, and
+  `// ??__Fg_arcfiles@@YAXXZ` for the destructor (see Arcfile.cpp). The PDB
+  knows these static functions only by that string; compare.py treats it as
+  their symbol. Matching them means defining the global, with its
+  constructor and destructor, the way ZUN did.
+- Implicit constructors/destructors: `// X::X` or `// X::~X`, or the symbol.
+- UCRT functions defined inline in the headers with C linkage:
+  `// LIBRARY: TH16 0x4090d0 SYMBOL` then `// _sprintf` (src/CrtInline.cpp).
+- The code after the CRT up to 0x48a3c0 and the small functions there are
+  exception unwind funclets generated from the functions they belong to;
+  they need no source of their own.
+
 ### Known tooling gaps
 
 - Template members cannot be annotated: build.py's name parsing does not
@@ -333,13 +353,6 @@ decompiled code the surroundings it had in the original:
 - build.py reads `template <> __declspec(noinline) X::f` as a function
   named `__declspec`; use DECOMP_NOINLINE. An explicit specialization of an
   in-class template member also needs a user in its own .cpp to be emitted.
-- Dynamic initializers (0x401000-0x401250) and C-linkage UCRT inlines
-  (0x405530, 0x405540, 0x4090d0 `sprintf`) cannot be annotated yet, and
-  sigscan does not locate `_chdir` or `_mkdir`; compare.py then reports
-  their callers below 100% although the code is identical.
-- SYNTHETIC only takes scalar deleting destructors, so implicit
-  constructors and destructors (AnmFastVm at 0x46b770/0x46b790) need an
-  explicit definition to be annotated.
 - The TH06 decomp's `Chain` code (`src/Global.cpp` there) is a close ancestor
   of TH16's `UpdateFuncRegistry`: same callback result codes, same case
   order in the switch, same search-then-cut structure in `unregister`.
