@@ -949,6 +949,263 @@ i32 TitleInf::do_practice_stage_select()
     return 1;
 }
 
+// The unlock cheat typed on the player data screen ("ILOVEBEER", as
+// DirectInput key codes).
+// GLOBAL: TH16 0x4936d8
+const i32 g_cheat_code[9] = {0x17, 0x26, 0x18, 0x2f, 0x12, 0x30, 0x12, 0x12, 0x13};
+// The keys newly pressed this frame (also scratch space for remapping
+// virtual keys to DirectInput key codes).
+// GLOBAL: TH16 0x4df940
+u8 g_cheat_keys_pressed[0x100];
+// Frames since the last correct key, and how much of the code was typed.
+// GLOBAL: TH16 0x4dfa40
+i32 g_cheat_timer;
+// GLOBAL: TH16 0x4dfa44
+u32 g_cheat_progress;
+// The keyboard this frame and the last.
+// GLOBAL: TH16 0x4dfd60
+u8 g_cheat_keys[0x100];
+// GLOBAL: TH16 0x4dfe60
+u8 g_cheat_prev_keys[0x100];
+
+// Small MenuHelper steps the player data inlines.
+static __forceinline void menu_save_selection(MenuHelper *m)
+{
+    m->current_selection = m->next_selection;
+}
+
+static __forceinline i32 menu_selection_moved(MenuHelper *m)
+{
+    return m->current_selection != m->next_selection;
+}
+
+// The player data screen: difficulty (menu_fc) and character (menu)
+// records, and pages of spell cards (menu_1d4, 0 for none). On Extra with
+// the fourth character selected it also reads the unlock cheat.
+// TODO: the original realigns its frame (and esp, -8), tests the up input after the three selection copies, and ORs the first 16 key bytes into the second.
+// FUNCTION: TH16 0x452330
+i32 TitleInf::do_player_data()
+{
+    switch (substate)
+    {
+    case 0:
+        menu.num_choices = 4;
+        menu.set_cursor(0);
+        menu_fc.num_choices = 5;
+        menu_fc.set_cursor(1);
+        menu_fc.wraps = 1;
+        menu_1d4.num_choices = (count_spells_of_difficulty(menu_fc.next_selection) + 9) / 10 + 1;
+        menu_1d4.set_cursor(0);
+        menu_1d4.wraps = 1;
+        if (anm_id_73c.id == 0)
+        {
+            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+        }
+        anm_ids[0x6d] = title_anm->create_effect(0x6d, -1, NULL);
+        set_substate(1);
+        create_effect(menu.next_selection + 0xa7);
+        create_effect(menu_fc.next_selection + 0xaf);
+        anm_ids[0xb7] = title_anm->create_effect(0xb7, -1, NULL);
+        anm_ids[0xb8] = title_anm->create_effect(0xb8, -1, NULL);
+        anm_ids[0xb9] = title_anm->create_effect(0xb9, -1, NULL);
+        anm_ids[0xba] = title_anm->create_effect(0xba, -1, NULL);
+        anm_ids[0xb4] = title_anm->create_effect(0xb4, -1, NULL);
+        anm_ids[0xb5] = title_anm->create_effect(0xb5, -1, NULL);
+        anm_ids[0xb6] = title_anm->create_effect(0xb6, -1, NULL);
+        anm_ids[0xbb] = title_anm->create_effect(0xbb, -1, NULL);
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        menu_save_selection(&menu);
+        menu_save_selection(&menu_fc);
+        menu_save_selection(&menu_1d4);
+        if (pressed_or_repeating_inline(INPUT_UP))
+        {
+            menu_fc.move_cursor(-1);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xb9], 2);
+        }
+        if (pressed_or_repeating_inline(INPUT_DOWN))
+        {
+            menu_fc.move_cursor(1);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xba], 2);
+        }
+        if (menu_selection_moved(&menu_fc))
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            interrupt_and_clear(menu_fc.current_selection + 0xaf);
+            create_effect(menu_fc.next_selection + 0xaf);
+            if (menu_1d4.next_selection > 0)
+            {
+                menu_1d4.set_cursor(1);
+                draw_spell_card_page();
+            }
+            menu_1d4.num_choices = (count_spells_of_difficulty(menu_fc.next_selection) + 9) / 10 + 1;
+        }
+        if (pressed_or_repeating_inline(INPUT_LEFT))
+        {
+            menu.move_cursor(-1);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xb7], 2);
+        }
+        if (pressed_or_repeating_inline(INPUT_RIGHT))
+        {
+            menu.move_cursor(1);
+            AnmManager::interrupt_tree_and_run(anm_ids[0xb8], 2);
+        }
+        if (menu_selection_moved(&menu))
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            interrupt_and_clear(menu.current_selection + 0xa7);
+            create_effect(menu.next_selection + 0xa7);
+            if (menu_1d4.next_selection > 0)
+            {
+                draw_spell_card_page();
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            if (menu_1d4.next_selection == 0)
+            {
+                for (i32 i = 0; i < 10; i++)
+                {
+                    anm_ids_740[i] = g_Supervisor.text_anm->create_effect(i + 3, -1, NULL);
+                }
+            }
+            menu_1d4.move_cursor(1);
+            if (menu_1d4.next_selection == 0)
+            {
+                for (i32 i = 0; i < 10; i++)
+                {
+                    AnmManager::interrupt_tree(anm_ids_740[i], 1);
+                }
+            }
+            else
+            {
+                draw_spell_card_page();
+            }
+            g_SoundManager.play_sound_centered(7, 0);
+        }
+        if (menu_fc.next_selection == 4 && menu.next_selection == 3)
+        {
+            if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_BOMB | INPUT_MENU | INPUT_ENTER))
+            {
+                g_cheat_progress = 0;
+                g_cheat_timer = 0;
+            }
+            memcpy(g_cheat_prev_keys, g_cheat_keys, sizeof(g_cheat_keys));
+            i32 source = get_keyboard_state(g_cheat_keys);
+            if (source == 2)
+            {
+                // GetKeyboardState gives virtual keys; move the letters to
+                // their DirectInput codes.
+                u8 *remapped = g_cheat_keys_pressed;
+                memset(remapped, 0, 0x100);
+                remapped[DIK_A] = g_cheat_keys['A'];
+                remapped[DIK_B] = g_cheat_keys['B'];
+                remapped[DIK_C] = g_cheat_keys['C'];
+                remapped[DIK_D] = g_cheat_keys['D'];
+                remapped[DIK_E] = g_cheat_keys['E'];
+                remapped[DIK_F] = g_cheat_keys['F'];
+                remapped[DIK_G] = g_cheat_keys['G'];
+                remapped[DIK_H] = g_cheat_keys['H'];
+                remapped[DIK_I] = g_cheat_keys['I'];
+                remapped[DIK_J] = g_cheat_keys['J'];
+                remapped[DIK_K] = g_cheat_keys['K'];
+                remapped[DIK_L] = g_cheat_keys['L'];
+                remapped[DIK_M] = g_cheat_keys['M'];
+                remapped[DIK_N] = g_cheat_keys['N'];
+                remapped[DIK_O] = g_cheat_keys['O'];
+                remapped[DIK_P] = g_cheat_keys['P'];
+                remapped[DIK_Q] = g_cheat_keys['Q'];
+                remapped[DIK_R] = g_cheat_keys['R'];
+                remapped[DIK_S] = g_cheat_keys['S'];
+                remapped[DIK_T] = g_cheat_keys['T'];
+                remapped[DIK_U] = g_cheat_keys['U'];
+                remapped[DIK_V] = g_cheat_keys['V'];
+                remapped[DIK_W] = g_cheat_keys['W'];
+                remapped[DIK_X] = g_cheat_keys['X'];
+                remapped[DIK_Y] = g_cheat_keys['Y'];
+                remapped[DIK_Z] = g_cheat_keys['Z'];
+                memcpy(g_cheat_keys, remapped, 0x100);
+            }
+            else if (source != 1)
+            {
+                goto tick;
+            }
+            for (i32 i = 0; i < 0x100; i++)
+            {
+                g_cheat_keys_pressed[i] = (g_cheat_keys[i] ^ g_cheat_prev_keys[i]) & g_cheat_keys[i];
+            }
+            if (g_cheat_progress >= 9)
+            {
+                g_Scorefile->unlock_all();
+                g_SoundManager.play_sound_centered(17, 0);
+                g_cheat_progress = 0;
+            }
+            else if ((i8)g_cheat_keys_pressed[g_cheat_code[g_cheat_progress]] < 0)
+            {
+                g_cheat_progress++;
+                g_cheat_timer = 0;
+            }
+            else
+            {
+                i8 any = 0;
+                for (i32 i = 0; i < DIK_SPACE; i++)
+                {
+                    any |= g_cheat_keys_pressed[i];
+                }
+                if (any < 0)
+                {
+                    g_cheat_progress = 0;
+                }
+            }
+        tick:
+            g_cheat_timer++;
+            if (g_cheat_timer > 300)
+            {
+                g_cheat_progress = 0;
+                g_cheat_timer = 0;
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            set_substate(3);
+            g_SoundManager.play_sound_centered(9, 0);
+            interrupt_and_clear(menu_fc.next_selection + 0xaf);
+            interrupt_and_clear(menu.next_selection + 0xa7);
+            interrupt_and_clear(0xb7);
+            interrupt_and_clear(0xb8);
+            interrupt_and_clear(0xb9);
+            interrupt_and_clear(0xba);
+            interrupt_and_clear(0xb4);
+            interrupt_and_clear(0xb5);
+            interrupt_and_clear(0xb6);
+            interrupt_and_clear(0xbb);
+            for (i32 i = 0; i < 10; i++)
+            {
+                AnmManager::interrupt_tree(anm_ids_740[i], 1);
+            }
+            return 1;
+        }
+        break;
+    case 3:
+        if (time_in_state.current >= 6)
+        {
+            interrupt_and_clear(0x6d);
+            AnmManager::interrupt_tree(anm_id_73c, 1);
+            anm_id_73c.id = 0;
+            set_state(1);
+            menu.pop();
+        }
+        break;
+    }
+    return 1;
+}
+
 // Player data, spell card page: ten spell cards of the chosen difficulty
 // (page menu_1d4 - 1), numbered with full-width digits, with their names
 // once seen and the chosen character's captures.

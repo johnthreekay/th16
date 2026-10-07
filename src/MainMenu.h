@@ -85,6 +85,11 @@ class TitleInf : public TaskInf
     void set_substate(i32 substate);
     // Interrupts anm_ids[index] with interrupt 1 and forgets it.
     void interrupt_and_clear(i32 index);
+    // Starts the title_anm script of the same index in anm_ids[index].
+    void create_effect(i32 index)
+    {
+        anm_ids[index] = title_anm->create_effect(index, -1, NULL);
+    }
     // Interrupts the first descendant of anm_ids[index] running the
     // script. Every caller passes index 0 and interrupt 29, which LTCG
     // folds (keeping the stack slots).
@@ -143,6 +148,8 @@ class TitleInf : public TaskInf
     // site; LTCG folded it.
     DECOMP_NOINLINE void load_spell_list(i32 stage, i32 row, i32 *ids, i32 unused);
     i32 highlight_spell_row(i32 selected);
+    // 0x452330 (ExpHP: sub_452330_replay_related). The player data.
+    i32 do_player_data();
     // 0x452c30. The spell card page of the player data.
     i32 draw_spell_card_page();
     // The row of replay_slot on its page of 25.
