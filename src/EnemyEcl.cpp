@@ -108,17 +108,21 @@ static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)
 
 // Where shooter i fires from: its absolute origin plus the offset when the
 // origin is set (third component above 0.9), else the enemy's position plus
-// the offset.
-static __forceinline D3DXVECTOR3 shot_origin(EnemyData *enemy, i32 i)
+// the offset. Written straight into the destination: a returned vector
+// would be a stack temporary, which makes LTCG align the frame.
+static __forceinline void get_shot_origin(EnemyData *enemy, i32 i, D3DXVECTOR3 *out)
 {
     if (enemy->bullet_mgr_origins[i].unk_8 > 0.9f)
     {
-        return D3DXVECTOR3(enemy->bullet_mgr_origins[i].xy.x + enemy->bullet_mgr_offsets[i].xy.x,
+        *out = D3DXVECTOR3(enemy->bullet_mgr_origins[i].xy.x + enemy->bullet_mgr_offsets[i].xy.x,
                            enemy->bullet_mgr_origins[i].xy.y + enemy->bullet_mgr_offsets[i].xy.y, 0.0f);
     }
-    return D3DXVECTOR3(enemy->bullet_mgr_offsets[i].xy.x + enemy->final_pos.pos.x,
-                       enemy->bullet_mgr_offsets[i].xy.y + enemy->final_pos.pos.y,
-                       enemy->bullet_mgr_offsets[i].unk_8 + enemy->final_pos.pos.z);
+    else
+    {
+        *out = D3DXVECTOR3(enemy->bullet_mgr_offsets[i].xy.x + enemy->final_pos.pos.x,
+                           enemy->bullet_mgr_offsets[i].xy.y + enemy->final_pos.pos.y,
+                           enemy->bullet_mgr_offsets[i].unk_8 + enemy->final_pos.pos.z);
+    }
 }
 
 // setNext: the life at which interrupt index fires and, unless the life is
@@ -1826,7 +1830,7 @@ int EnemyData::ecl_run_over_300()
         LaserLineInner params;
         i32 idx = get_int_arg(0);
         memcpy(params.ex, bullet_props[idx].ex, sizeof(params.ex));
-        params.start_pos = shot_origin(this, idx);
+        get_shot_origin(this, idx, &params.start_pos);
         params.type = bullet_props[idx].type;
         params.color = bullet_props[idx].color;
         params.ang_aim = normalize_angle(bullet_props[idx].ang_aim);
@@ -1848,7 +1852,7 @@ int EnemyData::ecl_run_over_300()
         LaserInfiniteInner params;
         i32 idx = get_int_arg(0);
         memcpy(params.ex, bullet_props[idx].ex, sizeof(params.ex));
-        params.start_pos = shot_origin(this, idx);
+        get_shot_origin(this, idx, &params.start_pos);
         params.type = bullet_props[idx].type;
         params.color = bullet_props[idx].color;
         params.ang_aim = normalize_angle(bullet_props[idx].ang_aim);
@@ -1874,7 +1878,7 @@ int EnemyData::ecl_run_over_300()
         LaserBeamInner params;
         i32 idx = get_int_arg(0);
         memcpy(params.ex, bullet_props[idx].ex, sizeof(params.ex));
-        params.start_pos = shot_origin(this, idx);
+        get_shot_origin(this, idx, &params.start_pos);
         params.color = bullet_props[idx].color;
         params.ang_aim = normalize_angle(bullet_props[idx].ang_aim);
         params.timing = bullet_props[idx].laser_timing[0];
@@ -1891,7 +1895,7 @@ int EnemyData::ecl_run_over_300()
         LaserCurveInner params;
         i32 idx = get_int_arg(0);
         memcpy(params.ex, bullet_props[idx].ex, sizeof(params.ex));
-        params.start_pos = shot_origin(this, idx);
+        get_shot_origin(this, idx, &params.start_pos);
         params.type = bullet_props[idx].type;
         params.color = bullet_props[idx].color;
         params.ang_aim = normalize_angle(bullet_props[idx].ang_aim);
