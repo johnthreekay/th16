@@ -239,6 +239,23 @@ decompiled code the surroundings it had in the original:
   zeroing (TitleInf ctor: `AnmId; AnmId[0x24]; AnmId[9]`).
 - dxguid IIDs can be defined in source to carry a GLOBAL annotation.
 
+- Frame realignment (`and esp,-8`) spreads up from callees: if a callee
+  needs 8-byte alignment, LTCG realigns its callers too. The draw_text
+  placeholder holds a volatile double so its callers get it.
+- The /GS decision cuts both ways: an opaque stub that receives a local's
+  address gives the caller a cookie, which a /GL placeholder body removes
+  (set_pos_time, the Interp steps); a visible body can also add one (see
+  get_vm_with_id above).
+- Some of ZUN's flag fields really are bitfields (EnemyData::flags_low,
+  AnmVm blend mode): assignments compile to xor/and/xor. EnemyFlagsLow and
+  AnmVmFlagsLoBits are bitfield views of them.
+- Parameter folding and dropping `this` only happen once a function is
+  HARNESS_CALLED with harness callers (spawn_item, create_vm_front,
+  get_boss, LaserManager::find_by_id).
+- Loop form decides store/load order: delete_vm_inline walks children with
+  `node = &list; while ((node = node->next) != NULL)` so the flags store
+  comes first.
+
 ### Known tooling gaps
 
 - Template members cannot be annotated: build.py's name parsing does not
@@ -253,6 +270,9 @@ decompiled code the surroundings it had in the original:
   compare.py.
 - build.py cannot tell overloads apart (two `ZunAngle::operator+` give "2
   matching symbols"), so 0x447650 is named `ZunAngle::add` for now.
+- build.py reads `template <> __declspec(noinline) X::f` as a function
+  named `__declspec`; use DECOMP_NOINLINE. An explicit specialization of an
+  in-class template member also needs a user in its own .cpp to be emitted.
 - SYNTHETIC only takes scalar deleting destructors, so implicit
   constructors and destructors (AnmFastVm at 0x46b770/0x46b790) need an
   explicit definition to be annotated.
