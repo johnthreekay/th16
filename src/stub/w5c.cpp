@@ -41,9 +41,3 @@ i32 TitleInf::do_music_room()
 {
     return 0;
 }
-
-// STUB: TH16 0x44b5f0
-i32 TitleInf::do_title_screen()
-{
-    return 0;
-}
