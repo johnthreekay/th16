@@ -549,6 +549,15 @@ DECOMP_NOINLINE GameThread::~GameThread()
     g_Supervisor.background_color = (GLOBALS_FLAGS_45C & 1) ? 0 : 0xff000000;
 }
 
+// The original seeks inline in on_tick_body. With the double math there,
+// LTCG realigns on_tick_body early enough to hand the alignment down to
+// sub_42dc50's callees, and Stage::start_std_vms (0x40add0) loses its
+// shrink-wrapped edi; kept out of line until that is understood.
+static DECOMP_NOINLINE void seek_bgm_to_stage_time()
+{
+    ((CStreamingSound *)g_SoundManager.bgm_stream)->seek(g_Globals.time_in_stage / 60.0);
+}
+
 // One frame of a game: the ending fade, the stage restart and intro
 // timing, the demo's end, the music restart after a pause and the timers.
 // TODO: the original keeps the return 3 epilogue at the top and a second null test around the inlined delete of g_Stage2.
@@ -656,7 +665,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
             }
             if (g_Globals.chapter < 0x2b)
             {
-                ((CStreamingSound *)g_SoundManager.bgm_stream)->seek(g_Globals.time_in_stage / 60.0);
+                seek_bgm_to_stage_time();
             }
             *(u32 *)&flags &= ~0x10000;
             unk_8c = 0;

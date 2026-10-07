@@ -19,11 +19,6 @@ i32 Gui::on_draw_2_body()
 }
 
 
-// STUB: TH16 0x427cf0
-i32 Gui::on_tick_body()
-{
-    return 1;
-}
 
 
 // STUB: TH16 0x43f350
