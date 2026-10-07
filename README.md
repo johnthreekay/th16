@@ -575,7 +575,8 @@ decompiled code the surroundings it had in the original:
     EnemyManager::initialize (73%), which reccmp reports as 100%.
   - ZunTimer::tick_mixed (the int frame in a local, current_f updated in
     each branch) gives the unscaled path its own xmm0 register: it matches
-    Bullet::step_ex_03 and helps a dozen other inlined ticks. As tick()
+    Bullet::step_ex_03 and ScreenEffect::on_tick_pulse and helps a dozen
+    other inlined ticks. As tick()
     itself it costs four matches, so it is chosen per call site. Still
     open: whether the scaled path loads current_f and adds the speed or
     folds current_f into the speed's register differs between near
