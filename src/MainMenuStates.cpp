@@ -1846,9 +1846,9 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
     pos.y = 378.0f;
     g_AsciiManager->create_stringf(&pos, "    %5d", g_Scorefile->characters[menu.next_selection].play_count);
     pos.y = 396.0f;
-    __int64 seconds = g_Scorefile->characters[menu.next_selection].play_time / 100;
-    __int64 minutes = seconds / 60;
-    __int64 hours = minutes / 60;
+    unsigned __int64 seconds = g_Scorefile->characters[menu.next_selection].play_time / 100;
+    unsigned __int64 minutes = seconds / 60;
+    unsigned __int64 hours = minutes / 60;
     g_AsciiManager->create_stringf(&pos, "%3lld:%.2lld:%.2lld", hours, minutes - hours * 60, seconds - minutes * 60);
     pos.y = 414.0f;
     g_AsciiManager->create_stringf(&pos, "    %5d",

@@ -61,7 +61,7 @@ struct ScorefileCharacter
     // Games played (shown in the player data).
     i32 play_count;
     // In hundredths of a second.
-    __int64 play_time;
+    unsigned __int64 play_time;
     // Per difficulty (the unlock cheat counts six).
     i32 play_counts[6];
     u8 unk_5180[0x5184 - 0x5180];
@@ -90,7 +90,7 @@ struct Scorefile
     // Set once a track has played, unlocking it in the music room.
     u8 bgm_unlocked[0x19fc8 - 0x19fa6];
     // Total of every character's play_time.
-    __int64 play_time;
+    unsigned __int64 play_time;
     u8 unk_19fd0[0x1a3ac - 0x19fd0];
 
     // 0x44a800. Whether the character cleared any of the main
