@@ -349,7 +349,7 @@ i32 TitleInf::do_difficulty_select()
         anm_ids[script] = title_anm->create_effect(script, -1, NULL);
         AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
         AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 13));
-        if (g_unk_4a6f1c == 4)
+        if (g_title_return_point == TITLE_RETURN_PRACTICE)
         {
             menu.set_cursor(g_Globals.difficulty);
             AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
@@ -561,7 +561,7 @@ i32 TitleInf::do_character_select()
         {
             clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9d));
         }
-        if (g_unk_4a6f1c == 4)
+        if (g_title_return_point == TITLE_RETURN_PRACTICE)
         {
             menu.set_cursor(g_Globals.character);
             AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 7));
@@ -685,7 +685,7 @@ i32 TitleInf::do_subseason_select()
         AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(g_Globals.character + 31));
         set_substate(1);
         anm_ids[0x6a] = title_anm->create_effect(0x6a, -1, NULL);
-        if (g_unk_4a6f1c == 4)
+        if (g_title_return_point == TITLE_RETURN_PRACTICE)
         {
             menu.set_cursor(g_Globals.subseason);
             goto confirm;
@@ -775,13 +775,13 @@ i32 TitleInf::do_subseason_select()
                 g_stage_data = &g_stage_table[1];
                 g_Globals.stage_num = 1;
                 g_Globals.weird_stage_num = 1;
-                g_Supervisor.gamemode_to_switch_to = 7;
+                g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
                 return 1;
             }
             g_stage_data = &g_stage_table[7];
             g_Globals.stage_num = 7;
             g_Globals.weird_stage_num = 7;
-            g_Supervisor.gamemode_to_switch_to = 7;
+            g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
             return 1;
         }
         break;
@@ -820,9 +820,9 @@ i32 TitleInf::do_practice_stage_select()
         menu.set_cursor(g_practice_last_stage);
         anm_ids[0x71] = title_anm->create_effect(0x71, -1, NULL);
         set_substate(1);
-        if (g_unk_4a6f1c == 4)
+        if (g_title_return_point == TITLE_RETURN_PRACTICE)
         {
-            g_unk_4a6f1c = 1;
+            g_title_return_point = TITLE_RETURN_MAIN;
         }
     case 1:
         if (time_in_state.current > 10)
@@ -962,10 +962,10 @@ i32 TitleInf::do_practice_stage_select()
             menu.push();
             set_state(2);
             i32 stage = menu.next_selection + 1;
-            g_Supervisor.gamemode_to_switch_to = 7;
+            g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
-            g_unk_4a6f1c = 4;
+            g_title_return_point = TITLE_RETURN_PRACTICE;
             g_stage_data = &g_stage_table[stage];
             g_practice_last_stage = menu.next_selection;
             return 1;
@@ -1597,7 +1597,7 @@ i32 TitleInf::do_replay_menu()
         {
             set_state(2);
             i32 stage = replay_stage + 1;
-            g_Supervisor.gamemode_to_switch_to = 13;
+            g_Supervisor.gamemode_to_switch_to = GAMEMODE_START_REPLAY;
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
             g_stage_data = &g_stage_table[stage];
@@ -1618,7 +1618,7 @@ i32 TitleInf::do_replay_menu()
                 g_Globals.spell_id = -1;
             }
             g_last_replay_slot = replay_slot;
-            g_unk_4a6f1c = 2;
+            g_title_return_point = TITLE_RETURN_REPLAY_MENU;
             return 1;
         }
         break;
@@ -2972,7 +2972,7 @@ i32 TitleInf::do_spell_practice_subseason()
         {
             menu.push();
             set_state(2);
-            g_unk_4a6f1c = 5;
+            g_title_return_point = TITLE_RETURN_SPELL_PRACTICE;
             i32 stage = spell_stage + 1;
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
@@ -2982,7 +2982,7 @@ i32 TitleInf::do_spell_practice_subseason()
             g_Globals.subshot = 0;
             g_Globals.subseason = menu.next_selection;
             g_Globals.difficulty = g_spell_difficulty[spell_ids[spell_index]];
-            g_Supervisor.gamemode_to_switch_to = 7;
+            g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
             g_spell_practice_last_stage = spell_stage;
             g_spell_practice_last_row = spell_row;
             g_spell_practice_last_index = spell_index;
@@ -3086,7 +3086,7 @@ i32 TitleInf::do_spell_practice_difficulty()
             {
                 menu.push();
                 set_state(2);
-                g_unk_4a6f1c = 5;
+                g_title_return_point = TITLE_RETURN_SPELL_PRACTICE;
                 i32 stage = spell_stage + 1;
                 g_Globals.stage_num = stage;
                 g_Globals.weird_stage_num = stage;
@@ -3096,7 +3096,7 @@ i32 TitleInf::do_spell_practice_difficulty()
                 g_Globals.subshot = 0;
                 g_Globals.difficulty = g_spell_difficulty[spell_ids[menu.next_selection]];
                 g_Globals.subseason = 4;
-                g_Supervisor.gamemode_to_switch_to = 7;
+                g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
                 g_spell_practice_last_stage = spell_stage;
                 g_spell_practice_last_row = spell_row;
                 g_spell_practice_last_index = menu.next_selection;

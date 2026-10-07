@@ -1763,7 +1763,7 @@ int EnemyInf::get_int_global(int var)
     case -9930:
         return g_Globals.power;
     case -9927:
-        if (g_GameThread->replay_mode == 0 && g_Supervisor.unk_700 != 0)
+        if (g_GameThread->replay_mode == 0 && g_Supervisor.new_game_started != 0)
         {
             return 1;
         }
@@ -2067,7 +2067,7 @@ f32 EnemyInf::get_float_global(int var)
     case -9930:
         return g_Globals.power;
     case -9927:
-        return (f32)(g_GameThread->replay_mode == 0) && g_Supervisor.unk_700 != 0;
+        return (f32)(g_GameThread->replay_mode == 0) && g_Supervisor.new_game_started != 0;
     case -9909:
         return (u32)unk_5744;
     case -9926:

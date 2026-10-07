@@ -129,14 +129,14 @@ HARNESS_CALLED i32 check_startup_shortcut()
             }
             if (strcmp(exe_path, title) != 0)
             {
-                g_GameWindow.unk_2c = 1;
+                g_GameWindow.started_by_launcher = 1;
             }
         }
-        g_Supervisor.flags &= ~0x40;
+        g_Supervisor.flags &= ~SUPERVISOR_NO_STARTUP_TITLE;
     }
     else
     {
-        g_Supervisor.flags |= 0x40;
+        g_Supervisor.flags |= SUPERVISOR_NO_STARTUP_TITLE;
     }
     return g_app_mutex != NULL ? 0 : -1;
 }
@@ -204,7 +204,7 @@ INT_PTR CALLBACK resolution_dialog_proc(HWND dialog, UINT message, WPARAM wparam
             SendMessageA(GetDlgItem(dialog, 0xcf), BM_SETCHECK, BST_CHECKED, 0);
             break;
         }
-        g_unk_4d9d1c = (g_unk_4d9d1c & ~0x80) | 0x100;
+        g_window_flags = (g_window_flags & ~WINDOW_DIALOG_CANCELLED) | WINDOW_DIALOG_OPEN;
         return FALSE;
     case WM_COMMAND:
         if (LOWORD(wparam) != 0xd0)
@@ -212,15 +212,15 @@ INT_PTR CALLBACK resolution_dialog_proc(HWND dialog, UINT message, WPARAM wparam
             return FALSE;
         }
         read_resolution_dialog();
-        g_unk_4d9d1c &= ~0x180;
+        g_window_flags &= ~(WINDOW_DIALOG_CANCELLED | WINDOW_DIALOG_OPEN);
         DestroyWindow(g_GameWindow.dialog);
         g_GameWindow.dialog = NULL;
         // Falls through.
     case WM_CLOSE:
-        if ((g_unk_4d9d1c & 0x180) == 0x100)
+        if ((g_window_flags & (WINDOW_DIALOG_CANCELLED | WINDOW_DIALOG_OPEN)) == WINDOW_DIALOG_OPEN)
         {
-            g_unk_4d9d1c &= ~0x100;
-            g_unk_4d9d1c |= 0x80;
+            g_window_flags &= ~WINDOW_DIALOG_OPEN;
+            g_window_flags |= WINDOW_DIALOG_CANCELLED;
         }
         DestroyWindow(g_GameWindow.dialog);
         g_GameWindow.dialog = NULL;

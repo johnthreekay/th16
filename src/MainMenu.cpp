@@ -119,19 +119,19 @@ unsigned __stdcall TitleInf::thread_start()
 {
     if (g_MainMenu->initialize() != 0)
     {
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 3;
+        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_QUIT;
         return 0;
     }
     if (g_LoadingThread != NULL)
     {
-        while (g_LoadingThread->count_638 < 180 && !(g_Supervisor.flags & 0x180))
+        while (g_LoadingThread->count_638 < 180 && !(g_Supervisor.flags & (SUPERVISOR_QUIT_REQUESTED | SUPERVISOR_FLAG_100)))
         {
             Sleep(16);
         }
         g_AnmManager->unload_anm(1);
     }
     g_MainMenu->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
-    g_unk_4d9d90 = 1;
+    g_frame_pacing.mode = 1;
     return 0;
 }
 
@@ -195,7 +195,7 @@ TitleInf::~TitleInf()
 TitleInf *TitleInf::create()
 {
     TitleInf *menu = new TitleInf;
-    g_unk_4d9d90 = 0;
+    g_frame_pacing.mode = 0;
     menu->thread.restart((ThreadStart)thread_start, menu);
     return menu;
 }
@@ -962,7 +962,7 @@ i32 TitleInf::on_tick()
             }
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
-            g_Supervisor.gamemode_to_switch_to = 13;
+            g_Supervisor.gamemode_to_switch_to = GAMEMODE_START_REPLAY;
             RpyInfo *info = replay->info;
             g_stage_data = &g_stage_table[stage];
             g_Globals.character = info->character;
@@ -972,7 +972,7 @@ i32 TitleInf::on_tick()
             g_Globals.difficulty = info->difficulty;
             replay->~ReplayManager();
             operator delete(replay, sizeof(ReplayManager));
-            g_unk_4a6f1c = 1;
+            g_title_return_point = TITLE_RETURN_MAIN;
             g_title_idle_frames = 0;
         }
     }
@@ -1011,13 +1011,13 @@ i32 TitleInf::on_tick()
         anm->disable_vms_from_anm_file(anm->loaded_anms[2]);
         anm->disable_vms_from_anm_file(anm->loaded_anms[0]);
         g_AsciiManager->hide_now_loading();
-        if (g_unk_4a6f1c == 3)
+        if (g_title_return_point == TITLE_RETURN_SCORE_ENTRY)
         {
             menu.num_choices = 10;
             menu.set_cursor(0);
             menu.push();
             set_state(14);
-            g_unk_4a6f1c = 1;
+            g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_score_name_entry();
             break;
@@ -1033,17 +1033,17 @@ i32 TitleInf::on_tick()
             g_Globals.difficulty = g_Globals.difficulty_before_demo;
         }
         g_Globals.flags_hi_45c &= ~1;
-        if (g_unk_4a6f1c == 0)
+        if (g_title_return_point == TITLE_RETURN_FIRST)
         {
             flags_5ce8 |= 2;
             set_state(1);
-            g_unk_4a6f1c = 1;
+            g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_title_screen();
             break;
         }
         flags_5ce8 &= ~2;
-        if (g_unk_4a6f1c == 1)
+        if (g_title_return_point == TITLE_RETURN_MAIN)
         {
             if (g_Globals.difficulty == 4)
             {
@@ -1053,7 +1053,7 @@ i32 TitleInf::on_tick()
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_title_screen();
         }
-        else if (g_unk_4a6f1c == 2)
+        else if (g_title_return_point == TITLE_RETURN_REPLAY_MENU)
         {
             g_Supervisor.play_bgm_wav(0, "th16_01");
             g_Supervisor.play_bgm(0, 0);
@@ -1062,21 +1062,21 @@ i32 TitleInf::on_tick()
             menu.set_cursor(4);
             menu.push();
             set_state(11);
-            g_unk_4a6f1c = 1;
+            g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_replay_menu();
         }
-        else if (g_unk_4a6f1c == 5)
+        else if (g_title_return_point == TITLE_RETURN_SPELL_PRACTICE)
         {
             ScreenEffect::create(9, 30, 0, 0, 0, 0x54);
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             set_state(17);
-            g_unk_4a6f1c = 1;
+            g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_spell_practice_stage_select();
         }
-        else if (g_unk_4a6f1c == 4)
+        else if (g_title_return_point == TITLE_RETURN_PRACTICE)
         {
             ScreenEffect::create(9, 30, 0, 0, 0, 0x54);
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
@@ -1115,7 +1115,7 @@ i32 TitleInf::on_tick()
         do_key_config();
         break;
     case 2:
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_FLAG_2000) ? 2 : 3;
+        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_QUIT;
         g_Supervisor.stop_bgm();
         break;
     case 9:

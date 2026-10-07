@@ -137,7 +137,7 @@ int PauseMenu::on_tick()
     {
     case 0:
         if (!(g_Globals.flags_hi_45c & 1) && !g_GameThread->flags.flag_16 &&
-            ((g_hardware_input_pressed & 0x100) || (g_Supervisor.flags & 0x10)) && g_GameThread->on_tick != NULL &&
+            ((g_hardware_input_pressed & 0x100) || (g_Supervisor.flags & SUPERVISOR_DEVICE_WAS_RESET)) && g_GameThread->on_tick != NULL &&
             (g_GameThread->on_tick->flags & UPDATE_FUNC_ACTIVE) && g_GameThread->time_in_stage.current >= 30)
         {
             open();
@@ -344,7 +344,7 @@ int PauseMenu::on_draw()
         AnmVm *vm = find_child_of(anm_id_1e8, 0x39);
         if (vm != NULL)
         {
-            g_Supervisor.vm_1c4->color_1.d3d = vm->color_1.d3d | 0xff000000;
+            g_Supervisor.arcade_blit_vm_2c->color_1.d3d = vm->color_1.d3d | 0xff000000;
         }
     }
     switch (state)
@@ -456,8 +456,8 @@ void PauseMenu::open()
     take_snapshot();
     saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
-    saved_global_4d9d90 = g_unk_4d9d90;
-    g_unk_4d9d90 = 0;
+    saved_global_4d9d90 = g_frame_pacing.mode;
+    g_frame_pacing.mode = 0;
     Gui *gui = g_Gui;
     if (gui->msg != NULL)
     {
@@ -478,7 +478,7 @@ void game_over_43f500()
     GameThread::update_play_time();
     if (g_GameThread->replay_mode == 1)
     {
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         return;
     }
     g_GameThread->flags.flag_4 = 1;
@@ -500,8 +500,8 @@ void game_over_43f500()
     menu->unk_1fc = 1;
     menu->saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
-    menu->saved_global_4d9d90 = g_unk_4d9d90;
-    g_unk_4d9d90 = 1;
+    menu->saved_global_4d9d90 = g_frame_pacing.mode;
+    g_frame_pacing.mode = 1;
     if (gui->msg != NULL)
     {
         gui->msg->hide();
@@ -583,8 +583,8 @@ void replay_ended_43f240()
     g_SoundManager.modify_bgm(6, 0, "Pause");
     menu->saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
-    menu->saved_global_4d9d90 = g_unk_4d9d90;
-    g_unk_4d9d90 = 0;
+    menu->saved_global_4d9d90 = g_frame_pacing.mode;
+    g_frame_pacing.mode = 0;
     menu->flags_3ec &= ~4;
 }
 
@@ -596,7 +596,7 @@ void pause_menu_43f350()
     GameThread::update_play_time();
     if (g_GameThread->replay_mode == 1)
     {
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         return;
     }
     menu->set_state(2);
@@ -628,8 +628,8 @@ void pause_menu_43f350()
     menu->unk_1fc = 0;
     menu->saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
-    menu->saved_global_4d9d90 = g_unk_4d9d90;
-    g_unk_4d9d90 = 1;
+    menu->saved_global_4d9d90 = g_frame_pacing.mode;
+    g_frame_pacing.mode = 1;
     menu->flags_3ec &= ~4;
 }
 
@@ -664,7 +664,7 @@ void PauseMenu::leave_state_1()
     {
         vm->set_flag_lo_2_tree_inline();
     }
-    g_unk_4d9d90 = saved_global_4d9d90;
+    g_frame_pacing.mode = saved_global_4d9d90;
 }
 
 // FUNCTION: TH16 0x43f740
@@ -1322,11 +1322,11 @@ void PauseMenu::tick_open()
             {
                 if (unk_1fc != 0)
                 {
-                    g_Supervisor.gamemode_to_switch_to = 10;
+                    g_Supervisor.gamemode_to_switch_to = GAMEMODE_RESTART;
                 }
                 else if (g_Globals.stage_num == 7)
                 {
-                    g_Supervisor.gamemode_to_switch_to = 14;
+                    g_Supervisor.gamemode_to_switch_to = GAMEMODE_RETRY_STAGE;
                 }
                 else
                 {
@@ -1373,19 +1373,19 @@ void PauseMenu::tick_open()
                         gui->msg->show();
                     }
                     Gui::sub_42c5c0();
-                    g_unk_4d9d90 = saved_global_4d9d90;
+                    g_frame_pacing.mode = saved_global_4d9d90;
                 }
             }
             break;
         case 1:
             AnmManager::interrupt_tree(anm_id_1e8, 1);
             AnmManager::interrupt_tree(anm_id_1e4, 1);
-            g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+            g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
             break;
         case 4:
             delete_vm_and_clear(anm_id_1e8);
             delete_vm_and_clear(anm_id_1e4);
-            g_Supervisor.gamemode_to_switch_to = g_GameThread->replay_mode != 0 ? 11 : 10;
+            g_Supervisor.gamemode_to_switch_to = g_GameThread->replay_mode != 0 ? GAMEMODE_RESTART_REPLAY : GAMEMODE_RESTART;
             break;
         }
         set_state(0);

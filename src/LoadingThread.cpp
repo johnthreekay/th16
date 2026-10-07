@@ -72,7 +72,7 @@ int LoadingThread::thread_start(void *arg)
             }
         }
     }
-    g_Supervisor.gamemode_to_switch_to = 3;
+    g_Supervisor.gamemode_to_switch_to = GAMEMODE_QUIT;
     t->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
     return 0;
 }
@@ -152,13 +152,13 @@ int LoadingThread::on_tick()
     if (flags & 2)
     {
         g_Supervisor.setup_special_anms();
-        g_unk_4d9d90 = 1;
+        g_frame_pacing.mode = 1;
         g_AsciiManager->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
         g_AsciiManager->on_draw_func_1->flags |= UPDATE_FUNC_ACTIVE;
         g_AsciiManager->on_draw_func_2->flags |= UPDATE_FUNC_ACTIVE;
         g_AsciiManager->on_draw_func_3->flags |= UPDATE_FUNC_ACTIVE;
-        g_Supervisor.flags &= ~0x2000;
-        g_Supervisor.gamemode_to_switch_to = 4;
+        g_Supervisor.flags &= ~SUPERVISOR_IDLE_ON_EXIT;
+        g_Supervisor.gamemode_to_switch_to = GAMEMODE_TITLE;
         flags &= ~2;
     }
     return 1;

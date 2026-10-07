@@ -464,7 +464,7 @@ HARNESS_CALLED i32 SoundManager::open_bgm(const char *path)
     i32 samples_per_sec = format->format.nSamplesPerSec;
     DWORD notify_size = samples_per_sec * block_align * 4 / 8;
     bgm_event = CreateEventA(NULL, FALSE, FALSE, NULL);
-    bgm_thread = CreateThread(NULL, 0, bgm_thread_proc, g_Supervisor.unk_58, 0, &bgm_thread_id);
+    bgm_thread = CreateThread(NULL, 0, bgm_thread_proc, g_Supervisor.main_window, 0, &bgm_thread_id);
     notify_size -= notify_size % block_align;
     if (FAILED(manager->CreateStreaming((CStreamingSound **)&bgm_stream, "thbgm.dat", 0, GUID_NULL, 8, notify_size,
                                         bgm_event, format)))
@@ -569,7 +569,7 @@ HARNESS_CALLED i32 SoundManager::play_preloaded_bgm(i32 slot)
     DWORD notify_size = samples_per_sec * block_align * 4 / 8;
     g_SoundManager.bgm_event = CreateEventA(NULL, FALSE, FALSE, NULL);
     g_SoundManager.bgm_thread =
-        CreateThread(NULL, 0, bgm_thread_proc, g_Supervisor.unk_58, 0, &g_SoundManager.bgm_thread_id);
+        CreateThread(NULL, 0, bgm_thread_proc, g_Supervisor.main_window, 0, &g_SoundManager.bgm_thread_id);
     notify_size -= notify_size % block_align;
     if (FAILED(g_SoundManager.manager->CreateStreamingFromMemory(
             (CStreamingSound **)&g_SoundManager.bgm_stream, g_SoundManager.preload_cursor[slot],

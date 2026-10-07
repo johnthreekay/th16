@@ -1157,7 +1157,7 @@ HARNESS_CALLED void Gui::sub_42c1b0()
 // FUNCTION: TH16 0x42c240
 void show_stage_logo()
 {
-    if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & 1))
+    if (g_Supervisor.gamemode_to_switch_to != GAMEMODE_UNUSED_8 && !(g_Globals.flags_hi_45c & 1))
     {
         g_Gui->stage_logo_anm->create_effect(0, -1, NULL);
     }
@@ -1621,7 +1621,7 @@ void Gui::sub_426d70()
     }
     gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
     gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
-    if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & 1) && g_Globals.game_mode != 2)
+    if (g_Supervisor.gamemode_to_switch_to != GAMEMODE_UNUSED_8 && !(g_Globals.flags_hi_45c & 1) && g_Globals.game_mode != 2)
     {
         create_effect_inline(gui->stage_logo_anm, 1, -1, NULL);
     }
@@ -1643,7 +1643,7 @@ void Gui::sub_426d70()
             vm->entity_pos = pos;
         }
     }
-    if (g_Supervisor.unk_700 != 0)
+    if (g_Supervisor.new_game_started != 0)
     {
         gui->id_104 = create_effect_inline(gui->front_anm, g_Globals.difficulty + 0x51, -1, NULL);
         AnmManager::interrupt_tree(gui->id_104, 3);
@@ -1655,7 +1655,7 @@ void Gui::sub_426d70()
     {
         gui->boss_bars[i].unk_4c = 0;
     }
-    if (g_Supervisor.unk_700 != 0)
+    if (g_Supervisor.new_game_started != 0)
     {
         gui->unk_118 = 0;
         gui->season_gauge_id = create_effect_inline(gui->front_anm, 0x71, -1, NULL);

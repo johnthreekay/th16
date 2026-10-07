@@ -41,7 +41,7 @@ struct RpyGamestate
     // Capture times (Spellcard::time_code) of the stage's spell cards, in
     // the order they ended.
     i32 spell_time_codes[0x14];
-    // Supervisor::unk_700 when the stage began.
+    // Supervisor::new_game_started when the stage began.
     u32 flag_290 : 1;
     u32 flags_290_hi : 31;
 

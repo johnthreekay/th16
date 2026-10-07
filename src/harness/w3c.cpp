@@ -16,14 +16,14 @@ void harness_w3c_expose_screen_globals()
 {
     w3c_stub_sink(&g_resolution_x);
     w3c_stub_sink(&g_resolution_y);
-    w3c_stub_sink(&g_unk_4d9d1c);
+    w3c_stub_sink(&g_window_flags);
 }
 
 // The HUD and title code read these;
 // without a reader LTCG drops the stores.
 i32 harness_w3c_read_hud_origin()
 {
-    return g_arcade_hud_origin_x + g_arcade_hud_origin_y + g_unk_4a6f1c;
+    return g_arcade_hud_origin_x + g_arcade_hud_origin_y + g_title_return_point;
 }
 
 // Like HelpManual::on_tick at 0x42eb62, 0x42ed5c and 0x42eec3.

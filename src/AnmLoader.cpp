@@ -114,7 +114,7 @@ AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *path)
     anm->load_wait = 1;
     do
     {
-        if (g_Supervisor.flags & 0x180)
+        if (g_Supervisor.flags & (SUPERVISOR_QUIT_REQUESTED | SUPERVISOR_FLAG_100))
         {
             break;
         }

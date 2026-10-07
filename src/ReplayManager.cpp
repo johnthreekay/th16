@@ -379,7 +379,7 @@ HARNESS_CALLED void ReplayManager::start_stage()
         g_replay_unsafe_rng.seed = gamestate->rng_state;
         g_replay_safe_rng.generation_count = 0;
         gamestate->stage = g_Globals.stage_num;
-        gamestate->flag_290 = g_Supervisor.unk_700;
+        gamestate->flag_290 = g_Supervisor.new_game_started;
     }
     else if (mode == REPLAY_PLAYBACK)
     {
@@ -418,7 +418,7 @@ HARNESS_CALLED void ReplayManager::begin_stage()
         RpyGamestate *gamestate = (RpyGamestate *)stage_gamestate_snapshots[g_Globals.stage_num];
         free_chunks(g_Globals.stage_num);
         currently_recording_chunk = new_chunk(g_Globals.stage_num);
-        if (g_Supervisor.unk_700 == 0)
+        if (g_Supervisor.new_game_started == 0)
         {
             memcpy(gamestate->globals, &g_Globals, sizeof(gamestate->globals));
         }
@@ -561,8 +561,8 @@ int ReplayManager::initialize(i32 mode, const char *filename)
         gamestate->stage = g_Globals.stage_num;
         gamestate->rng_state = g_replay_safe_rng.seed;
         g_replay_safe_rng.generation_count = 0;
-        gamestate->flag_290 = g_Supervisor.unk_700;
-        if (g_Supervisor.unk_700)
+        gamestate->flag_290 = g_Supervisor.new_game_started;
+        if (g_Supervisor.new_game_started)
         {
             gamestate->player_pos_subpixel[0] = 0;
             gamestate->player_pos_subpixel[1] = 0;

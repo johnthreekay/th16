@@ -49,11 +49,11 @@ void harness_w3d_title(i32 create)
     }
 }
 
-// Some code in the original takes the address of g_unk_4d9d90, so stores to
+// Some code in the original takes the address of g_frame_pacing.mode, so stores to
 // it stay in order with stores through pointers (TitleInf::thread_start).
 i32 *harness_w3d_unk_4d9d90()
 {
-    return &g_unk_4d9d90;
+    return &g_frame_pacing.mode;
 }
 
 // has_cleared keeps this in ecx: a second object stops LTCG from folding

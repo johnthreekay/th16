@@ -66,7 +66,7 @@ HARNESS_CALLED int FpsCounter::update()
 // FUNCTION: TH16 0x4263e0
 int FpsCounter::draw()
 {
-    if (g_Supervisor.gamemode_to_switch_to == 15 || g_Supervisor.gamemode_to_switch_to == 4)
+    if (g_Supervisor.gamemode_to_switch_to == GAMEMODE_ENDING || g_Supervisor.gamemode_to_switch_to == GAMEMODE_TITLE)
     {
         return UPDATE_FUNC_CONTINUE;
     }
