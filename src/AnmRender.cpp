@@ -223,6 +223,57 @@ i32 __fastcall anm_on_draw_fan(AnmVm *vm)
     return 0;
 }
 
+// Rebuilds the VM's world matrix (scale, then rotation) when needed and
+// puts it, moved to the VM's position, in matrix_184f56c.
+// TODO: ours aligns the frame to 16 for the spilled translation row (movaps); the original keeps an ebp frame with movups.
+// FUNCTION: TH16 0x466f00
+void AnmManager::render_sub_466f00(AnmVm *vm)
+{
+    D3DXMATRIX m;
+    if (!(vm->flags_lo & 0x10000))
+    {
+        vm->matrix_410 = vm->matrix_3d0;
+        vm->matrix_410._11 *= vm->scale_2.x * vm->scale.x;
+        vm->matrix_410._22 *= vm->scale_2.y * vm->scale.y;
+        vm->flags_lo &= ~ANM_VM_SCALE_CHANGED;
+        Float3 rotation = *vm->get_total_rotation();
+        D3DXMATRIX rotation_matrix;
+        if (rotation.x != 0.0f)
+        {
+            D3DXMatrixRotationX(&rotation_matrix, rotation.x);
+            D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+        }
+        if (rotation.y != 0.0f)
+        {
+            D3DXMatrixRotationY(&rotation_matrix, rotation.y);
+            D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+        }
+        if (rotation.z != 0.0f)
+        {
+            D3DXMatrixRotationZ(&rotation_matrix, rotation.z);
+            D3DXMatrixMultiply(&vm->matrix_410, &vm->matrix_410, &rotation_matrix);
+        }
+        vm->flags_lo &= ~ANM_VM_ROTATION_CHANGED;
+    }
+    m = vm->matrix_410;
+    m._41 = vm->entity_pos.x + vm->pos.x + vm->pos_2.x + m._41;
+    if ((vm->flags_hi & ANM_VM_LAYER_KIND_MASK) && vm->unk_5b0 == NULL)
+    {
+        m._41 += g_resolution_x * 0.5f;
+        m._42 += (g_resolution_y - 448.0f) * 0.5f;
+    }
+    m._42 = vm->entity_pos.y + vm->pos.y + vm->pos_2.y + m._42;
+    m._43 = vm->entity_pos.z + vm->pos.z + vm->pos_2.z;
+    if (vm->unk_5b0 != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
+    {
+        AnmVm *parent = vm->unk_5b0;
+        m._41 = parent->entity_pos.x + parent->pos.x + parent->pos_2.x + m._41;
+        m._42 = parent->entity_pos.y + parent->pos.y + parent->pos_2.y + m._42;
+        m._43 = parent->entity_pos.z + parent->pos.z + parent->pos_2.z + m._43;
+    }
+    matrix_184f56c = m;
+}
+
 // FUNCTION: TH16 0x4671b0
 void AnmManager::draw_vm__mode_5(AnmVm *vm)
 {

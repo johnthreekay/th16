@@ -15,11 +15,6 @@ ZunAngle InterpAngle::step()
     return current;
 }
 
-// STUB: TH16 0x466f00
-void AnmManager::render_sub_466f00(AnmVm *vm)
-{
-}
-
 // STUB: TH16 0x465280
 i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 unk)
 {
