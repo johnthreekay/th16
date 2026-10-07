@@ -342,6 +342,20 @@ decompiled code the surroundings it had in the original:
 - /INCLUDE'd accessors make callers spill xmm0 around them; HARNESS_CALLED
   restores the interprocedural register use (get_int_var and friends).
 
+- `pos[1]` (D3DXVECTOR3's `operator FLOAT*`) makes MSVC reload the field
+  after unrelated stores, unlike `pos.y` (the bullet wall bounces). A static
+  helper that stores through a pointer and is inlined forces reloads too,
+  and lookups inside it are not merged across calls.
+- `D3DXVec2Length((D3DXVECTOR2 *)&v)` matches ZUN's speed recomputation;
+  `sqrt(x*x + y*y)` does not.
+- `if (c) f(4); else f(3);` is one call with branching pushes;
+  `f(c ? 4 : 3)` becomes setne/add. Advancing a pointer parameter in place
+  gives `add`, a separate cursor `lea`.
+- Open: in an inlined ZunTimer::tick the original adds the speed into
+  current_f's register (xmm0); ours adds into the speed's (xmm1), and folds
+  the decrement's `* 1.0f`. No source variant found yet; it holds back
+  several bullet ex steps, InterpFloat3::step and Spellcard::on_tick_body.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
