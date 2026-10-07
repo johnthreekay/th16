@@ -20,6 +20,11 @@ FpsCounter::~FpsCounter()
     g_FpsCounter = NULL;
 }
 
+// Once a second: measures the frame rate (counting skipped frames), counts
+// measurements above 65 fps, and while a game runs (not loading or in a
+// menu) adds the second to the actual and expected frame totals that the
+// slowdown rate of replays and scores comes from (above 57 fps counts as
+// a full 60).
 // FUNCTION: TH16 0x4262f0
 HARNESS_CALLED int FpsCounter::update()
 {
@@ -63,6 +68,8 @@ HARNESS_CALLED int FpsCounter::update()
     return UPDATE_FUNC_CONTINUE;
 }
 
+// Draws the frame rate in the bottom right corner (red below 30, pink
+// below 40); not in the ending (game mode 15) or on the title (4).
 // FUNCTION: TH16 0x4263e0
 int FpsCounter::draw()
 {

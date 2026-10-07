@@ -124,7 +124,7 @@ unsigned __stdcall TitleInf::thread_start()
     }
     if (g_LoadingThread != NULL)
     {
-        while (g_LoadingThread->count_638 < 180 && !(g_Supervisor.flags & 0x180))
+        while (g_LoadingThread->draw_count < 180 && !(g_Supervisor.flags & 0x180))
         {
             Sleep(16);
         }

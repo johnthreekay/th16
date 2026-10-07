@@ -21,6 +21,8 @@ LoadingThread::LoadingThread()
 
 i32 load_shared_anms();
 
+// sig.anm goes in ANM slot 1 and text.anm in slot 0. thbgm.dat is opened
+// here unless config flag 0x10 is set (then only its name is kept).
 // FUNCTION: TH16 0x43adc0
 int LoadingThread::thread_start(void *arg)
 {
@@ -29,7 +31,7 @@ int LoadingThread::thread_start(void *arg)
     if (t->sig_anm != NULL)
     {
         t->on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
-        t->count_630 = 1;
+        t->logo_step = 1;
         AsciiInf *ascii = new AsciiInf();
         if (ascii->initialize() != 0)
         {
@@ -43,7 +45,7 @@ int LoadingThread::thread_start(void *arg)
         }
         else
         {
-            t->count_634 = 1;
+            t->now_loading_step = 1;
             g_Supervisor.text_anm = AnmManager::preload_anm(0, "text.anm");
             if (g_Supervisor.text_anm != NULL)
             {
@@ -77,6 +79,7 @@ int LoadingThread::thread_start(void *arg)
     return 0;
 }
 
+// Registers the update functions and starts the thread.
 // FUNCTION: TH16 0x43af60
 int LoadingThread::initialize()
 {
@@ -100,6 +103,8 @@ int LoadingThread::initialize()
 
 i32 unload_shared_anms();
 
+// Unloads what thread_start loaded (sig.anm, the ASCII manager, text.anm)
+// and saves and frees the score file.
 // FUNCTION: TH16 0x43afe0
 LoadingThread::~LoadingThread()
 {
@@ -146,6 +151,9 @@ LoadingThread *LoadingThread::create()
     return t;
 }
 
+// Once the thread has loaded everything (on_tick only becomes active
+// then), sets up the special ANM VMs, starts the ASCII manager and goes to
+// the title (game mode 4).
 // FUNCTION: TH16 0x43b290
 int LoadingThread::on_tick()
 {
@@ -168,12 +176,12 @@ int LoadingThread::on_tick()
 // FUNCTION: TH16 0x43b300
 int LoadingThread::on_draw()
 {
-    if (count_630 == 1)
+    if (logo_step == 1)
     {
         anm_id = sig_anm->create_effect(0, -1, NULL);
-        count_630++;
+        logo_step++;
     }
-    if (count_634 == 1)
+    if (now_loading_step == 1)
     {
         AsciiInf *ascii = g_AsciiManager;
         D3DXVECTOR3 pos(960.0f, 784.0f, 0.0f);
@@ -181,9 +189,9 @@ int LoadingThread::on_draw()
         {
             ascii->now_loading_id = ascii->ascii_anm->create_vm(0x11, &pos, 0.0f, -1, 0);
         }
-        count_634++;
+        now_loading_step++;
     }
-    count_638++;
+    draw_count++;
     return 1;
 }
 

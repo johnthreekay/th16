@@ -2293,10 +2293,10 @@ i32 TitleInf::do_manual()
         HelpManual::create();
         substate = 1;
         time_in_state.reset();
-        g_HelpManual->unk_128 = 128.0f;
+        g_HelpManual->x_offset = 128.0f;
         break;
     case 1:
-        if (g_HelpManual->unk_124 != 0)
+        if (g_HelpManual->closed != 0)
         {
             AnmManager::interrupt_tree(anm_id_73c, 1);
             anm_id_73c.id = 0;

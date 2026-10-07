@@ -1282,9 +1282,9 @@ void PauseMenu::tick_open()
         {
             anm_id_1e4.clear_flag_lo_2_tree();
             HelpManual::create();
-            g_HelpManual->unk_128 = 32.0f;
+            g_HelpManual->x_offset = 32.0f;
         }
-        if (g_HelpManual != NULL && g_HelpManual->unk_124 != 0)
+        if (g_HelpManual != NULL && g_HelpManual->closed != 0)
         {
             HelpManual::destroy();
             set_unk_1f4(6);
