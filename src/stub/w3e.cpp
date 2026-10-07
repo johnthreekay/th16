@@ -5,8 +5,3 @@
 void w3e_opaque_double(double *value)
 {
 }
-
-// STUB: TH16 0x451560
-void TitleInf::load_replay_list()
-{
-}

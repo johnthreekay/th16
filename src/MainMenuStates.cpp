@@ -1,13 +1,17 @@
 // States of the title screen's menus (TitleInf::on_tick dispatches on
 // state).
+#include <direct.h>
 #include <stddef.h>
+#include <stdio.h>
 
 #include "MainMenu.h"
 
 #include "EffectManager.h"
+#include "GameWindow.h"
 #include "Globals.h"
 #include "HelpManual.h"
 #include "Input.h"
+#include "ReplayManager.h"
 #include "SoundManager.h"
 #include "Scorefile.h"
 #include "Spellcard.h"
@@ -21,6 +25,65 @@ i32 __stdcall input_pressed_or_repeating(u32 mask);
 static_assert(offsetof(TitleInf, menu_5cec) == 0x5cec, "TitleInf::menu_5cec");
 static_assert(offsetof(TitleInf, spell_stage) == 0x5dc4, "TitleInf::spell_stage");
 static_assert(offsetof(TitleInf, spell_ids) == 0x5dd0, "TitleInf::spell_ids");
+
+// ReplayManager::create_from_file as LTCG inlined it into the replay list
+// loading.
+static inline ReplayManager *create_replay_inline(const char *filename)
+{
+    ReplayManager *replay = new ReplayManager;
+    replay->mode = REPLAY_LOADED;
+    if (replay->read_replay_file(filename) != 0)
+    {
+        delete replay;
+        return NULL;
+    }
+    return replay;
+}
+
+// Loads the numbered replays (th16_01.rpy to th16_25.rpy) and then the
+// user replays from the replay directory, until stopped through bit 2 of
+// flags_5ce8.
+// FUNCTION: TH16 0x451560
+void TitleInf::load_replay_list()
+{
+    char filename[0x40];
+    WIN32_FIND_DATAA find_data;
+    TitleInf *menu = g_MainMenu;
+
+    for (i32 i = 1; i <= 25; i++)
+    {
+        sprintf(filename, "th16_%.2d.rpy", i);
+        menu->replays[i - 1] = create_replay_inline(filename);
+        if (menu->flags_5ce8 & 4)
+        {
+            break;
+        }
+    }
+    _chdir(g_GameWindow.save_dir);
+    _chdir("replay");
+    HANDLE find = FindFirstFileA("th16_ud????.rpy", &find_data);
+    if (find != INVALID_HANDLE_VALUE)
+    {
+        for (i32 i = 25; i < 75; i++)
+        {
+            _chdir(g_GameWindow.exe_dir);
+            menu->replays[i] = ReplayManager::create_from_file(find_data.cFileName);
+            _chdir(g_GameWindow.save_dir);
+            _chdir("replay");
+            if (menu->flags_5ce8 & 4)
+            {
+                break;
+            }
+            if (!FindNextFileA(find, &find_data))
+            {
+                break;
+            }
+        }
+    }
+    FindClose(find);
+    _chdir(g_GameWindow.exe_dir);
+    menu->flags_5ce8 = (menu->flags_5ce8 & ~4) | 8;
+}
 
 // Stage names for the practice and replay menus, by stage number.
 // GLOBAL: TH16 0x491920

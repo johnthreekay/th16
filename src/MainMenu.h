@@ -39,7 +39,9 @@ class TitleInf : public TaskInf
     ReplayManager *replays[100];
     // Allocated with malloc.
     void *unk_5ce0;
-    u8 unk_5ce4[0x5cec - 0x5ce4];
+    i32 unk_5ce4;
+    // Bit 2 stops the replay list loading; bit 3 is set once it is done.
+    u32 flags_5ce8;
     MenuHelper menu_5cec;
     // Spell practice: the stage and boss attack whose spell cards are
     // listed, and the spell card ids of the listed rows.
