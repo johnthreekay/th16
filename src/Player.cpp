@@ -269,16 +269,16 @@ void Player::lose_life()
         AnmManager::interrupt_tree(inner.main_options[i].anm_id_b4, 1);
     }
     inner.num_main_options = 0;
-    if (g_Spellcard->flags & 1)
+    if (g_Spellcard->flags & SPELLCARD_ACTIVE)
     {
         if (g_Spellcard->time.current >= 60)
         {
             g_Spellcard->bonus = 0;
-            g_Spellcard->flags &= ~0x22;
+            g_Spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_EARLY_BOMB);
         }
         else if (g_MainBomb->in_use == 1)
         {
-            g_Spellcard->flags |= 0x20;
+            g_Spellcard->flags |= SPELLCARD_EARLY_BOMB;
         }
     }
     g_EnemyManager->inner.miss_count++;
@@ -297,16 +297,16 @@ void Player::die()
         g_SoundManager.play_sound_centered(2, 0);
     }
     g_EffectManager->effect_anm->create_vm(0x1d, &inner.pos, 0.0f, -1, 0);
-    if (g_Spellcard->flags & 1)
+    if (g_Spellcard->flags & SPELLCARD_ACTIVE)
     {
         if (g_Spellcard->time.current >= 60)
         {
             g_Spellcard->bonus = 0;
-            g_Spellcard->flags &= ~0x22;
+            g_Spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_EARLY_BOMB);
         }
         else if (g_MainBomb->in_use == 1)
         {
-            g_Spellcard->flags |= 0x20;
+            g_Spellcard->flags |= SPELLCARD_EARLY_BOMB;
         }
     }
     inner.time_in_state.reset();

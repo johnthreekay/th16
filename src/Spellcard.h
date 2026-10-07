@@ -8,6 +8,7 @@
 #include "decomp.h"
 #include "types.h"
 
+// Spellcard::flags.
 enum SpellcardFlags
 {
     SPELLCARD_ACTIVE = 1 << 0,
@@ -15,12 +16,22 @@ enum SpellcardFlags
     SPELLCARD_CAPTURABLE = 1 << 1,
     // The name banner moved out of the player's way.
     SPELLCARD_TEXT_MOVED = 1 << 2,
+    // ECL spellTimeout: a survival card. The bonus does not decay, and
+    // running out of time is not a timeout (SPELLCARD_TIMED_OUT).
     SPELLCARD_NO_BONUS_DECAY = 1 << 3,
+    // Set by ECL 543, which also removes the boss effect; not read.
     SPELLCARD_FLAG_10 = 1 << 4,
-    SPELLCARD_FLAG_20 = 1 << 5,
+    // The player bombed (or was hit while bombing) in the card's first 60
+    // frames: the card stays capturable, but while the bomb lasts the
+    // enemies take a thirtieth of the damage.
+    SPELLCARD_EARLY_BOMB = 1 << 5,
+    // measure_real_time's clock is running.
     SPELLCARD_TIMING = 1 << 6,
-    SPELLCARD_FLAG_80 = 1 << 7,
+    // A non-survival card ran out of time (sound at the end).
+    SPELLCARD_TIMED_OUT = 1 << 7,
     SPELLCARD_TEXT_AT_BOTTOM = 1 << 8,
+    // From StageBoss::spell_flag_200: keeps STAGE_FLAG_1 set after the
+    // card's first second.
     SPELLCARD_FLAG_200 = 1 << 9,
 };
 
@@ -44,9 +55,13 @@ struct Spellcard
     i32 bonus;
     i32 bonus_max;
     i32 timeout;
-    i32 unk_88;
+    // How many cards the stage has had: indexes the replay's
+    // spell_time_codes.
+    i32 cards_in_stage;
     i32 ticks;
-    i32 unk_90;
+    // ticks when the clock stopped: the game time the card took, shown
+    // with its result.
+    i32 frames_taken;
     // Real time (get_runtime) when the card started, and how long it took,
     // rounded to frames. Only 4-byte aligned (see the pack pragma).
     double start_time;

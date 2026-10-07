@@ -657,7 +657,7 @@ void StageInner::step_fog()
     D3DXVECTOR3 d;
     if (fog_kind == 1)
     {
-        if (g_Spellcard != NULL && (g_Spellcard->flags & 1))
+        if (g_Spellcard != NULL && (g_Spellcard->flags & SPELLCARD_ACTIVE))
         {
             goto tick;
         }

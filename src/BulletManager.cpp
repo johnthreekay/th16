@@ -442,11 +442,11 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
     }
     if (mode == 2)
     {
-        if (mgr->cancel_counter_multiple_of(5) && !(g_Spellcard->flags & 1))
+        if (mgr->cancel_counter_multiple_of(5) && !(g_Spellcard->flags & SPELLCARD_ACTIVE))
         {
             g_ItemManager->spawn_item(1, pos, 0, -ZUN_PI / 2.0f, 2.2f, 0, 0);
         }
-        if (!(g_Spellcard->flags & 1))
+        if (!(g_Spellcard->flags & SPELLCARD_ACTIVE))
         {
             g_ItemManager->spawn_item(10, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f,
                                       2.2f, 0, 0);

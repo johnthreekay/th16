@@ -549,9 +549,9 @@ int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage)
 static inline void enemy_play_hit_sound(EnemyData *enemy, i32 low_life_spell, i32 low_life)
 {
     u32 spell_flags = g_Spellcard->flags;
-    if ((enemy->flags_low & (ENEMY_FLAG_BIG_LIFE | ENEMY_FLAG_BOSS)) && (spell_flags & 9) != 9 &&
-        (((spell_flags & 1) && enemy->full->enemy.life.remaining_for_cur_attack < low_life_spell) ||
-         (!(spell_flags & 1) && enemy->full->enemy.life.remaining_for_cur_attack < low_life)))
+    if ((enemy->flags_low & (ENEMY_FLAG_BIG_LIFE | ENEMY_FLAG_BOSS)) && (spell_flags & (SPELLCARD_ACTIVE | SPELLCARD_NO_BONUS_DECAY)) != (SPELLCARD_ACTIVE | SPELLCARD_NO_BONUS_DECAY) &&
+        (((spell_flags & SPELLCARD_ACTIVE) && enemy->full->enemy.life.remaining_for_cur_attack < low_life_spell) ||
+         (!(spell_flags & SPELLCARD_ACTIVE) && enemy->full->enemy.life.remaining_for_cur_attack < low_life)))
     {
         g_SoundManager.play_sound_at_position(0x23, enemy->final_pos.pos.x);
     }
@@ -677,7 +677,7 @@ int EnemyData::step_logic()
         }
         if (life_damage != 0)
         {
-            if ((g_Spellcard->flags & 0x21) == 0x21)
+            if ((g_Spellcard->flags & (SPELLCARD_ACTIVE | SPELLCARD_EARLY_BOMB)) == (SPELLCARD_ACTIVE | SPELLCARD_EARLY_BOMB))
             {
                 life_damage /= 30;
             }
@@ -805,9 +805,9 @@ int EnemyData::step_logic()
         else if (time_in_ecl.current % 4 == 0)
         {
             u32 spell_flags = g_Spellcard->flags;
-            if ((flags_low & (ENEMY_FLAG_BIG_LIFE | ENEMY_FLAG_BOSS)) && (spell_flags & 9) != 9 &&
-                (((spell_flags & 1) && full->enemy.life.remaining_for_cur_attack < 100) ||
-                 (!(spell_flags & 1) && full->enemy.life.remaining_for_cur_attack < 500)))
+            if ((flags_low & (ENEMY_FLAG_BIG_LIFE | ENEMY_FLAG_BOSS)) && (spell_flags & (SPELLCARD_ACTIVE | SPELLCARD_NO_BONUS_DECAY)) != (SPELLCARD_ACTIVE | SPELLCARD_NO_BONUS_DECAY) &&
+                (((spell_flags & SPELLCARD_ACTIVE) && full->enemy.life.remaining_for_cur_attack < 100) ||
+                 (!(spell_flags & SPELLCARD_ACTIVE) && full->enemy.life.remaining_for_cur_attack < 500)))
             {
                 vm->color_2.d3d = 0xff0000ff;
                 vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
@@ -1300,10 +1300,10 @@ const char *EnemyInf::check_time_interrupts()
         enemy.time_in_ecl.reset();
         enemy.flags_low |= ENEMY_FLAG_TIMEOUT;
         Spellcard *spellcard = g_Spellcard;
-        if (!(spellcard->flags & 8))
+        if (!(spellcard->flags & SPELLCARD_NO_BONUS_DECAY))
         {
             enemy.flags_low &= ~ENEMY_FLAG_TIMEOUT;
-            spellcard->flags |= 0x80;
+            spellcard->flags |= SPELLCARD_TIMED_OUT;
             if (spellcard->flags & 1)
             {
                 if (spellcard->time.current >= 60)
@@ -2095,6 +2095,9 @@ static inline void anm_set_scale_2(AnmVm *vm, f32 x, f32 y)
 
 // TODO: register allocation: the original keeps full in ecx (reloading the context from it) and
 // spills vm, with this in edi and vm in ebx.
+// The ECL instructions that change one of the enemy's VMs (the slot is
+// always the first argument). The names are the usual thecl ones; ExpHP
+// groups them as 3xx__anmModify.
 // FUNCTION: TH16 0x4233a0
 void EnemyData::ecl_anm_vm_instr()
 {
@@ -2111,25 +2114,31 @@ void EnemyData::ecl_anm_vm_instr()
     }
     switch ((i16)instr->opcode)
     {
+    // anmRotate(slot, angle)
     case 319:
         vm->rotation.z = full->context.current_context->get_float_arg(1);
         vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         break;
+    // anmScale(slot, x, y)
     case 329:
         anm_set_scale(vm, full->context.current_context->get_float_arg(1), full->context.current_context->get_float_arg(2));
         break;
+    // anmScale2(slot, x, y)
     case 335:
         anm_set_scale_2(vm, full->context.current_context->get_float_arg(1),
                         full->context.current_context->get_float_arg(2));
         break;
+    // anmScaleTime(slot, time, mode, x, y)
     case 330:
         vm->scale_to(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
                      full->context.current_context->get_float_arg(3), full->context.current_context->get_float_arg(4));
         break;
+    // anmColor(slot, r, g, b)
     case 325:
         anm_set_rgb1(vm, full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
                      full->context.current_context->get_int_arg(3));
         break;
+    // anmColorTime(slot, time, mode, r, g, b)
     case 326:
     {
         ZunColor color;
@@ -2140,20 +2149,25 @@ void EnemyData::ecl_anm_vm_instr()
                       &color);
         break;
     }
+    // anmAlpha(slot, alpha)
     case 327:
         vm->color_1.a = full->context.current_context->get_int_arg(1);
         break;
+    // anmAlphaTime(slot, time, mode, alpha)
     case 328:
         vm->fade_alpha1(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
                         full->context.current_context->get_int_arg(3));
         break;
+    // anmAlpha2(slot, alpha)
     case 331:
         vm->color_2.a = full->context.current_context->get_int_arg(1);
         break;
+    // anmAlpha2Time(slot, time, mode, alpha)
     case 332:
         vm->fade_alpha2(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
                         full->context.current_context->get_int_arg(3));
         break;
+    // anmPosTime(slot, time, mode, x, y)
     case 333:
     {
         Float3 goal(full->context.current_context->get_float_arg(3), full->context.current_context->get_float_arg(4),
@@ -2162,9 +2176,11 @@ void EnemyData::ecl_anm_vm_instr()
                          &anm_ids[full->context.current_context->get_int_arg(0)].find_or_clear()->entity_pos, &goal);
         break;
     }
+    // anmLayer(slot, layer)
     case 336:
         vm->set_layer(full->context.current_context->get_int_arg(1));
         break;
+    // anmBlendMode(slot, mode)
     case 337:
         ((AnmVmFlagsLoBits *)&vm->flags_lo)->blend_mode = (u8)full->context.current_context->get_int_arg(1);
         break;

@@ -1935,13 +1935,16 @@ int EnemyData::ecl_run_over_300()
     case 542:
         g_Spellcard->flags |= SPELLCARD_NO_BONUS_DECAY;
         break;
+    // unknown543(): removes the boss effect.
     case 543:
         g_Spellcard->flags |= SPELLCARD_FLAG_10;
         delete_vm_and_clear(g_Spellcard->boss_anm_id);
         break;
+    // unknown567(on): the spell name at the bottom of the screen.
     case 567:
         ((SpellcardFlagBits *)&g_Spellcard->flags)->text_at_bottom = get_int_arg(0);
         break;
+    // unknown544(on): ENEMY_FLAG_8000000.
     case 544:
         ((EnemyFlagsLow *)&flags_low)->unk_27 = get_int_arg(0);
         break;

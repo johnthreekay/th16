@@ -59,11 +59,11 @@ static inline void spellcard_on_bomb()
         if (spellcard->time.current >= 60)
         {
             spellcard->bonus = 0;
-            spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_FLAG_20);
+            spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_EARLY_BOMB);
         }
         else if (g_MainBomb->in_use == 1)
         {
-            spellcard->flags |= SPELLCARD_FLAG_20;
+            spellcard->flags |= SPELLCARD_EARLY_BOMB;
         }
     }
 }
