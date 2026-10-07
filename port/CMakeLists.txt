@@ -23,6 +23,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
+# The game calls the sized operator delete(p, size) by name (AnmVm.cpp,
+# DSUtil.cpp, MainMenu.cpp, WinMain.cpp). GCC declares it in C++14 and
+# later; Clang only from version 19 on unless asked.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-fsized-deallocation)
+endif()
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
