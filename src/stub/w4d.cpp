@@ -7,9 +7,3 @@ i32 Bullet::run_ex()
 {
     return 0;
 }
-
-// STUB: TH16 0x4162d0
-i32 Bullet::step_ex_08()
-{
-    return 0;
-}

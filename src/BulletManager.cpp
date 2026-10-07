@@ -36,6 +36,21 @@ static void __fastcall bullet_sincosmul(Float3 *dst, f32 angle, f32 radius)
     }
 }
 
+// A second copy, which only step_ex_08 calls.
+// FUNCTION: TH16 0x4173a0
+static void __fastcall bullet_sincosmul_2(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
+
 // FUNCTION: TH16 0x411880
 BulletManager::BulletManager()
 {
@@ -1127,6 +1142,87 @@ i32 Bullet::on_tick()
     if (vm1.flags_lo & 1)
     {
         vm1.run();
+    }
+    return 0;
+}
+
+// TODO: ours realigns the frame (and esp, -8) for corner, folds the
+// timer decrement's multiply by 1.0f, and adds pos.x + half the other way.
+// FUNCTION: TH16 0x4162d0
+i32 Bullet::step_ex_08()
+{
+    ex_state[11].timer.decrement(1.0f);
+    if (ex_state[11].ints[0] != 0 &&
+        (outside_range(pos.x, vm_sprite(&vm0)->sprite_width, -192.0f, 192.0f) ||
+         outside_range(pos.y, vm_sprite(&vm0)->sprite_height, 0.0f, 448.0f)))
+    {
+        D3DXVECTOR3 dir;
+        D3DXVECTOR2 corner;
+        bullet_sincosmul_2(&dir, angle, 1.0f);
+        corner.x = (-384.0f - vm_sprite(&vm0)->sprite_width) * 0.5f - pos.x;
+        corner.y = 224.0f - (vm_sprite(&vm0)->sprite_height + 448.0f) * 0.5f - pos.y;
+        D3DXVec2Normalize(&corner, &corner);
+        f32 cross_0 = dir.x * corner.y - dir.y * corner.x;
+        f32 dot_0 = dir.y * corner.y + dir.x * corner.x;
+        corner.x = (vm_sprite(&vm0)->sprite_width + 384.0f) * 0.5f - pos.x;
+        corner.y = 224.0f - (vm_sprite(&vm0)->sprite_height + 448.0f) * 0.5f - pos.y;
+        D3DXVec2Normalize(&corner, &corner);
+        f32 cross_1 = dir.x * corner.y - dir.y * corner.x;
+        f32 dot_1 = dir.y * corner.y + dir.x * corner.x;
+        corner.x = (-384.0f - vm_sprite(&vm0)->sprite_width) * 0.5f - pos.x;
+        corner.y = (vm_sprite(&vm0)->sprite_height + 448.0f) * 0.5f + 224.0f - pos.y;
+        D3DXVec2Normalize(&corner, &corner);
+        f32 cross_2 = dir.x * corner.y - dir.y * corner.x;
+        f32 dot_2 = dir.y * corner.y + dir.x * corner.x;
+        corner.x = (vm_sprite(&vm0)->sprite_width + 384.0f) * 0.5f - pos.x;
+        corner.y = (vm_sprite(&vm0)->sprite_height + 448.0f) * 0.5f + 224.0f - pos.y;
+        D3DXVec2Normalize(&corner, &corner);
+        f32 cross_3 = dir.x * corner.y - dir.y * corner.x;
+        f32 dot_3 = dir.y * corner.y + dir.x * corner.x;
+        f32 best_left = -999.0f;
+        if (0.0f >= cross_0 && dot_0 > best_left && dot_0 >= 0.0f)
+        {
+            best_left = dot_0;
+        }
+        if (0.0f >= cross_1 && dot_1 > best_left && dot_1 >= 0.0f)
+        {
+            best_left = dot_1;
+        }
+        if (0.0f >= cross_2 && dot_2 > best_left && dot_2 >= 0.0f)
+        {
+            best_left = dot_2;
+        }
+        if (0.0f >= cross_3 && dot_3 > best_left && dot_3 >= 0.0f)
+        {
+            best_left = dot_3;
+        }
+        f32 best_right = -999.0f;
+        if (cross_0 >= 0.0f && dot_0 > best_right && dot_0 >= 0.0f)
+        {
+            best_right = dot_0;
+        }
+        if (cross_1 >= 0.0f && dot_1 > best_right && dot_1 >= 0.0f)
+        {
+            best_right = dot_1;
+        }
+        if (cross_2 >= 0.0f && dot_2 > best_right && dot_2 >= 0.0f)
+        {
+            best_right = dot_2;
+        }
+        if (cross_3 >= 0.0f && dot_3 > best_right && dot_3 >= 0.0f)
+        {
+            best_right = dot_3;
+        }
+        if (-998.0f > best_left || -998.0f > best_right)
+        {
+            active_ex_flags ^= 0x100;
+            return 1;
+        }
+    }
+    if (ex_state[11].timer.current <= 0)
+    {
+        active_ex_flags ^= 0x100;
+        return 1;
     }
     return 0;
 }

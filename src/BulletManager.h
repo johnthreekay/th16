@@ -124,7 +124,8 @@ struct Bullet
     void sub_412670();
     // 0x413860. Starts the et_ex transforms that are due.
     i32 run_ex();
-    // 0x4162d0.
+    // 0x4162d0. Keeps the bullet going while it is off screen and still
+    // heading back towards it, for a number of frames at most.
     i32 step_ex_08();
     // 0x414ec0. The first et_ex transform: a speed boost that fades over
     // 16 frames; 1 once it is over.
