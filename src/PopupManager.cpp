@@ -16,6 +16,7 @@ PopupManager::PopupManager()
     flags |= 2;
 }
 
+// Registers the tick and draw callbacks.
 // FUNCTION: TH16 0x449cd0
 int PopupManager::initialize()
 {

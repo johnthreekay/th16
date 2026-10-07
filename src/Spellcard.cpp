@@ -109,6 +109,8 @@ HARNESS_CALLED i32 count_spells_of_difficulty(i32 difficulty)
     return count;
 }
 
+// Draws the bonus (or the failed glyph) and the capture history next to
+// the spell card name.
 // FUNCTION: TH16 0x417d70
 i32 Spellcard::on_draw_body()
 {

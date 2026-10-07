@@ -7,6 +7,7 @@
 #include "EffectManager.h"
 #include "Laser.h"
 
+// Frees the segment and vertex buffers and the node list.
 // FUNCTION: TH16 0x437760
 i32 LaserCurveInf::on_destroy()
 {

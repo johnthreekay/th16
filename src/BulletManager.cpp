@@ -201,6 +201,8 @@ i32 __fastcall BulletManager::on_draw_callback(BulletManager *self)
     return self->on_draw_body();
 }
 
+// Draws the bullets layer by layer, each overlay VM (vm1) under its
+// bullet.
 // FUNCTION: TH16 0x412a60
 i32 BulletManager::on_draw_body()
 {
@@ -423,6 +425,9 @@ HARNESS_CALLED i32 BulletManager::cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3D
     return 0;
 }
 
+// Modes: 0 nothing; 1 and 3 count only; 2 cancel items (a power item every
+// fifth outside spells); 4 a season item (plus a cancel item during a
+// season release); 5 (bombs) a season item every third.
 // FUNCTION: TH16 0x416a00
 HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
 {

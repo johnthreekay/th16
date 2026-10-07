@@ -173,6 +173,7 @@ HARNESS_CALLED BOOL EnemyManager::is_enemy_alive(int id)
     return FALSE;
 }
 
+// The live enemy with the given id, NULL if there is none.
 // FUNCTION: TH16 0x41a9c0
 EnemyInf *EnemyManager::find_enemy_by_id(int id)
 {
@@ -194,6 +195,8 @@ EnemyInf *EnemyManager::find_enemy_by_id(int id)
     return enemy;
 }
 
+// Loads the stage's ECL file, points the first two ANM slots at bullet.anm
+// and the effect ANM, and registers the tick and draw callbacks.
 // FUNCTION: TH16 0x41ae70
 int EnemyManager::initialize(const char *ecl_filename)
 {
@@ -224,6 +227,8 @@ int EnemyManager::initialize(const char *ecl_filename)
     return 0;
 }
 
+// Deletes every enemy, the ECL files and the stage's enemy ANM files
+// (slots 10 to 15).
 // FUNCTION: TH16 0x41b1a0
 EnemyManager::~EnemyManager()
 {
@@ -258,6 +263,7 @@ HARNESS_CALLED EnemyManager *EnemyManager::create(const char *ecl_filename)
     return mgr;
 }
 
+// Unlinks an enemy from the active list (its destructor calls this).
 // FUNCTION: TH16 0x41ade0
 HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
 {
@@ -323,6 +329,8 @@ int EnemyManager::update()
     return UPDATE_FUNC_CONTINUE;
 }
 
+// Runs update unless the game is paused (or GameThread flag_1 or flag_10
+// is set).
 // FUNCTION: TH16 0x41b4f0
 int __fastcall EnemyManager::on_tick_callback(EnemyManager *mgr)
 {
@@ -351,6 +359,8 @@ int __fastcall EnemyManager::on_draw_callback(EnemyManager *mgr)
     return UPDATE_FUNC_CONTINUE;
 }
 
+// The enemy with this id. When the id is gone it returns the last enemy
+// of the list (NULL only for an empty list or id 0).
 // FUNCTION: TH16 0x41b540
 EnemyInf *EnemyRef::get()
 {
@@ -429,6 +439,8 @@ DECOMP_NOINLINE f32 *EnemyData::get_float_arg_ptr(int index)
     return full->context.current_context->get_float_arg_ptr(index);
 }
 
+// The targetable enemy closest to pos within max_dist (homing shots);
+// id 0 if there is none.
 // FUNCTION: TH16 0x425240
 HARNESS_CALLED EnemyRef EnemyManager::find_closest(D3DXVECTOR3 *pos, f32 max_dist)
 {
@@ -833,6 +845,8 @@ int EnemyData::step_logic()
 // GLOBAL: TH16 0x4a6dc0
 EnemyManager *g_EnemyManager;
 
+// Frees the boss slot and the enemy's VMs (unless ENEMY_FLAG_HIGH_4)
+// and its fog.
 // FUNCTION: TH16 0x41ba10
 EnemyInf::~EnemyInf()
 {
@@ -953,6 +967,8 @@ HARNESS_CALLED LaserDataInf *LaserManager::find_by_id(i32 id, i32 unused)
 // GLOBAL: TH16 0x4917b8
 extern EnemyFuncSetFunc const g_ecl_func_sets[3] = {NULL, ecl_funcset_cancel_near_player, ecl_funcset_zero_power};
 
+// Ticks the enemy at its slowdown: game speed is scaled for the tick and
+// the VMs get the same slowdown.
 // FUNCTION: TH16 0x41d1e0
 int EnemyInf::on_tick()
 {
@@ -1163,6 +1179,8 @@ int EnemyInf::die()
     return 1;
 }
 
+// Kills every enemy not protected by ENEMY_FLAGS_SURVIVE_KILL_ALL: death
+// effects, drops and set_death, then ENEMY_FLAG_DELETE.
 // TODO: the inlined tick (tick_mixed) adds speed and current_f the other way round (register choice).
 // FUNCTION: TH16 0x41d900
 void EnemyManager::kill_all()
@@ -1186,6 +1204,7 @@ void EnemyManager::kill_all()
     mgr->inner.time_in_stage.tick_mixed();
 }
 
+// kill_all for the enemies in the given kill_group (ECL 551).
 // TODO: register allocation: the original keeps value in ebx and spills next to the argument slot.
 // FUNCTION: TH16 0x41da30
 void __stdcall EnemyManager::kill_all_in_group(i32 value)
@@ -1486,6 +1505,8 @@ int EnemyData::ecl_enm_create()
     return 0;
 }
 
+// Where an integer ECL variable lives, for assignment; NULL for
+// read-only variables.
 // FUNCTION: TH16 0x423f80
 int *EnemyInf::get_int_global_ptr(int var)
 {
@@ -1546,6 +1567,8 @@ int *EnemyInf::get_int_global_ptr(int var)
     return NULL;
 }
 
+// Where a float ECL variable lives, for assignment; NULL for read-only
+// variables.
 // FUNCTION: TH16 0x424c10
 f32 *EnemyInf::get_float_global_ptr(int var)
 {
@@ -1624,6 +1647,7 @@ f32 *EnemyInf::get_float_global_ptr(int var)
     return NULL;
 }
 
+// The value of an ECL variable (EclVar) as an integer.
 // FUNCTION: TH16 0x423810
 int EnemyInf::get_int_global(int var)
 {
@@ -1864,6 +1888,7 @@ int EnemyInf::get_int_global(int var)
     return 0;
 }
 
+// The value of an ECL variable (EclVar) as a float.
 // FUNCTION: TH16 0x424110
 f32 EnemyInf::get_float_global(int var)
 {

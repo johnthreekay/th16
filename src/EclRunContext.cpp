@@ -11,6 +11,7 @@
 
 static_assert(sizeof(EclRunContext) == 0x11e8, "EclRunContext size");
 
+// The current instruction's integer argument index, resolving variables.
 // TODO: the original checks the stack range with two compares and loads the entry value before its type.
 // FUNCTION: TH16 0x473c90
 i32 EclRunContext::get_int_arg(int index)
@@ -43,6 +44,7 @@ i32 EclRunContext::get_int_arg(int index)
     return ins->args[index].i;
 }
 
+// The current instruction's float argument index, resolving variables.
 // FUNCTION: TH16 0x473d40
 HARNESS_CALLED f32 EclRunContext::get_float_arg(int index)
 {
@@ -127,6 +129,7 @@ HARNESS_CALLED f32 EclRunContext::get_float_arg_given_value(int index, f32 value
     return value;
 }
 
+// get_int_arg, popping a stack reference.
 // TODO: register allocation and the stack range check differ (two compares in the original).
 // FUNCTION: TH16 0x473fe0
 HARNESS_CALLED i32 EclRunContext::pop_int_arg(int index)
@@ -160,6 +163,7 @@ HARNESS_CALLED i32 EclRunContext::pop_int_arg(int index)
     return ins->args[index].i;
 }
 
+// get_float_arg, popping a stack reference.
 // TODO: register allocation differs around the popped entry.
 // FUNCTION: TH16 0x474090
 HARNESS_CALLED f32 EclRunContext::pop_float_arg(int index)
@@ -356,6 +360,7 @@ int SptResourceInf::load_ecl_data(void *data)
     return index;
 }
 
+// Index of the named subroutine (binary search), -1 if there is none.
 // FUNCTION: TH16 0x474740
 int SptResourceInf::find_sub_by_name(const char *name) throw()
 {

@@ -63,6 +63,7 @@ Item::~Item()
 {
 }
 
+// Registers the tick and the two draw callbacks.
 // FUNCTION: TH16 0x42f260
 DECOMP_NOINLINE i32 ItemManager::initialize()
 {
@@ -560,6 +561,7 @@ HARNESS_CALLED void Item::collect_piv(f32 value)
     }
 }
 
+// Clears every item and puts them back on the two free lists.
 // FUNCTION: TH16 0x4184a0
 void ItemManager::destroy_all()
 {

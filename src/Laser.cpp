@@ -268,6 +268,7 @@ void LaserBeamInf::method_8(i32 arg)
     inner.flag_38 = arg;
 }
 
+// Registers the tick and draw callbacks.
 // FUNCTION: TH16 0x431330
 i32 LaserManager::initialize()
 {
@@ -322,6 +323,8 @@ LaserManager *LaserManager::create()
     return mgr;
 }
 
+// Ticks every laser and deletes the cancelled and finished ones (those
+// marked pending_delete a frame later); frozen lasers only check grazes.
 // FUNCTION: TH16 0x431510
 i32 LaserManager::on_tick_body()
 {
@@ -361,6 +364,8 @@ i32 LaserManager::on_tick_body()
     return 1;
 }
 
+// Runs on_tick_body unless the game is paused (at zero game speed while
+// GameThread flag_1 is set).
 // FUNCTION: TH16 0x4316b0
 i32 __fastcall LaserManager::on_tick_callback(LaserManager *mgr)
 {
@@ -383,6 +388,7 @@ i32 __fastcall LaserManager::on_tick_callback(LaserManager *mgr)
     return mgr->on_tick_body();
 }
 
+// Draws every laser not cancelled.
 // FUNCTION: TH16 0x431720
 i32 __fastcall LaserManager::on_draw_callback(LaserManager *mgr)
 {
@@ -545,6 +551,8 @@ LaserInfiniteInner::LaserInfiniteInner()
     speed = 8.0f;
 }
 
+// Draws the laser body, the VM at its tip and, unless unk_7c is set, the
+// one at its origin.
 // FUNCTION: TH16 0x433720
 i32 LaserLineInf::on_draw()
 {

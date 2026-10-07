@@ -6,6 +6,8 @@
 #include "Supervisor.h"
 #include "ZunMath.h"
 
+// Grows the fog towards fog_radius, rebuilds its mesh around final_pos
+// and turns the wave angles.
 // FUNCTION: TH16 0x41cbd0
 void EnemyData::update_fog()
 {
