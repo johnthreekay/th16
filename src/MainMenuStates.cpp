@@ -8,6 +8,7 @@
 #include "HelpManual.h"
 #include "Input.h"
 #include "SoundManager.h"
+#include "Scorefile.h"
 #include "Spellcard.h"
 
 extern u32 g_hardware_input_repeat;
@@ -17,6 +18,76 @@ i32 __stdcall input_pressed_or_repeating(u32 mask);
 static_assert(offsetof(TitleInf, menu_5cec) == 0x5cec, "TitleInf::menu_5cec");
 static_assert(offsetof(TitleInf, spell_stage) == 0x5dc4, "TitleInf::spell_stage");
 static_assert(offsetof(TitleInf, spell_ids) == 0x5dd0, "TitleInf::spell_ids");
+
+// Stage names for the practice and replay menus, by stage number.
+// GLOBAL: TH16 0x491920
+const char *const g_stage_names[10] = {"test   ",  "Stage 1", "Stage 2", "Stage 3", "Stage 4",
+                                       "Stage 5", "Stage 6", "Extra  ", "Clear  ", "ExClear"};
+
+// The stages and practice high scores of stage practice.
+// TODO: the original frame has an unused 4-byte slot and stores pos.y from xmm0 before the loop.
+// FUNCTION: TH16 0x4513c0
+i32 TitleInf::on_draw__practice_stage_select()
+{
+    switch (substate)
+    {
+    case 2:
+    case 3:
+    {
+        Float3 pos(80.0f, 80.0f, 0.0f);
+        g_AsciiManager->draw_shadows = 1;
+        if (time_in_state.current >= 10 || substate == 3)
+        {
+            pos.x = 240.0f;
+            f32 y = 192.0f;
+            pos.y = y;
+            for (i32 stage = 1; stage < 7; stage++)
+            {
+                Scorefile *scorefile = g_Scorefile;
+                if (menu.next_selection == stage - 1)
+                {
+                    if (scorefile->characters[g_Globals.subshot + g_Globals.character]
+                            .practice[g_Globals.difficulty][stage]
+                            .unlocked)
+                    {
+                        if (substate == 3 && time_in_state.current % 4 >= 2)
+                        {
+                            g_AsciiManager->color.d3d = 0xff000000;
+                        }
+                        else
+                        {
+                            g_AsciiManager->color.d3d = 0xffffff00;
+                        }
+                    }
+                    else
+                    {
+                        g_AsciiManager->color.d3d = 0xffdfdfdf;
+                    }
+                }
+                else
+                {
+                    g_AsciiManager->color.d3d = 0xff808080;
+                }
+                ScorefilePractice *practice =
+                    &scorefile->characters[g_Globals.subshot + g_Globals.character].practice[g_Globals.difficulty][stage];
+                if (!practice->unlocked)
+                {
+                    g_AsciiManager->create_stringf(&pos, "%s  ---------", g_stage_names[stage]);
+                }
+                else
+                {
+                    g_AsciiManager->create_stringf(&pos, "%s  %.8d0", g_stage_names[stage], practice->high_score);
+                }
+                pos.y = y += 18.0f;
+            }
+        }
+        g_AsciiManager->color.d3d = 0xffffffff;
+        g_AsciiManager->draw_shadows = 0;
+        break;
+    }
+    }
+    return 1;
+}
 
 // The manual (help.anm), shown until HelpManual says it is done.
 // TODO: the first create_effect call swaps eax and ecx (g_AsciiManager and the result slot).

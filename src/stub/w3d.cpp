@@ -9,12 +9,6 @@ i32 TitleInf::on_tick()
     return 1;
 }
 
-// STUB: TH16 0x4513c0
-i32 TitleInf::on_draw__practice_stage_select()
-{
-    return 1;
-}
-
 // STUB: TH16 0x451d50
 i32 TitleInf::on_draw__replay()
 {
