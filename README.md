@@ -1,27 +1,31 @@
 # th16-decomp
 
 A matching decompilation of 東方天空璋 ～ Hidden Star in Four Seasons (TH16) v1.00a:
-C++ source that compiles back to the same bytes as `th16.exe`.
+C++ source written to compile, with ZUN's own compiler and flags, back to the
+machine code of `th16.exe`, checked function by function. Every function is
+decompiled; 905 of 1207 compile to identical bytes so far.
 
 This repository does not include the game's executable or its data files
 (`th16.dat`, music, the manual); you need your own copy of the game. The
-source does reproduce what compiling back to the same bytes requires: the
-initial contents of the executable's data tables and its string literals.
-`th16.exe` must have SHA-256
+source does reproduce what matching requires: the initial contents of the
+executable's data tables and its string literals. `th16.exe` must have
+SHA-256
 `c11776019f083978e66027e7394dafb1fb9543afca986f28049a49417e341929`.
 
 ## Status
 
-- Every function of the game is decompiled. reccmp compares 1207 functions
-  (the 1214 annotated ones less 7 CRT library functions it skips): 905 are
-  byte-identical and 19 more differ only in instruction scheduling. Its
-  summary line, "1222 / 1222 implemented, 94.06% accuracy", also counts 15
-  SIMD constants, which all match (93.99% over the functions alone); all 26
-  vtables match too.
-- The rest compile to functionally equivalent code. Each carries a one-line
-  `// TODO:` saying what still differs, mostly whole-program register
-  allocation and stack frame alignment; [docs/findings.md](docs/findings.md)
-  has the patterns behind them.
+- 905 of the 1207 functions reccmp compares (75%) are byte-identical, and 19
+  more differ only in instruction scheduling; reccmp skips the 7 annotated
+  CRT library functions. All 26 vtables match.
+- The other 283 compile to functionally equivalent code. Each carries a
+  one-line `// TODO:` saying what still differs, mostly register allocation
+  and stack frame alignment. Those are whole-program decisions, so fixing
+  one function can unmatch another, and some may never match;
+  [docs/findings.md](docs/findings.md) has the patterns behind them.
+- reccmp's summary line, "1222 / 1222 implemented, 94.06% accuracy", is the
+  average instruction similarity per entry, not a share of matching
+  functions. It also counts 15 SIMD constants, which all match (93.99% over
+  the functions alone).
 - Every annotated global holds the original's data (`scripts/check_data.py`:
   199 of 200 match; `g_Supervisor` differs only in defaults its initializer
   clears at startup), and none is a field of another annotated object.
