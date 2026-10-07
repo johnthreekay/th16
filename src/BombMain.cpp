@@ -81,7 +81,7 @@ i32 BombAyaAInf::begin()
     pos.y = 224.0f;
     angle = player->inner.unk_16050 * (1.0f / 128.0f) * 0.017453292f * 0.5f - ZUN_PI / 2;
     speed = player->inner.unk_16050 * (1.0f / 128.0f) * 0.05f;
-    g_SoundManager.play_sound_centered(30, 0);
+    g_SoundManager.play_sound_centered(SE_CH00, 0);
 
     anm_id = player->anm_file->create_vm(14, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm(anm_id);
@@ -138,7 +138,7 @@ i32 BombCirnoAInf::begin()
     Player *player = g_Player;
     pos = player->inner.pos;
     angle = -ZUN_PI / 2;
-    g_SoundManager.play_sound_centered(30, 0);
+    g_SoundManager.play_sound_centered(SE_CH00, 0);
 
     anm_id = player->anm_file->create_vm(10, &pos, 0.0f, -1, 0);
     AnmLoaded *anm = g_Player->anm_file;
@@ -204,7 +204,7 @@ i32 BombMarisaAInf::begin()
     Player *player = g_Player;
     pos = player->inner.pos;
     angle = -ZUN_PI / 2;
-    g_SoundManager.play_sound_centered(49, 0);
+    g_SoundManager.play_sound_centered(SE_NEP00, 0);
 
     anm_id = player->anm_file->create_vm(17, &pos, 0.0f, -1, 0);
     spellcard_on_bomb();
@@ -289,7 +289,7 @@ i32 BombReimuAInf::begin()
 {
     Player *player = g_Player;
     pos = player->inner.pos;
-    g_SoundManager.play_sound_centered(49, 0);
+    g_SoundManager.play_sound_centered(SE_NEP00, 0);
     spellcard_on_bomb();
     g_EnemyManager->inner.bomb_count++;
     if (unk_70 != NULL)
@@ -528,7 +528,7 @@ i32 BombReimuAInf::on_tick()
         if (g_Player->get_damage_source(orb->damage_source)->total_damage_dealt >= 300)
         {
             orb->finish();
-            g_SoundManager.play_sound_at_position(0x1b, orb->pos.x);
+            g_SoundManager.play_sound_at_position(SE_TAN00_3, orb->pos.x);
             ScreenEffect::create_inline(SCREEN_EFFECT_SHAKE, 8, 6, 6, 0, 0);
         }
         else
@@ -581,7 +581,7 @@ void BombReimuAOrb::finish()
     {
         if (active)
         {
-            g_SoundManager.play_sound_at_position(0x1b, pos.x);
+            g_SoundManager.play_sound_at_position(SE_TAN00_3, pos.x);
             g_BulletManager->cancel_radius_as_bomb(&pos, 128.0f, 1);
             g_LaserManager->cancel_in_radius(&pos, 128.0f, 1, 1);
             g_Player->get_damage_source(g_Player->create_damage_source(&pos, 64.0f, 8.0f, 0xb, 100))->flags |= 4;
@@ -610,7 +610,7 @@ void BombReimuAOrbs::finish_all()
             if (orb->active)
             {
                 D3DXVECTOR3 *pos = &orb->pos;
-                g_SoundManager.play_sound_at_position(0x1b, pos->x);
+                g_SoundManager.play_sound_at_position(SE_TAN00_3, pos->x);
                 g_BulletManager->cancel_radius_as_bomb(pos, 128.0f, 1);
                 g_LaserManager->cancel_in_radius_inline(pos, 128.0f, 1, 1);
                 g_Player->get_damage_source(g_Player->create_damage_source(pos, 64.0f, 8.0f, 0xb, 100))->flags |= 4;

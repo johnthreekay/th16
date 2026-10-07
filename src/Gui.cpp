@@ -650,7 +650,7 @@ HARNESS_CALLED i32 GuiMsgVm::run()
             }
             else
             {
-                g_SoundManager.play_sound_centered(0, 0);
+                g_SoundManager.play_sound_centered(SE_PLST00, 0);
             }
             pause_timer.set_value(0);
             next_text_line = 0;
@@ -1740,7 +1740,7 @@ i32 Gui::on_tick_body()
             {
                 if (timer_1b0.current % 4 == 0)
                 {
-                    g_SoundManager.play_sound_centered(0x27, 0);
+                    g_SoundManager.play_sound_centered(SE_KIRA01, 0);
                 }
                 unk_134 -= 1.0f;
                 unk_140 += unk_144;
@@ -1749,7 +1749,7 @@ i32 Gui::on_tick_body()
             {
                 if (timer_1b0.current != 90)
                 {
-                    g_SoundManager.play_sound_centered(0x2f, 0);
+                    g_SoundManager.play_sound_centered(SE_BONUS, 0);
                 }
                 unk_134 = unk_138;
                 unk_140 = unk_13c;
@@ -1833,13 +1833,13 @@ i32 Gui::on_tick_body()
             {
                 vm_94->interrupt_out_of_line(9);
                 vm_98->interrupt_out_of_line(9);
-                g_SoundManager.play_sound_centered(0xc, 0);
+                g_SoundManager.play_sound_centered(SE_TIMEOUT2, 0);
             }
             else if (unk_1d0 < 5)
             {
                 vm_94->interrupt_out_of_line(8);
                 vm_98->interrupt_out_of_line(8);
-                g_SoundManager.play_sound_centered(0xb, 0);
+                g_SoundManager.play_sound_centered(SE_TIMEOUT, 0);
             }
         }
         else if (unk_1d0 > unk_1d8)

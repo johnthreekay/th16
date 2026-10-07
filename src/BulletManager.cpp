@@ -324,7 +324,7 @@ static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
             AnmLoaded *anm = g_BulletManager->bullet_anm;
             g_BulletManager->anm_ids[bullet->index] = anm->create_vm(bullet->cancel_script, &bullet->pos, 0.0f, -1, 0);
         }
-        g_SoundManager.play_sound_at_position(0x47, bullet->pos.x);
+        g_SoundManager.play_sound_at_position(SE_ETBREAK, bullet->pos.x);
         gen_items_from_cancel(&bullet->pos, mode);
     }
     D3DXVECTOR3 delta = bullet->velocity * g_game_speed * 0.5f;

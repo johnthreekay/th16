@@ -294,7 +294,7 @@ void Player::die()
 {
     if (!(inner.flags & 8))
     {
-        g_SoundManager.play_sound_centered(2, 0);
+        g_SoundManager.play_sound_centered(SE_PLDEAD00, 0);
     }
     g_EffectManager->effect_anm->create_vm(0x1d, &inner.pos, 0.0f, -1, 0);
     if (g_Spellcard->flags & 1)
@@ -719,7 +719,7 @@ HARNESS_CALLED void Player::do_graze(Float3 *pos)
     mid.z = 0.0f;
     g_EffectManager->effect_anm->create_vm(0x18, &mid, 0.0f, -1, 0);
     g_PopupManager->generate_small_score_popup(&mid, g_Globals.graze_in_chapter, 0xffc0c0ff);
-    g_SoundManager.play_sound_at_position(0x2a, pos->x);
+    g_SoundManager.play_sound_at_position(SE_GRAZE, pos->x);
     g_ItemManager->spawn_item(0x10, pos, 0,
                               (f32)atan2((double)(pos->y - player->inner.pos.y), (double)(pos->x - player->inner.pos.x)),
                               1.9f, 0, 0);

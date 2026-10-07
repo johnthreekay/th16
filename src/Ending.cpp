@@ -331,7 +331,7 @@ i32 EndingChildF0::run()
             }
             if (g_hardware_input_pressed & 0x80001 || timer_2c.current <= 0)
             {
-                g_SoundManager.play_sound_centered(0, 0);
+                g_SoundManager.play_sound_centered(SE_PLST00, 0);
                 timer_2c.set_value(0);
                 break;
             }
@@ -373,7 +373,7 @@ i32 EndingChildF0::run()
             }
             else
             {
-                g_SoundManager.play_sound_centered(0, 0);
+                g_SoundManager.play_sound_centered(SE_PLST00, 0);
             }
             timer_2c.set_value(0);
             line_index = 0;

@@ -169,7 +169,7 @@ i32 __fastcall sht_on_init_446200(PlayerBullet *bullet)
 {
     Player *player = g_Player;
     bullet->unk_a0 = 0;
-    g_SoundManager.play_sound_at_position(0x14, player->inner.pos.x);
+    g_SoundManager.play_sound_at_position(SE_LAZER02, player->inner.pos.x);
     // The original reuses g_Player across the sound call, which LTCG knows
     // leaves it alone; with the sound code still a placeholder, spell that out.
     PlayerDamageSource *source =
@@ -336,7 +336,7 @@ i32 __fastcall sht_on_hit_446e20(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     bullet->damage_source_index = 0;
     bullet->pos.speed = 0.3f;
     source->pos = bullet->pos;
-    g_SoundManager.play_sound_at_position(0x41, bullet->pos.pos.x);
+    g_SoundManager.play_sound_at_position(SE_MSL2, bullet->pos.pos.x);
     return bullet->unk_9c;
 }
 
@@ -382,7 +382,7 @@ i32 __fastcall sht_on_hit_446f80(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     source->pos = bullet->pos;
     bullet->damage_source()->flags &= ~1;
     bullet->damage_source_index = 0;
-    g_SoundManager.play_sound_at_position(0x41, bullet->pos.pos.x);
+    g_SoundManager.play_sound_at_position(SE_MSL2, bullet->pos.pos.x);
     return bullet->unk_9c;
 }
 

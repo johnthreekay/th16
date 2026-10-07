@@ -256,11 +256,11 @@ i32 BombInf::activate()
     }
     if (is_season)
     {
-        g_SoundManager.play_sound_at_position(77, g_Player->inner.pos.x);
+        g_SoundManager.play_sound_at_position(SE_RELEASE, g_Player->inner.pos.x);
     }
     else
     {
-        g_SoundManager.play_sound_at_position(44, g_Player->inner.pos.x);
+        g_SoundManager.play_sound_at_position(SE_SLASH, g_Player->inner.pos.x);
     }
     begin();
     if (is_season)

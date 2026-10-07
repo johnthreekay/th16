@@ -360,7 +360,7 @@ i32 ItemManager::on_tick_body()
                 case 5:
                     if (g_Globals.collect_extend(0))
                     {
-                        g_SoundManager.play_sound_centered(0x11, 0);
+                        g_SoundManager.play_sound_centered(SE_EXTEND, 0);
                         g_Gui->sub_42bcf0(0, 4);
                     }
                     break;
@@ -388,7 +388,7 @@ i32 ItemManager::on_tick_body()
                     {
                         g_Player->inner.repopulate_options();
                         g_PopupManager->generate_small_score_popup(&item->position, -1, 0xffffff40);
-                        g_SoundManager.play_sound_at_position(0x3f, item->position.x);
+                        g_SoundManager.play_sound_at_position(SE_LGODSGET, item->position.x);
                     }
                     g_Globals.add_to_score(10);
                     Gui::update_season_gauge();
@@ -398,7 +398,7 @@ i32 ItemManager::on_tick_body()
                 }
                 player = g_Player;
             collected:
-                g_SoundManager.play_sound_at_position(0x25, item->position.x);
+                g_SoundManager.play_sound_at_position(SE_ITEM00, item->position.x);
                 item->release();
                 continue;
             }
@@ -623,11 +623,11 @@ i32 Item::spawn_effect()
         g_EffectManager->effect_anm->create_vm(0x65, &position, 0.0f, -1, 0);
         if (item_type == 4 || item_type == 5)
         {
-            g_SoundManager.play_sound_centered(0x4a, 0);
+            g_SoundManager.play_sound_centered(SE_BONUS4, 0);
         }
         else
         {
-            g_SoundManager.play_sound_centered(0x30, 0);
+            g_SoundManager.play_sound_centered(SE_BONUS2, 0);
         }
     }
     return 0;
@@ -739,13 +739,13 @@ void Item::collect_full_power()
         }
         g_Globals.piv = piv;
         g_PopupManager->generate_small_score_popup(&position, 100, 0xff40ff40);
-        g_SoundManager.play_sound_at_position(0xd, position.x);
+        g_SoundManager.play_sound_at_position(SE_POWERUP, position.x);
     }
     if (g_Globals.add_power(g_Globals.max_power))
     {
         g_Player->inner.repopulate_options();
         g_PopupManager->generate_small_score_popup(&position, -1, 0xffffff40);
-        g_SoundManager.play_sound_at_position(0xd, position.x);
+        g_SoundManager.play_sound_at_position(SE_POWERUP, position.x);
     }
 }
 
@@ -794,7 +794,7 @@ void Item::collect_power()
         {
             g_Player->inner.repopulate_options();
             g_PopupManager->generate_small_score_popup(&position, -1, 0xffffff40);
-            g_SoundManager.play_sound_at_position(0xd, position.x);
+            g_SoundManager.play_sound_at_position(SE_POWERUP, position.x);
         }
         value = 100;
     }
@@ -818,7 +818,7 @@ void Item::collect_big_power()
         value = 20000;
         g_Globals.add_to_score(20000);
         g_PopupManager->generate_small_score_popup(&position, 20000, 0xff808080);
-        g_SoundManager.play_sound_at_position(0xd, position.x);
+        g_SoundManager.play_sound_at_position(SE_POWERUP, position.x);
     }
     else
     {
@@ -826,7 +826,7 @@ void Item::collect_big_power()
         if (g_Globals.add_power(g_Globals.power_per_level))
         {
             g_Player->inner.repopulate_options();
-            g_SoundManager.play_sound_at_position(0xd, position.x);
+            g_SoundManager.play_sound_at_position(SE_POWERUP, position.x);
             g_PopupManager->generate_small_score_popup(&position, -1, 0xffffff40);
         }
     }
