@@ -357,7 +357,7 @@ int __fastcall Supervisor::on_draw_55(void *arg)
 }
 
 // FUNCTION: TH16 0x43dc30
-void Supervisor::release_surfaces()
+HARNESS_CALLED void Supervisor::release_surfaces()
 {
     if (g_Supervisor.arcade_surface_0 != NULL)
     {

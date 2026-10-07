@@ -32,7 +32,7 @@ inline void AnmLoadedD3D::create_render_target(i32 width, i32 height)
     bytes_per_pixel = g_Supervisor.present_params.BackBufferFormat == D3DFMT_A8R8G8B8 ? 4 : 2;
 }
 
-// TODO: edi and esi (entry pointer and height) are swapped.
+// TODO: edi and esi (the d3d entry pointer and the height) are swapped.
 // FUNCTION: TH16 0x459640
 HARNESS_CALLED void AnmManager::create_d3d_textures_for_loaded_anms()
 {

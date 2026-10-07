@@ -8,7 +8,7 @@
 // Whole-file write. Returns 0, -1 if the file cannot be created, or -2 on a
 // short write.
 i32 LTCG_FASTCALL file_write(const char *path, const void *data, i32 size);
-BOOL LTCG_FASTCALL file_exists(const char *path);
+DECOMP_NOINLINE BOOL LTCG_FASTCALL file_exists(const char *path);
 
 // Streaming access through one shared handle. Opening takes the file
 // critical section and file_close releases it, so only one file is open

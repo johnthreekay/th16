@@ -17,11 +17,5 @@ int SptResourceInf::load_ecl_data(void *data)
     return 0;
 }
 
-// STUB: TH16 0x45b130
-double LTCG_VECTORCALL get_runtime()
-{
-    return 0.0;
-}
-
 // GLOBAL: TH16 0x4a5244
 InputState g_InputState;

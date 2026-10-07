@@ -10,6 +10,8 @@ enum
     CS_FILE = 2,
     CS_GAME_ERROR_CONTEXT = 3,
     // Guards restarting g_Supervisor.thread.
+    // Guards get_runtime.
+    CS_TIMER = 5,
     CS_SUPERVISOR_THREAD = 6,
     CS_ANM_MANAGER = 9,
     CS_RNG = 10,

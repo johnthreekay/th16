@@ -65,6 +65,8 @@ struct Spellcard
     // it was tampered with). Only called through g_Spellcard, which LTCG
     // put in place of this.
     HARNESS_CALLED void decode_time_code(i32 *seconds, i32 *hundredths);
+    // 0x417bc0. Called once per presented frame.
+    static void sub_417bc0();
 };
 
 // Difficulty (0-3, 4 for Extra) of each spell card.
