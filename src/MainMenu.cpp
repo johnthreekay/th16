@@ -1045,7 +1045,7 @@ i32 TitleInf::on_tick()
         flags_5ce8 &= ~2;
         if (g_unk_4a6f1c == 1)
         {
-            if (g_Globals.difficulty == 4)
+            if (g_Globals.difficulty == DIFFICULTY_EXTRA)
             {
                 menu.set_cursor(1);
             }
@@ -1383,7 +1383,7 @@ i32 TitleInf::do_title_screen()
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             set_state(5);
             menu.push();
-            g_Globals.difficulty = 4;
+            g_Globals.difficulty = DIFFICULTY_EXTRA;
             menu.set_cursor(0);
             return 1;
         case 2:

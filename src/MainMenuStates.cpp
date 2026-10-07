@@ -667,12 +667,12 @@ extern const char *g_stage_names[10];
 // FUNCTION: TH16 0x450af0
 i32 TitleInf::do_subseason_select()
 {
-    i32 script = (g_Globals.difficulty == 4) * 2 + 0x97;
+    i32 script = (g_Globals.difficulty == DIFFICULTY_EXTRA) * 2 + 0x97;
     switch (substate)
     {
     case 0:
         menu.num_choices = 4;
-        if (g_Globals.difficulty == 4)
+        if (g_Globals.difficulty == DIFFICULTY_EXTRA)
         {
             menu.set_cursor(0);
             menu.num_choices = 1;
@@ -699,7 +699,7 @@ i32 TitleInf::do_subseason_select()
         break;
     case 2:
         menu.current_selection = menu.next_selection;
-        if (g_Globals.difficulty != 4)
+        if (g_Globals.difficulty != DIFFICULTY_EXTRA)
         {
             if (input_pressed_or_repeating(INPUT_LEFT))
             {
@@ -759,7 +759,7 @@ i32 TitleInf::do_subseason_select()
     start:
         if (time_in_state.current >= 40)
         {
-            if (g_Globals.difficulty != 4)
+            if (g_Globals.difficulty != DIFFICULTY_EXTRA)
             {
                 g_Globals.subseason = menu.next_selection;
             }
@@ -770,7 +770,7 @@ i32 TitleInf::do_subseason_select()
             menu.push();
             g_Globals.spell_id = -1;
             set_state(2);
-            if (g_Globals.difficulty < 4)
+            if (g_Globals.difficulty < DIFFICULTY_EXTRA)
             {
                 g_stage_data = &g_stage_table[1];
                 g_Globals.stage_num = 1;

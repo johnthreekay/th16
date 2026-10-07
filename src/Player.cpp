@@ -1682,7 +1682,7 @@ i32 Player::on_tick_body()
     inner.time_in_stage.tick();
     inner.timer_3c.tick();
     if (g_Gui->msg == NULL && g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 &&
-        !(*(u32 *)&g_GameThread->flags & 0x4000) && inner.timer_3c.current >= 20 && !(inner.flags & 4) &&
+        !(*(u32 *)&g_GameThread->flags & GAME_THREAD_GAME_CLEARED) && inner.timer_3c.current >= 20 && !(inner.flags & 4) &&
         !(inner.flags & 0x10))
     {
         tick_shooting_state();
