@@ -47,6 +47,18 @@ struct EffectManager
     // the manager through g_EffectManager.
     HARNESS_CALLED i32 track(AnmId id);
 
+    // track as LTCG inlines it into some callers.
+    i32 track_inline(AnmId id)
+    {
+        i32 index = next_index();
+        if (index == -1)
+        {
+            return 0;
+        }
+        anm_ids[index] = id;
+        return index | 0x80000000;
+    }
+
     // create_tracked as LTCG inlines it into some callers.
     i32 create_tracked_inline(i32 effect, D3DXVECTOR3 *pos)
     {

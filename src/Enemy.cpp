@@ -12,6 +12,7 @@
 #include "Laser.h"
 #include "Player.h"
 #include "Rng.h"
+#include "SoundManager.h"
 #include "Supervisor.h"
 #include "UpdateFunc.h"
 
@@ -774,4 +775,59 @@ void EnemyData::update_final_pos()
         }
         abs_pos.pos = final_pos.pos - rel_pos.pos;
     }
+}
+
+// TODO: ours saves ebx/esi after the death sound (shrink-wrapped) and reuses the loaded
+// positions for the atan2 arguments; the original reloads them.
+// FUNCTION: TH16 0x41d520
+int EnemyInf::die()
+{
+    if (enemy.death_sound >= 0)
+    {
+        g_SoundManager.play_sound_at_position(enemy.death_sound, enemy.final_pos.pos.x);
+    }
+    if (enemy.death_anm_script >= 0)
+    {
+        f32 angle = -ZUN_PI / 2;
+        Float3 *pos = &enemy.final_pos.pos;
+        if (!(0.04f > (enemy.last_damage_pos.x - pos->x) * (enemy.last_damage_pos.x - pos->x) +
+                          (enemy.last_damage_pos.y - pos->y) * (enemy.last_damage_pos.y - pos->y)))
+        {
+            angle = zun_atan2f(pos->y - enemy.last_damage_pos.y, pos->x - enemy.last_damage_pos.x);
+        }
+        g_EffectManager->track_inline(g_EnemyManager->anim_statement_anms[enemy.death_anm_index]->create_vm(
+            enemy.death_anm_script, pos, angle, 3, 0));
+    }
+    if (enemy.drop_season.bonus_timer.current <= 0)
+    {
+        enemy.drops.extra_counts[15] = enemy.drop_season.min_count;
+    }
+    else
+    {
+        enemy.drops.extra_counts[15] =
+            (enemy.drops.extra_counts[15] - enemy.drop_season.min_count) * enemy.drop_season.bonus_timer.current /
+                enemy.drop_season.max_time +
+            enemy.drop_season.min_count;
+    }
+    enemy.drops.eject_all_drops(&enemy.final_pos.pos);
+    if (enemy.unk_452c > 0 && enemy.own_chapter == g_Globals.chapter)
+    {
+        g_Globals.enemies_destroyed_in_chapter += enemy.unk_452c;
+        enemy.unk_452c = 0;
+    }
+    if (enemy.set_death[0] != '\0')
+    {
+        free_all_async();
+        reset_run_context();
+        context.current_context->cur_location.subroutine_index = file_manager->find_sub_by_name(enemy.set_death);
+        context.current_context->cur_location.offset_from_first_instruction = 0;
+        context.current_context->time = 0.0f;
+        run_ecl(0.0f);
+        enemy.set_death[0] = '\0';
+    }
+    if (on_death_callback != NULL)
+    {
+        ((void(__fastcall *)(EnemyInf *))on_death_callback)(this);
+    }
+    return 1;
 }

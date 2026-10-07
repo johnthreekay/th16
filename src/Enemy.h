@@ -153,7 +153,7 @@ struct EnemyData
     EnemyLife life;
     EnemyDrop drops;
     i32 unk_3fe0;
-    u32 death_sound;
+    i32 death_sound;
     i32 death_anm_script;
     i32 death_anm_index;
     i32 unk_3ff0;
@@ -219,6 +219,8 @@ class EnemyInf : public SptInf
 
     EnemyInf(const char *sub_name);
     int on_tick();
+    // 0x41d520. Death effects, drops and the set_death subroutine; always 1.
+    int die();
     void set_interrupt(int index, int time, const char *sub);
     void set_timeout(int index, const char *sub);
     virtual int run_over_300();
