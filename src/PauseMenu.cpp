@@ -717,6 +717,13 @@ void PauseMenu::leave_state_3()
 #include "HelpManual.h"
 #include "Player.h"
 
+// ReplayManager::set_end_stage where LTCG inlined it.
+static __forceinline void replay_set_end_stage_inline(ReplayManager *replay, i32 extra_stage)
+{
+    _time64(&replay->info->timestamp);
+    replay->info->stage = extra_stage != 0 ? extra_stage + 7 : g_Globals.stage_num;
+}
+
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 
 // FUNCTION: TH16 0x43f980
@@ -892,7 +899,6 @@ void PauseMenu::tick_open()
             AnmManager::interrupt_tree(anm_id_1e4.search_children(0x81, 0), 6);
             menu_34.set_cursor(1);
             set_unk_1f4(16);
-            return;
         }
         break;
     case 7:
@@ -1177,19 +1183,20 @@ void PauseMenu::tick_open()
         if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
         {
             g_SoundManager.play_sound_centered(9, 0);
-            if (name_cursor != 0)
+            if (name_cursor == 0)
             {
-                name_cursor--;
-                name[name_cursor] = ' ';
-                return;
+                if (unk_1f4 == 12)
+                {
+                    flags_3ec &= ~2;
+                    flags_3ec |= 1;
+                    set_unk_1f4(11);
+                    return;
+                }
+                break;
             }
-            if (unk_1f4 == 12)
-            {
-                flags_3ec &= ~2;
-                flags_3ec |= 1;
-                set_unk_1f4(11);
-                return;
-            }
+            name_cursor--;
+            name[name_cursor] = ' ';
+            return;
         }
         break;
     case 11:
@@ -1225,7 +1232,7 @@ void PauseMenu::tick_open()
             }
             else
             {
-                g_ReplayManager->set_end_stage(0);
+                replay_set_end_stage_inline(g_ReplayManager, 0);
             }
             strcpy(name, g_Scorefile->last_replay_name);
             name_cursor = 0;
@@ -1353,7 +1360,7 @@ void PauseMenu::tick_open()
                     g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
                     g_Globals.score = 0;
                     g_Globals.continues_used++;
-                    if (g_Globals.continues_used > 9)
+                    if (g_Globals.continues_used >= 10)
                     {
                         g_Globals.continues_used = 9;
                     }
