@@ -295,6 +295,99 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
     return 1;
 }
 
+// The high score name entry after a game: the top ten of the character and
+// difficulty played, and while a name is entered, the name and the
+// character grid.
+// TODO: register allocation: the original keeps the index in esi and g_AsciiManager in edx (swapped).
+// FUNCTION: TH16 0x4538b0
+HARNESS_CALLED i32 TitleInf::on_draw__4538b0()
+{
+    switch (substate)
+    {
+    case 2:
+        break;
+    default:
+        return 1;
+    }
+    Float3 pos;
+    pos.x = 22.0f;
+    pos.y = 160.0f;
+    pos.z = 0.0f;
+    i32 difficulty = g_Globals.difficulty;
+    g_AsciiManager->draw_shadows = 1;
+    for (i32 i = 0; i < 10; i++)
+    {
+        g_AsciiManager->color.d3d =
+            unk_5a58 != 0 ? ~(i * 16) | 0xffffff00 : (menu.next_selection != i ? 0xff808040 : 0xffffffff);
+        ScorefileScore *score =
+            &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].scores[difficulty][i];
+        if (score->timestamp != 0)
+        {
+            struct tm *time = localtime(&score->timestamp);
+            g_AsciiManager->create_stringf(&pos, "%2d  %s  %9ld%d  %.4d/%.2d/%.2d %.2d:%.2d %s  %s  %2.1f%%", i + 1,
+                                           score->name, score->score, score->continues_used, time->tm_year + 1900,
+                                           time->tm_mon + 1, time->tm_mday, time->tm_hour, time->tm_min,
+                                           g_season_names[score->subseason], g_stage_names[score->stage],
+                                           score->slowdown);
+        }
+        else
+        {
+            g_AsciiManager->create_stringf(&pos, "%2d  %s  %9ld%d  ----/--/-- --:-- Season  Stage -  ---%%", i + 1,
+                                           score->name, score->score, score->continues_used, score->slowdown);
+        }
+        pos.y += 18.0f;
+    }
+    if (unk_5a58 != 0)
+    {
+        return 1;
+    }
+    pos.x = 58.0f;
+    pos.y = menu.next_selection * 18.0f + 160.0f;
+    pos.z = 0.0f;
+    g_AsciiManager->color.d3d = 0xffffffff;
+    g_AsciiManager->create_stringf(&pos, "%s", replay_name);
+    pos.x = replay_name_cursor * 9 + 58.0f;
+    if (replay_name_cursor == 8)
+    {
+        pos.x -= 9.0f;
+    }
+    g_AsciiManager->color.d3d = 0xffffff00;
+    g_AsciiManager->create_stringf(&pos, "_");
+    pos.x = 212.0f;
+    g_AsciiManager->color.d3d = 0xffffffff;
+    pos.y = 360.0f;
+    pos.z = 0.0f;
+    for (i32 i = 0; i < 91; i++)
+    {
+        g_AsciiManager->color.d3d = menu_5a5c.next_selection == i ? 0xffffff00 : 0xff808080;
+        i32 c;
+        if (i < 88)
+        {
+            c = g_name_entry_chars[i];
+        }
+        else if (i == 88)
+        {
+            c = 0x81;
+        }
+        else
+        {
+            c = (i != 89) + 0x7f;
+        }
+        g_AsciiManager->create_stringf(&pos, "%c", c);
+        if (i % 13 == 12)
+        {
+            pos.x = 212.0f;
+            pos.y += 16.0f;
+        }
+        else
+        {
+            pos.x += 18.0f;
+        }
+    }
+    g_AsciiManager->color.d3d = 0xffffffff;
+    return 1;
+}
+
 // The replay save screen: the 25 slots, then the chosen slot with the name
 // being entered and the character grid.
 // FUNCTION: TH16 0x4541b0

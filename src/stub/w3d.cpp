@@ -15,12 +15,6 @@ i32 TitleInf::on_draw__replay()
     return 1;
 }
 
-// STUB: TH16 0x4538b0
-i32 TitleInf::on_draw__4538b0()
-{
-    return 1;
-}
-
 // STUB: TH16 0x440fb0
 i32 Player::initialize()
 {
