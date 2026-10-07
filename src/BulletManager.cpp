@@ -838,3 +838,32 @@ i32 Bullet::step_ex_12()
     }
     return 0;
 }
+
+// TODO: the original stores pos.z after loading the angle, and the inlined
+// timer tick keeps the frame in xmm0 (ours xmm1).
+// FUNCTION: TH16 0x415f90
+i32 Bullet::step_ex_17()
+{
+    if (ex_state[8].timer.current >= ex_state[8].ints[0])
+    {
+        pos = *(D3DXVECTOR3 *)&ex_state[8].floats[5];
+        active_ex_flags &= ~0x20000;
+        speed = ex_state[8].floats[0];
+        bullet_sincosmul(&velocity, angle, speed);
+        velocity.z = 0.0f;
+        return 1;
+    }
+    if (ex_state[8].timer.current == 0)
+    {
+        ex_move_i.initial = pos;
+    }
+    D3DXVECTOR3 prev = pos;
+    velocity = ex_move_i.step() - prev;
+    if (fabsf(velocity.x) > 0.0001f || fabsf(velocity.y) > 0.0001f)
+    {
+        angle = wrap_angle(atan2(velocity.y, velocity.x));
+    }
+    velocity.z = 0.0f;
+    ex_state[8].timer.tick();
+    return 0;
+}

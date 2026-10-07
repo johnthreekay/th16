@@ -143,6 +143,9 @@ struct Bullet
     // 0x415d80. Wraps the bullet around to the other side once it has left
     // the playfield, some number of times.
     i32 step_ex_12();
+    // 0x415f90. Moves to a position along ex_move_i, then continues at the
+    // given speed.
+    i32 step_ex_17();
 
     // ZUN's angle is a ZunAngle; some transforms call its operators.
     ZunAngle &angle_ref()

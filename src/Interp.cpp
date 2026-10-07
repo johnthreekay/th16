@@ -165,7 +165,7 @@ HARNESS_CALLED f32 InterpFloat::step()
     {
         // Constant acceleration: goal is added to the step.
         initial += bezier_2;
-        bezier_2 += goal;
+        bezier_2 = bezier_2 + goal;
         current = initial;
         return current;
     }
@@ -233,7 +233,7 @@ i32 InterpInt::step()
     else if (method == 17)
     {
         initial += bezier_2;
-        bezier_2 += goal;
+        bezier_2 = bezier_2 + goal;
         current = initial;
         return current;
     }
@@ -295,6 +295,63 @@ D3DXVECTOR2 InterpFloat2::step()
         f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
         f32 c_bezier_2 = (t - 1.0f) * t * t;
         current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+    }
+    else
+    {
+        f32 x = interp_common_methods(method, time.current_f, (f32)end_time);
+        current = (goal - initial) * x + initial;
+    }
+    return current;
+}
+
+// TODO: the timer tick and the bezier terms differ in register allocation,
+// and method 17 loads goal.x before bezier_2.x.
+// FUNCTION: TH16 0x406e10
+D3DXVECTOR3 InterpFloat3::step()
+{
+    if (end_time > 0)
+    {
+        time.tick();
+        if (time.current >= end_time)
+        {
+            time.set(end_time);
+            end_time = 0;
+            if (method == 7 || method == 17)
+            {
+                return initial;
+            }
+            return goal;
+        }
+    }
+    else if (end_time == 0)
+    {
+        if (method == 7 || method == 17)
+        {
+            return initial;
+        }
+        return goal;
+    }
+    if (method == 7)
+    {
+        D3DXVECTOR3 tmp = initial;
+        initial = goal + tmp;
+        current = initial;
+    }
+    else if (method == 17)
+    {
+        D3DXVECTOR3 tmp = initial;
+        initial = tmp + bezier_2;
+        bezier_2 = bezier_2 + goal;
+        current = initial;
+    }
+    else if (method == 8)
+    {
+        f32 t = time.current_f / (f32)end_time;
+        f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
+        f32 c_goal = t * t * (3.0f - 2.0f * t);
+        f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
+        f32 c_bezier_2 = (t - 1.0f) * t * t;
+        current = goal * c_goal + initial * c_initial + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
     }
     else
     {
@@ -399,7 +456,7 @@ D3DXVECTOR3 InterpStrange1::step()
         {
             D3DXVECTOR3 tmp = initial;
             initial = bezier_2 + tmp;
-            bezier_2 = goal + bezier_2;
+            bezier_2 = bezier_2 + goal;
             current = initial;
         }
         else if (method_for_3d == 8)
@@ -485,7 +542,7 @@ Int3 InterpInt3::step()
     {
         Int3 tmp = initial;
         initial = tmp + bezier_2;
-        bezier_2 = goal + bezier_2;
+        bezier_2 = bezier_2 + goal;
         current = initial;
     }
     else if (method == 8)
