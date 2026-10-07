@@ -1256,6 +1256,7 @@ done:
 
 // Steps the VM by one frame, at the game speed scaled down by the
 // slowdown of the VM (or its root). 1 once the VM should be deleted.
+// TODO: same cases and layout; differs in the saved game speed's stack slot (0x64, original 0x34), fsetRand sharing fsetMod's store tail, eax/ecx swaps in 106/112/130/131, the GameThread check's branch sense and the entity_pos.z add order.
 // FUNCTION: TH16 0x45f980
 i32 AnmVm::run()
 {
