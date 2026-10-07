@@ -54,7 +54,7 @@ void LaserInfiniteInf::run_ex()
 // 2 if a circle at pos touches the laser's rectangle, else 0.
 // TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
 // FUNCTION: TH16 0x436ef0
-i32 LaserInfiniteInf::method_30(Float3 *pos, f32 radius)
+i32 LaserInfiniteInf::touches_circle(Float3 *pos, f32 radius)
 {
     f32 dx = pos->x - position.x;
     f32 dy = pos->y - position.y;

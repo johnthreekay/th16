@@ -337,7 +337,7 @@ i32 LaserCurveInf::cancel(i32 mode, i32 b)
 // 2 if a circle at pos touches the laser's rectangle, else 0.
 // TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
 // FUNCTION: TH16 0x43a760
-i32 LaserCurveInf::method_30(Float3 *pos, f32 radius)
+i32 LaserCurveInf::touches_circle(Float3 *pos, f32 radius)
 {
     f32 dx = pos->x - position.x;
     f32 dy = pos->y - position.y;
@@ -361,7 +361,7 @@ i32 LaserCurveInf::method_30(Float3 *pos, f32 radius)
 // 0x100 and returns 1.
 // TODO: the original keeps the multiply of the speed by 1.0f (see ZunTimer::operator--).
 // FUNCTION: TH16 0x439730
-i32 LaserCurveInf::method_60()
+i32 LaserCurveInf::step_ex_offscreen()
 {
     ex_state[11].timer.decrement(1.0f);
     if (ex_state[11].timer.current <= 0)

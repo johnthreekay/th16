@@ -25,7 +25,7 @@ i32 LaserLineInf::on_destroy()
 // 2 if a circle at pos touches the laser's rectangle, else 0.
 // TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
 // FUNCTION: TH16 0x434f70
-i32 LaserLineInf::method_30(Float3 *pos, f32 radius)
+i32 LaserLineInf::touches_circle(Float3 *pos, f32 radius)
 {
     f32 dx = pos->x - position.x;
     f32 dy = pos->y - position.y;
@@ -43,9 +43,9 @@ i32 LaserLineInf::method_30(Float3 *pos, f32 radius)
     return 2;
 }
 
-// The same et_ex step as LaserCurveInf::method_3c.
+// The same et_ex step as LaserCurveInf::step_ex_accel.
 // FUNCTION: TH16 0x432dc0
-i32 LaserLineInf::method_3c()
+i32 LaserLineInf::step_ex_accel()
 {
     BulletExState *st = &ex_state[1];
     if (st->timer.current >= st->ints[0])

@@ -90,24 +90,31 @@ class LaserDataInf
     virtual i32 on_draw();
     // Called right before LaserManager deletes the laser.
     virtual i32 on_destroy();
-    virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
+    // ExpHP: method_1c. Adds a damage value to g_LaserManager's
+    // rect_damage_sum for each point of the laser inside a rotated
+    // rectangle (only the infinite laser's version is called).
+    virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
     virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
     virtual i32 method_2c(i32 a, i32 b, i32 c, i32 d);
-    virtual i32 method_30(Float3 *pos, f32 radius);
+    // ExpHP: method_30. 2 if a circle at pos touches the laser, else 0.
+    virtual i32 touches_circle(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
-    virtual i32 method_38();
-    virtual i32 method_3c();
-    virtual i32 method_40();
-    virtual i32 method_44();
-    virtual i32 method_48();
-    virtual i32 method_4c();
-    virtual i32 method_50();
-    virtual i32 method_54();
+    // The et_ex steps (ExpHP: method_38 to method_60), as Bullet::step_ex_NN
+    // for the BulletExType of the same name; BULLET_EX_ANGLE picks one of
+    // three by its mode (ex_state[3].ints[3]: 0, 1 or 4).
+    virtual i32 step_ex_speedup();
+    virtual i32 step_ex_accel();
+    virtual i32 step_ex_angle_accel();
+    virtual i32 step_ex_angle();
+    virtual i32 step_ex_angle_mode_4();
+    virtual i32 step_ex_angle_mode_1();
+    virtual i32 step_ex_bounce();
+    virtual i32 step_ex_wrap();
     virtual i32 method_58();
     virtual i32 method_5c();
-    virtual i32 method_60();
+    virtual i32 step_ex_offscreen();
     // Only LaserLineInf implements it, returning a heap copy of itself.
     virtual LaserDataInf *clone();
 
@@ -191,15 +198,15 @@ class LaserLineInf : public LaserDataInf
     virtual i32 on_tick();
     virtual i32 on_draw();
     virtual i32 on_destroy();
-    virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
+    virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
     virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(Float3 *pos, f32 radius);
+    virtual i32 touches_circle(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
-    virtual i32 method_3c();
-    virtual i32 method_44();
-    virtual i32 method_50();
+    virtual i32 step_ex_accel();
+    virtual i32 step_ex_angle();
+    virtual i32 step_ex_bounce();
     virtual LaserDataInf *clone();
 
     // Sprite mapping callback 2 of the line laser VMs: the sprite of the
@@ -263,11 +270,11 @@ class LaserInfiniteInf : public LaserDataInf
     virtual i32 on_tick();
     virtual i32 on_draw();
     virtual i32 on_destroy();
-    virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
+    virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
     virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(Float3 *pos, f32 radius);
+    virtual i32 touches_circle(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
 };
 
@@ -385,16 +392,16 @@ class LaserCurveInf : public LaserDataInf
     virtual i32 on_tick();
     virtual i32 on_draw();
     virtual i32 on_destroy();
-    virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
+    virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
     virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
     virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(Float3 *pos, f32 radius);
+    virtual i32 touches_circle(Float3 *pos, f32 radius);
     virtual i32 check_graze_or_kill(i32 a);
-    virtual i32 method_3c();
-    virtual i32 method_40();
-    virtual i32 method_44();
-    DECOMP_NOINLINE virtual i32 method_60();
+    virtual i32 step_ex_accel();
+    virtual i32 step_ex_angle_accel();
+    virtual i32 step_ex_angle();
+    DECOMP_NOINLINE virtual i32 step_ex_offscreen();
 
     HARNESS_CALLED LaserCurveNode *append_node(f32 value);
 
@@ -450,9 +457,9 @@ class LaserBeamInf : public LaserDataInf
     virtual i32 on_tick();
     virtual i32 on_draw();
     virtual i32 on_destroy();
-    virtual i32 method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
+    virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
     virtual i32 cancel(i32 mode, i32 b);
-    virtual i32 method_30(Float3 *pos, f32 radius);
+    virtual i32 touches_circle(Float3 *pos, f32 radius);
 };
 
 // Placeholder virtual methods (not decompiled yet) live in the laser .cpp
@@ -483,9 +490,9 @@ struct LaserManager
     Float3 cancel_pos;
     Float3 cancel_pos_2;
     AnmLoaded *bullet_anm;
-    // Summed by the method_1c variants: 18 to 22 for each point of a laser
-    // inside their rectangle, by laser width. Nothing reads it.
-    i32 unk_608;
+    // Summed by the sum_rect_damage variants: 18 to 22 for each point of a
+    // laser inside their rectangle, by laser width. Nothing reads it.
+    i32 rect_damage_sum;
     u8 unk_60c[4];
 
     LaserManager();

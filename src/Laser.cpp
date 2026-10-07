@@ -100,7 +100,7 @@ i32 LaserDataInf::on_destroy()
 }
 
 // FUNCTION: TH16 0x430e90
-i32 LaserDataInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
+i32 LaserDataInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 {
     return 0;
 }
@@ -130,7 +130,7 @@ i32 LaserDataInf::method_2c(i32 a, i32 b, i32 c, i32 d)
 }
 
 // FUNCTION: TH16 0x430ee0
-i32 LaserDataInf::method_30(Float3 *pos, f32 radius)
+i32 LaserDataInf::touches_circle(Float3 *pos, f32 radius)
 {
     return 0;
 }
@@ -142,49 +142,49 @@ i32 LaserDataInf::check_graze_or_kill(i32 a)
 }
 
 // FUNCTION: TH16 0x430f00
-i32 LaserDataInf::method_38()
+i32 LaserDataInf::step_ex_speedup()
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x430f10
-i32 LaserDataInf::method_3c()
+i32 LaserDataInf::step_ex_accel()
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x430f20
-i32 LaserDataInf::method_40()
+i32 LaserDataInf::step_ex_angle_accel()
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x430f30
-i32 LaserDataInf::method_44()
+i32 LaserDataInf::step_ex_angle()
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x430f40
-i32 LaserDataInf::method_48()
+i32 LaserDataInf::step_ex_angle_mode_4()
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x430f50
-i32 LaserDataInf::method_4c()
+i32 LaserDataInf::step_ex_angle_mode_1()
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x430f60
-i32 LaserDataInf::method_50()
+i32 LaserDataInf::step_ex_bounce()
 {
     return 0;
 }
 
 // FUNCTION: TH16 0x430f70
-i32 LaserDataInf::method_54()
+i32 LaserDataInf::step_ex_wrap()
 {
     return 0;
 }
@@ -202,7 +202,7 @@ i32 LaserDataInf::method_5c()
 }
 
 // FUNCTION: TH16 0x430fa0
-i32 LaserDataInf::method_60()
+i32 LaserDataInf::step_ex_offscreen()
 {
     return 0;
 }
@@ -597,7 +597,7 @@ i32 LaserLineInf::on_draw()
 // by the game speed) and turns it to face its direction of motion, until
 // the step's time runs out.
 // FUNCTION: TH16 0x4395b0
-i32 LaserCurveInf::method_3c()
+i32 LaserCurveInf::step_ex_accel()
 {
     BulletExState *st = &ex_state[1];
     if (st->timer.current >= st->ints[0])
@@ -620,7 +620,7 @@ i32 LaserCurveInf::method_3c()
 // it, until the step's time runs out.
 // TODO: the original loads floats[0] before storing the new angle (scheduling; wrap_angle or reading floats[0] first do not help).
 // FUNCTION: TH16 0x439460
-i32 LaserCurveInf::method_40()
+i32 LaserCurveInf::step_ex_angle_accel()
 {
     BulletExState *st = &ex_state[2];
     if (st->timer.current >= st->ints[0])
@@ -678,7 +678,7 @@ static __forceinline void allocate_line_laser_inline(void *params)
 // wall, with ex_state[4].floats[0] as its speed (none with bit 0x10), and
 // the step ends. 1 if the laser bounced.
 // FUNCTION: TH16 0x432620
-i32 LaserLineInf::method_50()
+i32 LaserLineInf::step_ex_bounce()
 {
     Float3 tip;
     laser_sincosmul(&tip, angle, hit_length);
@@ -757,9 +757,9 @@ i32 LaserLineInf::method_50()
 }
 
 // The same et_ex step for straight lasers.
-// TODO: as LaserCurveInf::method_44: the new angle in xmm0 (ours xmm1), ints[2] incremented later, current_f added into the speed register.
+// TODO: as LaserCurveInf::step_ex_angle: the new angle in xmm0 (ours xmm1), ints[2] incremented later, current_f added into the speed register.
 // FUNCTION: TH16 0x432c20
-i32 LaserLineInf::method_44()
+i32 LaserLineInf::step_ex_angle()
 {
     f32 len;
     if (ex_state[3].timer.current >= ex_state[3].ints[0])
@@ -794,7 +794,7 @@ i32 LaserLineInf::method_44()
 // and gives it a new length; after ints[1] rounds the step ends.
 // TODO: the original keeps the new angle in xmm0 (ours xmm1), increments ints[2] later and adds current_f into the speed register in the timer tick.
 // FUNCTION: TH16 0x4392c0
-i32 LaserCurveInf::method_44()
+i32 LaserCurveInf::step_ex_angle()
 {
     f32 len;
     if (ex_state[3].timer.current >= ex_state[3].ints[0])
@@ -1043,7 +1043,7 @@ i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i3
     return count;
 }
 
-// collision_test_circle_rect as LTCG inlined it into the method_1c
+// collision_test_circle_rect as LTCG inlined it into the sum_rect_damage
 // variants.
 static __forceinline i32 test_circle_rect_inline(f32 rect_x, f32 rect_y, f32 w, f32 h, f32 angle, f32 circle_x,
                                                  f32 circle_y, f32 radius)
@@ -1087,7 +1087,7 @@ static __forceinline i32 test_circle_rect_inline(f32 rect_x, f32 rect_y, f32 w, 
     return 0;
 }
 
-// The first boss, as the method_1c variants look it up (inlined
+// The first boss, as the sum_rect_damage variants look it up (inlined
 // find_enemy_by_id).
 static __forceinline EnemyInf *laser_boss()
 {
@@ -1103,11 +1103,11 @@ static __forceinline AnmLoadedSprite *laser_boss_sprite()
 
 static_assert(offsetof(EnemyInf, enemy.anm_ids) == 0x1330, "EnemyInf::enemy.anm_ids");
 
-// Never called. LaserInfiniteInf::method_1c for a straight laser: the boss
+// Never called. LaserInfiniteInf::sum_rect_damage for a straight laser: the boss
 // is only tested when it exists, and the damage per point also depends on
-// the laser's length, as in LaserCurveInf::method_1c.
+// the laser's length, as in LaserCurveInf::sum_rect_damage.
 // FUNCTION: TH16 0x434010
-i32 LaserLineInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
+i32 LaserLineInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 {
     Float3 *pos = (Float3 *)a;
     Float3 *size = (Float3 *)b;
@@ -1175,7 +1175,7 @@ i32 LaserLineInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
             {
                 damage = (i32)((width - 16.0f) / 80.0f * 3.0f + damage + 1.0f);
             }
-            g_LaserManager->unk_608 += damage;
+            g_LaserManager->rect_damage_sum += damage;
         }
         world_y += step.y;
         world_x += step.x;
@@ -1189,12 +1189,12 @@ i32 LaserLineInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 // clear, sets it once a point is within 8 units of the boss's sprite (at
 // three quarters size). Counts the points inside the rectangle at pos (size,
 // turned by rect_angle) and adds a damage value by laser width for each to
-// g_LaserManager->unk_608. Its own points move only 8 units per step in
+// g_LaserManager->rect_damage_sum. Its own points move only 8 units per step in
 // the rectangle's frame. The parameters are pos, size, rect_angle, unused,
 // e (skip while ex_invuln_remaining_frames runs) and boss_hit.
 // TODO: register allocation differs (the original keeps this in edi, size in esi); it multiplies the sprite sizes before zun_sinf and squares each corner distance again, as in collision_test_circle_rect.
 // FUNCTION: TH16 0x436010
-i32 LaserInfiniteInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
+i32 LaserInfiniteInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 {
     Float3 *pos = (Float3 *)a;
     Float3 *size = (Float3 *)b;
@@ -1252,7 +1252,7 @@ i32 LaserInfiniteInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
             {
                 damage = (i32)((width - 16.0f) / 80.0f * 3.0f + damage + 1.0f);
             }
-            g_LaserManager->unk_608 += damage;
+            g_LaserManager->rect_damage_sum += damage;
         }
         local_x += local_step.x;
         world_x += step.x;
@@ -1262,13 +1262,13 @@ i32 LaserInfiniteInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
     return count;
 }
 
-// Never called. LaserInfiniteInf::method_1c for the segments of a curvy
+// Never called. LaserInfiniteInf::sum_rect_damage for the segments of a curvy
 // laser: sets *boss_hit once a segment is within 8 units of the boss's
 // sprite, and counts the segments inside the rectangle, adding a damage
-// value by laser length and width for each to g_LaserManager->unk_608.
-// TODO: as LaserInfiniteInf::method_1c; ours also keeps g_EnemyManager in edi across the loop where the original reloads it.
+// value by laser length and width for each to g_LaserManager->rect_damage_sum.
+// TODO: as LaserInfiniteInf::sum_rect_damage; ours also keeps g_EnemyManager in edi across the loop where the original reloads it.
 // FUNCTION: TH16 0x439d60
-i32 LaserCurveInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
+i32 LaserCurveInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 {
     Float3 *center = (Float3 *)a;
     Float3 *size = (Float3 *)b;
@@ -1325,7 +1325,7 @@ i32 LaserCurveInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
             {
                 damage = (i32)((width - 16.0f) / 80.0f * 3.0f + damage + 1.0f);
             }
-            g_LaserManager->unk_608 += damage;
+            g_LaserManager->rect_damage_sum += damage;
         }
     }
     return count;
@@ -2611,38 +2611,38 @@ i32 LaserLineInf::on_tick()
         again = 0;
         if (ex_flags & BULLET_EX_SPEEDUP)
         {
-            again = method_38();
+            again = step_ex_speedup();
         }
         if (ex_flags & BULLET_EX_ACCEL)
         {
-            again += method_3c();
+            again += step_ex_accel();
         }
         if (ex_flags & BULLET_EX_ANGLE_ACCEL)
         {
-            again += method_40();
+            again += step_ex_angle_accel();
         }
         if (ex_flags & BULLET_EX_ANGLE)
         {
             switch (ex_state[3].ints[3])
             {
             case 0:
-                again += method_44();
+                again += step_ex_angle();
                 break;
             case 1:
-                again += method_4c();
+                again += step_ex_angle_mode_1();
                 break;
             case 4:
-                again += method_48();
+                again += step_ex_angle_mode_4();
                 break;
             }
         }
         if (ex_flags & BULLET_EX_BOUNCE)
         {
-            again += method_50();
+            again += step_ex_bounce();
         }
         if (ex_flags & BULLET_EX_WRAP)
         {
-            again += method_54();
+            again += step_ex_wrap();
         }
         if ((i32)ex_flags < 0)
         {
@@ -2744,42 +2744,42 @@ i32 LaserCurveInf::on_tick()
         again = 0;
         if (ex_flags & BULLET_EX_SPEEDUP)
         {
-            again = method_38();
+            again = step_ex_speedup();
         }
         if (ex_flags & BULLET_EX_ACCEL)
         {
-            again += method_3c();
+            again += step_ex_accel();
         }
         if (ex_flags & BULLET_EX_ANGLE_ACCEL)
         {
-            again += method_40();
+            again += step_ex_angle_accel();
         }
         if (ex_flags & BULLET_EX_ANGLE)
         {
             switch (ex_state[3].ints[3])
             {
             case 0:
-                again += method_44();
+                again += step_ex_angle();
                 break;
             case 1:
-                again += method_4c();
+                again += step_ex_angle_mode_1();
                 break;
             case 4:
-                again += method_48();
+                again += step_ex_angle_mode_4();
                 break;
             }
         }
         if (ex_flags & BULLET_EX_BOUNCE)
         {
-            again += method_50();
+            again += step_ex_bounce();
         }
         if (ex_flags & BULLET_EX_WRAP)
         {
-            again += method_54();
+            again += step_ex_wrap();
         }
         if (ex_flags & BULLET_EX_OFFSCREEN)
         {
-            again += method_60();
+            again += step_ex_offscreen();
         }
         if ((i32)ex_flags < 0)
         {
