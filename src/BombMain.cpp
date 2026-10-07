@@ -17,6 +17,23 @@
 #include "Spellcard.h"
 #include "ZunMath.h"
 
+// The copy of ZunMath.h's sincosmul in Cirno's bomb's object file (TH16
+// keeps one per object file). A static of its own so that it can be
+// annotated.
+// FUNCTION: TH16 0x40f570
+static void __fastcall cirno_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
+
 // A bomb ends a spell card's bonus once the card has run a second.
 static inline void spellcard_on_bomb()
 {
@@ -144,7 +161,7 @@ i32 BombCirnoAInf::on_tick()
         f32 scale = vm->scale.x;
         f32 angle = g_replay_safe_rng.randf_neg_1_to_1() * ZUN_PI;
         D3DXVECTOR3 effect_pos;
-        sincosmul(&effect_pos, angle, g_replay_safe_rng.randf_0_to_1() * scale);
+        cirno_sincosmul(&effect_pos, angle, g_replay_safe_rng.randf_0_to_1() * scale);
         effect_pos.z = 0.0f;
         effect_pos += pos;
         AnmVm *effect = g_EffectManager->get_tracked_vm(g_EffectManager->create_tracked(3, &effect_pos, 0));
