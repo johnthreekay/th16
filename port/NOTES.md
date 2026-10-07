@@ -1,11 +1,14 @@
 # Portable build (Linux/macOS, GCC/Clang)
 
 The game sources in `src/` compile and link with GCC and Clang, 32-bit
-(`-m32`) and 64-bit, against stand-in Windows/DirectX headers. The platform
-layer is stubbed except for audio (DirectSound over SDL2, see "Audio"): the
-binary starts, runs WinMain's setup until loading th16.cfg fails
-(CreateFileA is a stub), logs that and exits cleanly, in all four builds. The matching MSVC build is unaffected (see "Keeping the
-matching build").
+(`-m32`) and 64-bit, against stand-in Windows/DirectX headers. Audio
+(DirectSound over SDL2, see "Audio") and graphics (Direct3D 9 over OpenGL,
+see "Graphics") are done; files, threads, the window and input are still
+stubs, so the binary starts, runs WinMain's setup until loading th16.cfg
+fails (CreateFileA is a stub), logs that and exits cleanly, in all four
+builds. With the test shim (`-DTH16_TEST_SHIM=ON`, see "Graphics") it
+plays: title screen, menus and stage 1 render. The matching MSVC build is
+unaffected (see "Keeping the matching build").
 
 ## Building
 
@@ -89,12 +92,14 @@ buffer, as in the original).
   - `win32_misc.cpp`: winmm joystick (stubs), COM and shell link (fail, which
     the game handles), WINNLSEnableIME (no-op).
   - `gdi_stubs.cpp`: the text renderer's GDI calls: stubs.
-  - `d3d9_stubs.cpp`: stub classes for IDirect3D9, IDirect3DDevice9,
-    IDirect3DTexture9, IDirect3DSurface9, IDirect3DVertexBuffer9 with every
-    method. Direct3DCreate9 returns the stub IDirect3D9, whose CreateDevice
-    fails.
+  - `d3d9_gl.cpp`: Direct3D 9 (IDirect3D9, the device, textures,
+    surfaces, vertex buffers) on OpenGL 3.3 through SDL2, complete for what
+    the game uses (see "Graphics"). `d3d9_gl.h` is its interface for the
+    window code, `d3d9_gl_internal.h` what it shares with d3dx9_tex.cpp,
+    `d3d9_gl_funcs.h` the GL functions it loads.
   - `d3dx9_math.cpp`: complete (matrix, vector, projection functions).
-  - `d3dx9_tex.cpp`: texture creation and surface loading: stubs.
+  - `d3dx9_tex.cpp`: the D3DX texture helpers: complete except image file
+    decoding, which the game data never needs (see "Graphics").
   - `dinput_stubs.cpp`: stub classes for IDirectInput8A and
     IDirectInputDevice8A, the data formats and DIPROP ids.
     DirectInput8Create fails (the game falls back to GetKeyboardState and
@@ -105,8 +110,9 @@ buffer, as in the original).
     `src/stub/` (see "Game data in src/stub/").
   - `layout_checks.cpp`: compile-time layout checks that stay on in the
     64-bit build (`TH16_PORT_CHECK`, defined in port_prelude.h).
-- `tests/`: the audio tests (see "Audio") and `th16dat.py`, a Python copy
-  of the game's th16.dat reader that lists and extracts files for tests.
+- `tests/`: the audio tests (see "Audio"), `th16dat.py`, a Python copy
+  of the game's th16.dat reader that lists and extracts files for tests,
+  and `platform_shim.cpp`, the test-only platform layer (see "Graphics").
 
 The interfaces in `include/` are C++ abstract classes with only the methods
 the game calls (plus a few obvious companions), in an order of our own: the
@@ -284,6 +290,142 @@ All pass in the four builds, and under ThreadSanitizer (clang64 with
 stops at th16.cfg). Once files, threads and events work, the title BGM
 should stream as in `th16_dsound_game_test`.
 
+## Graphics
+
+`port/src/d3d9_gl.cpp` implements Direct3D 9 on an OpenGL 3.3 core context
+through SDL2 (no libGL link: the GL functions in `d3d9_gl_funcs.h` are
+loaded with `SDL_GL_GetProcAddress`), `port/src/d3dx9_tex.cpp` the D3DX
+texture helpers on top of it.
+
+### Interface for the window code (`port/src/d3d9_gl.h`)
+
+The renderer does not own the window. The window code (win32_user*.cpp):
+
+1. after `SDL_Init(SDL_INIT_VIDEO)`, calls `port_gl_prepare_window()` (GL
+   attributes), then creates the window with `port_gl_window_flags()`
+   (`SDL_WINDOW_OPENGL`) added to its own flags;
+2. calls `port_gl_attach_window(window)` before the game's `CreateDevice`
+   (CreateWindowExA is the natural place); the HWND the game passes to
+   `CreateDevice` is not looked at;
+3. calls `port_gl_detach_window(window)` before destroying it;
+4. maps mouse positions with `port_gl_window_to_back_buffer` if it needs
+   them (Present letterboxes the back buffer into the window).
+
+If nothing is attached, `CreateDevice` initializes SDL video itself and
+opens a plain window of its own (`port_gl_window()` returns whichever is
+in use), so the renderer works with the stub window code. The renderer
+never pumps events; full-screen modes (`Windowed = FALSE`) become
+`SDL_WINDOW_FULLSCREEN_DESKTOP` on the window in CreateDevice/Reset.
+GL is only called from the thread that created the device (the game's main
+thread).
+
+### How it works
+
+- One shader emulates the fixed-function state the game uses:
+  pre-transformed (`XYZRHW`) and world-space (`XYZ`) vertices with diffuse
+  color and one texture coordinate; the world, view and projection
+  matrices; the texture matrix (`D3DTTFF_COUNT2`, input `(u, v, 1, 0)`, not
+  applied to pre-transformed vertices, as in D3D); texture stage 0's color
+  and alpha operations and arguments (every D3DTOP the game could set,
+  `D3DTA_COMPLEMENT`/`ALPHAREPLICATE`, the texture factor; without a
+  texture, an operation that reads it selects the current color, as D3D
+  drivers do); alpha test (8-bit compare); vertex fog (linear, exp, exp2,
+  range fog). Blending (separate alpha, every blend op), depth test and
+  write, culling, color write mask and the viewport (with MinZ/MaxZ) are
+  GL state. Uniforms are only sent when they change; vertices go through
+  one streaming buffer (mapped unsynchronized, orphaned when full).
+- Coordinates: every render target, the back buffer included, is an RGBA8
+  texture with an FBO, stored with D3D's row 0 (the top) first. The shader
+  flips y so that GL's window row 0 is D3D's row 0, moves vertices by half
+  a pixel (D3D9 pixel centers are on integers), and remaps clip-space z
+  from [0, w] to [-w, w]. Pre-transformed vertices are mapped through the
+  viewport, so they are clipped to it as on D3D9 hardware, with depth
+  clamping instead of near/far clipping, and 1/rhw as w. Present blits the
+  back buffer to the window, flipped and scaled to fit (aspect kept).
+- Textures keep their pixels in their D3D format (as the managed pool
+  does); LockRect hands those out and UnlockRect marks the rectangle
+  dirty; the GL texture (always RGBA8) is created and updated when a draw
+  on the device thread needs it. So the loading thread can create and fill
+  textures while the main thread draws, as the game does. Formats:
+  A8R8G8B8, X8R8G8B8, R5G6B5, X1R5G5B5, A1R5G5B5, A4R4G4B4, X4R4G4B4,
+  A8R3G3B2, R3G3B2, R8G8B8, A8 (samples as (0, 0, 0, a), as in D3D9), L8,
+  A8L8; one mip level (the game draws without mipmaps). Render targets
+  have no CPU copy: LockRect, D3DXLoadSurfaceFromSurface and the
+  screenshot read them back with glReadPixels (device thread only). All
+  render targets share one depth buffer (24-bit; D3D's was D16), grown to
+  the largest target, like D3D's single auto depth surface. SetRenderTarget
+  resets the viewport to the whole target and Clear is clipped to the
+  viewport, as in D3D9.
+- Present: the game expects Present to wait for a 60 Hz vertical blank.
+  Vsync is on unless the game asks for `D3DPRESENT_INTERVAL_IMMEDIATE`; on
+  a display that is not at 60 Hz (or when 60 swaps take under half a
+  second: hidden windows, drivers that ignore the swap interval), Present
+  also waits on a 60 Hz timer. GetAdapterDisplayMode reports 60 Hz for that
+  reason, and GetRasterStatus is always in the vertical blank.
+- Image files: D3DXCreateTextureFromFileInMemoryEx,
+  D3DXLoadSurfaceFromFileInMemory and D3DXGetImageInfoFromFileInMemory only
+  get data for ANM entries without embedded pixels that name an image
+  file, read from disk next to the game (`file_read_all(..., 1)`), never
+  from th16.dat. th16.dat has none: its 54 .anm files hold 417 embedded
+  textures (formats 1, 3, 5 and 7 of `g_anm_d3d_formats`: A8R8G8B8 190,
+  R5G6B5 52, A4R4G4B4 136, A8 39), 4 empty textures and 2 render targets
+  (`tests/th16dat.py` to extract, then read the entry headers). So no image
+  decoder is vendored: those three functions log the file's first bytes
+  and fail. The rest of D3DX is complete: format conversion between all
+  the formats above, D3DX_FILTER_NONE (no scaling, transparent black
+  outside the source), POINT, and the other filters as an area average
+  when shrinking (the 2:1 low-resolution textures at 640x480) or bilinear
+  when growing; color keys; D3DX_DEFAULT sizes.
+- Not implemented (the game never uses them): stages above 0, lighting,
+  vertex and pixel shaders, index buffers, stencil, point sprites,
+  specular, `Present` with rectangles, `StretchRect` from or to a
+  non-render-target, MSAA. Each logs once through PORT_UNIMPLEMENTED if it
+  is ever reached.
+
+### Testing
+
+Until the real platform layer exists, `-DTH16_TEST_SHIM=ON` links
+`port/tests/platform_shim.cpp` first with `--allow-multiple-definition`, so
+its files, threads, events, window (attached to the renderer) and scripted
+keyboard replace the stubs. Without a sound device it also drops the
+queued BGM commands, which GameThread otherwise waits for forever before
+a stage starts. Never needed once the platform layer is in. Its file layer
+reads missing files from the game folder (`TH16_GAME_DIR`, by default
+`~/Touhou Project/(TH16) Touhou Tenkuushou ~ Hidden Star in Four Seasons`)
+read-only, and writes only to the current directory (APPDATA is
+`./appdata`, so th16.cfg, score and snapshots go to
+`./appdata/ShanghaiAlice/th16/`).
+
+Headless run (no window on the desktop, no sound), from a run directory
+under build-port/ holding `appdata/ShanghaiAlice/th16/th16.cfg` (a
+windowed configuration):
+
+```
+env -u DISPLAY -u WAYLAND_DISPLAY SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \
+    TH16_GL_DUMP_DIR=frames TH16_GL_DUMP_EVERY=300 TH16_GL_EXIT_AFTER=3600 \
+    TH16_SHIM_KEYS=900:Z:5,940:Z:5,... ../shim64/th16
+```
+
+Renderer environment variables (any build): `TH16_GL_DUMP_DIR` (write
+the back buffer as `frame_NNNNNN.png` there), `TH16_GL_DUMP_EVERY` (every
+N presents, default 60), `TH16_GL_DUMP_FROM` (first frame to dump),
+`TH16_GL_EXIT_AFTER` (exit after N presents), `TH16_GL_TRACE_FRAME` (log
+the render target changes, clears and draws with their state for that
+frame), `TH16_GL_PACE=0` (no 60 Hz timer: run as fast as possible),
+`TH16_GL_VSYNC=0`. Shim: `TH16_SHIM_KEYS` ("frame:KEY:frames,...", frames
+counted in GetKeyboardState calls; Z X C P UP DOWN LEFT RIGHT ESC SHIFT
+CTRL ENTER), `TH16_GAME_DIR`.
+
+Checked this way (clang 32- and 64-bit, NVIDIA through EGL with SDL's
+offscreen driver), at 640x480 and 1280x960: the loading screen, the title
+screen, difficulty, character and season selection, stage 1 (3D forest
+with fog, enemies, items, HUD, the spring season release, the player's
+invincibility blink), the pause menu (its blurred copy of the playfield
+goes through D3DXLoadSurfaceFromSurface from a render target), and the
+in-game screenshot (P: back buffer LockRect, written as a BMP by the
+game's thread). Text drawn through GDI (TextHelper) stays blank until the
+GDI layer exists; the textures it fills work like any other.
+
 ## Game data in src/stub/
 
 `src/stub/`, `src/placeholder/` and `src/harness/` hold no game functions
@@ -351,7 +493,11 @@ directory and the score file sections, which hold no pointers.
   file; with 8-byte pointers `ShtShooter` is 0x68 bytes, not 0x58, and the
   shooters start at 0x1e0, not 0x1b8. The port converts the file to the
   in-memory layout first (`port_convert_sht_file`), then the original loop
-  resolves offsets and indices.
+  resolves offsets and indices. A table ends at the first record with a
+  negative fire rate, and the file's terminators are shorter than a record
+  (table offsets are not multiples of 0x58), so the conversion copies each
+  table record by record and writes a whole terminator record after it
+  (needed in the 32-bit build too: it crashed at the first game start).
 - Scorefile (Scorefile.h): `ScorefileData` (the real layout) starts with
   two pointers, `Scorefile` (the view most code uses) assumes 8 bytes for
   them. The view gets 8 bytes of padding on 64-bit and `ScorefileData` is

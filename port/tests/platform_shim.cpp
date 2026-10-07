@@ -14,7 +14,7 @@
 // - Window: an SDL window handed to the renderer (port_gl_attach_window).
 //   No messages; GetKeyboardState plays the script in TH16_SHIM_KEYS
 //   ("frame:KEY:frames,...", frames counted in GetKeyboardState calls,
-//   KEY one of Z X C UP DOWN LEFT RIGHT ESC SHIFT ENTER).
+//   KEY one of Z X C P UP DOWN LEFT RIGHT ESC SHIFT CTRL ENTER).
 // - Sound: without DirectSound nothing consumes the BGM command queue, and
 //   GameThread waits for it to drain before a stage starts; a shim thread
 //   drops the commands.
@@ -669,7 +669,7 @@ BOOL GetKeyboardState(PBYTE lpKeyState)
                 int vk;
             } keys[] = {{"Z", 'Z'},        {"X", 'X'},          {"C", 'C'},          {"UP", 0x26},
                         {"DOWN", 0x28},    {"LEFT", 0x25},      {"RIGHT", 0x27},     {"ESC", 0x1b},
-                        {"SHIFT", 0x10},   {"ENTER", 0x0d},     {"CTRL", 0x11}};
+                        {"SHIFT", 0x10},   {"ENTER", 0x0d},     {"CTRL", 0x11},      {"P", 'P'}};
             for (auto &k : keys)
             {
                 if (strcmp(k.name, key) == 0)

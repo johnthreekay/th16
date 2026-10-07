@@ -1139,6 +1139,7 @@ struct PortDevice final : public IDirect3DDevice9
     // Frame dumps for testing (see NOTES.md).
     std::string dump_dir;
     uint32_t dump_every = 0;
+    uint32_t dump_from = 0;
     uint32_t exit_after = 0;
     // TH16_GL_TRACE_FRAME: logs the calls that build that frame.
     uint32_t trace_frame = 0;
@@ -1995,6 +1996,8 @@ bool PortDevice::init(SDL_Window *target, const D3DPRESENT_PARAMETERS &pp)
         dump_dir = dump;
         const char *every = getenv("TH16_GL_DUMP_EVERY");
         dump_every = every != NULL ? (uint32_t)atoi(every) : 60;
+        const char *from = getenv("TH16_GL_DUMP_FROM");
+        dump_from = from != NULL ? (uint32_t)atoi(from) : 0;
     }
     const char *trace_env = getenv("TH16_GL_TRACE_FRAME");
     trace_frame = trace_env != NULL ? (uint32_t)atoi(trace_env) : 0;
@@ -2160,20 +2163,22 @@ void PortDevice::apply_present_params()
     {
         SDL_SetWindowFullscreen(window, params.Windowed ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
     }
-    // Vsync paces the game only if the display runs at 60 Hz; otherwise
-    // Present waits on a 60 Hz timer (pace_frame).
+    // The game counts on Present waiting for a 60 Hz vertical blank. Vsync
+    // stays on against tearing; it paces the game by itself only on a
+    // 60 Hz display, elsewhere Present also waits on a 60 Hz timer
+    // (pace_frame), which then decides the frame rate.
     bool want_vsync = params.PresentationInterval != D3DPRESENT_INTERVAL_IMMEDIATE;
     int display = SDL_GetWindowDisplayIndex(window);
     SDL_DisplayMode mode;
     bool display_60 = display >= 0 && SDL_GetCurrentDisplayMode(display, &mode) == 0 && mode.refresh_rate >= 59 &&
                       mode.refresh_rate <= 61;
-    vsync = want_vsync && display_60 && env_flag("TH16_GL_VSYNC", true);
+    vsync = want_vsync && env_flag("TH16_GL_VSYNC", true);
     if (SDL_GL_SetSwapInterval(vsync ? 1 : 0) != 0)
     {
         vsync = false;
     }
     pace_allowed = want_vsync && env_flag("TH16_GL_PACE", true);
-    pace = pace_allowed && !vsync;
+    pace = pace_allowed && !(vsync && display_60);
     next_frame_time = 0.0;
     vsync_check_frames = 0;
 }
@@ -2608,15 +2613,31 @@ HRESULT PortDevice::draw(D3DPRIMITIVETYPE type, UINT count, const void *data, UI
     {
         const float *v = (const float *)data;
         PortTexture *rt = as_surface(render_target)->owner;
-        gl_log("draw type %d n %u fvf %03x stride %u rt %p(%ux%u) vp %u,%u %ux%u tex %p(%ux%u) blend %d %u/%u op %u "
+        gl_log("draw type %d n %u fvf %03x stride %u rt %p(%ux%u) vp %u,%u %ux%u tex %p(%ux%u f%d) blend %d %u/%u op %u "
                "atest %u ref %u cop %u/%u aop %u z %u/%u fog %u v0 %.1f,%.1f,%.3f,%.3f c0 %08x",
                type, count, fvf, stride, (void *)rt, rt->width, rt->height, viewport.X, viewport.Y, viewport.Width,
-               viewport.Height, (void *)texture, texture ? texture->width : 0, texture ? texture->height : 0,
+               viewport.Height, (void *)texture, texture ? texture->width : 0, texture ? texture->height : 0, texture ? (int)texture->format : 0,
                render_states[D3DRS_ALPHABLENDENABLE], render_states[D3DRS_SRCBLEND], render_states[D3DRS_DESTBLEND],
                render_states[D3DRS_BLENDOP], render_states[D3DRS_ALPHATESTENABLE], render_states[D3DRS_ALPHAREF],
                stage_states[0][D3DTSS_COLOROP], stage_states[0][D3DTSS_COLORARG2], stage_states[0][D3DTSS_ALPHAOP],
                render_states[D3DRS_ZENABLE], render_states[D3DRS_ZWRITEENABLE], render_states[D3DRS_FOGENABLE], v[0],
                v[1], v[2], pretransformed ? v[3] : 0.0f, (fvf & D3DFVF_DIFFUSE) ? ((const uint32_t *)data)[pretransformed ? 4 : 3] : 0);
+        if (!pretransformed)
+        {
+            gl_log("  fog %u/%u %.1f..%.1f color %08x tfactor %08x zfunc %u ttf %u world %.1f %.1f %.1f",
+                   render_states[D3DRS_FOGTABLEMODE], render_states[D3DRS_FOGVERTEXMODE],
+                   dword_to_float(render_states[D3DRS_FOGSTART]), dword_to_float(render_states[D3DRS_FOGEND]),
+                   render_states[D3DRS_FOGCOLOR], render_states[D3DRS_TEXTUREFACTOR], render_states[D3DRS_ZFUNC],
+                   stage_states[0][D3DTSS_TEXTURETRANSFORMFLAGS], world._41, world._42, world._43);
+            D3DMATRIX m;
+            matrix_multiply(&m, world, view);
+            for (int i = 0; i < 4 && i < (int)count + 2; i++)
+            {
+                const float *p = (const float *)((const uint8_t *)data + i * stride);
+                float ez = p[0] * m._13 + p[1] * m._23 + p[2] * m._33 + m._43;
+                gl_log("    v%d %.1f,%.1f,%.1f eye z %.1f", i, p[0], p[1], p[2], ez);
+            }
+        }
     }
     apply_state(pretransformed);
 
@@ -2866,7 +2887,7 @@ HRESULT PortDevice::Present(const RECT *pSourceRect, const RECT *pDestRect, HWND
 {
     delete_dead_objects();
     frame_count++;
-    if (!dump_dir.empty() && dump_every != 0 && frame_count % dump_every == 0)
+    if (!dump_dir.empty() && dump_every != 0 && frame_count >= dump_from && frame_count % dump_every == 0)
     {
         dump_frame();
     }
