@@ -28,3 +28,7 @@ void Supervisor::release_dinput()
 void Supervisor::reset_render_state()
 {
 }
+
+void w3e_opaque_double(double *value)
+{
+}

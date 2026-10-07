@@ -2,6 +2,9 @@
 // checksum and the resolution dialog.
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include <shlobj.h>
 
 #include "FileSystem.h"
 #include "GameErrorContext.h"
@@ -10,6 +13,8 @@
 
 BOOL CALLBACK enum_game_controllers(LPCDIDEVICEINSTANCEA instance, LPVOID context);
 BOOL CALLBACK enum_controller_axes(LPCDIDEVICEOBJECTINSTANCEA object, LPVOID context);
+HARNESS_CALLED BOOL __stdcall resolve_shortcut(const char *link_path, char *out, i32 unused);
+void read_resolution_dialog();
 
 static_assert(offsetof(Supervisor, joystick_caps) == 0x2c, "Supervisor layout");
 static_assert(offsetof(Supervisor, exe_checksum) == 0xa14, "Supervisor layout");
@@ -44,6 +49,145 @@ i32 Supervisor::compute_exe_checksum()
         return sum;
     }
     return -1;
+}
+
+// uuid.lib is not linked; the shell GUIDs the original takes from it.
+static const GUID s_IID_IShellLinkA = {0x000214ee, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
+static const GUID s_IID_IPersistFile = {0x0000010b, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
+static const GUID s_CLSID_ShellLink = {0x00021401, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
+
+// Created by WinMain so that only one instance runs.
+// GLOBAL: TH16 0x4dfb4c
+HANDLE g_app_mutex;
+
+// Decides whether the game was started from a shortcut (or from somewhere
+// other than its own executable), which the frame pacing and the window
+// setup look at. 0 if the single instance mutex exists, -1 otherwise.
+// FUNCTION: TH16 0x45bd70
+HARNESS_CALLED i32 check_startup_shortcut()
+{
+    STARTUPINFOA startup = {sizeof(STARTUPINFOA)};
+    char exe_path[0x105];
+    char title[0x105];
+    GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
+    GetConsoleTitleA(title, sizeof(title));
+    GetStartupInfoA(&startup);
+    if (startup.lpTitle != NULL)
+    {
+        char *ext = strrchr(startup.lpTitle, '.');
+        if (file_exists(startup.lpTitle) && ext != NULL)
+        {
+            if (_stricmp(ext, ".lnk") == 0)
+            {
+                do
+                {
+                    resolve_shortcut(startup.lpTitle, title, 0);
+                } while (_stricmp(strrchr(title, '.'), ".lnk") == 0);
+            }
+            else
+            {
+                strcpy(title, startup.lpTitle);
+            }
+            if (strcmp(exe_path, title) != 0)
+            {
+                g_GameWindow.unk_2c = 1;
+            }
+        }
+        g_Supervisor.flags &= ~0x40;
+    }
+    else
+    {
+        g_Supervisor.flags |= 0x40;
+    }
+    return g_app_mutex != NULL ? 0 : -1;
+}
+
+// Resolves a .lnk file to the path it points at.
+// FUNCTION: TH16 0x45bff0
+HARNESS_CALLED BOOL __stdcall resolve_shortcut(const char *link_path, char *out, i32 unused)
+{
+    IShellLinkA *link;
+    IPersistFile *file;
+    WIN32_FIND_DATAA find_data;
+    if (out == NULL)
+    {
+        return FALSE;
+    }
+    BOOL ok = FALSE;
+    CoInitialize(NULL);
+    if (SUCCEEDED(CoCreateInstance(s_CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, s_IID_IShellLinkA, (void **)&link)))
+    {
+        if (SUCCEEDED(link->QueryInterface(s_IID_IPersistFile, (void **)&file)))
+        {
+            WCHAR *wide_path = new WCHAR[MAX_PATH];
+            MultiByteToWideChar(CP_ACP, 0, link_path, -1, wide_path, MAX_PATH);
+            if (SUCCEEDED(file->Load(wide_path, STGM_READ)))
+            {
+                if (SUCCEEDED(link->GetPath(out, MAX_PATH, &find_data, 0)))
+                {
+                    ok = TRUE;
+                }
+            }
+            delete wide_path;
+            file->Release();
+        }
+        link->Release();
+    }
+    CoUninitialize();
+    return ok;
+}
+
+// FUNCTION: TH16 0x45c110
+INT_PTR CALLBACK resolution_dialog_proc(HWND dialog, UINT message, WPARAM wparam, LPARAM lparam)
+{
+    switch (message)
+    {
+    case WM_INITDIALOG:
+        if (g_Supervisor.config.flags_2c & 0x100)
+        {
+            SendMessageA(GetDlgItem(dialog, 0xca), BM_SETCHECK, BST_CHECKED, 0);
+        }
+        switch (g_Supervisor.config.window_size)
+        {
+        case 0:
+            SendMessageA(GetDlgItem(dialog, 0xcb), BM_SETCHECK, BST_CHECKED, 0);
+        case 3:
+            SendMessageA(GetDlgItem(dialog, 0xcd), BM_SETCHECK, BST_CHECKED, 0);
+            break;
+        case 1:
+            SendMessageA(GetDlgItem(dialog, 0xcb), BM_SETCHECK, BST_CHECKED, 0);
+        case 4:
+            SendMessageA(GetDlgItem(dialog, 0xce), BM_SETCHECK, BST_CHECKED, 0);
+            break;
+        case 2:
+            SendMessageA(GetDlgItem(dialog, 0xcb), BM_SETCHECK, BST_CHECKED, 0);
+        case 5:
+            SendMessageA(GetDlgItem(dialog, 0xcf), BM_SETCHECK, BST_CHECKED, 0);
+            break;
+        }
+        g_GameWindow.flags = (g_GameWindow.flags & ~0x80) | 0x100;
+        return FALSE;
+    case WM_COMMAND:
+        if (LOWORD(wparam) != 0xd0)
+        {
+            return FALSE;
+        }
+        read_resolution_dialog();
+        g_GameWindow.flags &= ~0x180;
+        DestroyWindow(g_GameWindow.dialog);
+        g_GameWindow.dialog = NULL;
+        // Falls through.
+    case WM_CLOSE:
+        if ((g_GameWindow.flags & 0x180) == 0x100)
+        {
+            g_GameWindow.flags &= ~0x100;
+            g_GameWindow.flags |= 0x80;
+        }
+        DestroyWindow(g_GameWindow.dialog);
+        g_GameWindow.dialog = NULL;
+        return TRUE;
+    }
+    return FALSE;
 }
 
 // Reads the options of the resolution dialog: the 60 fps check box and the

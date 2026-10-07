@@ -75,3 +75,16 @@ void harness_w3e_sound_release()
 {
     g_SoundManager.release();
 }
+
+HARNESS_CALLED i32 check_startup_shortcut();
+
+void w3e_opaque_double(double *value);
+
+// Like WinMain (0x459aa1), whose frame is realigned to 8 bytes: LTCG then
+// knows the stack is aligned in check_startup_shortcut and resolve_shortcut.
+i32 harness_w3e_startup()
+{
+    double aligned;
+    w3e_opaque_double(&aligned);
+    return check_startup_shortcut();
+}
