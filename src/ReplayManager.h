@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "GameThread.h"
 #include "UpdateFunc.h"
 #include "ZunList.h"
 #include "types.h"
@@ -57,12 +58,24 @@ struct RpyGamestate
 struct RpyInfo
 {
     char name[0xa];
-    // 2: spell practice.
-    u16 flags_a;
+    union
+    {
+        // 2: spell practice.
+        u16 flags_a;
+        struct
+        {
+            // The low bit of Globals::game_mode.
+            u8 flag_practice : 1;
+            u8 flag_spell_practice : 1;
+            u8 flags_a_2 : 6;
+            u8 flags_a_hi;
+        };
+    };
     __time64_t timestamp;
     // The final score, divided by 10.
     u32 score;
-    u8 unk_18[0x7c - 0x18];
+    // The game thread's settings when the replay was recorded.
+    ConfigData config;
     // Percentage of frames slowed down.
     f32 slowdown;
     // Stage snapshots stored after this.
@@ -75,6 +88,11 @@ struct RpyInfo
     i32 continues_used;
     i32 spell_id;
     i32 subseason;
+
+    RpyInfo()
+    {
+        memset(this, 0, sizeof(RpyInfo));
+    }
 };
 #pragma pack(pop)
 
@@ -83,6 +101,11 @@ struct RpyInfo
 struct RpyHeader
 {
     u8 data[0x24];
+
+    RpyHeader()
+    {
+        memset(this, 0, sizeof(RpyHeader));
+    }
 };
 
 // RpyHeader's fields as read_replay_file uses them.
@@ -90,7 +113,11 @@ struct RpyFileHeader
 {
     u32 magic;
     u16 version;
-    u8 unk_6[0x1c - 0x6];
+    u8 unk_6[0xc - 0x6];
+    // Of the whole file (header plus compressed data).
+    u32 file_size;
+    u32 unk_10;
+    u8 unk_14[0x1c - 0x14];
     // Of the encrypted, compressed data after the header.
     u32 compressed_size;
     u32 size;

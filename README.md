@@ -383,6 +383,34 @@ decompiled code the surroundings it had in the original:
   enough; an EH caller that realigns through the ebx frame does not do it.
   The earlier zun_sinf/zun_cosf "call count" and zun_atan2f observations
   are probably this effect.
+- That rule, made precise (wave 5 merge, Player::on_tick_body):
+  - It is LTCG's double stack alignment pass: linking with
+    `/d2:-NoDoubleStackAlign` inlines cosf/floorf everywhere (diagnostic
+    only; `/d2:-inlinelog3` lists every inline, `/d2:-dumpCallGraph:<file>`
+    writes the call graph LTCG uses as DGML).
+  - The source is a function with C++ EH state at /GL time and no own
+    realignment. The EH state counts even when codegen removes the frame:
+    `new T` whose constructor is not known nothrow leaves only the dead
+    `push ecx; mov [ebp-4], p` (Player::create).
+  - It flows down direct call edges and through taking a function's
+    address (Player::initialize registering on_tick_callback counts as a
+    call). Indirect calls do not carry it, and plain unaligned or /GS
+    callers are not sources.
+  - Each reached function that would inline a UCRT math helper calls an
+    out-of-line copy instead, and only the reached ones: an EH caller of
+    zun_cosf costs zun_cosf alone, one of PosVel::step costs all three.
+  - It stops at a function that realigns for a double of its own (plain
+    `and esp,-8`). An ebx-form realignment that comes from an aligned
+    caller does not stop it, and extra unaligned callers do not undo it.
+  - Spelling the wrappers out as `(f32)cos((double)x)` dodges the inliner
+    but not the alignment: the copies then skip their realignment and other
+    frames shift (update_final_pos).
+  - Open: the original has the same dead EH state in Player::create and
+    still inlines, so something on its create, initialize, on_tick chain
+    stops it (its on_tick_callback pads the call with `push ecx` where ours
+    tail jumps). Until that is found zun_sinf, zun_cosf and zun_floorf are
+    TODOs. A local double in on_tick_body restores all three (and
+    lose_life) but is not ZUN's code.
 - A caller that realigns its frame gives its callees known alignment: they
   get padded frames and lose edi shrink-wrapping, even with other callers.
   Whether a function realigns is decided over the whole function, not per

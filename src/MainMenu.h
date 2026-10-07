@@ -134,6 +134,18 @@ class TitleInf : public TaskInf
     i32 do_spell_practice_row();
     i32 do_spell_practice_subseason();
     i32 do_spell_practice_difficulty();
+    // 0x44b5f0 (ExpHP: MainMenu::do_title_screen).
+    i32 do_title_screen();
+    // 0x44fe20 (ExpHP: MainMenu::do_difficulty_select).
+    i32 do_difficulty_select();
+    // 0x4502c0 (ExpHP: MainMenu::do_character_select).
+    i32 do_character_select();
+    // 0x452330 (ExpHP: MainMenu::sub_452330_replay_related).
+    i32 do_state_452330();
+    // 0x4532f0 (ExpHP: MainMenu::do_menu_sub_4532f0).
+    i32 do_state_4532f0();
+    // 0x4546f0 (ExpHP: MainMenu::do_music_room).
+    i32 do_music_room();
     // 0x4560b0. Fills spell_ids (and their VMs) with the spell cards of a
     // stage's boss attack. The last argument is the same at every call
     // site; LTCG folded it.
@@ -149,3 +161,5 @@ class TitleInf : public TaskInf
 };
 
 extern TitleInf *g_MainMenu;
+// The difficulty names as the menus and the replay info show them.
+extern const char *const g_difficulty_names[6];
