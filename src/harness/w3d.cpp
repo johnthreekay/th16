@@ -29,12 +29,6 @@ i32 harness_w3d_replay_end_stage(i32 stage)
     return g_ReplayManager->set_end_stage(stage);
 }
 
-// GameThread's stage setup (0x42dd2d, 0x42df45).
-void harness_w3d_replay_begin_stage()
-{
-    g_ReplayManager->begin_stage();
-}
-
 // The title menus (0x44c8c0 and others) always interrupt children of
 // anm_ids[0] with 29.
 void harness_w3d_title_interrupt(TitleInf *menu, i32 script)

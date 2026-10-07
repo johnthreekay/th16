@@ -395,9 +395,8 @@ HARNESS_CALLED void ReplayManager::start_stage()
     }
 }
 
-// TODO: the original realigns its frame (and esp, -8; most likely for a
-// callee such as repopulate_options) and reads the stage before clearing
-// current_tick_num_in_stage in the recording branch.
+// TODO: the original realigns its frame through ebx (and esp, -8), most
+// likely for repopulate_options; the body matches.
 // FUNCTION: TH16 0x448eb0
 HARNESS_CALLED void ReplayManager::begin_stage()
 {
@@ -425,8 +424,8 @@ HARNESS_CALLED void ReplayManager::begin_stage()
         }
         gamestate->player_pos_subpixel[0] = g_Player->inner.pos_subpixel.x;
         gamestate->player_pos_subpixel[1] = g_Player->inner.pos_subpixel.y;
-        current_tick_num_in_stage = 0;
         stage_num = g_Globals.stage_num;
+        current_tick_num_in_stage = 0;
         ((RpyGamestate *)stage_gamestate_snapshots[stage_num])->player_is_focused = g_Player->inner.is_focused;
     }
     else if (mode == REPLAY_PLAYBACK)
