@@ -42,6 +42,10 @@ struct Camera
     Float2 unk_fc;
     Float3 unk_104;
     CameraSky sky;
+
+    // 0x40d510. Empty; g_Supervisor's static initializer calls it for each
+    // camera.
+    Camera();
 };
 
 // 0x43c780. Recomputes a camera's matrices for a flat view of its viewport.

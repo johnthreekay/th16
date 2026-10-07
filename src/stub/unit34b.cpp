@@ -8,13 +8,6 @@
 #include "../Gui.h"
 #include "../StageData.h"
 
-// STUB: TH16 0x406380
-AnmId AnmLoaded::create_effect(i32 script, i32 layer, AnmVm **out)
-{
-    AnmId id;
-    return id;
-}
-
 // GLOBAL: TH16 0x4a6f18
 StageData *g_stage_data;
 

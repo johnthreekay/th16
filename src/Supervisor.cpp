@@ -60,6 +60,11 @@ static_assert(offsetof(SoundManager, bgm_dat_name) == 0x5560, "SoundManager::bgm
 // GLOBAL: TH16 0x4c10d0
 Supervisor g_Supervisor;
 
+// FUNCTION: TH16 0x40d510
+Camera::Camera()
+{
+}
+
 // GLOBAL: TH16 0x4a52e4
 i16 g_pad_mapping[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
