@@ -486,6 +486,46 @@ void PauseMenu::open()
     flags_3ec &= ~4;
 }
 
+// TODO: the original realigns its frame to 8 bytes (ebx-based form); the body matches.
+// FUNCTION: TH16 0x43f500
+void game_over_43f500()
+{
+    PauseMenu *menu = g_PauseMenu;
+    GameThread::update_play_time();
+    if (g_GameThread->replay_mode == 1)
+    {
+        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+        return;
+    }
+    g_GameThread->flags.flag_4 = 1;
+    menu->set_state(3);
+    menu->set_unk_1f4_inline(3);
+    if (g_Globals.game_mode == 2)
+    {
+        menu->set_unk_1f4(5);
+    }
+    if (g_Globals.game_mode == 0)
+    {
+        menu->anm_id_1e8 = g_Supervisor.text_anm->create_ui_vm_at_origin(0x34, 0);
+        g_AnmManager->copy_screen_to_sprite(menu->anm_id_1e8, (i32)(g_screen_coord_scale * 32.0f),
+                                            (i32)(g_screen_coord_scale * 16.0f), (i32)(g_screen_coord_scale * 384.0f),
+                                            (i32)(g_screen_coord_scale * 448.0f));
+    }
+    Gui *gui = g_Gui;
+    menu->front_anm = gui->front_anm;
+    menu->unk_1fc = 1;
+    menu->saved_game_speed = g_game_speed;
+    g_game_speed = 1.0f;
+    menu->saved_global_4d9d90 = g_unk_4d9d90;
+    g_unk_4d9d90 = 1;
+    if (gui->msg != NULL)
+    {
+        gui->msg->hide();
+    }
+    Gui::sub_42c580();
+    menu->flags_3ec |= 4;
+}
+
 // TODO: ours folds the character offset into the practice index (one imul by 0xa63, scaled by 8); the original adds it to the pointer.
 // FUNCTION: TH16 0x43f7e0
 void PauseMenu::begin_score_entry()
@@ -548,7 +588,7 @@ void replay_ended_43f240()
 {
     PauseMenu *menu = g_PauseMenu;
     menu->set_state(1);
-    menu->set_unk_1f4(1);
+    menu->set_unk_1f4_inline(1);
     g_GameThread->flags.flag_4 = 1;
     menu->take_snapshot();
     menu->front_anm = g_Gui->front_anm;
@@ -581,7 +621,7 @@ HARNESS_CALLED void pause_menu_43f350()
         return;
     }
     menu->set_state(2);
-    menu->set_unk_1f4(2);
+    menu->set_unk_1f4_inline(2);
     g_GameThread->flags.flag_4 = 1;
     SoundManager::pause_sounds();
     g_SoundManager.play_sound_centered(0xe, 0);

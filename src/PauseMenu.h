@@ -52,7 +52,13 @@ struct PauseMenu
     // Kept alive by its callers rather than /INCLUDE, so that LTCG sees it
     // leaves ecx alone (replay_ended_43f240 counts on that).
     HARNESS_CALLED void set_state(i32 state);
-    void set_unk_1f4(i32 value);
+    DECOMP_NOINLINE void set_unk_1f4(i32 value);
+    // set_unk_1f4 where LTCG inlined it.
+    __forceinline void set_unk_1f4_inline(i32 value)
+    {
+        unk_1f4 = value;
+        time_in_current_menu.reset();
+    }
 
     // 0x43f6a0, 0x43f740 and 0x43f790: leaving states 1 (the pause menu),
     // 2 and 3. They restore the game speed and the play time clock; the
@@ -96,6 +102,8 @@ extern PauseMenu *g_PauseMenu;
 
 // 0x43f240. Opens the menu shown when a replay ends.
 void replay_ended_43f240();
+// 0x43f500. Opens the game over menu (continue or quit).
+void game_over_43f500();
 // 0x43f350 (ExpHP: sub_43f350_pause). Opens the menu at the end of a
 // game (or ends spell practice's retry loop).
 void pause_menu_43f350();
