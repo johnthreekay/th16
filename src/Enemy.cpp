@@ -1484,50 +1484,6 @@ int EnemyData::ecl_enm_create()
     return 0;
 }
 
-// ECL variable numbers (ExpHP's truth). Only the ones read here.
-enum EclVar
-{
-    ECL_VAR_I0 = -9985,
-    ECL_VAR_I1 = -9984,
-    ECL_VAR_I2 = -9983,
-    ECL_VAR_I3 = -9982,
-    ECL_VAR_MISS_COUNT = -9949,
-    ECL_VAR_BOMB_COUNT = -9948,
-    ECL_VAR_CAN_STILL_CAPTURE = -9947,
-    ECL_VAR_BOSS_I0 = -9943,
-    ECL_VAR_BOSS_I1 = -9942,
-    ECL_VAR_BOSS_I2 = -9941,
-    ECL_VAR_BOSS_I3 = -9940,
-    ECL_VAR_GI0 = -9926,
-    ECL_VAR_GI1 = -9925,
-    ECL_VAR_GI2 = -9924,
-    ECL_VAR_GI3 = -9923,
-    ECL_VAR_ABS_X = -9995,
-    ECL_VAR_ABS_Y = -9994,
-    ECL_VAR_REL_X = -9993,
-    ECL_VAR_REL_Y = -9992,
-    ECL_VAR_F0 = -9981,
-    ECL_VAR_F1 = -9980,
-    ECL_VAR_F2 = -9979,
-    ECL_VAR_F3 = -9978,
-    ECL_VAR_BOSS_F0 = -9939,
-    ECL_VAR_BOSS_F1 = -9938,
-    ECL_VAR_BOSS_F2 = -9937,
-    ECL_VAR_BOSS_F3 = -9936,
-    ECL_VAR_F4 = -9935,
-    ECL_VAR_F5 = -9934,
-    ECL_VAR_F6 = -9933,
-    ECL_VAR_F7 = -9932,
-    ECL_VAR_GF0 = -9922,
-    ECL_VAR_GF1 = -9921,
-    ECL_VAR_GF2 = -9920,
-    ECL_VAR_GF3 = -9919,
-    ECL_VAR_GF4 = -9918,
-    ECL_VAR_GF5 = -9917,
-    ECL_VAR_GF6 = -9916,
-    ECL_VAR_GF7 = -9915,
-};
-
 // FUNCTION: TH16 0x423f80
 int *EnemyInf::get_int_global_ptr(int var)
 {
@@ -1546,7 +1502,7 @@ int *EnemyInf::get_int_global_ptr(int var)
         return &g_EnemyManager->inner.miss_count;
     case ECL_VAR_BOMB_COUNT:
         return &g_EnemyManager->inner.bomb_count;
-    case ECL_VAR_CAN_STILL_CAPTURE:
+    case ECL_VAR_CAPTURE:
         return &g_EnemyManager->inner.can_still_capture_spell;
     case ECL_VAR_BOSS_I0:
         boss = g_EnemyManager->get_boss(0);
@@ -1674,233 +1630,233 @@ int EnemyInf::get_int_global(int var)
     f32 dy;
     switch (var)
     {
-    case -10000:
+    case ECL_VAR_RAND:
         return g_replay_safe_rng.rand_u32() & 0x7fffffff;
-    case -9999:
+    case ECL_VAR_RANDF:
         return (i32)g_replay_safe_rng.randf_0_to_1();
-    case -9987:
+    case ECL_VAR_RANDF2:
         return (i32)g_replay_safe_rng.randf_neg_1_to_1();
-    case -9997:
-    case -9977:
+    case ECL_VAR_FINAL_X:
+    case ECL_VAR_FINAL_X2:
         return (i32)enemy.final_pos.pos.x;
-    case -9996:
-    case -9976:
+    case ECL_VAR_FINAL_Y:
+    case ECL_VAR_FINAL_Y2:
         return (i32)enemy.final_pos.pos.y;
-    case -9995:
-    case -9975:
+    case ECL_VAR_ABS_X:
+    case ECL_VAR_ABS_X2:
         return (i32)enemy.abs_pos.pos.x;
-    case -9994:
-    case -9974:
+    case ECL_VAR_ABS_Y:
+    case ECL_VAR_ABS_Y2:
         return (i32)enemy.abs_pos.pos.y;
-    case -9993:
-    case -9973:
+    case ECL_VAR_REL_X:
+    case ECL_VAR_REL_X2:
         return (i32)enemy.rel_pos.pos.x;
-    case -9992:
-    case -9972:
+    case ECL_VAR_REL_Y:
+    case ECL_VAR_REL_Y2:
         return (i32)enemy.rel_pos.pos.y;
-    case -9991:
-    case -9965:
+    case ECL_VAR_PLAYER_X:
+    case ECL_VAR_PLAYER_X2:
         return (i32)g_Player->inner.pos.x;
-    case -9990:
-    case -9964:
+    case ECL_VAR_PLAYER_Y:
+    case ECL_VAR_PLAYER_Y2:
         return (i32)g_Player->inner.pos.y;
-    case -9988:
+    case ECL_VAR_TIME:
         return enemy.time_in_ecl.current;
-    case -9986:
+    case ECL_VAR_TIMEOUT:
         return ((EnemyFlagsLow *)&enemy.flags_low)->flag_1000000;
-    case -9971:
+    case ECL_VAR_ABS_ANGLE:
         return (i32)enemy.abs_pos.angle.value;
-    case -9970:
+    case ECL_VAR_REL_ANGLE:
         return (i32)enemy.rel_pos.angle.value;
-    case -9958:
+    case ECL_VAR_FINAL_ANGLE:
         return (i32)zun_atan2f(enemy.final_pos.velocity.y, enemy.final_pos.velocity.x);
-    case -9969:
+    case ECL_VAR_ABS_SPEED:
         return (i32)enemy.abs_pos.speed;
-    case -9968:
+    case ECL_VAR_REL_SPEED:
         return (i32)enemy.rel_pos.speed;
-    case -9967:
+    case ECL_VAR_ABS_RADIUS:
         return (i32)enemy.abs_pos.radial_dist;
-    case -9966:
+    case ECL_VAR_REL_RADIUS:
         return (i32)enemy.rel_pos.radial_dist;
-    case -9963:
+    case ECL_VAR_BOSS_X:
         return (i32)g_EnemyManager->get_boss(0)->enemy.final_pos.pos.x;
-    case -9962:
+    case ECL_VAR_BOSS_Y:
         return (i32)g_EnemyManager->get_boss(0)->enemy.final_pos.pos.y;
-    case -9961:
+    case ECL_VAR_MAIN_ANM_SCRIPT:
         return enemy.anm_ids[0].find_or_clear()->unk_49c;
-    case -9960:
+    case ECL_VAR_RANK:
         return g_Globals.rank;
-    case -9959:
+    case ECL_VAR_DIFF:
         return g_Globals.difficulty;
-    case -9954:
+    case ECL_VAR_LIFE:
         return enemy.life.current;
-    case -9953:
+    case ECL_VAR_EASY:
         return g_Globals.difficulty == DIFFICULTY_EASY;
-    case -9952:
+    case ECL_VAR_NORMAL:
         return g_Globals.difficulty == DIFFICULTY_NORMAL;
-    case -9951:
+    case ECL_VAR_HARD:
         return g_Globals.difficulty == DIFFICULTY_HARD;
-    case -9950:
+    case ECL_VAR_LUNATIC:
         return g_Globals.difficulty == DIFFICULTY_LUNATIC;
-    case -9949:
+    case ECL_VAR_MISS_COUNT:
         return g_EnemyManager->inner.miss_count;
-    case -9948:
+    case ECL_VAR_BOMB_COUNT:
         return g_EnemyManager->inner.bomb_count;
-    case -9947:
+    case ECL_VAR_CAPTURE:
         return g_EnemyManager->inner.can_still_capture_spell;
-    case -9946:
+    case ECL_VAR_ENM_CNT_REAL:
         return g_EnemyManager->enemy_count_real;
-    case -9908:
+    case ECL_VAR_ENM_CNT:
         return g_EnemyManager->get_enemy_count();
-    case -9945:
+    case ECL_VAR_SHOTTYPE:
         return g_Globals.subshot + g_Globals.character;
-    case -9944:
+    case ECL_VAR_DIST_PLAYER:
         dy = enemy.final_pos.pos.y - g_Player->inner.pos.y;
         dx = enemy.final_pos.pos.x - g_Player->inner.pos.x;
         return (i32)sqrtf(dx * dx + dy * dy);
-    case -9931:
+    case ECL_VAR_LAST_ENM_ID:
         return g_EnemyManager->inner.last_enemy_id;
-    case -9930:
+    case ECL_VAR_POWER:
         return g_Globals.power;
-    case -9927:
+    case ECL_VAR_DS3:
         if (g_GameThread->replay_mode == 0 && g_Supervisor.unk_700 != 0)
         {
             return 1;
         }
         break;
-    case -9957:
+    case ECL_VAR_TRUE:
         return 1;
-    case -9943:
+    case ECL_VAR_BOSS_I0:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return boss->enemy.ecl_int_vars[0];
         }
         break;
-    case -9942:
+    case ECL_VAR_BOSS_I1:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return boss->enemy.ecl_int_vars[1];
         }
         break;
-    case -9941:
+    case ECL_VAR_BOSS_I2:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return boss->enemy.ecl_int_vars[2];
         }
         break;
-    case -9940:
+    case ECL_VAR_BOSS_I3:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return boss->enemy.ecl_int_vars[3];
         }
         break;
-    case -9939:
+    case ECL_VAR_BOSS_F0:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)boss->enemy.ecl_float_vars[0];
         }
         break;
-    case -9938:
+    case ECL_VAR_BOSS_F1:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)boss->enemy.ecl_float_vars[1];
         }
         break;
-    case -9937:
+    case ECL_VAR_BOSS_F2:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)boss->enemy.ecl_float_vars[2];
         }
         break;
-    case -9936:
+    case ECL_VAR_BOSS_F3:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)boss->enemy.ecl_float_vars[3];
         }
         break;
-    case -9911:
+    case ECL_VAR_BOSS_ANGLE:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)zun_atan2f(boss->enemy.final_pos.velocity.y, boss->enemy.final_pos.velocity.x);
         }
         break;
-    case -9910:
+    case ECL_VAR_BOSS_SPEED:
         boss = g_EnemyManager->get_boss(0);
         if (boss != NULL)
         {
             return (i32)boss->enemy.abs_pos.speed;
         }
         break;
-    case -9909:
+    case ECL_VAR_PARENT_ID:
         return unk_5744;
-    case -9985:
+    case ECL_VAR_I0:
         return enemy.ecl_int_vars[0];
-    case -9984:
+    case ECL_VAR_I1:
         return enemy.ecl_int_vars[1];
-    case -9983:
+    case ECL_VAR_I2:
         return enemy.ecl_int_vars[2];
-    case -9982:
+    case ECL_VAR_I3:
         return enemy.ecl_int_vars[3];
-    case -9981:
+    case ECL_VAR_F0:
         return (i32)enemy.ecl_float_vars[0];
-    case -9980:
+    case ECL_VAR_F1:
         return (i32)enemy.ecl_float_vars[1];
-    case -9979:
+    case ECL_VAR_F2:
         return (i32)enemy.ecl_float_vars[2];
-    case -9978:
+    case ECL_VAR_F3:
         return (i32)enemy.ecl_float_vars[3];
-    case -9935:
+    case ECL_VAR_F4:
         return (i32)enemy.ecl_float_vars[4];
-    case -9934:
+    case ECL_VAR_F5:
         return (i32)enemy.ecl_float_vars[5];
-    case -9933:
+    case ECL_VAR_F6:
         return (i32)enemy.ecl_float_vars[6];
-    case -9932:
+    case ECL_VAR_F7:
         return (i32)enemy.ecl_float_vars[7];
-    case -9926:
+    case ECL_VAR_GI0:
         return g_EnemyManager->inner.ecl_int_vars[0];
-    case -9925:
+    case ECL_VAR_GI1:
         return g_EnemyManager->inner.ecl_int_vars[1];
-    case -9924:
+    case ECL_VAR_GI2:
         return g_EnemyManager->inner.ecl_int_vars[2];
-    case -9923:
+    case ECL_VAR_GI3:
         return g_EnemyManager->inner.ecl_int_vars[3];
-    case -9922:
+    case ECL_VAR_GF0:
         return (i32)g_EnemyManager->inner.ecl_float_vars[0];
-    case -9921:
+    case ECL_VAR_GF1:
         return (i32)g_EnemyManager->inner.ecl_float_vars[1];
-    case -9920:
+    case ECL_VAR_GF2:
         return (i32)g_EnemyManager->inner.ecl_float_vars[2];
-    case -9919:
+    case ECL_VAR_GF3:
         return (i32)g_EnemyManager->inner.ecl_float_vars[3];
-    case -9918:
+    case ECL_VAR_GF4:
         return (i32)g_EnemyManager->inner.ecl_float_vars[4];
-    case -9917:
+    case ECL_VAR_GF5:
         return (i32)g_EnemyManager->inner.ecl_float_vars[5];
-    case -9916:
+    case ECL_VAR_GF6:
         return (i32)g_EnemyManager->inner.ecl_float_vars[6];
-    case -9915:
+    case ECL_VAR_GF7:
         return (i32)g_EnemyManager->inner.ecl_float_vars[7];
-    case -9914:
+    case ECL_VAR_ID:
         return enemy_id;
-    case -9907:
+    case ECL_VAR_SPELL_ID:
         return g_Globals.spell_id;
-    case -9906:
+    case ECL_VAR_MIRROR:
         return ((EnemyFlagsLow *)&enemy.flags_low)->mirrored;
-    case -9905:
+    case ECL_VAR_CHAPTER:
         return g_Globals.chapter;
-    case -9904:
+    case ECL_VAR_GAME_MISS_COUNT:
         return g_Globals.miss_count;
-    case -9903:
+    case ECL_VAR_SUBSEASON:
         return g_Globals.subseason;
     }
     return 0;
@@ -1914,195 +1870,195 @@ f32 EnemyInf::get_float_global(int var)
     f32 dy;
     switch (var)
     {
-    case -10000:
+    case ECL_VAR_RAND:
         return g_replay_safe_rng.rand_u32() & 0x7fffffff;
-    case -9999:
+    case ECL_VAR_RANDF:
         return g_replay_safe_rng.randf_0_to_1();
-    case -9987:
+    case ECL_VAR_RANDF2:
         return g_replay_safe_rng.randf_neg_1_to_1();
-    case -9998:
+    case ECL_VAR_RANDRAD:
         return g_replay_safe_rng.randf_neg_1_to_1() * ZUN_PI;
-    case -9997:
-    case -9977:
+    case ECL_VAR_FINAL_X:
+    case ECL_VAR_FINAL_X2:
         return enemy.final_pos.pos.x;
-    case -9996:
-    case -9976:
+    case ECL_VAR_FINAL_Y:
+    case ECL_VAR_FINAL_Y2:
         return enemy.final_pos.pos.y;
-    case -9995:
-    case -9975:
+    case ECL_VAR_ABS_X:
+    case ECL_VAR_ABS_X2:
         return enemy.abs_pos.pos.x;
-    case -9994:
-    case -9974:
+    case ECL_VAR_ABS_Y:
+    case ECL_VAR_ABS_Y2:
         return enemy.abs_pos.pos.y;
-    case -9993:
-    case -9973:
+    case ECL_VAR_REL_X:
+    case ECL_VAR_REL_X2:
         return enemy.rel_pos.pos.x;
-    case -9992:
-    case -9972:
+    case ECL_VAR_REL_Y:
+    case ECL_VAR_REL_Y2:
         return enemy.rel_pos.pos.y;
-    case -9991:
-    case -9965:
+    case ECL_VAR_PLAYER_X:
+    case ECL_VAR_PLAYER_X2:
         return g_Player->inner.pos.x;
-    case -9990:
-    case -9964:
+    case ECL_VAR_PLAYER_Y:
+    case ECL_VAR_PLAYER_Y2:
         return g_Player->inner.pos.y;
-    case -9989:
+    case ECL_VAR_ANGLE_TO_PLAYER:
         return g_Player->angle_to_player(&enemy.final_pos.pos);
-    case -9988:
+    case ECL_VAR_TIME:
         return enemy.time_in_ecl.current_f;
-    case -9986:
+    case ECL_VAR_TIMEOUT:
         return ((EnemyFlagsLow *)&enemy.flags_low)->flag_1000000;
-    case -9985:
+    case ECL_VAR_I0:
         return enemy.ecl_int_vars[0];
-    case -9984:
+    case ECL_VAR_I1:
         return enemy.ecl_int_vars[1];
-    case -9983:
+    case ECL_VAR_I2:
         return enemy.ecl_int_vars[2];
-    case -9982:
+    case ECL_VAR_I3:
         return enemy.ecl_int_vars[3];
-    case -9981:
+    case ECL_VAR_F0:
         return enemy.ecl_float_vars[0];
-    case -9980:
+    case ECL_VAR_F1:
         return enemy.ecl_float_vars[1];
-    case -9979:
+    case ECL_VAR_F2:
         return enemy.ecl_float_vars[2];
-    case -9978:
+    case ECL_VAR_F3:
         return enemy.ecl_float_vars[3];
-    case -9935:
+    case ECL_VAR_F4:
         return enemy.ecl_float_vars[4];
-    case -9934:
+    case ECL_VAR_F5:
         return enemy.ecl_float_vars[5];
-    case -9933:
+    case ECL_VAR_F6:
         return enemy.ecl_float_vars[6];
-    case -9932:
+    case ECL_VAR_F7:
         return enemy.ecl_float_vars[7];
-    case -9943:
+    case ECL_VAR_BOSS_I0:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_int_vars[0] : 0.0f;
-    case -9942:
+    case ECL_VAR_BOSS_I1:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_int_vars[1] : 0.0f;
-    case -9941:
+    case ECL_VAR_BOSS_I2:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_int_vars[2] : 0.0f;
-    case -9940:
+    case ECL_VAR_BOSS_I3:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_int_vars[3] : 0.0f;
-    case -9939:
+    case ECL_VAR_BOSS_F0:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_float_vars[0] : 0.0f;
-    case -9938:
+    case ECL_VAR_BOSS_F1:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_float_vars[1] : 0.0f;
-    case -9937:
+    case ECL_VAR_BOSS_F2:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_float_vars[2] : 0.0f;
-    case -9936:
+    case ECL_VAR_BOSS_F3:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.ecl_float_vars[3] : 0.0f;
-    case -9911:
+    case ECL_VAR_BOSS_ANGLE:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? zun_atan2f(boss->enemy.final_pos.velocity.y, boss->enemy.final_pos.velocity.x) : 0.0f;
-    case -9910:
+    case ECL_VAR_BOSS_SPEED:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.abs_pos.speed : 0.0f;
-    case -9971:
+    case ECL_VAR_ABS_ANGLE:
         return enemy.abs_pos.angle.value;
-    case -9970:
+    case ECL_VAR_REL_ANGLE:
         return enemy.rel_pos.angle.value;
-    case -9958:
+    case ECL_VAR_FINAL_ANGLE:
         return zun_atan2f(enemy.final_pos.velocity.y, enemy.final_pos.velocity.x);
-    case -9969:
+    case ECL_VAR_ABS_SPEED:
         return enemy.abs_pos.speed;
-    case -9968:
+    case ECL_VAR_REL_SPEED:
         return enemy.rel_pos.speed;
-    case -9967:
+    case ECL_VAR_ABS_RADIUS:
         return enemy.abs_pos.radial_dist;
-    case -9966:
+    case ECL_VAR_REL_RADIUS:
         return enemy.rel_pos.radial_dist;
-    case -9963:
+    case ECL_VAR_BOSS_X:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.final_pos.pos.x : 0.0f;
-    case -9962:
+    case ECL_VAR_BOSS_Y:
         boss = g_EnemyManager->get_boss(0);
         return boss != NULL ? boss->enemy.final_pos.pos.y : 128.0f;
-    case -9960:
+    case ECL_VAR_RANK:
         return g_Globals.rank;
-    case -9959:
+    case ECL_VAR_DIFF:
         return g_Globals.difficulty;
-    case -9957:
+    case ECL_VAR_TRUE:
         return 1.0f;
-    case -9956:
+    case ECL_VAR_ABS_ANGLE_TO_PLAYER:
         return g_Player->angle_to_player(&enemy.abs_pos.pos);
-    case -9955:
+    case ECL_VAR_REL_ANGLE_TO_PLAYER:
         return g_Player->angle_to_player(&enemy.rel_pos.pos);
-    case -9954:
+    case ECL_VAR_LIFE:
         return enemy.life.current;
-    case -9953:
+    case ECL_VAR_EASY:
         return g_Globals.difficulty == 0.0f;
-    case -9952:
+    case ECL_VAR_NORMAL:
         return g_Globals.difficulty == 1.0f;
-    case -9951:
+    case ECL_VAR_HARD:
         return g_Globals.difficulty == 2.0f;
-    case -9950:
+    case ECL_VAR_LUNATIC:
         return g_Globals.difficulty == 3.0f;
-    case -9949:
+    case ECL_VAR_MISS_COUNT:
         return g_EnemyManager->inner.miss_count;
-    case -9948:
+    case ECL_VAR_BOMB_COUNT:
         return g_EnemyManager->inner.bomb_count;
-    case -9947:
+    case ECL_VAR_CAPTURE:
         return g_EnemyManager->inner.can_still_capture_spell;
-    case -9946:
+    case ECL_VAR_ENM_CNT_REAL:
         return g_EnemyManager->enemy_count_real;
-    case -9908:
+    case ECL_VAR_ENM_CNT:
         return g_EnemyManager->get_enemy_count();
-    case -9945:
+    case ECL_VAR_SHOTTYPE:
         return g_Globals.subshot + g_Globals.character;
-    case -9944:
+    case ECL_VAR_DIST_PLAYER:
         dy = enemy.final_pos.pos.y - g_Player->inner.pos.y;
         dx = enemy.final_pos.pos.x - g_Player->inner.pos.x;
         return sqrtf(dx * dx + dy * dy);
-    case -9931:
+    case ECL_VAR_LAST_ENM_ID:
         return (u32)g_EnemyManager->inner.last_enemy_id;
-    case -9930:
+    case ECL_VAR_POWER:
         return g_Globals.power;
-    case -9927:
+    case ECL_VAR_DS3:
         return (f32)(g_GameThread->replay_mode == 0) && g_Supervisor.unk_700 != 0;
-    case -9909:
+    case ECL_VAR_PARENT_ID:
         return (u32)unk_5744;
-    case -9926:
+    case ECL_VAR_GI0:
         return g_EnemyManager->inner.ecl_int_vars[0];
-    case -9925:
+    case ECL_VAR_GI1:
         return g_EnemyManager->inner.ecl_int_vars[1];
-    case -9924:
+    case ECL_VAR_GI2:
         return g_EnemyManager->inner.ecl_int_vars[2];
-    case -9923:
+    case ECL_VAR_GI3:
         return g_EnemyManager->inner.ecl_int_vars[3];
-    case -9922:
+    case ECL_VAR_GF0:
         return g_EnemyManager->inner.ecl_float_vars[0];
-    case -9921:
+    case ECL_VAR_GF1:
         return g_EnemyManager->inner.ecl_float_vars[1];
-    case -9920:
+    case ECL_VAR_GF2:
         return g_EnemyManager->inner.ecl_float_vars[2];
-    case -9919:
+    case ECL_VAR_GF3:
         return g_EnemyManager->inner.ecl_float_vars[3];
-    case -9918:
+    case ECL_VAR_GF4:
         return g_EnemyManager->inner.ecl_float_vars[4];
-    case -9917:
+    case ECL_VAR_GF5:
         return g_EnemyManager->inner.ecl_float_vars[5];
-    case -9916:
+    case ECL_VAR_GF6:
         return g_EnemyManager->inner.ecl_float_vars[6];
-    case -9915:
+    case ECL_VAR_GF7:
         return g_EnemyManager->inner.ecl_float_vars[7];
-    case -9914:
+    case ECL_VAR_ID:
         return (u32)enemy_id;
-    case -9907:
+    case ECL_VAR_SPELL_ID:
         return g_Globals.spell_id;
-    case -9906:
+    case ECL_VAR_MIRROR:
         return (enemy.flags_low >> 19) & 1;
-    case -9905:
+    case ECL_VAR_CHAPTER:
         return g_Globals.chapter;
-    case -9903:
+    case ECL_VAR_SUBSEASON:
         return g_Globals.subseason;
     }
     return 0.0f;

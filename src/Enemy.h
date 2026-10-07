@@ -266,6 +266,137 @@ struct EnemyData
     f32 *get_float_arg_ptr(int index);
 };
 
+// The global variables of enemy ECL (EnemyInf::get_int_global and
+// friends). Names follow ExpHP's th-re-data labels where they fit.
+enum EclVar
+{
+    // Random nonnegative integer.
+    ECL_VAR_RAND = -10000,
+    // Random float in [0, 1).
+    ECL_VAR_RANDF = -9999,
+    // Random angle in [-pi, pi) (float only).
+    ECL_VAR_RANDRAD = -9998,
+    // Position the enemy is drawn at (abs_pos + rel_pos).
+    ECL_VAR_FINAL_X = -9997,
+    ECL_VAR_FINAL_Y = -9996,
+    ECL_VAR_ABS_X = -9995,
+    ECL_VAR_ABS_Y = -9994,
+    ECL_VAR_REL_X = -9993,
+    ECL_VAR_REL_Y = -9992,
+    ECL_VAR_PLAYER_X = -9991,
+    ECL_VAR_PLAYER_Y = -9990,
+    // From final_pos (float only).
+    ECL_VAR_ANGLE_TO_PLAYER = -9989,
+    // time_in_ecl.
+    ECL_VAR_TIME = -9988,
+    // Random float in [-1, 1).
+    ECL_VAR_RANDF2 = -9987,
+    // Set while a time interrupt runs (EnemyFlagsLow::timeout).
+    ECL_VAR_TIMEOUT = -9986,
+    // The enemy's own variables (ecl_int_vars, ecl_float_vars).
+    ECL_VAR_I0 = -9985,
+    ECL_VAR_I1 = -9984,
+    ECL_VAR_I2 = -9983,
+    ECL_VAR_I3 = -9982,
+    ECL_VAR_F0 = -9981,
+    ECL_VAR_F1 = -9980,
+    ECL_VAR_F2 = -9979,
+    ECL_VAR_F3 = -9978,
+    // Aliases of FINAL_X to REL_Y.
+    ECL_VAR_FINAL_X2 = -9977,
+    ECL_VAR_FINAL_Y2 = -9976,
+    ECL_VAR_ABS_X2 = -9975,
+    ECL_VAR_ABS_Y2 = -9974,
+    ECL_VAR_REL_X2 = -9973,
+    ECL_VAR_REL_Y2 = -9972,
+    // Movement of abs_pos and rel_pos.
+    ECL_VAR_ABS_ANGLE = -9971,
+    ECL_VAR_REL_ANGLE = -9970,
+    ECL_VAR_ABS_SPEED = -9969,
+    ECL_VAR_REL_SPEED = -9968,
+    // Radius of circular movement.
+    ECL_VAR_ABS_RADIUS = -9967,
+    ECL_VAR_REL_RADIUS = -9966,
+    // Aliases of PLAYER_X and PLAYER_Y.
+    ECL_VAR_PLAYER_X2 = -9965,
+    ECL_VAR_PLAYER_Y2 = -9964,
+    // Boss 0's final_pos.
+    ECL_VAR_BOSS_X = -9963,
+    ECL_VAR_BOSS_Y = -9962,
+    // Script number of the VM in anm_ids[0] (ExpHP: ANM_ID).
+    ECL_VAR_MAIN_ANM_SCRIPT = -9961,
+    ECL_VAR_RANK = -9960,
+    ECL_VAR_DIFF = -9959,
+    // Direction of final_pos's velocity.
+    ECL_VAR_FINAL_ANGLE = -9958,
+    // Always 1.
+    ECL_VAR_TRUE = -9957,
+    // From abs_pos and rel_pos (float only).
+    ECL_VAR_ABS_ANGLE_TO_PLAYER = -9956,
+    ECL_VAR_REL_ANGLE_TO_PLAYER = -9955,
+    ECL_VAR_LIFE = -9954,
+    // 1 on that difficulty.
+    ECL_VAR_EASY = -9953,
+    ECL_VAR_NORMAL = -9952,
+    ECL_VAR_HARD = -9951,
+    ECL_VAR_LUNATIC = -9950,
+    // EnemyManagerInner counters for the current spell.
+    ECL_VAR_MISS_COUNT = -9949,
+    ECL_VAR_BOMB_COUNT = -9948,
+    ECL_VAR_CAPTURE = -9947,
+    // EnemyManager::enemy_count_real.
+    ECL_VAR_ENM_CNT_REAL = -9946,
+    // Character plus subshot.
+    ECL_VAR_SHOTTYPE = -9945,
+    // Distance from final_pos to the player.
+    ECL_VAR_DIST_PLAYER = -9944,
+    // Boss 0's variables (the enemy's own when there is no boss).
+    ECL_VAR_BOSS_I0 = -9943,
+    ECL_VAR_BOSS_I1 = -9942,
+    ECL_VAR_BOSS_I2 = -9941,
+    ECL_VAR_BOSS_I3 = -9940,
+    ECL_VAR_BOSS_F0 = -9939,
+    ECL_VAR_BOSS_F1 = -9938,
+    ECL_VAR_BOSS_F2 = -9937,
+    ECL_VAR_BOSS_F3 = -9936,
+    ECL_VAR_F4 = -9935,
+    ECL_VAR_F5 = -9934,
+    ECL_VAR_F6 = -9933,
+    ECL_VAR_F7 = -9932,
+    ECL_VAR_LAST_ENM_ID = -9931,
+    ECL_VAR_POWER = -9930,
+    // 1 outside replays when Supervisor::unk_700 is set (ExpHP: DS3).
+    ECL_VAR_DS3 = -9927,
+    // Globals shared by every enemy (EnemyManagerInner).
+    ECL_VAR_GI0 = -9926,
+    ECL_VAR_GI1 = -9925,
+    ECL_VAR_GI2 = -9924,
+    ECL_VAR_GI3 = -9923,
+    ECL_VAR_GF0 = -9922,
+    ECL_VAR_GF1 = -9921,
+    ECL_VAR_GF2 = -9920,
+    ECL_VAR_GF3 = -9919,
+    ECL_VAR_GF4 = -9918,
+    ECL_VAR_GF5 = -9917,
+    ECL_VAR_GF6 = -9916,
+    ECL_VAR_GF7 = -9915,
+    // The enemy's own id.
+    ECL_VAR_ID = -9914,
+    // Direction of boss 0's velocity.
+    ECL_VAR_BOSS_ANGLE = -9911,
+    ECL_VAR_BOSS_SPEED = -9910,
+    // Id of the enemy that created this one (ExpHP: UNKNOWN9).
+    ECL_VAR_PARENT_ID = -9909,
+    // EnemyManager::get_enemy_count.
+    ECL_VAR_ENM_CNT = -9908,
+    ECL_VAR_SPELL_ID = -9907,
+    ECL_VAR_MIRROR = -9906,
+    ECL_VAR_CHAPTER = -9905,
+    // Misses in the whole game (Globals::miss_count, int only).
+    ECL_VAR_GAME_MISS_COUNT = -9904,
+    ECL_VAR_SUBSEASON = -9903,
+};
+
 // Damage hooks ECL can install (EnemyData::func_from_ecl_flag_ext_dmg).
 typedef int(__fastcall *EnemyExtDamageFunc)(EnemyData *enemy, int damage);
 
