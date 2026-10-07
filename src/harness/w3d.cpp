@@ -106,3 +106,10 @@ void harness_w3d_graze(Float3 *pos)
 {
     g_Player->do_graze(pos);
 }
+
+// Enemies and lasers (0x41c99b, 0x433615, ...) test rotated rectangles.
+i32 harness_w3d_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only)
+{
+    return g_Player->check_hit_rotated_rect(pos, angle, width, length, graze_only) +
+           g_Player->check_hit_rotated_rect(pos, width, angle, length * 2.0f, 0);
+}

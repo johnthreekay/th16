@@ -333,6 +333,9 @@ struct Player
     // turns a hit into a graze.
     HARNESS_CALLED i32 check_hit_rect(Float3 *pos, Float3 *size, i32 graze_only);
     HARNESS_CALLED i32 check_hit_circle(Float3 *pos, f32 radius, i32 graze_only);
+    // 0x443af0. The same for a rectangle reaching length from pos along
+    // angle, width wide (lasers).
+    HARNESS_CALLED i32 check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only);
 };
 
 // .sht files kept by ~Player when the next Player reuses them.

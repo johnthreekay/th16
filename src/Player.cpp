@@ -537,3 +537,45 @@ HARNESS_CALLED void Player::do_graze(Float3 *pos)
     g_ItemManager->spawn_item(0x10, pos, 0, atan2f(pos->y - player->inner.pos.y, pos->x - player->inner.pos.x), 1.9f,
                               0, 0);
 }
+
+// TODO: the original realigns its frame (and esp, -8) and orders the
+// rotation and the bounds differently (same convention and logic).
+// FUNCTION: TH16 0x443af0
+HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only)
+{
+    f32 neg_angle = -angle;
+    D3DXVECTOR3 d = inner.pos - *pos;
+    f32 s = zun_sinf(neg_angle);
+    f32 c = zun_cosf(neg_angle);
+    D3DXVECTOR3 r(d.x * c - d.y * s, d.y * c + d.x * s, 0.0f);
+    D3DXVECTOR3 lo = r - hurtbox_halfsize * 16.0f;
+    D3DXVECTOR3 hi = r + hurtbox_halfsize * 16.0f;
+    if (lo.x > length || lo.y > width * 0.5f || 0.0f > hi.x || width * -0.5f > hi.y)
+    {
+        return 0;
+    }
+    lo = r - hurtbox_halfsize;
+    hi = r + hurtbox_halfsize;
+    if (lo.x > length || lo.y > width * 0.5f || 0.0f > hi.x || width * -0.5f > hi.y)
+    {
+        return 2;
+    }
+    if (g_Gui != NULL && g_Gui->msg != NULL)
+    {
+        return 0;
+    }
+    if (graze_only)
+    {
+        return 2;
+    }
+    if (inner.state == 2 || inner.state == 4 || inner.state == 3)
+    {
+        return 0;
+    }
+    if (inner.iframes.current > 0)
+    {
+        return 0;
+    }
+    die();
+    return 1;
+}
