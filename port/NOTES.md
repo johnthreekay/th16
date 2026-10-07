@@ -49,14 +49,16 @@ locks and the text upload work; Present waits for the next 1/60 s when
 the game asks for vsync). It is for running the game without a renderer.
 
 The CMake build compiles every `src/*.cpp` (the glob is not recursive, so
-`src/stub/`, `src/placeholder/` and `src/harness/` stay out) and `port/src/*.cpp`,
-with `-DTH16_PORT`, C++17 (gnu++17) and `-include port/include/port_prelude.h`.
+`src/harness/`, the matching build's stand-in callers, stays out),
+`src/stub/Opaque.cpp` by name (see "Game data in src/stub/") and
+`port/src/*.cpp`, with `-DTH16_PORT`, C++17 (gnu++17) and
+`-include port/include/port_prelude.h`.
 
 Flags that matter for behaviour (CMakeLists.txt): `-fno-strict-aliasing`,
 `-fwrapv`, `-fno-delete-null-pointer-checks`, `-fsigned-char`,
 `-ffp-contract=off`, GCC's
 `-fno-aggressive-loop-optimizations` (the game indexes past arrays, e.g.
-`Scorefile::unlock_all` writes `clears[5]` of an `i32[5]`, MainMenu.cpp:782),
+`Scorefile::unlock_all` writes `clears[5]` of an `i32[5]`, MainMenu.cpp:791),
 and for `-m32` `-msse2 -mfpmath=sse` (the original does its float math in SSE;
 x87 would round differently).
 
@@ -64,13 +66,13 @@ Warnings left in a clean build (Clang 41/32, GCC 72/63 for 64/32-bit; no
 errors): 31 `-Wdelete-non-virtual-dtor` (the game's
 classes have virtual methods and non-virtual destructors, as in the
 original), 24 GCC `-Wuninitialized` (constructors that clear one bit of an
-uninitialised field: UpdateFunc.h:67, ZunTimer.h:33, written that way to
-match), 9 `-Wint-to-pointer-cast` on 64-bit (LaserXInf::method_1c, never
-called, see below), 5 `-Wmismatched-new-delete` (DSUtil.cpp's SAFE_DELETE on arrays,
-SupervisorSetup.cpp:166 `delete` of a `new[]`), 2 GCC `-Waddress`
-(Stage.cpp:610, 631: comparing `&sprites[i]` with NULL), 1 GCC
-`-Wformat-overflow` (GameWindow.cpp:415, a 4 KiB save path into a 256-byte
-buffer, as in the original).
+uninitialised field: UpdateFunc.h:76, ZunTimer.h:35, written that way to
+match), 9 `-Wint-to-pointer-cast` on 64-bit (`sum_rect_damage` of the
+laser classes, never called, see below), 5 `-Wmismatched-new-delete`
+(DSUtil.cpp's SAFE_DELETE on arrays, SupervisorSetup.cpp:170 `delete` of a
+`new[]`), 2 GCC `-Waddress` (Stage.cpp:635, 656: comparing `&sprites[i]`
+with NULL), 1 GCC `-Wformat-overflow` (GameWindow.cpp:415, a 4 KiB save
+path into a 256-byte buffer, as in the original).
 
 ## Layout of port/
 
@@ -85,6 +87,8 @@ buffer, as in the original).
     `_vsprintf_l`, `__time64_t`, `_time64`, `_localtime64`, and a
     `localtime(const __time64_t *)` overload since MSVC's `time_t` is 64-bit).
   - `port_fpu.h`: the x87 inline assembly as functions (see below).
+  - `d3dx9math.h` also has `PortAnonVec3`, a D3DXVECTOR3 without
+    constructors for members of anonymous structs (see below).
   - `port_com.h`: HRESULT, GUID, IUnknown, `DEFINE_GUID` (declares only),
     CoInitialize/CoCreateInstance.
   - `windows.h`, `mmsystem.h`, `mmreg.h`, `winnls32.h`, `shlobj.h`,
@@ -130,15 +134,11 @@ buffer, as in the original).
     decoding, which the game data never needs (see "Graphics").
   - `dsound_sdl.cpp`, `dsound_sdl.h`: DirectSound 8 as a software mixer on
     one SDL audio device, complete for what the game uses (see "Audio").
-  - `game_tables.cpp`: the game globals the matching build defines in
-    `src/stub/` (see "Game data in src/stub/").
   - `layout_checks.cpp`: compile-time layout checks that stay on in the
     64-bit build (`TH16_PORT_CHECK`, defined in port_prelude.h).
 - `tests/`: the audio tests (see "Audio"), the platform test
-  (`platform_test.cpp`), `th16dat.py`, a Python copy of the game's
-  th16.dat reader that lists and extracts files for tests, and
-  `platform_shim.cpp`, the test-only platform layer the renderer was
-  tested with before the real one existed (see "Graphics").
+  (`platform_test.cpp`) and `th16dat.py`, a Python copy of the game's
+  th16.dat reader that lists and extracts files for tests.
 
 The interfaces in `include/` are C++ abstract classes with only the methods
 the game calls (plus a few obvious companions), in an order of our own: the
@@ -152,30 +152,41 @@ SDK's, so code and data that use them keep their meaning.
 
 - `src/decomp.h`: a `#ifdef TH16_PORT` branch defines `DECOMP_NOINLINE` as
   `__attribute__((noinline))`, `DECOMP_ALIGN16` as
-  `__attribute__((aligned(16)))`, `HARNESS_CALLED`, `LTCG_FASTCALL`,
-  `LTCG_VECTORCALL` as nothing and `LTCG_NOTHROW` as `noexcept`.
+  `__attribute__((aligned(16)))`, and `HARNESS_CALLED`, `LTCG_FASTCALL`,
+  `LTCG_VECTORCALL` as nothing.
 - `src/types.h`: `iptr`/`uptr`, integers that hold pointers (`i32`/`u32`
   for MSVC, `intptr_t`/`uintptr_t` in the port).
-- Inline assembly: every `__asm` block has a `#ifdef TH16_PORT` branch that
-  calls a `port_fpu.h` helper with the same arguments: `port_sincosmul`,
-  `port_sincosmul2` (the fsincos multiply copies, 20 of them),
-  `port_sincos` (fld/fsincos/fstp pairs), `port_frndint_sub` (AnmDraw.cpp's
-  pixel snapping) and `port_finit` (`__asm finit`, a no-op). On x86 and
-  x86-64 the helpers run `fsincos` itself through GNU inline asm on
-  `long double`, so results are bit-identical to the original (which runs
-  them after `finit`, in 64-bit precision). Elsewhere (ARM macOS) they fall
-  back to `sinl`/`cosl`, which can differ in the last bit. Main's readability
-  pass plans to move these blocks behind helpers in `src/ZunAsm.h`; when that
-  merges, the `#ifdef TH16_PORT` branches belong inside those helpers.
+- Inline assembly: every `__asm` block in the game goes through a macro in
+  `src/ZunAsm.h`, and each macro has a `#ifdef TH16_PORT` branch that calls
+  a `port_fpu.h` helper; the game sources have no per-site port code for
+  asm. `ZUN_ASM_SINCOSMUL_XY`, `ZUN_ASM_SINCOSMUL` and
+  `ZUN_ASM_SINCOSMUL_PTRS` (the fsincos multiply copies) call
+  `port_sincosmul2`, `ZUN_ASM_SINCOS` (fld/fsincos/fstp pairs)
+  `port_sincos`, `ZUN_ASM_SNAP_QUAD_TO_PIXEL_CENTERS` (AnmDraw.cpp's pixel
+  snapping) `port_frndint_sub` per coordinate, and `ZUN_ASM_FINIT`
+  `port_finit` (a no-op). On x86 and x86-64 the helpers run `fsincos`
+  itself through GNU inline asm on `long double`, so results are
+  bit-identical to the original when it runs them in 64-bit precision
+  (after `finit`). Elsewhere (ARM macOS) they fall back to `sinl`/`cosl`,
+  which can differ in the last bit. (ZunAsm.h notes that Direct3D puts the
+  x87 unit in 24-bit precision at device creation; the game's `finit`s,
+  among them those in the Rng float functions, put it back to 64 bits.)
 - MSVC extensions in the code itself:
   - taking the address of a temporary vector (`&(a - b)`,
     `&Float3(x, y, z)`): `D3DXVECTOR2/3/4` and `D3DXMATRIX` have a member
     `operator&`, which is legal on temporaries;
   - binding `AnmId &` to a temporary (`get_vm_or_clear(find_child_id(...))`):
     an rvalue overload in AnmManager.h under `TH16_PORT`;
-  - two `goto`s jumping past initialisations: BulletManager.cpp (the angle
-    in case 4 moved into its own block) and PauseMenu.cpp (`choice`
-    declared, then assigned). Both unguarded; MSVC output unchanged.
+  - three `goto`s jumping past initialisations: BulletManager.cpp (the
+    angle in the BULLET_EX_ACCEL case moved into its own block),
+    PauseMenu.cpp (`choice` declared, then assigned) and GameThread.cpp
+    (`zero` in `thread_start`, the same). All unguarded; MSVC output
+    unchanged;
+  - members with constructors in an anonymous struct (Bomb.h's
+    `BombReimuAOrb`, whose `pos` and `start_pos` overlay its `PosVel`):
+    GCC rejects them, so under `TH16_PORT` they are `PortAnonVec3`
+    (d3dx9math.h), D3DXVECTOR3's layout without constructors, converting
+    to and from D3DXVECTOR3 and with its arithmetic.
 - Calling conventions are irrelevant in the port (every caller and callee is
   ours), so they expand to nothing, including in function pointer types.
 
@@ -434,9 +445,36 @@ it run for 90 s without input. With the OpenGL renderer (normal build,
 `TH16_GL_DUMP_DIR` for frames; offscreen on NVIDIA, Xvfb on Mesa
 llvmpipe): the loading screen and title menu, the music room's text, and
 stage 1 played holding Z (`xdotool keydown z`) through the midboss to the
-boss dialogue, whose text shows in the speech bubbles. SDL's HIDAPI controller probing (libusb) can take a
-second or more at startup, much longer under gdb; `SDL_JOYSTICK_HIDAPI=0`
-skips it for tests.
+boss dialogue, whose text shows in the speech bubbles. SDL's HIDAPI
+controller probing (libusb) can take a second or more at startup, much
+longer under gdb; `SDL_JOYSTICK_HIDAPI=0` skips it for tests.
+
+A headless run with the OpenGL renderer and keys, as used for the checks
+after merging main (no window on the desktop, no sound; the game data is
+only read, saves go to the `--save-dir`), as a script run by
+`xvfb-run -a -s "-screen 0 1280x1024x24" sh run.sh`:
+
+```
+export SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy SDL_JOYSTICK_HIDAPI=0 TH16_NO_DIALOGS=1
+export TH16_GL_DUMP_DIR=$PWD/build-port/run/frames TH16_GL_DUMP_EVERY=60 TH16_GL_EXIT_AFTER=4200
+mkdir -p build-port/run/frames build-port/run/save
+build-port/clang64/th16 --save-dir build-port/run/save \
+    --game-dir "$HOME/Touhou Project/(TH16) Touhou Tenkuushou ~ Hidden Star in Four Seasons" &
+sleep 14
+for i in 1 2 3 4 5; do xdotool mousemove 200 200 keydown z sleep 0.15 keyup z; sleep 2; done
+sleep 8; xdotool keydown z; wait
+```
+
+(Z five times: Game Start, difficulty, character, season, then into stage
+1; then Z held. Without a window manager, keys go to the window under the
+pointer, hence the `mousemove`.) Checked this way after the merge of main
+72c0ffa (clang64, Mesa llvmpipe): the title menu, stage 1 with its
+enemies, items, HUD and the BGM caption, enemy bullets (now from main's
+`g_bullet_types`), grazing, the player dying (Normal starts with two spare
+lives) and the continue menu once they run out. The straight-edged fog
+area at the bottom of the playfield before the midboss (around stage
+frame 2300) looks the same in the build from before the merge at the same
+stage time.
 
 ### Not done
 
@@ -544,9 +582,9 @@ port/tests/run_dsound_tests.sh build-port/clang64 "<game dir>"
   after `seek`. The test provides the few Win32 calls DSUtil.cpp makes.
 
 All pass in the four builds, and under ThreadSanitizer (clang64 with
-`-fsanitize=thread`). The game itself does not reach DirectSound yet (it
-stops at th16.cfg). Once files, threads and events work, the title BGM
-should stream as in `th16_dsound_game_test`.
+`-fsanitize=thread`). The game uses the mixer through the platform layer;
+the headless runs use SDL's dummy driver, where the BGM thread takes its
+commands and stages start.
 
 ## Graphics
 
@@ -642,71 +680,41 @@ thread).
 
 ### Testing
 
-Before the platform layer existed, `-DTH16_TEST_SHIM=ON` linked
-`port/tests/platform_shim.cpp` first with `--allow-multiple-definition`, so
-its files, threads, events, window (attached to the renderer) and scripted
-keyboard replace the stubs. Without a sound device it also drops the
-queued BGM commands, which GameThread otherwise waits for forever before
-a stage starts. The platform layer supersedes it (with it, run the
-normal build the same way, keys through xdotool under xvfb-run: see
-"Platform layer", Testing); the renderer variables below work with
-either. Its file layer
-reads missing files from the game folder (`TH16_GAME_DIR`, by default
-`~/Touhou Project/(TH16) Touhou Tenkuushou ~ Hidden Star in Four Seasons`)
-read-only, and writes only to the current directory (APPDATA is
-`./appdata`, so th16.cfg, score and snapshots go to
-`./appdata/ShanghaiAlice/th16/`).
-
-Headless run (no window on the desktop, no sound), from a run directory
-under build-port/ holding `appdata/ShanghaiAlice/th16/th16.cfg` (a
-windowed configuration):
-
-```
-env -u DISPLAY -u WAYLAND_DISPLAY SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy \
-    TH16_GL_DUMP_DIR=frames TH16_GL_DUMP_EVERY=300 TH16_GL_EXIT_AFTER=3600 \
-    TH16_SHIM_KEYS=900:Z:5,940:Z:5,... ../shim64/th16
-```
-
+Run the normal build headless as in "Platform layer", Testing (Xvfb with
+Mesa, or SDL's offscreen driver on NVIDIA through EGL; for Mesa through
+EGL point `__EGL_VENDOR_LIBRARY_FILENAMES` at glvnd's `50_mesa.json`).
 Renderer environment variables (any build): `TH16_GL_DUMP_DIR` (write
 the back buffer as `frame_NNNNNN.png` there), `TH16_GL_DUMP_EVERY` (every
 N presents, default 60), `TH16_GL_DUMP_FROM` (first frame to dump),
 `TH16_GL_EXIT_AFTER` (exit after N presents), `TH16_GL_TRACE_FRAME` (log
 the render target changes, clears and draws with their state for that
 frame), `TH16_GL_PACE=0` (no 60 Hz timer: run as fast as possible),
-`TH16_GL_VSYNC=0`. Shim: `TH16_SHIM_KEYS` ("frame:KEY:frames,...", frames
-counted in GetKeyboardState calls; Z X C P UP DOWN LEFT RIGHT ESC SHIFT
-CTRL ENTER), `TH16_GAME_DIR`.
+`TH16_GL_VSYNC=0`.
 
-Checked this way (clang 32- and 64-bit, NVIDIA through EGL with SDL's
-offscreen driver), at 640x480 and 1280x960: the loading screen, the title
-screen, difficulty, character and season selection, stage 1 (3D forest
-with fog, enemies, items, HUD, the spring season release, the player's
-invincibility blink), the pause menu (its blurred copy of the playfield
-goes through D3DXLoadSurfaceFromSurface from a render target), and the
-in-game screenshot (P: back buffer LockRect, written as a BMP by the
-game's thread). Also on Mesa (llvmpipe, through EGL: point
-`__EGL_VENDOR_LIBRARY_FILENAMES` at glvnd's `50_mesa.json`), and with BGM
-on through dsound_sdl.cpp on SDL's dummy audio driver (the stage starts,
-so the BGM thread drains its queue). Text drawn through GDI (TextHelper)
-stays blank until the GDI layer exists; the textures it fills work like
-any other.
+Checked (clang 32- and 64-bit, NVIDIA through EGL and Mesa llvmpipe), at
+640x480 and 1280x960: the loading screen, the title screen, difficulty,
+character and season selection, stage 1 (3D forest with fog, enemies,
+items, HUD, the spring season release, the player's invincibility blink),
+the pause menu (its blurred copy of the playfield goes through
+D3DXLoadSurfaceFromSurface from a render target), the in-game screenshot
+(P: back buffer LockRect, written as a BMP by the game's thread), GDI text
+(menus, the music room, dialogue) and BGM through dsound_sdl.cpp on SDL's
+dummy audio driver. (Before the platform layer existed this was checked
+with a test-only shim, port/tests/platform_shim.cpp, since removed.)
 
 ## Game data in src/stub/
 
-`src/stub/`, `src/placeholder/` and `src/harness/` hold no game functions
-(no `FUNCTION` annotations; the placeholders and harness callers only
-shape MSVC's output, and the link succeeds without them). But `src/stub/`
-defines 19 real game globals (with `GLOBAL` annotations), zero-filled so that
-LTCG cannot see their contents. In the original 10 of them have contents:
-the ANM callback tables `g_anm_on_switch_funcs`, `g_anm_on_destroy_funcs`,
-`g_anm_on_copy_funcs`, `g_anm_serialize_funcs`, `g_anm_on_tick_funcs`,
-`g_anm_sprite_mapping_funcs`, `g_anm_on_draw_funcs`, the effect table
-`g_effect_table`, the stage table `g_stage_table` and
-`g_spell_difficulty`. `port/src/game_tables.cpp` defines all 19 with the
-original's contents (read from th16.exe 1.00a). When main moves them into
-`src/` (its readability plan), delete the entries here: the zero-filled
-ones are weak and give way silently, the tables are strong and the link
-reports the duplicate.
+`src/harness/` holds no game code: its stand-in callers only shape MSVC's
+output, and the port leaves it out. `src/stub/` is one file, `Opaque.cpp`,
+which the matching build compiles without /GL so that LTCG cannot see into
+it: the game globals `g_zero_vec2` and `g_stage_table` (with the
+original's contents) and two empty sink functions the harness calls. The
+port compiles it by name (port/CMakeLists.txt); the sinks are dead code
+there. Every other data table (the ANM callback tables, `g_effect_table`,
+`g_spell_difficulty`, `g_bullet_types`, `g_pad_mapping`, `g_game_speed`,
+`g_Globals`' starting difficulty) is defined with its contents in its
+module in `src/`, so the port has no copies of game data of its own (it
+used to, in `port/src/game_tables.cpp`, while main had them zero-filled).
 
 ## Keeping the matching build
 
@@ -716,14 +724,20 @@ reports the duplicate.
   from its assignment). After each change:
   `.venv/bin/python scripts/build.py`, `scripts/check_unchanged.py` (all
   1214 functions unchanged) and `scripts/quickdiff.py | grep -c MATCH`
-  (842 at the start of this branch and after it). `check_unchanged` always
-  reports `.rdata` as different: the linker writes a new timestamp and PDB
-  id each time, even for identical builds.
+  (863 after merging main 72c0ffa). `check_unchanged` always reports
+  `.rdata` as different: the linker writes a new timestamp and PDB id each
+  time, even for identical builds. Build the baseline (main's tree) in a
+  directory whose path has the same length as the one being checked: the
+  PDB path is in `.rdata`, a longer one moves the data after it, and the
+  five atexit thunks at the end of `.text` (`??__Fg_Supervisor` and
+  others) then compare differently in quickdiff although nothing changed.
+  (After the merges, main's tree and this branch were built as
+  `build/main-tree` and `build/merge-tree` of the worktree.)
 - Edited game files (expect merge conflicts with main's renames on these
-  lines): decomp.h, types.h, AnmManager.h, Supervisor.h (`unk_0`),
-  Scorefile.h, SoundManager.h, Player.h, Player.cpp, PlayerShot.cpp,
-  AnmDraw.cpp, AnmManagerVms.cpp, BombMain.cpp, Stage.cpp,
-  BulletManager.cpp, PauseMenu.cpp, and the 19 files with `__asm` blocks.
+  lines): decomp.h, types.h, ZunAsm.h, AnmManager.h, Bomb.h, Scorefile.h,
+  SoundManager.h, Player.h, Player.cpp, PlayerShot.cpp, AnmDraw.cpp,
+  AnmManagerVms.cpp, BombMain.cpp, BulletManager.cpp, GameThread.cpp,
+  PauseMenu.cpp, Stage.cpp.
 - The game's `static_assert`s are off in the 64-bit build. Layout facts that
   must hold there too go in `port/src/layout_checks.cpp` as
   `TH16_PORT_CHECK(...)` (file structures, the Scorefile and BgmStream
@@ -741,15 +755,16 @@ directory and the score file sections, which hold no pointers.
 ### Fixed (MSVC output unchanged)
 
 - Pointers passed or stored as `i32`/`u32`, now `iptr`/`uptr` (types.h):
-  the sht hit callbacks' position and size arguments (Player.h:210-211
-  typedefs, PlayerShot.cpp, Player.cpp:891 call; sht_on_hit_446870 casts
-  them back to `Float3 *`), `AnmManager::render_cache_184fbc0` (a sprite
-  pointer used as a cache key, AnmManager.h:316, AnmDraw.cpp:657-660),
-  `BombInf::method_c` arguments (Player.cpp:823), the null `AnmId` returns in
-  AnmManagerVms.cpp:970,1017.
-- `Supervisor::unk_0` holds the HINSTANCE (WinMain.cpp:445 writes it through
-  `*(HINSTANCE *)`); was `u8[4]`, which overwrote `d3d` on 64-bit and
-  crashed at shutdown. Now `u8[sizeof(void *)]`.
+  the sht hit callbacks' `enemy_pos` and `enemy_size` (the `ShtHitFunc` and
+  `DamageSourceHitFunc` typedefs, Player.h:382-385, PlayerShot.cpp,
+  Player.cpp:965 call; sht_on_hit_laser casts them back to `Float3 *`),
+  `AnmManager::last_texture_matrix_sprite` (a sprite pointer used as a
+  cache key, AnmManager.h:423, AnmDraw.cpp:599-602), the
+  `BombInf::compute_damage` call (Player.cpp:897), the null `AnmId`
+  returns in AnmManagerVms.cpp:970,1017.
+- `Supervisor`'s first field holds the HINSTANCE; it was `u8[4]`, which
+  overwrote `d3d` on 64-bit and crashed at shutdown. Main now declares it
+  as `HINSTANCE instance`.
 - STD (Stage.cpp `load_std`): the `StdHeader::objects` table of 4-byte
   offsets was rewritten into pointers in place. The port builds its own
   table (freed in `~Stage`).
@@ -767,48 +782,49 @@ directory and the score file sections, which hold no pointers.
   two pointers, `Scorefile` (the view most code uses) assumes 8 bytes for
   them. The view gets 8 bytes of padding on 64-bit and `ScorefileData` is
   packed to 4, so both views and `sizeof` agree.
-- `CSound::m_desc` (SoundManager.h:212) was `u8[0x24]`; DSUtil.cpp:140,215
+- `CSound::m_desc` (SoundManager.h:221) was `u8[0x24]`; DSUtil.cpp:137,212
   copy a whole `DSBUFFERDESC` (0x28 bytes on 64-bit) into it, clobbering
   `m_manager`. Now `u8[0x20 + sizeof(void *)]`.
-- `BgmStream` (SoundManager.h:111), a hand-laid-out view of
+- `BgmStream` (SoundManager.h:118), a hand-laid-out view of
   `CStreamingSound`: packed to 4 like `CSound` and its gap before
   `refilling` widened on 64-bit.
 - Reimu's bomb orbs (BombMain.cpp:321) were allocated as 0x6c0 bytes; they
-  hold an `EnemyInf *` each and need 0x700 on 64-bit. Now
-  `sizeof(BombReimuAOrbs)`.
+  hold an `EnemyInf *` each and need 0x700 on 64-bit. Now (in main too)
+  `sizeof(BombReimuAOrbs)`; BombMain.cpp:26 checks the 32-bit size.
 
 ### Open
 
-- `LaserXInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)`
-  (Laser.h:70,167,235,350,413; Laser.cpp:1110-1115, 1197-1202, 1271-1276;
-  LaserBeam.cpp:22) takes pointers in a, b and f and casts them back
-  (the 9 `-Wint-to-pointer-cast` warnings). Nothing calls it; if something
-  does, make those three `iptr`.
+- `sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)` of the
+  laser classes (ExpHP: method_1c; Laser.h:96,204,276,398,463;
+  Laser.cpp:1430-1435, 1517-1522, 1591-1596; LaserBeam.cpp:22) takes
+  pointers in a, b and f and casts them back (the 9
+  `-Wint-to-pointer-cast` warnings). Nothing calls it; if something does,
+  make those three `iptr`.
 - Function pointer types that do not match the function (also in the
-  original, harmless on x86-64 and ARM64 since the mismatched argument is
-  unused or of the same size class): `g_effect_table[1].init` is
-  `anm_effect_2_init(AnmVm *, i32)` called as `(AnmVm *, D3DXVECTOR3 *)`;
-  `g_anm_serialize_funcs[1]` takes `u8 *` for `void *`;
-  `SoundManager::thread_init`/`thread_load_sound_files` return void but are
-  started as `LPTHREAD_START_ROUTINE` (WinMain.cpp:401, Supervisor.cpp:994;
-  only the exit code is garbage).
+  original, harmless on x86-64 and ARM64): `SoundManager::thread_init` and
+  `thread_load_sound_files` return void but are started as
+  `LPTHREAD_START_ROUTINE` (WinMain.cpp:402, Supervisor.cpp:1002; only the
+  exit code is garbage). (The effect table's and the serialize table's
+  mismatches are gone: main declares those callbacks with the table types.)
 - `#pragma pack(4)` structs hold 8-byte pointers at 4-aligned offsets
   (Supervisor, GameWindow, CSound, PauseMenu, Spellcard, Scorefile,
   RpyInfo): fine for plain loads and stores on x86-64 and ARM64, wrong for
   atomics.
-- AnmVm snapshots (AnmManagerVms.cpp:788-878, AnmVmCallbacks.cpp:269-310)
-  copy pointer-holding `AnmVm` records by `sizeof`. Consistent within one
+- AnmVm snapshots (AnmManagerVms.cpp:788-886, and
+  `anm_gather_effect_on_serialize` in AnmVmCallbacks.cpp) copy
+  pointer-holding `AnmVm` records by `sizeof`. Consistent within one
   build; they stay in memory (not in replays), so nothing to do.
 
 ### Not 64-bit, but noticed
 
-- Fog.cpp:27 allocates one byte too few
-  (`sizeof(AnmVm *) * FOG_STRIP_COUNT - 1`): the original's bug, in both
-  builds.
-- MainMenu.cpp:782 writes `clears[5]` of an `i32[5]` (into the next field,
-  as in the original); GCC needs `-fno-aggressive-loop-optimizations`.
+- Fog.cpp:33-34 allocate one byte too few
+  (`sizeof(AnmVm *) * FOG_STRIP_COUNT - 1`, the same for the ids): the
+  original's bug, in both builds.
+- MainMenu.cpp:791 (`Scorefile::unlock_all`) writes `clears[5]` of an
+  `i32[5]` (into the next field, as in the original); GCC needs
+  `-fno-aggressive-loop-optimizations`.
 - GameWindow.cpp:415 formats a 4 KiB `save_dir` into a 256-byte path
   buffer. The game only sees the short virtual save path
   (`C:\AppData\ShanghaiAlice\th16\`, see "Files"), whatever the host
   folder is, so it cannot overflow.
-- `delete` on `new[]` memory (DSUtil.cpp SAFE_DELETE, SupervisorSetup.cpp:166).
+- `delete` on `new[]` memory (DSUtil.cpp SAFE_DELETE, SupervisorSetup.cpp:170).
