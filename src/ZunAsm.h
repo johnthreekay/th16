@@ -15,16 +15,19 @@
 // instruction needs its own __asm prefix, and `;` would start an asm comment
 // that swallows the rest of the line, so there is none.
 //
-// The fsincos helpers are used as the bodies of small __fastcall functions
+// The ZUN_ASM_SINCOSMUL* blocks are the bodies of small __fastcall functions
 // that TH16 keeps once per object file (0x4054d0, 0x417510, 0x430df0, ...).
 // Each source file defines its own static copy so that every copy can be
-// annotated with its address; they must stay per file.
+// annotated with its address; they must stay per file. ZUN_ASM_SINCOS and
+// ZUN_ASM_FINIT sit inline in the functions that use them. Direct3D 9
+// switches the x87 FPU to 24-bit precision when it creates a device (TH16
+// does not ask it to preserve the FPU state), which matters for these
+// x87 blocks; most of the game's float code uses SSE.
 
 // Resets the x87 FPU: control word 0x37f (64-bit precision, round to
 // nearest even, all exceptions masked), empty register stack, cleared
-// status. Has no effect on C variables. Direct3D 9 lowers the x87
-// precision to 24 bits when it creates a device, which this undoes for
-// the code that follows.
+// status. Has no effect on C variables; it undoes Direct3D's 24-bit
+// precision setting for the x87 code that follows.
 #define ZUN_ASM_FINIT() __asm { __asm finit }
 
 // cosine = cosf(angle); sine = sinf(angle);

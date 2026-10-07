@@ -27,6 +27,7 @@ struct InputManager
     // auto-repeating, the second keeps counting.
     u32 hold_frames[0x40];
     u32 hold_frames_total[0x40];
+    // Never used.
     u8 unk_214[0x22c - 0x214];
     // Buttons held for at least 8 frames.
     u32 held_long;

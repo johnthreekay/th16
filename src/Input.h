@@ -29,6 +29,7 @@ struct InputState
     // Buttons pressed and released this frame.
     u32 input_rising;
     u32 input_falling;
+    // Never used.
     u32 unk_98;
     // Buttons held for at least INPUT_HELD_LONG_FRAMES frames.
     u32 input_held_long;
@@ -51,20 +52,20 @@ union InputGlobals
     InputManager hardware;
     struct
     {
-        u8 unk_0[0x94];
+        u8 pad_before_repeat_time[0x94];
         // Per button: frames until InputState::update repeats it in
         // input_repeat (hardware.hold_frames[0x20 + i]).
         i32 repeat_time[0x20];
     };
     struct
     {
-        u8 unk_0_[0x194];
+        u8 pad_before_state[0x194];
         InputState state;
     };
     // The hold counters by device: [0] the hardware's, [1] the game's.
     struct
     {
-        u8 unk_0__[0x14];
+        u8 pad_before_hold[0x14];
         u32 hold[2][0x20];
         u32 hold_total[2][0x20];
     };

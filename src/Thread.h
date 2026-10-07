@@ -19,6 +19,7 @@ class ThreadInf
     // Set while join_if_running waits for the thread to notice.
     BOOL stop_requested;
     BOOL should_run;
+    // Never used.
     int unk_14;
     ThreadStart start;
 

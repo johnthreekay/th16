@@ -5,9 +5,10 @@
 
 // A float angle kept in [-pi, pi] (wrap_angle after every operation). The
 // name is ours; the methods are inferred from a run of small functions at
-// 0x4052e0-0x4054cc and two more at 0x4475f0 and 0x447650. Kept out of line
-// with harness callers (src/harness/ZunAngle.cpp), which give them the
-// custom conventions LTCG picked in the original.
+// 0x4052e0-0x4054cc and two more at 0x4475f0 and 0x447650. They are
+// HARNESS_CALLED: kept out of line and alive by their callers alone, so
+// that LTCG gives them the custom conventions it picked in the original
+// (`this` in ecx, the float in xmm1).
 struct ZunAngle
 {
     f32 value;
