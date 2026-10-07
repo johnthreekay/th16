@@ -25,7 +25,7 @@ const char *const g_stage_names[10] = {"test   ",  "Stage 1", "Stage 2", "Stage 
                                        "Stage 5", "Stage 6", "Extra  ", "Clear  ", "ExClear"};
 
 // The stages and practice high scores of stage practice.
-// TODO: the original frame has an unused 4-byte slot and stores pos.y from xmm0 before the loop.
+// TODO: the original frame has an unused 4-byte slot and saves ebx/esi on entry rather than in the branch.
 // FUNCTION: TH16 0x4513c0
 i32 TitleInf::on_draw__practice_stage_select()
 {
@@ -39,8 +39,7 @@ i32 TitleInf::on_draw__practice_stage_select()
         if (time_in_state.current >= 10 || substate == 3)
         {
             pos.x = 240.0f;
-            f32 y = 192.0f;
-            pos.y = y;
+            pos.y = 192.0f;
             for (i32 stage = 1; stage < 7; stage++)
             {
                 Scorefile *scorefile = g_Scorefile;
@@ -78,13 +77,76 @@ i32 TitleInf::on_draw__practice_stage_select()
                 {
                     g_AsciiManager->create_stringf(&pos, "%s  %.8d0", g_stage_names[stage], practice->high_score);
                 }
-                pos.y = y += 18.0f;
+                pos.y += 18.0f;
             }
         }
         g_AsciiManager->color.d3d = 0xffffffff;
         g_AsciiManager->draw_shadows = 0;
         break;
     }
+    }
+    return 1;
+}
+
+// The capture history of the listed spell cards in spell practice (its own
+// and the main game's).
+// TODO: ours saves esi/edi after the substate checks (shrink-wrapped); the original saves them in the prologue.
+// FUNCTION: TH16 0x456d50
+i32 TitleInf::on_draw__spell_practice_histories()
+{
+    if (substate > 0 && (substate <= 2 || (substate == 3 && state != 19)))
+    {
+        Float3 pos;
+        pos.x = 330.0f;
+        pos.y = 191.0f;
+        pos.z = 0.0f;
+        g_AsciiManager->font_id = 2;
+        g_AsciiManager->draw_shadows = 1;
+        for (i32 i = 0; i < 5; i++)
+        {
+            i32 id = spell_ids[i];
+            if (id >= -1)
+            {
+                if (state == 19 && i == menu.next_selection)
+                {
+                    g_AsciiManager->color.d3d =
+                        g_Scorefile->characters[menu_5cec.next_selection].spells[id].captures[1] != 0 ? 0xff90d0ff
+                                                                                                      : 0xffb0b0b0;
+                }
+                else
+                {
+                    g_AsciiManager->color.d3d =
+                        g_Scorefile->characters[menu_5cec.next_selection].spells[id].captures[1] != 0 ? 0xff60a0c0
+                                                                                                      : 0xff404040;
+                }
+                if (g_Scorefile->characters[4].spells[id].attempts[0] == 0 &&
+                    g_Scorefile->characters[4].spells[id].attempts[1] == 0)
+                {
+                    g_AsciiManager->create_stringf(&pos, "SCORE        00  ----/----");
+                }
+                else
+                {
+                    ScorefileSpell *spell = &g_Scorefile->characters[menu_5cec.next_selection].spells[id];
+                    g_AsciiManager->create_stringf(&pos, "SCORE %8d0  %4d/%4d", spell->practice_score,
+                                                   spell->captures[1], spell->attempts[1]);
+                    pos.y += 10.0f;
+                    g_AsciiManager->color.d3d =
+                        g_Scorefile->characters[menu_5cec.next_selection].spells[id].captures[0] != 0 ? 0xff206060
+                                                                                                      : 0xff404040;
+                    if (g_spell_difficulty[id] <= 4)
+                    {
+                        spell = &g_Scorefile->characters[menu_5cec.next_selection].spells[id];
+                        g_AsciiManager->create_stringf(&pos, "GAME MODE        %4d/%4d", spell->captures[0],
+                                                       spell->attempts[0]);
+                    }
+                    pos.y -= 10.0f;
+                }
+            }
+            pos.y += 44.0f;
+        }
+        g_AsciiManager->font_id = 0;
+        g_AsciiManager->draw_shadows = 0;
+        g_AsciiManager->color.d3d = 0xffffffff;
     }
     return 1;
 }

@@ -33,12 +33,6 @@ i32 TitleInf::on_draw__4541b0()
     return 1;
 }
 
-// STUB: TH16 0x456d50
-i32 TitleInf::on_draw__spell_practice_histories()
-{
-    return 1;
-}
-
 // STUB: TH16 0x440fb0
 i32 Player::initialize()
 {

@@ -12,7 +12,9 @@ struct ScorefileSpell
     char name[0x80];
     i32 captures[2];
     i32 attempts[2];
-    u8 unk_90[0x9c - 0x90];
+    u8 unk_90[0x98 - 0x90];
+    // Spell practice high score, divided by 10.
+    i32 practice_score;
 };
 
 // Stage practice record of one stage.
