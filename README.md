@@ -566,6 +566,39 @@ decompiled code the surroundings it had in the original:
   but Gui::sub_426d70 keeps the cookie where the original copies the
   struct from memory.
 
+- TODO sweep (enemies, ECL, bullets):
+  - quickdiff counts unknown data addresses as equal, so a float constant
+    one ulp off still shows MATCH; reccmp prints it as `<OFFSETn>`. The
+    cancel item spread is `ZUN_PI / 180.0f * 10.0f` (0x3e32b8c2), not
+    `ZUN_PI / 18.0f` (0x3e32b8c3). Run compare.py on quickdiff MATCHes
+    that use float literals. Conversely quickdiff misreads
+    EnemyManager::initialize (73%), which reccmp reports as 100%.
+  - ZunTimer::tick_mixed (the int frame in a local, current_f updated in
+    each branch) gives the unscaled path its own xmm0 register: it matches
+    Bullet::step_ex_03 and helps a dozen other inlined ticks. As tick()
+    itself it costs four matches, so it is chosen per call site. Still
+    open: whether the scaled path loads current_f and adds the speed or
+    folds current_f into the speed's register differs between near
+    identical callers (kill_all and kill_all_no_set_death come out
+    exactly the other way round from the original).
+  - Declaration order of locals decides evaluation order where the
+    expression order does not: bullet_in_circle computes dy first only
+    with `dx` declared before `dy`, whichever way the sum is written.
+  - Contiguous int and float arrays copied with one memcpy give the
+    original's three movups (ecl_enm_create); two loops do not.
+  - Bullet::cancel matches with `D3DXVECTOR3 delta = ...; pos += delta;`
+    (per-field `pos.x = pos.x + delta.x` and `pos += velocity * ...` each
+    fold one component differently) and the ANM file loaded into a local
+    before create_vm, so it is read before the arguments are pushed.
+  - interp_common_methods: the two-branch curves assign x in both
+    branches and multiply or return once after the if/else, which the
+    original's per-case result registers show (69% to 83% in reccmp).
+  - BulletManager::on_draw_callback's push ecx/pop ecx padding comes with
+    a harness standing in for thread_start's aligned call of
+    BulletManager::create (create and initialize HARNESS_CALLED), but then
+    on_tick_callback pads its tail call too: in the original on_tick_body
+    realigns itself (and esp,-8), so on_tick_callback can jump to it.
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.

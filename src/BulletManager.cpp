@@ -180,7 +180,10 @@ i32 __fastcall BulletManager::on_tick_callback(BulletManager *self)
     return self->on_tick_body();
 }
 
-// TODO: the original wraps a plain call in push ecx/pop ecx; ours tail-calls.
+// TODO: the original wraps a plain call in push ecx/pop ecx; ours tail-calls. A harness
+// standing in for thread_start's aligned create() call (create and initialize HARNESS_CALLED)
+// matches this and lifts initialize to 96%, but on_tick_callback then pads its call too,
+// because our on_tick_body does not realign itself like the original's.
 // FUNCTION: TH16 0x412c80
 i32 __fastcall BulletManager::on_draw_callback(BulletManager *self)
 {
