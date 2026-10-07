@@ -1,8 +1,11 @@
+#include <math.h>
+#include <stddef.h>
 #include <string.h>
 
 #include "AnmManager.h"
 #include "AsciiManager.h"
 #include "Globals.h"
+#include "GameThread.h"
 #include "Gui.h"
 #include "ReplayManager.h"
 #include "Scorefile.h"
@@ -215,5 +218,67 @@ HARNESS_CALLED void Spellcard::end()
     if (flags & 0x80)
     {
         g_SoundManager.play_sound_centered(0x45, 0);
+    }
+}
+
+double LTCG_VECTORCALL get_runtime();
+
+static_assert(offsetof(Spellcard, start_time) == 0x94, "Spellcard layout");
+static_assert(offsetof(Spellcard, time_code) == 0xa4, "Spellcard layout");
+static_assert(sizeof(Spellcard) == 0xbc, "Spellcard size");
+
+// TODO: ours aligns the frame to 64 bytes for the doubles (the original
+// does not), keeps the rounded time on the stack across floor instead of
+// reloading it, and increments unk_88 through a register.
+// FUNCTION: TH16 0x417bc0
+void Spellcard::measure_real_time()
+{
+    Spellcard *sc = g_Spellcard;
+    if (sc->flags & 1)
+    {
+        if (!(sc->flags & 0x40))
+        {
+            sc->start_time = get_runtime();
+            sc->flags |= 0x40;
+        }
+        return;
+    }
+    if (!(sc->flags & 0x40))
+    {
+        return;
+    }
+    sc->unk_90 = sc->ticks;
+    double elapsed = get_runtime() - sc->start_time;
+    double rest = fmod(elapsed, 0.0167);
+    sc->real_time_taken = elapsed - rest;
+    if (rest >= 0.00835)
+    {
+        sc->real_time_taken += 0.0167;
+    }
+    double whole = floor(sc->real_time_taken);
+    i32 seconds = (i32)whole;
+    double fraction = sc->real_time_taken - whole;
+    if (seconds >= 1000)
+    {
+        seconds = 999;
+    }
+    sc->real_time_taken = 0.0;
+    sc->flags &= ~0x40;
+    i32 hundredths = (i32)(fraction * 100.0);
+    sc->time_code = ((seconds + 22 + hundredths) * 1000 + (seconds + 66) % 1000) * 100 + (hundredths + 33) % 100;
+    if (g_GameThread->replay_mode == 0)
+    {
+        ((RpyGamestate *)g_ReplayManager->stage_gamestate_snapshots[g_Globals.stage_num])
+            ->spell_time_codes[sc->unk_88] = sc->time_code;
+        sc->unk_88++;
+    }
+    else
+    {
+        sc->time_code = g_ReplayManager->stages[g_Globals.stage_num].gamestate_at_stage_begin->spell_time_codes[sc->unk_88];
+        if (sc->is_time_code_bad())
+        {
+            sc->time_code = 0x6ad1584;
+        }
+        sc->unk_88++;
     }
 }

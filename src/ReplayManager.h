@@ -28,6 +28,11 @@ struct RpyGamestate
     i16 rng_state;
     // Frames of input recorded for the stage.
     i32 num_frames;
+    u8 unk_8[0x240 - 0x8];
+    // Capture times (Spellcard::time_code) of the stage's spell cards, in
+    // the order they ended.
+    i32 spell_time_codes[0x14];
+    u8 unk_290[0x294 - 0x290];
 };
 
 // A block of recorded input, 900 frames long. ExpHP: zRpyChunk.

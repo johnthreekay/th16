@@ -24,7 +24,8 @@ enum SpellcardFlags
 };
 
 // The spell card being declared, its bonus and its on-screen name. Layout
-// from ExpHP (zSpellcard).
+// from ExpHP (zSpellcard). Its doubles sit at 4-byte boundaries.
+#pragma pack(push, 4)
 struct Spellcard
 {
     u32 flags_0;
@@ -45,7 +46,10 @@ struct Spellcard
     i32 unk_88;
     i32 ticks;
     i32 unk_90;
-    u8 unk_94[0xa4 - 0x94];
+    // Real time (get_runtime) when the card started, and how long it took,
+    // rounded to frames. Only 4-byte aligned (see the pack pragma).
+    double start_time;
+    double real_time_taken;
     // Capture time, encoded with a check value against tampering.
     i32 time_code;
     D3DXVECTOR3 boss_pos;
@@ -69,7 +73,13 @@ struct Spellcard
     // out the bonus if it was captured and counts the capture. Only called
     // through g_Spellcard.
     HARNESS_CALLED void end();
+    // 0x417bc0. Measures the card's real duration: starts the clock while
+    // the card runs, then turns the time into the tamper-checked
+    // time_code and records it in (or, during playback, reads it from) the
+    // replay.
+    static void measure_real_time();
 };
+#pragma pack(pop)
 
 // Difficulty (0-3, 4 for Extra) of each spell card.
 extern i8 g_spell_difficulty[0x78];
