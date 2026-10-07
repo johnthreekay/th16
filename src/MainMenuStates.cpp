@@ -803,10 +803,11 @@ i32 TitleInf::do_subseason_select()
 // The keyboard state the practice menu reads when a stage is picked.
 // GLOBAL: TH16 0x4dfa48
 u8 g_practice_keys[0x100];
-// Set from the number key held when a practice stage is picked (0 if
-// none).
+// The number key (1 to 9) held when a practice stage is picked, 0 for
+// none: the practice then starts with that many lives minus one instead
+// of 9 (GameThread).
 // GLOBAL: TH16 0x4a5bf8
-i32 g_unk_4a5bf8;
+i32 g_practice_lives_key;
 
 // Stage practice: picking the stage.
 // TODO: the original keeps both input words in registers for the cursor tests.
@@ -865,83 +866,83 @@ i32 TitleInf::do_practice_stage_select()
             g_SoundManager.play_sound_centered(SE_OK00, 0);
             g_SoundManager.play_sound_centered(SE_BOON00, 0);
             g_practice_last_stage = menu.next_selection;
-            g_unk_4a5bf8 = 0;
+            g_practice_lives_key = 0;
             if (get_keyboard_state(g_practice_keys) == 0)
             {
                 if (g_practice_keys['1'] & 0x80)
                 {
-                    g_unk_4a5bf8 = 1;
+                    g_practice_lives_key = 1;
                 }
                 else if (g_practice_keys['2'] & 0x80)
                 {
-                    g_unk_4a5bf8 = 2;
+                    g_practice_lives_key = 2;
                 }
                 else if (g_practice_keys['3'] & 0x80)
                 {
-                    g_unk_4a5bf8 = 3;
+                    g_practice_lives_key = 3;
                 }
                 else if (g_practice_keys['4'] & 0x80)
                 {
-                    g_unk_4a5bf8 = 4;
+                    g_practice_lives_key = 4;
                 }
                 else if (g_practice_keys['5'] & 0x80)
                 {
-                    g_unk_4a5bf8 = 5;
+                    g_practice_lives_key = 5;
                 }
                 else if (g_practice_keys['6'] & 0x80)
                 {
-                    g_unk_4a5bf8 = 6;
+                    g_practice_lives_key = 6;
                 }
                 else if (g_practice_keys['7'] & 0x80)
                 {
-                    g_unk_4a5bf8 = 7;
+                    g_practice_lives_key = 7;
                 }
                 else if (g_practice_keys['8'] & 0x80)
                 {
-                    g_unk_4a5bf8 = 8;
+                    g_practice_lives_key = 8;
                 }
                 else if (g_practice_keys['9'] & 0x80)
                 {
-                    g_unk_4a5bf8 = 9;
+                    g_practice_lives_key = 9;
                 }
             }
             else
             {
                 if (g_practice_keys[DIK_1] & 0x80)
                 {
-                    g_unk_4a5bf8 = 1;
+                    g_practice_lives_key = 1;
                 }
                 else if (g_practice_keys[DIK_2] & 0x80)
                 {
-                    g_unk_4a5bf8 = 2;
+                    g_practice_lives_key = 2;
                 }
                 else if (g_practice_keys[DIK_3] & 0x80)
                 {
-                    g_unk_4a5bf8 = 3;
+                    g_practice_lives_key = 3;
                 }
                 else if (g_practice_keys[DIK_4] & 0x80)
                 {
-                    g_unk_4a5bf8 = 4;
+                    g_practice_lives_key = 4;
                 }
                 else if (g_practice_keys[DIK_5] & 0x80)
                 {
-                    g_unk_4a5bf8 = 5;
+                    g_practice_lives_key = 5;
                 }
                 else if (g_practice_keys[DIK_6] & 0x80)
                 {
-                    g_unk_4a5bf8 = 6;
+                    g_practice_lives_key = 6;
                 }
                 else if (g_practice_keys[DIK_7] & 0x80)
                 {
-                    g_unk_4a5bf8 = 7;
+                    g_practice_lives_key = 7;
                 }
                 else if (g_practice_keys[DIK_8] & 0x80)
                 {
-                    g_unk_4a5bf8 = 8;
+                    g_practice_lives_key = 8;
                 }
                 else if (g_practice_keys[DIK_9] & 0x80)
                 {
-                    g_unk_4a5bf8 = 9;
+                    g_practice_lives_key = 9;
                 }
             }
             g_Supervisor.fade_out_bgm(0.05f);

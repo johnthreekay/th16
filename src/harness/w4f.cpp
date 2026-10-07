@@ -8,7 +8,7 @@ extern i32 g_spell_practice_last_stage;
 extern i32 g_spell_practice_last_row;
 extern i32 g_spell_practice_last_index;
 extern i32 g_practice_last_stage;
-extern i32 g_unk_4a5bf8;
+extern i32 g_practice_lives_key;
 
 // The practice menus (0x450f10, 0x455495, 0x455a09, 0x456a7d) start from
 // the last choice; without a reader LTCG drops the stores.
@@ -29,5 +29,5 @@ i32 harness_w4f_circle(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 radius)
 // The game thread reads the number key picked with a practice stage.
 i32 harness_w4f_practice_key()
 {
-    return g_unk_4a5bf8;
+    return g_practice_lives_key;
 }

@@ -36,7 +36,7 @@ i32 unit5_placeholder(void *object);
 
 extern i32 g_unk_4c0f40;
 extern i32 g_continues_remaining;
-extern i32 g_unk_4a5bf8;
+extern i32 g_practice_lives_key;
 
 // g_Globals' flag word at 0x45c as a whole (flags_lo_45c, game_mode, ...).
 #define GLOBALS_FLAGS_45C (*(u32 *)((u8 *)&g_Globals + 0x45c))
@@ -214,13 +214,13 @@ i32 GameThread::thread_start()
         {
             g_Globals.lives = 2;
         }
-        else if (g_unk_4a5bf8 == 0)
+        else if (g_practice_lives_key == 0)
         {
             g_Globals.lives = 9;
         }
         else
         {
-            g_Globals.lives = g_unk_4a5bf8 - 1;
+            g_Globals.lives = g_practice_lives_key - 1;
         }
         if (Player::create() == NULL)
         {
