@@ -351,8 +351,16 @@ struct AnmMaskVertex
 static __forceinline void anm_mask_set_vertex(AnmMaskVertex *v, f32 x, f32 y)
 {
     v->pos = D3DXVECTOR3(x, y, 0.0f);
-    v->rhw = 1.0f;
-    v->diffuse = 0;
+}
+
+// rhw 1 and no color for the four vertices.
+static __forceinline void anm_mask_finish_vertices(AnmMaskVertex *v)
+{
+    v[0].rhw = v[1].rhw = v[2].rhw = v[3].rhw = 1.0f;
+    v[0].diffuse = 0;
+    v[1].diffuse = 0;
+    v[2].diffuse = 0;
+    v[3].diffuse = 0;
 }
 
 // Clears the alpha of the masked area: only alpha is written.
@@ -389,7 +397,7 @@ static __forceinline void anm_mask_draw(AnmMaskVertex *vertices)
     g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
 }
 
-// TODO: the original keeps the extra data in ebx (ours spills it) and orders the rhw and color stores of the vertices differently.
+// TODO: the original keeps the extra data in ebx and copies it to esi for the draw_vm loop; ours never uses ebx and spills it.
 // FUNCTION: TH16 0x4073a0
 i32 __fastcall anm_on_draw_masked(AnmVm *vm)
 {
@@ -402,6 +410,7 @@ i32 __fastcall anm_on_draw_masked(AnmVm *vm)
         anm_mask_set_vertex(&arcade[1], 512.0f, 16.0f);
         anm_mask_set_vertex(&arcade[2], 128.0f, 464.0f);
         anm_mask_set_vertex(&arcade[3], 512.0f, 464.0f);
+        anm_mask_finish_vertices(arcade);
         anm_mask_draw(arcade);
     }
     else if (data->mode == 0 && g_Supervisor.present_params.BackBufferFormat == D3DFMT_A8R8G8B8)
@@ -412,6 +421,7 @@ i32 __fastcall anm_on_draw_masked(AnmVm *vm)
         anm_mask_set_vertex(&screen[1], (f32)g_resolution_x, 0.0f);
         anm_mask_set_vertex(&screen[2], 0.0f, (f32)g_resolution_y);
         anm_mask_set_vertex(&screen[3], (f32)g_resolution_x, (f32)g_resolution_y);
+        anm_mask_finish_vertices(screen);
         anm_mask_draw(screen);
     }
     for (i32 i = 0; i < 4; i++)
