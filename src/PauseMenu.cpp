@@ -607,14 +607,9 @@ void replay_ended_43f240()
     menu->flags_3ec &= ~4;
 }
 
-// Matches but for its frame (the original does not realign it to 8 bytes),
-// and it stops LTCG from folding play_sound_centered's this everywhere:
-// any caller of CStreamingSound::get_play_time that also calls
-// play_sound_centered does that in our build while get_play_time does not
-// realign its own frame. Kept out until that is solved; the stub in
-// src/stub/unit34b.cpp stands in (0x43f350).
-#if 0
-HARNESS_CALLED void pause_menu_43f350()
+// TODO: the original keeps an ebp frame with a 4-byte pad (push ebp; push ecx); ours has none.
+// FUNCTION: TH16 0x43f350
+void pause_menu_43f350()
 {
     PauseMenu *menu = g_PauseMenu;
     GameThread::update_play_time();
@@ -639,8 +634,8 @@ HARNESS_CALLED void pause_menu_43f350()
     menu->front_anm = g_Gui->front_anm;
     if (g_Globals.game_mode != 2)
     {
-        strcpy(menu->saved_bgm_name, g_SoundManager.bgm_name);
-        menu->saved_bgm_time = ((CStreamingSound *)g_SoundManager.bgm_stream)->get_play_time();
+        strcpy(menu->saved_bgm_name, g_SoundManager.get_bgm_name());
+        menu->saved_bgm_time = g_SoundManager.bgm_play_time();
         g_Supervisor.play_bgm_wav(0, "th128_08");
         if (g_Supervisor.config.flags_2c & 0x10)
         {
@@ -656,7 +651,6 @@ HARNESS_CALLED void pause_menu_43f350()
     g_unk_4d9d90 = 1;
     menu->flags_3ec &= ~4;
 }
-#endif
 
 // The original's callback is a jmp to the member function, most likely the
 // fastcall invoker of a capture-less lambda; a static thunk compiles the same.

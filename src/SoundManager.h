@@ -489,6 +489,10 @@ struct SoundManager
     {
         ((CStreamingSound *)bgm_stream)->seek(seconds);
     }
+    __forceinline const char *get_bgm_name()
+    {
+        return bgm_name;
+    }
 };
 
 extern SoundManager g_SoundManager;
