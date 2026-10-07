@@ -1480,7 +1480,6 @@ GuiMsgVm::GuiMsgVm(void *script)
     unk_1bc = 320.0f;
 }
 
-// TODO: the original stores ".wav" as an immediate (see play_bgm_wav).
 // FUNCTION: TH16 0x429ff0
 void Gui::start_dialogue(i32 script)
 {
@@ -1493,7 +1492,7 @@ void Gui::start_dialogue(i32 script)
         {
             char path[0x100];
             strcpy(path, stage->music_names[boss]);
-            strcat(path, ".wav");
+            append_wav_extension(path);
             if (strcmp(g_SoundManager.bgm_name, path) == 0)
             {
                 return;

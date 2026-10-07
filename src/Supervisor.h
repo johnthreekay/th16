@@ -264,6 +264,20 @@ enum SupervisorFlags
 
 extern Supervisor g_Supervisor;
 
+// strcat(path, ".wav") as play_bgm_wav and Gui::start_dialogue have it:
+// strlen, then ".wav" stored as one immediate and the terminator from the
+// zero the loop ended on. strcat, or strcpy/memcpy of the literal, copy it
+// from memory instead.
+__forceinline void append_wav_extension(char *path)
+{
+    char *p = &path[strlen(path)];
+    p[0] = '.';
+    p[1] = 'w';
+    p[2] = 'a';
+    p[3] = 'v';
+    p[4] = '\0';
+}
+
 // enable_d3d_fog, enable_zwrite and disable_zwrite as the stage drawing code
 // has them inline.
 inline HRESULT Supervisor::enable_d3d_fog_inline()
