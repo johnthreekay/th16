@@ -755,6 +755,8 @@ HARNESS_CALLED AnmId Supervisor::create_fog_vm(i32 count, i32 script)
 
 // Points the arcade surfaces at text.anm's render target textures and
 // starts the VMs that draw them, picked by window width.
+// TODO: effective match only since AnmVm::run became real code: the last
+// flag `and` is scheduled after the pops in ours, before them in the original.
 // FUNCTION: TH16 0x43d970
 void Supervisor::setup_special_anms()
 {

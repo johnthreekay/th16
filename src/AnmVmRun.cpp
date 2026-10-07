@@ -1,7 +1,12 @@
+#include <math.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "AnmManager.h"
 #include "AnmVm.h"
+#include "AsciiManager.h"
+#include "EffectManager.h"
+#include "GameThread.h"
 #include "Rng.h"
 #include "Supervisor.h"
 
@@ -9,6 +14,16 @@ static_assert(offsetof(AnmVm, rotation_related) == 0x5f0, "AnmVm layout");
 static_assert(sizeof(AnmVm) == 0x5fc, "AnmVm layout");
 static_assert(sizeof(InterpInt3) == 0x58, "InterpInt3 layout");
 static_assert(sizeof(InterpAngle) == 0x30, "InterpAngle layout");
+static_assert(offsetof(AnmVm, pos_i) == 0x8c, "AnmVm layout");
+static_assert(offsetof(AnmVm, rotate_i) == 0x16c, "AnmVm layout");
+static_assert(offsetof(AnmVm, rotate_2d_i) == 0x1c4, "AnmVm layout");
+static_assert(offsetof(AnmVm, u_vel_i) == 0x348, "AnmVm layout");
+static_assert(offsetof(AnmVm, uv_quad_of_sprite) == 0x3a8, "AnmVm layout");
+static_assert(offsetof(AnmVm, int_vars) == 0x4a0, "AnmVm layout");
+static_assert(offsetof(AnmVm, pos_2) == 0x4e0, "AnmVm layout");
+static_assert(offsetof(AnmVm, index_of_sprite_mapping_func) == 0x5dc, "AnmVm layout");
+static_assert(offsetof(AsciiInf, ascii_anm) == 0x19240, "AsciiInf layout");
+static_assert(offsetof(Supervisor, cameras) + 3 * sizeof(Camera) + offsetof(Camera, unk_104) == 0x6c0, "Supervisor layout");
 
 // FUNCTION: TH16 0x45f2d0
 HARNESS_CALLED f32 AnmVm::get_float_var(f32 value)
@@ -92,7 +107,7 @@ HARNESS_CALLED f32 AnmVm::get_float_var(f32 value)
 }
 
 // FUNCTION: TH16 0x45f610
-i32 AnmVm::get_int_var(i32 value)
+HARNESS_CALLED i32 AnmVm::get_int_var(i32 value)
 {
     switch (value)
     {
@@ -135,7 +150,7 @@ i32 AnmVm::get_int_var(i32 value)
 }
 
 // FUNCTION: TH16 0x45f780
-f32 *AnmVm::get_float_var_ptr(f32 *value)
+HARNESS_CALLED f32 *AnmVm::get_float_var_ptr(f32 *value)
 {
     switch ((i32)*value)
     {
@@ -174,7 +189,7 @@ f32 *AnmVm::get_float_var_ptr(f32 *value)
 }
 
 // FUNCTION: TH16 0x45f890
-i32 *AnmVm::get_int_var_ptr(i32 *value)
+HARNESS_CALLED i32 *AnmVm::get_int_var_ptr(i32 *value)
 {
     switch (*value)
     {
@@ -209,6 +224,1063 @@ void LTCG_FASTCALL divide_vec2_by_640_480(Float2 *out, Float2 *in)
     {
         out->y = 0.0f;
     }
+}
+
+// This file's copies of ZunMath.h's sincosmul (TH16 keeps one per object
+// file): the first writes the two results through separate pointers.
+// FUNCTION: TH16 0x464930
+static void __fastcall anm_sincosmul_xy(f32 *x, f32 *y, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, x
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        mov eax, y
+        fstp [eax]
+    }
+}
+
+// FUNCTION: TH16 0x464d60
+static void __fastcall anm_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
+
+// ANM instruction arguments: argument n is a constant unless bit n of
+// var_mask says it names a script variable.
+#define ANM_IS_VAR(n) (ins->var_mask & (1 << (n)))
+#define ANM_INT(n) (ANM_IS_VAR(n) ? get_int_var(ins->args[n].i) : ins->args[n].i)
+#define ANM_FLOAT(n) (ANM_IS_VAR(n) ? get_float_var(ins->args[n].f) : ins->args[n].f)
+#define ANM_INT_PTR(n) (ANM_IS_VAR(n) ? get_int_var_ptr(&ins->args[n].i) : &ins->args[n].i)
+#define ANM_FLOAT_PTR(n) (ANM_IS_VAR(n) ? get_float_var_ptr(&ins->args[n].f) : &ins->args[n].f)
+
+#define ANM_FLAGS_LO ((AnmVmFlagsLoFields *)&flags_lo)
+#define ANM_FLAGS_HI ((AnmVmFlagsHiFields *)&flags_hi)
+
+// Stores to float argument n (a variable or the argument itself), with the
+// value computed first.
+static __forceinline void anm_store_float(AnmVm *vm, AnmRawInstr *ins, i32 n, f32 value)
+{
+    *((ins->var_mask & (1 << n)) ? vm->get_float_var_ptr(&ins->args[n].f) : &ins->args[n].f) = value;
+}
+
+// From a to b as t goes from 0 to 1.
+static inline f32 anm_lerp(f32 t, f32 a, f32 b)
+{
+    return t * (b - a) + a;
+}
+
+
+// The color arguments of instructions 408 and 413 (and the current color),
+// as set_rgb1_time and set_rgb2_time take them. Alpha is left unset.
+struct AnmRgb
+{
+    u8 b;
+    u8 g;
+    u8 r;
+};
+
+static inline void anm_rgb(AnmRgb *c, i32 r, i32 g, i32 b)
+{
+    c->b = b;
+    c->g = g;
+    c->r = r;
+}
+
+// 0x469e20. Sets up render mode 10 (ANM instruction 302): extra data and
+// the on_tick and on_draw callbacks 4 and 6.
+int __fastcall anm_effect_4_init(AnmVm *vm);
+
+// The interpreter proper: runs the instructions due by the current time,
+// then steps everything that changes on its own. 1 once the VM should be
+// deleted.
+__forceinline i32 AnmVm::run_script()
+{
+    AnmRawInstr *ins;
+    i32 result = 0;
+    if (instr_offset < 0 || (flags_lo & ANM_VM_FLAG_LO_100000))
+    {
+        return 0;
+    }
+    timer_1c++;
+    if (pending_interrupt == 0)
+    {
+        if ((flags_hi & (ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000)) == ANM_VM_FLAG_HI_4000 && g_GameThread != NULL &&
+            g_GameThread->flags.flag_1)
+        {
+            return 0;
+        }
+    }
+    else
+    {
+    interrupt:
+        // Jump to the label of the pending interrupt, else to label -1.
+        i32 fallback_offset = 0;
+        i32 offset = 0;
+        AnmRawInstr *fallback = NULL;
+        ins = (AnmRawInstr *)g_AnmManager->loaded_anms[anm_loaded_index]->scripts[script_id];
+        while (!(ins->opcode == 5 && pending_interrupt == ins->args[0].i) && ins->opcode != -1)
+        {
+            if (ins->opcode == 5 && ins->args[0].i == -1)
+            {
+                fallback = ins;
+                fallback_offset = offset;
+            }
+            offset += ins->offset_to_next;
+            ins = (AnmRawInstr *)((u8 *)ins + ins->offset_to_next);
+        }
+        flags_lo &= ~ANM_VM_STOPPED;
+        pending_interrupt = 0;
+        if (ins->opcode != 5)
+        {
+            if (fallback == NULL)
+            {
+                goto stop;
+            }
+            ins = fallback;
+            offset = fallback_offset;
+        }
+        interrupt_return_time.set_from(script_time);
+        interrupt_return_offset = instr_offset;
+        offset += ins->offset_to_next;
+        script_time.set_value(ins->time);
+        flags_lo |= ANM_VM_VISIBLE;
+        instr_offset = offset;
+    }
+
+    for (;;)
+    {
+        ins = (AnmRawInstr *)(g_AnmManager->loaded_anms[anm_loaded_index]->scripts[script_id] + instr_offset);
+        if (ins->time > script_time.current)
+        {
+            goto done;
+        }
+        switch (ins->opcode)
+        {
+        // jmp
+        case 200:
+            script_time.set_value(ins->args[1].i);
+            instr_offset = ins->args[0].i;
+            continue;
+        // jmpDec
+        case 201:
+            (*(!ANM_IS_VAR(0) ? &ins->args[0].i : get_int_var_ptr(&ins->args[0].i)))--;
+            if (ANM_INT(0) > 0)
+            {
+                script_time.set_value(ins->args[2].i);
+                instr_offset = ins->args[1].i;
+                continue;
+            }
+            break;
+        // wait
+        case 6:
+            script_time.rewind(ANM_INT(0));
+            break;
+        // caseReturn
+        case 7:
+            script_time.set_from(interrupt_return_time);
+            instr_offset = interrupt_return_offset;
+            continue;
+        // iset, fset
+        case 100:
+            *ANM_INT_PTR(0) = ANM_INT(1);
+            break;
+        case 101:
+            *ANM_FLOAT_PTR(0) = ANM_FLOAT(1);
+            break;
+        // isetAdd ... fsetMod
+        case 112:
+        {
+            i32 a = ANM_INT(1);
+            i32 b = ANM_INT(2);
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p = a + b;
+            break;
+        }
+        case 113:
+            *ANM_FLOAT_PTR(0) = ANM_FLOAT(1) + ANM_FLOAT(2);
+            break;
+        case 114:
+            *ANM_INT_PTR(0) = ANM_INT(1) - ANM_INT(2);
+            break;
+        case 115:
+            *ANM_FLOAT_PTR(0) = ANM_FLOAT(1) - ANM_FLOAT(2);
+            break;
+        case 116:
+            *ANM_INT_PTR(0) = ANM_INT(1) * ANM_INT(2);
+            break;
+        case 117:
+            *ANM_FLOAT_PTR(0) = ANM_FLOAT(1) * ANM_FLOAT(2);
+            break;
+        case 118:
+        {
+            i32 a = ANM_INT(1);
+            i32 b = ANM_INT(2);
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p = a / b;
+            break;
+        }
+        case 119:
+            *ANM_FLOAT_PTR(0) = ANM_FLOAT(1) / ANM_FLOAT(2);
+            break;
+        case 120:
+        {
+            i32 a = ANM_INT(1);
+            i32 b = ANM_INT(2);
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p = a % b;
+            break;
+        }
+        case 121:
+            anm_store_float(this, ins, 0, fmodf(ANM_FLOAT(1), ANM_FLOAT(2)));
+            break;
+        // iadd ... fmod
+        case 102:
+        {
+            i32 value = ANM_INT(1);
+            *ANM_INT_PTR(0) += value;
+            break;
+        }
+        case 103:
+        {
+            f32 value = ANM_FLOAT(1);
+            *ANM_FLOAT_PTR(0) += value;
+            break;
+        }
+        case 104:
+        {
+            i32 value = ANM_INT(1);
+            *ANM_INT_PTR(0) -= value;
+            break;
+        }
+        case 105:
+        {
+            f32 value = ANM_FLOAT(1);
+            *ANM_FLOAT_PTR(0) -= value;
+            break;
+        }
+        case 106:
+        {
+            i32 value = ANM_INT(1);
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p *= value;
+            break;
+        }
+        case 107:
+        {
+            f32 value = ANM_FLOAT(1);
+            *ANM_FLOAT_PTR(0) *= value;
+            break;
+        }
+        case 108:
+        {
+            i32 value = ANM_INT(1);
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p /= value;
+            break;
+        }
+        case 109:
+        {
+            f32 value = ANM_FLOAT(1);
+            *ANM_FLOAT_PTR(0) /= value;
+            break;
+        }
+        case 110:
+        {
+            i32 value = ANM_INT(1);
+            i32 *p = &ins->args[0].i;
+            if (ANM_IS_VAR(0))
+            {
+                p = get_int_var_ptr(p);
+            }
+            *p %= value;
+            break;
+        }
+        case 111:
+            anm_store_float(this, ins, 0, fmodf(ANM_FLOAT(0), ANM_FLOAT(1)));
+            break;
+        // isetRand, fsetRand
+        case 122:
+        {
+            u32 range = ANM_INT(1);
+            *ANM_INT_PTR(0) = range != 0 ? g_replay_unsafe_rng.rand_u32() % range : 0;
+            break;
+        }
+        case 123:
+            anm_store_float(this, ins, 0, g_replay_unsafe_rng.randf_0_to(ANM_FLOAT(1)));
+            break;
+        // fsin, fcos, ftan, facos, fatan
+        case 124:
+        {
+            f32 value = sinf(ANM_FLOAT(1));
+            *ANM_FLOAT_PTR(0) = value;
+            break;
+        }
+        case 125:
+        {
+            f32 value = cosf(ANM_FLOAT(1));
+            *ANM_FLOAT_PTR(0) = value;
+            break;
+        }
+        case 126:
+        {
+            f32 value = tanf(ANM_FLOAT(1));
+            *ANM_FLOAT_PTR(0) = value;
+            break;
+        }
+        case 127:
+        {
+            f32 value = acosf(ANM_FLOAT(1));
+            *ANM_FLOAT_PTR(0) = value;
+            break;
+        }
+        case 128:
+        {
+            f32 value = atanf(ANM_FLOAT(1));
+            *ANM_FLOAT_PTR(0) = value;
+            break;
+        }
+        // validRad
+        case 129:
+            *ANM_FLOAT_PTR(0) = add_normalize_angle(ANM_FLOAT(0), 0.0f);
+            break;
+        // circlePos
+        case 130:
+            anm_sincosmul_xy(ANM_FLOAT_PTR(0), ANM_FLOAT_PTR(1), ANM_FLOAT(2), ANM_FLOAT(3));
+            break;
+        // circlePosRand
+        case 131:
+        {
+            f32 min = ANM_FLOAT(2);
+            f32 max = ANM_FLOAT(3);
+            f32 angle = g_replay_unsafe_rng.randf_neg_1_to_1() * ZUN_PI;
+            f32 radius = anm_lerp(g_replay_unsafe_rng.randf_neg_1_to_1(), min, max);
+            Float3 point;
+            anm_sincosmul(&point, angle, radius);
+            *ANM_FLOAT_PTR(0) = point.x;
+            *ANM_FLOAT_PTR(1) = point.y;
+            break;
+        }
+        // ije ... fjge
+        case 202:
+            if (ANM_INT(0) == ANM_INT(1))
+            {
+                goto jump;
+            }
+            break;
+        case 203:
+            if (ANM_FLOAT(0) == ANM_FLOAT(1))
+            {
+                goto jump;
+            }
+            break;
+        case 204:
+            if (ANM_INT(0) != ANM_INT(1))
+            {
+                goto jump;
+            }
+            break;
+        case 205:
+            if (ANM_FLOAT(0) != ANM_FLOAT(1))
+            {
+                goto jump;
+            }
+            break;
+        case 206:
+            if (ANM_INT(0) < ANM_INT(1))
+            {
+                goto jump;
+            }
+            break;
+        case 207:
+            if (ANM_FLOAT(0) < ANM_FLOAT(1))
+            {
+                goto jump;
+            }
+            break;
+        case 208:
+            if (ANM_INT(0) <= ANM_INT(1))
+            {
+                goto jump;
+            }
+            break;
+        case 209:
+            if (ANM_FLOAT(0) <= ANM_FLOAT(1))
+            {
+                goto jump;
+            }
+            break;
+        case 210:
+            if (ANM_INT(0) > ANM_INT(1))
+            {
+                goto jump;
+            }
+            break;
+        case 211:
+            if (ANM_FLOAT(0) > ANM_FLOAT(1))
+            {
+                goto jump;
+            }
+            break;
+        case 212:
+            if (ANM_INT(0) >= ANM_INT(1))
+            {
+                goto jump;
+            }
+            break;
+        case 213:
+            if (ANM_FLOAT(0) >= ANM_FLOAT(1))
+            {
+                goto jump;
+            }
+            break;
+        // The jump of ije ... fjge.
+        jump:
+            script_time.set_value(ins->args[3].i);
+            instr_offset = ins->args[2].i;
+            continue;
+        // sprite
+        case 300:
+        {
+            flags_lo |= ANM_VM_VISIBLE;
+            i32 sprite;
+            if (index_of_sprite_mapping_func != 0)
+            {
+                sprite = g_anm_sprite_mapping_funcs[index_of_sprite_mapping_func](this, ANM_INT(0));
+            }
+            else
+            {
+                sprite = ANM_INT(0);
+            }
+            if (sprite < 0)
+            {
+                g_AsciiManager->ascii_anm->set_sprite(this, 0x102);
+            }
+            else
+            {
+                g_AnmManager->loaded_anms[anm_loaded_index]->set_sprite(this, sprite);
+            }
+            time_of_last_sprite_set = script_time.current;
+            break;
+        }
+        case 432:
+            ANM_FLAGS_HI->ignore_game_speed = ANM_INT(0);
+            break;
+        // scriptNew
+        case 500:
+            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, 0);
+            break;
+        // scriptNewPos
+        case 505:
+        {
+            AnmId id = g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, 0);
+            AnmVm *child = id.find_or_clear();
+            child->pos_2.x = ANM_FLOAT(1);
+            child->pos_2.y = ANM_FLOAT(2);
+            break;
+        }
+        // scriptNewFront, scriptNewUI, scriptNewUIFront
+        case 502:
+            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, 2);
+            break;
+        case 501:
+            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, 4);
+            break;
+        case 503:
+            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_child(ANM_INT(0), this, 6);
+            break;
+        // copyVars
+        case 509:
+            if (unk_5b0 != NULL)
+            {
+                memcpy(int_vars, unk_5b0->int_vars, offsetof(AnmVm, pos_2) - offsetof(AnmVm, int_vars));
+            }
+            break;
+        // scriptNewRootPos
+        case 506:
+        {
+            AnmId id = g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_root(ANM_INT(0), this, 0);
+            AnmVm *child = id.find_or_clear();
+            child->pos_2.x = ANM_FLOAT(1);
+            child->pos_2.y = ANM_FLOAT(2);
+            break;
+        }
+        // scriptNewRoot
+        case 504:
+            g_AnmManager->loaded_anms[anm_loaded_index]->create_managed_root(ANM_INT(0), this, 0);
+            break;
+        // effectNew
+        case 508:
+            g_EffectManager->create_effect(ANM_INT(0), (D3DXVECTOR3 *)this, this);
+            break;
+        // spriteRand
+        case 301:
+        {
+            flags_lo |= ANM_VM_VISIBLE;
+            i32 sprite;
+            if (index_of_sprite_mapping_func != 0)
+            {
+                sprite = g_anm_sprite_mapping_funcs[index_of_sprite_mapping_func](
+                    this, ANM_INT(0) + g_replay_unsafe_rng.rand_u32() % ANM_INT(1));
+            }
+            else
+            {
+                sprite = ANM_INT(0) + g_replay_unsafe_rng.rand_u32() % ANM_INT(1);
+            }
+            if (sprite < 0)
+            {
+                g_AsciiManager->ascii_anm->set_sprite(this, 0x102);
+            }
+            else
+            {
+                g_AnmManager->loaded_anms[anm_loaded_index]->set_sprite(this, sprite);
+            }
+            time_of_last_sprite_set = script_time.current;
+            break;
+        }
+        // scale, scale2, zoomOut
+        case 402:
+            scale.x = ANM_FLOAT(0);
+            scale.y = ANM_FLOAT(1);
+            flags_lo |= ANM_VM_SCALE_CHANGED;
+            break;
+        case 434:
+            scale_2.x = ANM_FLOAT(0);
+            scale_2.y = ANM_FLOAT(1);
+            flags_lo |= ANM_VM_SCALE_CHANGED;
+            break;
+        case 429:
+            uv_scale.x = ANM_FLOAT(0);
+            uv_scale.y = ANM_FLOAT(1);
+            flags_lo |= ANM_VM_UV_SCALE_CHANGED;
+            break;
+        // alpha, color, alpha2, color2
+        case 403:
+            color_1.a = ANM_INT(0);
+            break;
+        case 404:
+            color_1.r = ANM_INT(0);
+            color_1.g = ANM_INT(1);
+            color_1.b = ANM_INT(2);
+            break;
+        case 405:
+            color_2.a = ANM_INT(0);
+            break;
+        case 406:
+            color_2.r = ANM_INT(0);
+            color_2.g = ANM_INT(1);
+            color_2.b = ANM_INT(2);
+            break;
+        // flipX, flipY
+        case 308:
+            flags_lo ^= ANM_VM_FLAG_LO_800;
+            scale.x *= -1.0f;
+            flags_lo |= ANM_VM_SCALE_CHANGED;
+            break;
+        case 309:
+            flags_lo ^= ANM_VM_FLAG_LO_1000;
+            scale.y *= -1.0f;
+            flags_lo |= ANM_VM_SCALE_CHANGED;
+            break;
+        // colorizeChildren
+        case 315:
+            ANM_FLAGS_HI->colorize_children = (u8)ins->args[0].i;
+            break;
+        case 316:
+            flags_lo |= ANM_VM_FLAG_LO_2;
+            break;
+        case 317:
+            flags_lo &= ~ANM_VM_FLAG_LO_2;
+            break;
+        // rotate
+        case 401:
+            rotation.x = ANM_FLOAT(0);
+            rotation.y = ANM_FLOAT(1);
+            rotation.z = ANM_FLOAT(2);
+            flags_lo |= ANM_VM_ROTATION_CHANGED;
+            break;
+        // angleVel, scaleGrowth
+        case 415:
+            set_angular_velocity(ANM_FLOAT(0), ANM_FLOAT(1), ANM_FLOAT(2));
+            break;
+        case 416:
+            set_scale_growth(ANM_FLOAT(0), ANM_FLOAT(1));
+            break;
+        // alphaTimeLinear
+        case 417:
+            set_alpha1_time(ANM_INT(1), INTERP_LINEAR, color_1.a, (u8)ins->args[0].i);
+            break;
+        // blendMode
+        case 303:
+            ANM_FLAGS_LO->blend_mode = ins->args[0].i;
+            break;
+        // pos
+        case 400:
+            if (!(flags_lo & ANM_VM_POS_I_TO_POS_2))
+            {
+                pos = Float3(ANM_FLOAT(0), ANM_FLOAT(1), ANM_FLOAT(2));
+            }
+            else
+            {
+                pos_2 = Float3(ANM_FLOAT(0), ANM_FLOAT(1), ANM_FLOAT(2));
+            }
+            break;
+        // anchorOffset
+        case 436:
+            anchor_offset.x = ANM_FLOAT(0);
+            anchor_offset.y = ANM_FLOAT(1);
+            break;
+        // rotationMode
+        case 437:
+            ANM_FLAGS_HI->rotation_mode = ANM_INT(0);
+            break;
+        // visible
+        case 310:
+            ANM_FLAGS_LO->visible = ins->args[0].i;
+            break;
+        // anchor
+        case 421:
+            ANM_FLAGS_LO->anchor_x = ((u16 *)ins->args)[0];
+            ANM_FLAGS_LO->anchor_y = ((u16 *)ins->args)[1];
+            break;
+        // scrollX, scrollY
+        case 425:
+            uv_scroll_vel.x = ANM_FLOAT(0);
+            flags_hi |= ANM_VM_HAS_VELOCITY;
+            break;
+        case 426:
+            uv_scroll_vel.y = ANM_FLOAT(0);
+            flags_hi |= ANM_VM_HAS_VELOCITY;
+            break;
+        // zWriteDisable
+        case 305:
+            ANM_FLAGS_LO->z_write_disable = ins->args[0].i;
+            break;
+        case 306:
+            ANM_FLAGS_LO->follow_camera = ins->args[0].i;
+            break;
+        // resampleMode
+        case 311:
+            ANM_FLAGS_HI->filter_point = ins->args[0].i;
+            break;
+        // posTime
+        case 407:
+            pos_i.end_time = ANM_INT(0);
+            pos_i.bezier_1 = g_zero_vec;
+            pos_i.bezier_2 = g_zero_vec;
+            pos_i.method = ins->args[1].i;
+            if (!(flags_lo & ANM_VM_POS_I_TO_POS_2))
+            {
+                pos_i.initial = pos;
+            }
+            else
+            {
+                pos_i.initial = pos_2;
+            }
+            pos_i.goal = Float3(ANM_FLOAT(2), ANM_FLOAT(3), ANM_FLOAT(4));
+            pos_i.reset_timer();
+            break;
+        // Like posTime, to a point given by angle and distance.
+        case 433:
+        {
+            pos_i.end_time = ANM_INT(0);
+            pos_i.bezier_1 = g_zero_vec;
+            pos_i.bezier_2 = g_zero_vec;
+            pos_i.method = ins->args[1].i;
+            if (!(flags_lo & ANM_VM_POS_I_TO_POS_2))
+            {
+                pos_i.initial = pos;
+            }
+            else
+            {
+                pos_i.initial = pos_2;
+            }
+            Float3 goal;
+            anm_sincosmul(&goal, ANM_FLOAT(2), ANM_FLOAT(3));
+            goal.z = 0.0f;
+            pos_i.goal = goal;
+            pos_i.reset_timer();
+            break;
+        }
+        // moveBezier
+        case 420:
+        {
+            Float3 bezier_1;
+            Float3 bezier_2;
+            bezier_1.x = ANM_FLOAT(1);
+            bezier_1.y = ANM_FLOAT(2);
+            bezier_1.z = ANM_FLOAT(3);
+            bezier_2.x = ANM_FLOAT(7);
+            bezier_2.y = ANM_FLOAT(8);
+            bezier_2.z = ANM_FLOAT(9);
+            pos_i.end_time = ANM_INT(0);
+            pos_i.bezier_1 = bezier_1;
+            pos_i.bezier_2 = bezier_2;
+            pos_i.method = INTERP_BEZIER;
+            if (!(flags_lo & ANM_VM_POS_I_TO_POS_2))
+            {
+                pos_i.initial = pos;
+            }
+            else
+            {
+                pos_i.initial = pos_2;
+            }
+            pos_i.goal = Float3(ANM_FLOAT(4), ANM_FLOAT(5), ANM_FLOAT(6));
+            pos_i.reset_timer();
+            break;
+        }
+        // colorTime, alphaTime, color2Time, alpha2Time
+        case 408:
+        {
+            AnmRgb initial;
+            anm_rgb(&initial, color_1.r, color_1.g, color_1.b);
+            AnmRgb goal;
+            anm_rgb(&goal, ANM_INT(2), ANM_INT(3), ANM_INT(4));
+            set_rgb1_time(ANM_INT(0), (u8)ins->args[1].i, (ZunColor *)&initial, (ZunColor *)&goal);
+            break;
+        }
+        case 409:
+            set_alpha1_time(ANM_INT(0), (u8)ins->args[1].i, color_1.a, ANM_INT(2));
+            break;
+        case 413:
+        {
+            AnmRgb initial;
+            anm_rgb(&initial, color_2.r, color_2.g, color_2.b);
+            AnmRgb goal;
+            anm_rgb(&goal, ANM_INT(2), ANM_INT(3), ANM_INT(4));
+            set_rgb2_time(ANM_INT(0), (u8)ins->args[1].i, (ZunColor *)&initial, (ZunColor *)&goal);
+            break;
+        }
+        case 414:
+            set_alpha2_time(ANM_INT(0), (u8)ins->args[1].i, color_2.a, ANM_INT(2));
+            break;
+        // rotateTime
+        case 410:
+        {
+            Float3 goal(ANM_FLOAT(2), ANM_FLOAT(3), ANM_FLOAT(4));
+            rotate_i.end_time = ANM_INT(0);
+            rotate_i.bezier_1 = g_zero_vec;
+            rotate_i.bezier_2 = g_zero_vec;
+            rotate_i.method = ins->args[1].i;
+            rotate_i.initial = rotation;
+            rotate_i.goal = goal;
+            rotate_i.reset_timer();
+            flags_lo |= ANM_VM_ROTATION_CHANGED;
+            break;
+        }
+        // rotateTime2D
+        case 411:
+        {
+            ZunAngle goal(ANM_FLOAT(2));
+            ZunAngle initial(rotation.z);
+            ZunAngle zero(0.0f);
+            rotate_2d_i.end_time = ANM_INT(0);
+            rotate_2d_i.bezier_1 = zero;
+            rotate_2d_i.bezier_2 = zero;
+            rotate_2d_i.method = ins->args[1].i;
+            rotate_2d_i.initial = initial;
+            rotate_2d_i.goal = goal;
+            rotate_2d_i.reset_time();
+            flags_lo |= ANM_VM_ROTATION_CHANGED;
+            break;
+        }
+        // scaleTime, scale2Time (which starts from scale, not scale_2),
+        // zoomOutTime
+        case 412:
+        {
+            Float2 goal(ANM_FLOAT(2), ANM_FLOAT(3));
+            set_scale_interp(ANM_INT(0), (u8)ins->args[1].i, &scale, &goal);
+            flags_lo |= ANM_VM_SCALE_CHANGED;
+            break;
+        }
+        case 435:
+        {
+            Float2 goal(ANM_FLOAT(2), ANM_FLOAT(3));
+            set_434_time(ANM_INT(0), (u8)ins->args[1].i, &scale, &goal);
+            flags_lo |= ANM_VM_SCALE_CHANGED;
+            break;
+        }
+        case 430:
+        {
+            Float2 goal(ANM_FLOAT(2), ANM_FLOAT(3));
+            set_uv_scale_time(ANM_INT(0), (u8)ins->args[1].i, &uv_scale, &goal);
+            flags_lo |= ANM_VM_UV_SCALE_CHANGED;
+            break;
+        }
+        // scrollXTime, scrollYTime
+        case 427:
+        {
+            f32 goal = ANM_FLOAT(2);
+            u_vel_i.end_time = ANM_INT(0);
+            u_vel_i.bezier_1 = 0.0f;
+            u_vel_i.bezier_2 = 0.0f;
+            u_vel_i.method = ins->args[1].i;
+            u_vel_i.initial = uv_scroll_vel.x;
+            u_vel_i.goal = goal;
+            u_vel_i.reset();
+            break;
+        }
+        case 428:
+        {
+            f32 goal = ANM_FLOAT(2);
+            v_vel_i.end_time = ANM_INT(0);
+            v_vel_i.bezier_1 = 0.0f;
+            v_vel_i.bezier_2 = 0.0f;
+            v_vel_i.method = ins->args[1].i;
+            v_vel_i.initial = uv_scroll_vel.y;
+            v_vel_i.goal = goal;
+            v_vel_i.reset();
+            break;
+        }
+        // type
+        case 302:
+            ANM_FLAGS_LO->render_mode = ins->args[0].i;
+            if (ANM_FLAGS_LO->render_mode == 10)
+            {
+                anm_effect_4_init(this);
+            }
+            break;
+        // Moves entity_pos into pos.
+        case 422:
+            pos = entity_pos;
+            entity_pos.x = 0.0f;
+            entity_pos.y = 0.0f;
+            entity_pos.z = 0.0f;
+            break;
+        // texCircle, texArcEven, texArc
+        case 600:
+            ANM_FLAGS_LO->render_mode = 9;
+            alloc_extra_data(ANM_INT(0) * 56);
+            break;
+        case 601:
+            ANM_FLAGS_LO->render_mode = 13;
+            alloc_extra_data(ANM_INT(0) * 56);
+            break;
+        case 602:
+            ANM_FLAGS_LO->render_mode = 14;
+            alloc_extra_data(ANM_INT(0) * 56);
+            break;
+        // texCylinder3D, texRing3D
+        case 609:
+            ANM_FLAGS_LO->render_mode = 24;
+            alloc_extra_data(ANM_INT(0) * 48);
+            break;
+        case 610:
+            ANM_FLAGS_LO->render_mode = 25;
+            alloc_extra_data(ANM_INT(0) * 48);
+            break;
+        // UVs from the sprite's current corners.
+        case 418:
+        {
+            Float3 corners[4];
+            write_sprite_corners(corners);
+            divide_vec2_by_640_480(&uv_quad_of_sprite[0], (Float2 *)&corners[0]);
+            divide_vec2_by_640_480(&uv_quad_of_sprite[1], (Float2 *)&corners[1]);
+            divide_vec2_by_640_480(&uv_quad_of_sprite[2], (Float2 *)&corners[2]);
+            divide_vec2_by_640_480(&uv_quad_of_sprite[3], (Float2 *)&corners[3]);
+            break;
+        }
+        case 419:
+            ANM_FLAGS_HI->uv_quad_from_corners = ANM_INT(0);
+            break;
+        // drawRect, drawRectGrad, drawRectRot, drawRectRotGrad, drawLine,
+        // drawRectBorder
+        case 603:
+            ANM_FLAGS_LO->render_mode = 16;
+            sprite_size.x = ANM_FLOAT(0);
+            sprite_size.y = ANM_FLOAT(1);
+            break;
+        case 606:
+            ANM_FLAGS_LO->render_mode = 20;
+            sprite_size.x = ANM_FLOAT(0);
+            sprite_size.y = ANM_FLOAT(1);
+            break;
+        case 607:
+            ANM_FLAGS_LO->render_mode = 21;
+            sprite_size.x = ANM_FLOAT(0);
+            sprite_size.y = ANM_FLOAT(1);
+            break;
+        case 608:
+            ANM_FLAGS_LO->render_mode = 22;
+            sprite_size.x = ANM_FLOAT(0);
+            sprite_size.y = ANM_FLOAT(1);
+            break;
+        case 613:
+            ANM_FLAGS_LO->render_mode = 26;
+            sprite_size.x = ANM_FLOAT(0);
+            sprite_size.y = ANM_FLOAT(1);
+            break;
+        case 612:
+            ANM_FLAGS_LO->render_mode = 27;
+            sprite_size.x = ANM_FLOAT(0);
+            sprite_size.y = ANM_FLOAT(1);
+            break;
+        // drawPoly, drawPolyBorder, drawRing
+        case 604:
+            ANM_FLAGS_LO->render_mode = 17;
+            sprite_size.x = ANM_FLOAT(0);
+            int_vars[0] = ANM_INT(1);
+            break;
+        case 605:
+            ANM_FLAGS_LO->render_mode = 18;
+            sprite_size.x = ANM_FLOAT(0);
+            int_vars[0] = ANM_INT(1);
+            break;
+        case 611:
+            ANM_FLAGS_LO->render_mode = 19;
+            sprite_size.x = ANM_FLOAT(0);
+            sprite_size.y = ANM_FLOAT(1);
+            int_vars[0] = ANM_INT(2);
+            break;
+        case 507:
+            ANM_FLAGS_HI->no_parent_pos = ANM_INT(0);
+            break;
+        // scrollMode
+        case 312:
+            ANM_FLAGS_HI->address_u = ANM_INT(0);
+            ANM_FLAGS_LO->address_v = ANM_INT(1);
+            break;
+        // resolutionMode
+        case 313:
+            ANM_FLAGS_HI->resolution_mode = ANM_INT(0);
+            break;
+        case 314:
+            ANM_FLAGS_HI->rotate_with_parent = ANM_INT(0);
+            break;
+        // originMode
+        case 438:
+            ANM_FLAGS_HI->origin_mode = (u8)ins->args[0].i;
+            break;
+        case 431:
+            ANM_FLAGS_HI->flag_8 = (u8)ins->args[0].i;
+            break;
+        // layer
+        case 304:
+            set_layer((u8)ins->args[0].i);
+            break;
+        // colorMode
+        case 423:
+            ANM_FLAGS_LO->color_mode = (u8)ins->args[0].i;
+            break;
+        // rotateAuto
+        case 424:
+            ANM_FLAGS_HI->auto_rotate = (u8)ins->args[0].i;
+            break;
+        // randMode
+        case 307:
+            ANM_FLAGS_HI->rand_mode = (u8)ins->args[0].i;
+            break;
+        // stopHide, stop
+        case 4:
+            flags_lo &= ~ANM_VM_VISIBLE;
+        case 3:
+            if (pending_interrupt != 0)
+            {
+                goto interrupt;
+            }
+            flags_lo |= ANM_VM_STOPPED;
+            goto stop;
+        // delete
+        case -1:
+        case 1:
+            flags_lo &= ~ANM_VM_VISIBLE;
+            result = 1;
+        // static
+        case 2:
+            instr_offset = -1;
+            return result;
+        }
+        instr_offset += ins->offset_to_next;
+    }
+
+stop:
+    script_time--;
+done:
+    if (flags_hi & ANM_VM_HAS_VELOCITY)
+    {
+        step_velocities();
+    }
+    if (flags_lo & ANM_VM_FOLLOW_CAMERA)
+    {
+        entity_pos += g_Supervisor.cameras[3].unk_104;
+    }
+    if (flags_hi & ANM_VM_UV_QUAD_FROM_CORNERS)
+    {
+        Float3 corners[4];
+        write_sprite_corners(corners);
+        divide_vec2_by_640_480(&uv_quad_of_sprite[0], (Float2 *)&corners[0]);
+        divide_vec2_by_640_480(&uv_quad_of_sprite[1], (Float2 *)&corners[1]);
+        divide_vec2_by_640_480(&uv_quad_of_sprite[2], (Float2 *)&corners[2]);
+        divide_vec2_by_640_480(&uv_quad_of_sprite[3], (Float2 *)&corners[3]);
+    }
+    step_interpolators();
+    update_special_vertices();
+    if (g_anm_on_wait_funcs[index_of_on_wait] != NULL && g_anm_on_wait_funcs[index_of_on_wait](this) != 0)
+    {
+        return 1;
+    }
+    script_time.tick_split();
+    return 0;
+}
+
+// Steps the VM by one frame, at the game speed scaled down by the
+// slowdown of the VM (or its root). 1 once the VM should be deleted.
+// TODO: same cases and layout; differs in the saved game speed's stack slot (0x64, original 0x34), fsetRand sharing fsetMod's store tail, eax/ecx swaps in 106/112/130/131, the GameThread check's branch sense and the entity_pos.z add order.
+// FUNCTION: TH16 0x45f980
+i32 AnmVm::run()
+{
+    f32 saved_game_speed = g_game_speed;
+    if (flags_hi & ANM_VM_IGNORE_GAME_SPEED)
+    {
+        g_game_speed = 1.0f;
+    }
+    if (get_slowdown_factor_inline() > 0.0f)
+    {
+        g_game_speed = saved_game_speed - get_slowdown_factor_inline() * saved_game_speed;
+        if (g_game_speed < 0.0f)
+        {
+            g_game_speed = 0.0f;
+        }
+    }
+    if (index_of_on_tick != 0 && g_anm_on_tick_funcs[index_of_on_tick](this) != 0)
+    {
+        g_game_speed = saved_game_speed;
+        return 1;
+    }
+    i32 result = run_script();
+    g_game_speed = saved_game_speed;
+    return result;
 }
 
 // FUNCTION: TH16 0x464dd0

@@ -28,12 +28,6 @@ f32 harness_interp_common_methods(i32 mode, i32 time, i32 end_time)
     return interp_common_methods(mode, (f32)time, (f32)end_time);
 }
 
-// Like the VM update loop around 0x45f980.
-f32 harness_anm_vm_slowdown(AnmVm *vm)
-{
-    return vm->get_slowdown_factor() * 2.0f;
-}
-
 // Some globals have their address taken elsewhere in the game, so LTCG
 // must assume stores through pointers may change them. Without that it
 // moves loads of them across such stores.

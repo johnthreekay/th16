@@ -10,6 +10,10 @@
 #include "../Supervisor.h"
 #include "../ZunMath.h"
 
+// Takes the address of a local double (src/stub/w4b.cpp), which makes the
+// caller's frame 8-byte aligned.
+void w4b_opaque_double(double *value);
+
 // Like the main menu (0x450d75, 0x4512f2, ...), which starts its cursor
 // effect this way.
 i32 harness_menu_ui_effect()
@@ -74,11 +78,16 @@ void harness_posvel_set_angle(PosVel *pv, f32 angle)
     pv->set_angle(angle * 2.0f);
 }
 
-// Like the spell card code (0x41804c, 0x418346).
+// Like the spell card code (0x41804c, 0x418346). Its frames are 8-byte
+// aligned, so LTCG knows the stack is aligned in these two, which call
+// AnmVm::run (which needs it) without realigning their own frames.
 void harness_gui_spell_vms()
 {
+    double aligned;
+    w4b_opaque_double(&aligned);
     g_Gui->interrupt_spell_vms_2();
     g_Gui->interrupt_spell_vms_3();
+    w4b_opaque_double(&aligned);
 }
 
 // Bullet code passes the zero vector by address (0x412282, 0x412605), so

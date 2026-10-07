@@ -3,13 +3,6 @@
 #include "../AnmVm.h"
 #include "../SoundManager.h"
 
-// Like the instruction interpreter in AnmVm::run (0x45f980), which reads
-// float arguments through get_float_var.
-f32 harness_anm_get_float_var(AnmVm *vm, f32 *args)
-{
-    return vm->get_float_var(args[0]) + vm->get_float_var(args[1]);
-}
-
 // Like the shutdown code around 0x4598fd.
 i32 harness_sound_stop_threads()
 {
@@ -53,14 +46,6 @@ void harness_sound_misc(i32 id)
     g_SoundManager.reset();
     g_SoundManager.stop_sound(id);
     g_SoundManager.stop_sound(-1);
-}
-
-// Like AnmVm::run (0x45f980), which steps the interpolators every frame and
-// resets rotate_2d_i's timer from instruction 437.
-void harness_anm_step_interpolators(AnmVm *vm)
-{
-    vm->step_interpolators();
-    vm->rotate_2d_i.reset_time();
 }
 
 // Like Supervisor's per-frame drawing setup, which resets the batches.

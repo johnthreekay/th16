@@ -721,7 +721,7 @@ AnmId AnmLoaded::create_managed_child(i32 script, AnmVm *parent, i32 mode)
 }
 
 // FUNCTION: TH16 0x46eea0
-AnmId AnmLoaded::create_managed_root(i32 script, AnmVm *like, i32 unused)
+HARNESS_CALLED AnmId AnmLoaded::create_managed_root(i32 script, AnmVm *like, i32 unused)
 {
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;
