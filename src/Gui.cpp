@@ -1588,8 +1588,9 @@ static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
     }
 }
 
-// Sets the HUD up for a stage: the life and bomb counters, the spell VMs,
+//// Sets the HUD up for a stage: the life and bomb counters, the spell VMs,
 // the stage logo, the demo and difficulty markers and the season gauge.
+// TODO: ours gets a /GS cookie for pos (see README) and realigns through ebx; the original realigns plainly.
 // FUNCTION: TH16 0x426d70
 void Gui::sub_426d70()
 {
@@ -1665,7 +1666,7 @@ void Gui::sub_426d70()
     }
     if (g_Supervisor.unk_700 != 0)
     {
-        gui->season_gauge_has_level = 0;
+        gui->unk_118 = 0;
         gui->season_gauge_id = create_effect_inline(gui->front_anm, 0x71, -1, NULL);
         AnmManager *anm = g_AnmManager;
         AnmVm *vm = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, 0x75));
