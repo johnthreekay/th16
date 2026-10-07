@@ -248,7 +248,7 @@ static __forceinline void restart_stage_objects()
 
 // TODO: the original realigns the frame (ebx frame, and esp, -8), has 4
 // more bytes of locals, and folds allocate_new_enemy's unused argument
-// (push ecx); start_fade_in gets g_Stage in ecx here.
+// (push ecx).
 // FUNCTION: TH16 0x42dc50
 i32 GameThread::sub_42dc50()
 {
@@ -262,7 +262,7 @@ i32 GameThread::sub_42dc50()
     g_Stage->start_std_vms();
     if (g_Stage2 != NULL)
     {
-        g_Stage->start_fade_in();
+        g_Stage2->start_fade_in();
         g_Stage->start_fade_out();
         flags.flag_11 = 1;
         AnmManager::interrupt_tree(g_Gui->id_c8, 1);
