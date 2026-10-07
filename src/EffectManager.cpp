@@ -9,14 +9,31 @@
 // GLOBAL: TH16 0x4a6db8
 EffectManager *g_EffectManager;
 
-// The effect kinds that EffectManager::create_effect sets up. In the
-// original each row names its ANM script and points at its init callback
-// (anm_masked_effect_init, anm_gather_effect_init,
-// anm_jagged_line_blue_init and anm_jagged_line_gray_init in
-// AnmVmCallbacks.cpp) with the matching on_tick/on_draw/on_destroy indices;
-// not filled in here.
+// The effects' init callbacks (AnmVmCallbacks.cpp).
+int __fastcall anm_masked_effect_init(AnmVm *vm, D3DXVECTOR3 *pos);
+int __fastcall anm_gather_effect_init(AnmVm *vm, D3DXVECTOR3 *pos);
+int __fastcall anm_jagged_line_blue_init(AnmVm *vm, D3DXVECTOR3 *pos);
+int __fastcall anm_jagged_line_gray_init(AnmVm *vm, D3DXVECTOR3 *pos);
+
+// The effects EffectManager::create_effect sets up, indexed by EffectId.
+// Each starts script 0 of effect.anm, which its init callback then sets up,
+// and selects its callbacks in the g_anm_*_funcs tables (AnmVm.h); the
+// gather effect's copy and serialize callbacks are entry 1 of their tables.
 // GLOBAL: TH16 0x4a2250
-EffectData g_effect_table[4];
+EffectData g_effect_table[4] = {
+    // EFFECT_MASKED
+    {0, 0, anm_masked_effect_init, ANM_CALLBACK_MASKED_EFFECT, ANM_CALLBACK_MASKED_EFFECT,
+     ANM_CALLBACK_MASKED_EFFECT, ANM_CALLBACK_MASKED_EFFECT, ANM_CALLBACK_NONE, ANM_CALLBACK_NONE},
+    // EFFECT_GATHER
+    {0, 0, anm_gather_effect_init, ANM_CALLBACK_GATHER_EFFECT, ANM_CALLBACK_GATHER_EFFECT,
+     ANM_CALLBACK_GATHER_EFFECT, ANM_CALLBACK_GATHER_EFFECT, 1, 1},
+    // EFFECT_JAGGED_LINE_BLUE
+    {0, 0, anm_jagged_line_blue_init, ANM_CALLBACK_JAGGED_LINE, ANM_CALLBACK_JAGGED_LINE,
+     ANM_CALLBACK_JAGGED_LINE, ANM_CALLBACK_JAGGED_LINE, ANM_CALLBACK_NONE, ANM_CALLBACK_NONE},
+    // EFFECT_JAGGED_LINE_GRAY
+    {0, 0, anm_jagged_line_gray_init, ANM_CALLBACK_JAGGED_LINE, ANM_CALLBACK_JAGGED_LINE,
+     ANM_CALLBACK_JAGGED_LINE, ANM_CALLBACK_JAGGED_LINE, ANM_CALLBACK_NONE, ANM_CALLBACK_NONE},
+};
 
 // FUNCTION: TH16 0x418790
 i32 preload_bullet_and_effect_anm()

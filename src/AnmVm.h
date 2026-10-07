@@ -638,30 +638,30 @@ enum AnmSpriteMapping
 
 // Script callbacks, selected per VM by the index_of_* fields.
 typedef i32(__fastcall *AnmVmSwitchFunc)(AnmVm *vm, i32 interrupt);
-extern AnmVmSwitchFunc g_anm_on_switch_funcs[4];
+extern AnmVmSwitchFunc const g_anm_on_switch_funcs[4];
 typedef i32(__fastcall *AnmVmFunc)(AnmVm *vm);
-extern AnmVmFunc g_anm_on_destroy_funcs[4];
+extern AnmVmFunc const g_anm_on_destroy_funcs[4];
 // Run first thing every frame by AnmVm::run, selected by index_of_on_tick;
 // nonzero skips the script (ExpHP: ANM_ON_TICK_CALLABLES).
-extern AnmVmFunc g_anm_on_tick_funcs[5];
+extern AnmVmFunc const g_anm_on_tick_funcs[5];
 // Run after the script by AnmVm::run, selected by index_of_on_wait; nonzero
 // keeps the script time from advancing. Only entry 0 (none) exists.
 extern AnmVmFunc g_anm_on_wait_funcs[1];
 // Run by AnmManager::draw_vm before drawing, selected by index_of_on_draw.
-extern AnmVmFunc g_anm_on_draw_funcs[7];
+extern AnmVmFunc const g_anm_on_draw_funcs[7];
 // Maps the sprite numbers of ANM instructions 300 and 301, selected by
 // index_of_sprite_mapping_func (ExpHP: ANM_ON_SPRITE_SET_FUNCS).
 typedef i32(__fastcall *AnmVmSpriteFunc)(AnmVm *vm, i32 sprite);
-extern AnmVmSpriteFunc g_anm_sprite_mapping_funcs[4];
+extern AnmVmSpriteFunc const g_anm_sprite_mapping_funcs[4];
 // Called with the copy, the original and an extra argument when a VM with
 // extra data is copied (ExpHP: ANM_ON_COPY_FUNC_2).
 typedef i32(__fastcall *AnmVmCopyFunc)(AnmVm *vm, const AnmVm *other, i32 arg);
-extern AnmVmCopyFunc g_anm_on_copy_funcs[2];
+extern AnmVmCopyFunc const g_anm_on_copy_funcs[2];
 // Write (load 0) or read back (load 1) a VM's extra data in a save buffer,
 // adding the bytes used to *size; selected by index_of_on_serialize (ExpHP:
 // ANM_ON_COPY_FUNC_1).
-typedef i32(__fastcall *AnmVmSerializeFunc)(AnmVm *vm, void *data, i32 *size, i32 load);
-extern AnmVmSerializeFunc g_anm_serialize_funcs[2];
+typedef i32(__fastcall *AnmVmSerializeFunc)(AnmVm *vm, u8 *buffer, i32 *size, i32 load);
+extern AnmVmSerializeFunc const g_anm_serialize_funcs[2];
 
 // One running ANM script: a sprite (or shape) with its position, rotation,
 // scale and colors, the interpolators that animate them, and the script

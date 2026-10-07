@@ -1,0 +1,290 @@
+#!/usr/bin/env python3
+"""Compare the contents of every annotated global with the original.
+
+For each `// GLOBAL: TH16 0x...` annotation in src/, the global's bytes in
+build/th16.exe (address from build/th16.map, size from the PDB's type
+information) are compared with orig/th16.exe at the annotated address.
+Globals that only get their value at run time are zero in both files, so
+they compare equal; a table whose definition lacks an initializer while the
+original has contents shows up as a difference.
+
+A 4-byte value that differs still counts as equal when both are pointers
+to corresponding things:
+- functions: build/functions.txt pairs each decompiled function with its
+  original address; library functions come from build/lib.csv;
+- data: annotated globals and vtables (`// GLOBAL:`, `// VTABLE:`) and the
+  library data and string literals in build/lib.csv, at the same offset;
+- other string literals: our value points at a `??_C@` literal and both
+  point at the same NUL-terminated bytes.
+Any other differing pair of in-image addresses is reported as an unmapped
+pointer.
+
+Usage:
+  scripts/check_data.py            # report the globals that differ
+  scripts/check_data.py -v         # also list every global that matches
+  scripts/check_data.py g_foo ...  # only these globals, with all details
+"""
+
+import csv
+import os
+import re
+import sys
+from pathlib import Path
+
+import pefile
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import toolchain as tc  # noqa: E402
+
+ROOT = tc.ROOT
+ANNOTATION = re.compile(r"//\s*(GLOBAL|VTABLE):\s*TH16\s+(0x[0-9a-fA-F]+)")
+MAP_LINE = re.compile(r"\s*([0-9a-f]{4}):([0-9a-f]{8})\s+(\S+)\s+([0-9a-f]{8})\s+(?:f\s+)?(?:i\s+)?(\S+)\s*$")
+
+
+class Image:
+    def __init__(self, path):
+        self.pe = pefile.PE(str(path), fast_load=True)
+        self.base = self.pe.OPTIONAL_HEADER.ImageBase
+        self.end = self.base + self.pe.OPTIONAL_HEADER.SizeOfImage
+        self.data = self.pe.get_memory_mapped_image()
+        text = next(s for s in self.pe.sections if s.Name.rstrip(b"\0") == b".text")
+        self.text = (self.base + text.VirtualAddress, self.base + text.VirtualAddress + text.Misc_VirtualSize)
+
+    def read(self, va, size):
+        # The mapped image stops at the last section's raw data; the rest of
+        # an uninitialized section (.bss) reads as zeros.
+        return bytes(self.data[va - self.base:va - self.base + size]).ljust(size, b"\0")
+
+    def dword(self, va):
+        return int.from_bytes(self.read(va, 4), "little")
+
+    def cstring(self, va):
+        return self.read(va, 0x400).split(b"\0")[0]
+
+    def contains(self, va):
+        return self.base <= va < self.end
+
+    def section_va(self, section, offset):
+        return self.base + self.pe.sections[section - 1].VirtualAddress + offset
+
+
+def read_map():
+    """Our symbols: decorated name -> [(address, object file)]."""
+    syms = {}
+    for line in (ROOT / "build/th16.map").read_text(errors="replace").splitlines():
+        m = MAP_LINE.match(line)
+        if m and m.group(1) != "0000":
+            syms.setdefault(m.group(3), []).append((int(m.group(4), 16), m.group(5)))
+    return syms
+
+
+def read_annotations():
+    """(kind, original address, name, source file) for every GLOBAL and
+    VTABLE annotation. The name is the variable (GLOBAL) or class (VTABLE)
+    declared on the next line that is not a comment."""
+    found = []
+    for src in sorted((ROOT / "src").rglob("*")):
+        if src.suffix not in (".cpp", ".h"):
+            continue
+        lines = src.read_text(errors="replace").splitlines()
+        for i, line in enumerate(lines):
+            m = ANNOTATION.search(line)
+            if not m:
+                continue
+            j = i + 1
+            while j < len(lines) and (lines[j].strip().startswith("//") or not lines[j].strip()):
+                j += 1
+            decl = lines[j] if j < len(lines) else ""
+            if m.group(1) == "VTABLE":
+                name = re.search(r"\b(?:class|struct)\s+(\w+)", decl)
+            else:
+                # A function pointer `T (*name)(...)`, else the identifier
+                # before an array bound, initializer or `;`.
+                name = (re.search(r"\(\s*(?:\w+\s+)?\*\s*(?:const\s+)?(\w+)\s*\)", decl)
+                        or re.search(r"(\w+)\s*(?:\[[^\]]*\]\s*)*(?:=|;|\(|\{)", decl))
+            if name:
+                found.append((m.group(1), int(m.group(2), 16), name.group(1), src))
+    return found
+
+
+def our_symbol(syms, kind, name, src):
+    """The decorated symbol and our address for an annotated name."""
+    if kind == "VTABLE":
+        candidates = [s for s in syms if s.startswith(f"??_7{name}@@6B")]
+    else:
+        candidates = [s for s in syms if s == f"_{name}" or s.startswith(f"?{name}@@3")]
+    entries = [(s, a, obj) for s in candidates for a, obj in syms[s]]
+    if len(entries) > 1:
+        # A static defined in several objects: take the one from this file.
+        own = [e for e in entries if e[2].lower() == f"{src.stem.lower()}.obj"]
+        entries = own or entries
+    return (entries[0][0], entries[0][1]) if entries else (None, None)
+
+
+def pdb_sizes(ours):
+    """Size of each global in our build, keyed by (address, name), from the
+    PDB's global symbols and types (reccmp's cvdump in the project's Wine
+    prefix)."""
+    os.environ.update(tc.env())
+    from reccmp.cvdump.runner import Cvdump
+    parsed = Cvdump(str(ROOT / "build/th16.pdb")).globals().types().run()
+    sizes = {}
+    for g in parsed.globals:
+        if not 0 < g.section <= len(ours.pe.sections):
+            continue
+        try:
+            size = parsed.types.get(g.type).size
+        except Exception:
+            continue
+        if size:
+            key = (ours.section_va(g.section, g.offset), g.name)
+            sizes[key] = max(size, sizes.get(key, 0))
+    return sizes
+
+
+class PointerMap:
+    """Pairs original addresses with ours: functions, annotated data,
+    library symbols, and vtables by their RTTI class name."""
+
+    def __init__(self, orig, syms, annotations):
+        self.orig = orig
+        self.syms = syms
+        self.func = {}
+        for line in (ROOT / "build/functions.txt").read_text().splitlines():
+            o, r, _ = line.split()
+            self.func[int(o, 16)] = int(r, 16)
+        self.data = []  # (orig start, orig end, our start)
+        rows = (l for l in (ROOT / "build/lib.csv").read_text().splitlines() if l and not l.startswith("#"))
+        for row in csv.DictReader(rows, delimiter="|"):
+            if row["symbol"] in syms:
+                ours = syms[row["symbol"]][0][0]
+                orig = int(row["address"], 16)
+                if row["type"] == "library":
+                    self.func.setdefault(orig, ours)
+                else:
+                    self.data.append((orig, orig + 1, ours))
+        for kind, orig, name, src, sym, ours, size in annotations:
+            if ours is not None:
+                self.data.append((orig, orig + max(size or 4, 4), ours))
+
+    def expected(self, value):
+        """Our address corresponding to an original address, or None."""
+        if value in self.func:
+            return self.func[value]
+        for lo, hi, ours in self.data:
+            if lo <= value < hi:
+                return ours + (value - lo)
+        return self.vtable(value)
+
+    def vtable(self, value):
+        """A vtable is preceded by its RTTI complete object locator, whose
+        type descriptor names the class (`.?AVName@@`); ours is `??_7Name@@6B@`."""
+        col = self.orig.dword(value - 4)
+        if not self.orig.contains(col) or self.orig.dword(col) != 0:
+            return None
+        desc = self.orig.dword(col + 12)
+        if not self.orig.contains(desc):
+            return None
+        name = self.orig.cstring(desc + 8)
+        if not name.startswith(b".?AV") or not name.endswith(b"@@"):
+            return None
+        entries = self.syms.get(f"??_7{name[4:].decode()}6B@")
+        return entries[0][0] if entries else None
+
+
+def compare(orig, ours, pointers, string_literals, orig_addr, our_addr, size):
+    """Differences of one global: list of (offset, kind, orig value, our value)."""
+    a, b = orig.read(orig_addr, size), ours.read(our_addr, size)
+    if a == b:
+        return []
+    diffs = []
+    off = 0
+    while off < size:
+        n = 4 if off + 4 <= size else size - off
+        if a[off:off + n] == b[off:off + n]:
+            off += n
+            continue
+        if n == 4:
+            va, vb = int.from_bytes(a[off:off + 4], "little"), int.from_bytes(b[off:off + 4], "little")
+            if orig.contains(va) and ours.contains(vb):
+                want = pointers.expected(va)
+                if want == vb:
+                    off += 4
+                    continue
+                if want is None and vb in string_literals and orig.cstring(va) == ours.cstring(vb):
+                    off += 4
+                    continue
+                diffs.append((off, "pointer" if want is not None else "unmapped", va, vb))
+                off += 4
+                continue
+            diffs.append((off, "value", va, vb))
+            off += 4
+            continue
+        diffs.append((off, "bytes", a[off:off + n].hex(), b[off:off + n].hex()))
+        off += n
+    return diffs
+
+
+def describe(d):
+    off, kind, va, vb = d
+    if kind == "bytes":
+        return f"+{off:#x}: orig {va} ours {vb}"
+    if kind == "pointer":
+        return f"+{off:#x}: orig points at {va:#x}, ours at {vb:#x} (does not correspond)"
+    if kind == "unmapped":
+        return f"+{off:#x}: unmapped pointer: orig {va:#x}, ours {vb:#x}"
+    return f"+{off:#x}: orig {va:#010x} ours {vb:#010x}"
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    verbose = "-v" in sys.argv[1:] or bool(args)
+    orig = Image(ROOT / "orig/th16.exe")
+    ours = Image(ROOT / "build/th16.exe")
+    syms = read_map()
+    sizes = pdb_sizes(ours)
+    by_addr = sorted((a, s) for s, entries in syms.items() for a, _ in entries)
+    string_literals = {a for a, s in by_addr if s.startswith("??_C@")}
+
+    annotations = []
+    for kind, orig_addr, name, src in read_annotations():
+        sym, addr = our_symbol(syms, kind, name, src)
+        size = sizes.get((addr, name)) if addr is not None else None
+        if size is None and addr is not None:
+            # No type size (vtables, symbols from libraries): up to the next symbol.
+            nxt = min((a for a, _ in by_addr if a > addr), default=addr + 4)
+            size = nxt - addr
+        annotations.append((kind, orig_addr, name, src, sym, addr, size))
+
+    pointers = PointerMap(orig, syms, annotations)
+    counts = {"match": 0, "differ": 0, "unmapped": 0, "missing": 0}
+    for kind, orig_addr, name, src, sym, addr, size in sorted(annotations, key=lambda x: x[1]):
+        if kind != "GLOBAL" or (args and name not in args):
+            continue
+        where = f"{orig_addr:#x} {name} ({src.relative_to(ROOT)})"
+        if addr is None:
+            counts["missing"] += 1
+            print(f"{where}: not found in build/th16.map")
+            continue
+        diffs = compare(orig, ours, pointers, string_literals, orig_addr, addr, size)
+        if not diffs:
+            counts["match"] += 1
+            if verbose:
+                print(f"{where}: MATCH ({size:#x} bytes)")
+            continue
+        status = "differ" if any(d[1] != "unmapped" for d in diffs) else "unmapped"
+        counts[status] += 1
+        label = "DIFFERS" if status == "differ" else "UNMAPPED POINTERS"
+        print(f"{where}: {label} at {len(diffs)} of {size:#x} bytes' dwords")
+        for d in diffs[:None if verbose else 8]:
+            print(f"    {describe(d)}")
+        if not verbose and len(diffs) > 8:
+            print(f"    ... {len(diffs) - 8} more")
+    total = sum(counts.values())
+    print(f"{total} globals: {counts['match']} match, {counts['differ']} differ, "
+          f"{counts['unmapped']} only through unmapped pointers, {counts['missing']} not found")
+    sys.exit(1 if total != counts["match"] else 0)
+
+
+if __name__ == "__main__":
+    main()

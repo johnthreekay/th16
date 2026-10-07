@@ -102,7 +102,7 @@ struct Spellcard
 #pragma pack(pop)
 
 // Difficulty (0-3, 4 for Extra) of each spell card.
-extern i8 g_spell_difficulty[0x78];
+extern const i8 g_spell_difficulty[0x78];
 HARNESS_CALLED i32 count_spells_of_difficulty(i32 difficulty);
 
 extern Spellcard *g_Spellcard;
