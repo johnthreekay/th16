@@ -33,6 +33,9 @@
 #include "port_kernel.h"
 #include "port_platform.h"
 #include "port_stub.h"
+#ifdef TH16_THCRAP
+#include "thcrap/thcrap.h"
+#endif
 
 namespace
 {
@@ -490,6 +493,9 @@ HWND CreateWindowExA(DWORD dwExStyle, LPCSTR lpClassName, LPCSTR lpWindowName, D
     window->width = nWidth;
     window->height = nHeight;
     std::string title = port_sjis_to_utf8(lpWindowName != NULL ? lpWindowName : "");
+#ifdef TH16_THCRAP
+    port_thcrap_window_title(lpWindowName, &title);
+#endif
     bool full_screen = (dwStyle & WS_POPUP) != 0;
     window->sdl = create_sdl_window(title.c_str(), X, Y, nWidth, nHeight, full_screen);
     if (window->sdl != NULL)

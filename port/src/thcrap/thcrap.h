@@ -2,6 +2,8 @@
 // the game's are in port/include/port_thcrap.h. Only with TH16_THCRAP.
 #pragma once
 
+#include <string>
+
 #include <windows.h>
 
 // Loads the patch stack: the thcrap folder is `dir` (--thcrap), else
@@ -11,6 +13,11 @@
 // else the newest run configuration in config/. TH16_THCRAP=0 turns it
 // off. Returns whether a stack with patches for th16 was loaded.
 bool port_thcrap_init(const char *dir, const char *config);
+
+// win32_user.cpp's CreateWindowExA: thcrap's tsa_CreateWindowExA (the
+// translated window title, else the patches' game title and build).
+// Replaces *utf8 when a stack is loaded.
+void port_thcrap_window_title(const char *name, std::string *utf8);
 
 // gdi_text.cpp's CreateFontA: thcrap's textdisp_CreateFontA (the run
 // configuration's "font" replaces the face).

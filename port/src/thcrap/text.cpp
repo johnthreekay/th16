@@ -507,6 +507,24 @@ int text_extent_for_font_id(const char *str, int font_id)
 
 using namespace thcrap;
 
+void port_thcrap_window_title(const char *name, std::string *utf8)
+{
+    if (!port_thcrap_active() || name == NULL)
+    {
+        return;
+    }
+    const char *translated = strings_lookup(name);
+    const char *title = json_string_value(json_object_get(runconfig(), "title"));
+    if (translated != name)
+    {
+        *utf8 = translated;
+    }
+    else if (title != NULL)
+    {
+        *utf8 = std::string(title) + " " + game_build();
+    }
+}
+
 void port_thcrap_font_face(char face[LF_FACESIZE])
 {
     if (!port_thcrap_active())

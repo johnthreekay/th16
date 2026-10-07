@@ -101,10 +101,6 @@ void format_one(std::string *out, const std::string &spec, char conversion, int 
         {
             n = snprintf(buf, sizeof(buf), spec.c_str(), va_arg(*args, long long));
         }
-        else if (length_kind == 1)
-        {
-            n = snprintf(buf, sizeof(buf), spec.c_str(), va_arg(*args, long));
-        }
         else
         {
             n = snprintf(buf, sizeof(buf), spec.c_str(), va_arg(*args, int));
@@ -289,7 +285,8 @@ std::string strings_vsprintf(const char *format, va_list args_in)
         }
         else if (length_kind == 1)
         {
-            spec += 'l';
+            // MSVC's long is 32 bits: the game passes an i32 for %ld.
+            length_kind = 0;
         }
         spec += conversion;
         format_one(&out, spec, conversion, length_kind, &args);
@@ -313,6 +310,11 @@ int port_thcrap_vsnprintf(char *buf, size_t size, const char *format, va_list ar
     if (size > 0)
     {
         size_t n = text.size() < size - 1 ? text.size() : size - 1;
+        // Cut at a whole UTF-8 character.
+        while (n < text.size() && n > 0 && ((uint8_t)text[n] & 0xc0) == 0x80)
+        {
+            n--;
+        }
         memcpy(buf, text.data(), n);
         buf[n] = '\0';
     }

@@ -17,6 +17,10 @@
 
 #include <d3dx9tex.h>
 
+#ifdef TH16_PNG
+#include <png.h>
+#endif
+
 #include "d3d9_gl_internal.h"
 #include "port_stub.h"
 
@@ -158,11 +162,42 @@ void apply_color_key(std::vector<uint32_t> &pixels, D3DCOLOR key)
     }
 }
 
-// Decodes an image file in memory. No container format turned up in
-// th16.dat (see NOTES.md); report what arrives so a decoder can be added.
+// Decodes an image file in memory: PNG when the port is built with libpng
+// (TH16_PNG, with thcrap support: the help manual's pages are help_NN.png
+// in th16.dat, see NOTES.md, "thcrap"); anything else is reported so a
+// decoder can be added.
 bool decode_image(const void *data, UINT size, std::vector<uint32_t> &pixels, D3DXIMAGE_INFO *info)
 {
     const uint8_t *p = (const uint8_t *)data;
+#ifdef TH16_PNG
+    if (size >= 8 && png_sig_cmp(p, 0, 8) == 0)
+    {
+        png_image png;
+        memset(&png, 0, sizeof(png));
+        png.version = PNG_IMAGE_VERSION;
+        if (png_image_begin_read_from_memory(&png, data, size))
+        {
+            // BGRA bytes are a little-endian D3DCOLOR (A8R8G8B8).
+            png.format = PNG_FORMAT_BGRA;
+            pixels.resize((size_t)png.width * png.height);
+            if (png_image_finish_read(&png, NULL, pixels.data(), 0, NULL))
+            {
+                memset(info, 0, sizeof(*info));
+                info->Width = png.width;
+                info->Height = png.height;
+                info->Depth = 1;
+                info->MipLevels = 1;
+                info->Format = D3DFMT_A8R8G8B8;
+                info->ResourceType = D3DRTYPE_TEXTURE;
+                info->ImageFileFormat = D3DXIFF_PNG;
+                return true;
+            }
+            png_image_free(&png);
+        }
+        fprintf(stderr, "[th16-port] D3DX: bad PNG file (%u bytes)\n", size);
+        return false;
+    }
+#endif
     if (size >= 4)
     {
         fprintf(stderr, "[th16-port] D3DX: unsupported image file (%u bytes, starts %02x %02x %02x %02x)\n", size,
