@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "AsciiManager.h"
+#include "Player.h"
 #include "PopupManager.h"
 #include "Supervisor.h"
 
@@ -152,4 +153,117 @@ HARNESS_CALLED void PopupManager::generate_small_score_popup(Float3 *pos, i32 va
     str->pos = *pos;
     str->unk_18 = 1.0f;
     mgr->next_index++;
+}
+
+static_assert(offsetof(AnmVm, sprite_size) == 0x70, "AnmVm::sprite_size");
+static_assert(offsetof(PopupManager, strings) == 0x614, "PopupManager::strings");
+
+// The score strings rise digit by digit and fade near the player; the
+// release bonus strings (13 and up) go through the ASCII manager.
+// FUNCTION: TH16 0x44a000
+int PopupManager::on_draw()
+{
+    if (!(g_Supervisor.config.flags_2c & 4))
+    {
+        g_Supervisor.disable_d3d_fog_inline();
+    }
+    PopupString *s = strings;
+    for (i32 i = 0; i < 13; i++, s++)
+    {
+        f32 spacing = 8.0f;
+        if (!s->active)
+        {
+            continue;
+        }
+        if (s->time.current < 8)
+        {
+            spacing /= s->time.current_f;
+        }
+        vm.entity_pos.x = s->pos.x - s->num_digits * spacing * 0.5f;
+        vm.entity_pos.y = s->pos.y;
+        vm.color_1.d3d = s->color;
+        f32 dx = g_Player->inner.pos.x - s->pos.x;
+        f32 dy = g_Player->inner.pos.y - s->pos.y;
+        i32 dist = dy * dy + dx * dx;
+        i32 alpha;
+        if (dist > 0x4000)
+        {
+            alpha = 0xff;
+        }
+        else if (dist > 0x1000)
+        {
+            alpha = ((dist - 0x1000) << 7) / 0x3000 + 0x80;
+        }
+        else
+        {
+            alpha = 0x80;
+        }
+        u8 *digit = (u8 *)&s->digits[s->num_digits - 1];
+        for (i32 j = s->num_digits; j > 0; j--, digit--)
+        {
+            i32 sprite;
+            if (s->time.current < 0x34 - j * 2 || *digit == 10)
+            {
+                sprite = *digit + 0x103;
+            }
+            else if (s->time.current < 0x38 - j * 2)
+            {
+                sprite = *digit + 0x10e;
+            }
+            else if (s->time.current < 0x3c - j * 2)
+            {
+                sprite = *digit + 0x118;
+            }
+            else
+            {
+                goto next;
+            }
+            {
+                AnmVm *v = &vm;
+                AnmManager *anm = g_AnmManager;
+                v->set_sprite_uvs(sprite);
+                vm.color_1.a = alpha;
+                v->flags_lo |= ANM_VM_SCALE_CHANGED;
+                v->sprite_size.x = anm->loaded_anms[v->anm_loaded_index]->sprites[v->sprite_id].sprite_width;
+                AnmVm::write_sprite_corners__without_rot(
+                    v, (Float3 *)&g_sprite_temp_buffer[0].pos, (Float3 *)&g_sprite_temp_buffer[1].pos,
+                    (Float3 *)&g_sprite_temp_buffer[2].pos, (Float3 *)&g_sprite_temp_buffer[3].pos);
+                anm->render_sprite_2d(v, 1);
+            }
+        next:
+            vm.entity_pos.x += spacing;
+        }
+    }
+    for (i32 i = 0; i < 5; i++, s++)
+    {
+        if (!s->active)
+        {
+            continue;
+        }
+        AsciiInf *ascii = g_AsciiManager;
+        ascii->font_id = 2;
+        ascii->group = 2;
+        ascii->color.d3d = s->color;
+        ascii->align_h = 0;
+        ascii->align_v = 0;
+        Float3 pos = s->pos;
+        pos.x += 224.0f;
+        pos.y += 16.0f;
+        if (s->bonus >= 0)
+        {
+            ascii->create_stringf(&pos, "BONUS %.1f", s->bonus_rate);
+            pos.y += 11.0f;
+            g_AsciiManager->create_stringf(&pos, "%d", s->bonus);
+        }
+        else
+        {
+            ascii->create_stringf(&pos, "NO BONUS");
+        }
+        g_AsciiManager->color.d3d = 0xffffffff;
+        g_AsciiManager->group = 0;
+        g_AsciiManager->font_id = 0;
+        g_AsciiManager->align_h = 1;
+        g_AsciiManager->align_v = 1;
+    }
+    return 1;
 }

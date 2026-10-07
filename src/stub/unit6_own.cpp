@@ -31,11 +31,6 @@ void PauseMenu::tick_open()
 #include "../AsciiManager.h"
 #include "../PopupManager.h"
 
-// STUB: TH16 0x44a000
-int PopupManager::on_draw()
-{
-    return 1;
-}
 
 #include "../LoadingThread.h"
 
