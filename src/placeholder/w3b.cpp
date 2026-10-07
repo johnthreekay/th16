@@ -36,15 +36,3 @@ void AnmVm::set_pos_time(i32 end_time, i32 method, Float3 *initial, Float3 *goal
     pos_i.time = 0;
 }
 
-// The enemies' position interpolator step, visible so that callers passing
-// the address of their result get no /GS cookie.
-// STUB: TH16 0x4258b0
-D3DXVECTOR3 InterpStrange1::step()
-{
-    if (end_time > 0)
-    {
-        time.tick();
-        w3b_placeholder_sink(this, end_time);
-    }
-    return current;
-}

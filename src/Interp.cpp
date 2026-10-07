@@ -360,6 +360,95 @@ D3DXVECTOR2 InterpFloat2::step_radial_dist()
     return current;
 }
 
+// TODO: some vector adds load their operands the other way round, and method 17 per axis keeps
+// the sum in xmm0 where the original copies it back through eax.
+// FUNCTION: TH16 0x4258b0
+D3DXVECTOR3 InterpStrange1::step()
+{
+    if (end_time > 0)
+    {
+        time.tick();
+        if (time.current >= end_time)
+        {
+            time.set(end_time);
+            end_time = 0;
+            if (method_for_3d == 7 || method_for_3d == 17)
+            {
+                return initial;
+            }
+            return goal;
+        }
+    }
+    else if (end_time == 0)
+    {
+        if (method_for_3d == 7 || method_for_3d == 17)
+        {
+            return initial;
+        }
+        return goal;
+    }
+    if (!(flag_1d & 1))
+    {
+        if (method_for_3d == 7)
+        {
+            D3DXVECTOR3 tmp = initial;
+            initial = goal + tmp;
+            current = initial;
+        }
+        else if (method_for_3d == 17)
+        {
+            D3DXVECTOR3 tmp = initial;
+            initial = bezier_2 + tmp;
+            bezier_2 = goal + bezier_2;
+            current = initial;
+        }
+        else if (method_for_3d == 8)
+        {
+            f32 t = time.current_f / (f32)end_time;
+            f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
+            f32 c_goal = t * t * (3.0f - 2.0f * t);
+            f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
+            f32 c_bezier_2 = (t - 1.0f) * t * t;
+            current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+        }
+        else
+        {
+            f32 x = interp_common_methods(method_for_3d, time.current_f, (f32)end_time);
+            current = (goal - initial) * x + initial;
+        }
+    }
+    else
+    {
+        for (i32 i = 0; i < 3; i++)
+        {
+            if (methods_1d[i] == 7)
+            {
+                initial[i] = goal[i] + initial[i];
+                current[i] = initial[i];
+            }
+            else if (methods_1d[i] == 17)
+            {
+                initial[i] = bezier_2[i] + initial[i];
+                current[i] = initial[i];
+                bezier_2[i] = bezier_2[i] + goal[i];
+            }
+            else if (methods_1d[i] == 8)
+            {
+                f32 t = time.current_f / (f32)end_time;
+                current[i] = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f) * initial[i] +
+                             t * t * (3.0f - 2.0f * t) * goal[i] + (1.0f - t) * (1.0f - t) * t * bezier_1[i] +
+                             (t - 1.0f) * t * t * bezier_2[i];
+            }
+            else
+            {
+                f32 x = interp_common_methods(methods_1d[i], time.current_f, (f32)end_time);
+                current[i] = (goal[i] - initial[i]) * x + initial[i];
+            }
+        }
+    }
+    return current;
+}
+
 // TODO: the timer tick adds current_f and the speed the other way round, and one lea swaps its operands.
 // FUNCTION: TH16 0x464590
 Int3 InterpInt3::step()
