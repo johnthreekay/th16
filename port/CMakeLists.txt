@@ -47,7 +47,19 @@ else()
     list(FILTER TH16_PORT_SOURCES EXCLUDE REGEX "/src/d3d9_null\\.cpp$")
 endif()
 
-add_executable(th16 ${TH16_GAME_SOURCES} ${TH16_PORT_SOURCES})
+# Renderer testing before the platform layer existed: port/tests/platform_shim.cpp
+# replaced the file, thread and window stubs (linked first, duplicates
+# allowed, so its definitions win). Superseded by the platform layer.
+option(TH16_TEST_SHIM "Link the test-only platform shim over the stubs" OFF)
+set(TH16_SHIM_SOURCES)
+if(TH16_TEST_SHIM)
+    set(TH16_SHIM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/tests/platform_shim.cpp)
+endif()
+
+add_executable(th16 ${TH16_SHIM_SOURCES} ${TH16_GAME_SOURCES} ${TH16_PORT_SOURCES})
+if(TH16_TEST_SHIM)
+    target_link_options(th16 PRIVATE -Wl,--allow-multiple-definition)
+endif()
 
 target_include_directories(th16 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${TH16_ROOT}/src)
 # 64-bit file offsets on 32-bit hosts too (thbgm.dat is 388 MB; seeking
@@ -124,8 +136,9 @@ endif()
 
 find_package(Threads REQUIRED)
 # SDL2 (or sdl2-compat), whose CMake package defines SDL2::SDL2: the window,
-# events and input (win32_user.cpp, input_sdl.cpp) and audio output
-# (dsound_sdl.cpp).
+# events and input (win32_user.cpp, input_sdl.cpp), audio output
+# (dsound_sdl.cpp) and the OpenGL context (d3d9_gl.cpp, which loads its GL
+# functions through SDL, so nothing links libGL).
 find_package(SDL2 REQUIRED CONFIG)
 target_link_libraries(th16 PRIVATE SDL2::SDL2 Threads::Threads m)
 
