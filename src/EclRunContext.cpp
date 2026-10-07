@@ -942,13 +942,13 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 goto next_instr;
             }
             case 79:
-                stack.push_float(sinf(stack.pop_float()));
+                stack.push_float((f32)sin(stack.pop_float()));
                 goto next_instr;
             case 88:
                 stack.push_float(sqrtf(stack.pop_float()));
                 goto next_instr;
             case 80:
-                stack.push_float(cosf(stack.pop_float()));
+                stack.push_float((f32)cos(stack.pop_float()));
                 goto next_instr;
             // x, y = radius at angle
             case 81:

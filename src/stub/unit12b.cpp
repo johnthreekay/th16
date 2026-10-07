@@ -16,10 +16,7 @@ void Stage::on_draw_06()
 {
 }
 
-// STUB: TH16 0x40b3b0
-void StageInner::run_std()
-{
-}
+// StageInner::run_std (0x40b3b0) is in src/Stage.cpp.
 
 // STUB: TH16 0x40c4a0
 void StageInner::step_fog()

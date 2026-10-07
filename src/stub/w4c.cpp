@@ -1,6 +1,9 @@
-// Opaque helpers for wave 4's interpreter placeholders
-// (src/placeholder/w4c.cpp). Compiled without /GL.
-int w4c_placeholder_sink(void *object, int value)
+// Opaque placeholders for functions wave 4's interpreters (ECL, MSG, STD,
+// bullet ex) call that are not decompiled yet. Compiled without /GL.
+#include "../Stage.h"
+
+// STUB: TH16 0x40cd10
+CameraSky InterpCameraSky::step()
 {
-    return (int)object + value;
+    return current;
 }

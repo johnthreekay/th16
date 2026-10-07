@@ -435,3 +435,348 @@ void Stage::interrupt_vms(i32 n)
         inner.anm_vms[i].run();
     }
 }
+
+// The stage script (STD) and the camera rocking patterns. The rocking code
+// calls the out-of-line sinf and cosf (0x405510, 0x4054f0). Written as
+// zun_sinf/zun_cosf calls, the extra call sites make LTCG turn those two
+// into thunks to a separate out-of-line sinf/cosf, so it uses sinf/cosf,
+// which LTCG then keeps out of line here.
+// TODO: the original realigns its frame (and esp, -8 with an ebx frame),
+// which moves every stack slot; its callees that realign (AnmVm::run) are
+// stubs here. Its sinf/cosf calls go to 0x405510/0x4054f0 rather than to
+// our separate out-of-line copies.
+// FUNCTION: TH16 0x40b3b0
+i32 StageInner::run_std()
+{
+    StdInstr *ins = (StdInstr *)((u8 *)stage->script + cur_instr_offset);
+    while (ins->time <= time_in_stage.current)
+    {
+        switch (ins->opcode)
+        {
+        // stop: the script waits here for good.
+        case 0:
+            goto stopped;
+        // jmp: offset, new time
+        case 1:
+            time_in_stage.set_inline(ins->args[1]);
+            cur_instr_offset = ins->args[0];
+            ins = (StdInstr *)((u8 *)stage->script + cur_instr_offset);
+            continue;
+        // pos: also keeps how far the camera moved.
+        case 2:
+            camera.unk_104 = camera.position;
+            camera.position.x = *(f32 *)&ins->args[0];
+            camera.position.y = *(f32 *)&ins->args[1];
+            camera.position.z = *(f32 *)&ins->args[2];
+            camera.unk_104 = camera.position - camera.unk_104;
+            break;
+        // posTime
+        case 3:
+        {
+            Float3 goal(*(f32 *)&ins->args[2], *(f32 *)&ins->args[3], *(f32 *)&ins->args[4]);
+            camera_pos_i.end_time = ins->args[0];
+            camera_pos_i.method = ins->args[1];
+            camera_pos_i.initial = camera.position;
+            camera_pos_i.goal = goal;
+            camera_pos_i.reset_timer();
+            break;
+        }
+        // facing
+        case 4:
+            camera.facing.x = *(f32 *)&ins->args[0];
+            camera.facing.y = *(f32 *)&ins->args[1];
+            camera.facing.z = *(f32 *)&ins->args[2];
+            break;
+        // facingTime
+        case 5:
+        {
+            Float3 goal(*(f32 *)&ins->args[2], *(f32 *)&ins->args[3], *(f32 *)&ins->args[4]);
+            camera_facing_i.end_time = ins->args[0];
+            camera_facing_i.method = ins->args[1];
+            camera_facing_i.initial = camera.facing;
+            camera_facing_i.goal = goal;
+            camera_facing_i.reset_timer();
+            break;
+        }
+        // up
+        case 6:
+            camera.up.x = *(f32 *)&ins->args[0];
+            camera.up.y = *(f32 *)&ins->args[1];
+            camera.up.z = *(f32 *)&ins->args[2];
+            break;
+        // upTime
+        case 18:
+        {
+            Float3 goal(*(f32 *)&ins->args[2], *(f32 *)&ins->args[3], *(f32 *)&ins->args[4]);
+            camera_up_i.end_time = ins->args[0];
+            camera_up_i.method = ins->args[1];
+            camera_up_i.initial = camera.up;
+            camera_up_i.goal = goal;
+            camera_up_i.reset_timer();
+            break;
+        }
+        // fov
+        case 7:
+            camera.field_of_view = *(f32 *)&ins->args[0];
+            break;
+        // fog: color, begin and end distance
+        case 8:
+            *(i32 *)camera.sky.color = ins->args[0];
+            camera.sky.color_components[0] = camera.sky.color[0];
+            camera.sky.color_components[1] = camera.sky.color[1];
+            camera.sky.color_components[2] = camera.sky.color[2];
+            camera.sky.color_components[3] = camera.sky.color[3];
+            camera.sky.begin_distance = *(f32 *)&ins->args[1];
+            camera.sky.end_distance = *(f32 *)&ins->args[2];
+            break;
+        // fogTime
+        case 9:
+        {
+            CameraSky goal;
+            goal.begin_distance = *(f32 *)&ins->args[3];
+            goal.end_distance = *(f32 *)&ins->args[4];
+            goal.color_components[0] = ((u8 *)&ins->args[2])[0];
+            goal.color_components[1] = ((u8 *)&ins->args[2])[1];
+            goal.color_components[2] = ((u8 *)&ins->args[2])[2];
+            goal.color_components[3] = ((u8 *)&ins->args[2])[3];
+            for (i32 i = 0; i < 4; i++)
+            {
+                goal.color[i] = goal.color_components[i];
+            }
+            set_sky_interp(ins->args[0], ins->args[1], &goal);
+            break;
+        }
+        // posBezier, facingBezier: initial, bezier_1, goal, bezier_2.
+        case 10:
+        {
+            Float3 bezier_1(*(f32 *)&ins->args[2], *(f32 *)&ins->args[3], *(f32 *)&ins->args[4]);
+            Float3 goal(*(f32 *)&ins->args[5], *(f32 *)&ins->args[6], *(f32 *)&ins->args[7]);
+            Float3 bezier_2(*(f32 *)&ins->args[8], *(f32 *)&ins->args[9], *(f32 *)&ins->args[10]);
+            camera_pos_i.end_time = ins->args[0];
+            camera_pos_i.initial = camera.position;
+            camera_pos_i.bezier_1 = bezier_1;
+            camera_pos_i.goal = goal;
+            camera_pos_i.bezier_2 = bezier_2;
+            camera_pos_i.method = 8;
+            camera_pos_i.reset_timer();
+            break;
+        }
+        case 11:
+        {
+            Float3 bezier_1(*(f32 *)&ins->args[2], *(f32 *)&ins->args[3], *(f32 *)&ins->args[4]);
+            Float3 goal(*(f32 *)&ins->args[5], *(f32 *)&ins->args[6], *(f32 *)&ins->args[7]);
+            Float3 bezier_2(*(f32 *)&ins->args[8], *(f32 *)&ins->args[9], *(f32 *)&ins->args[10]);
+            camera_facing_i.end_time = ins->args[0];
+            camera_facing_i.initial = camera.facing;
+            camera_facing_i.bezier_1 = bezier_1;
+            camera_facing_i.goal = goal;
+            camera_facing_i.bezier_2 = bezier_2;
+            camera_facing_i.method = 8;
+            camera_facing_i.reset_timer();
+            break;
+        }
+        // rockMode
+        case 12:
+            rocking_mode() = *(u8 *)&ins->args[0];
+            if (rocking_mode() == 0)
+            {
+                camera.rocking_vector_1.x = 0.0f;
+                camera.rocking_vector_1.y = 0.0f;
+                camera.rocking_vector_1.z = 0.0f;
+            }
+            timer_1c.reset_inline();
+            if (rocking_mode() == 2)
+            {
+                timer_1c.set_value(0x200);
+            }
+            break;
+        // bgColor
+        case 13:
+            g_Supervisor.background_color = ins->args[0];
+            break;
+        // sprite: replaces one of the eight extra VMs (-1 stops it, -2
+        // hides it).
+        case 14:
+        {
+            i32 script = ins->args[1];
+            if (script >= 0)
+            {
+                AnmVm *vm = &anm_vms[ins->args[0]];
+                stage->stage_anm->copy_vm(vm, script);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+            }
+            else if (script == -2)
+            {
+                anm_vms[ins->args[0]].flags_lo &= ~1;
+            }
+            else if (script == -1)
+            {
+                anm_vms[ins->args[0]].instr_offset = script;
+                anm_vms[ins->args[0]].flags_lo &= ~1;
+            }
+            unk_32f0[ins->args[0]] = ins->args[2];
+            break;
+        }
+        // Replaces the fog effect.
+        case 17:
+            if (fog != NULL)
+            {
+                delete fog;
+            }
+            fog = NULL;
+            unk_3318 = 112.0f;
+            unk_331c = 192.0f;
+            unk_3320 = -1;
+            unk_3338 = 0;
+            unk_333c = 0;
+            fog_timer.reset_inline();
+            fog_kind = ins->args[0];
+            if (unk_3318 > 0.0f)
+            {
+                if (fog_kind == 1)
+                {
+                    fog = new Fog(0, 7, 0);
+                }
+                else
+                {
+                    fog = new Fog(0, 0x11, 0);
+                }
+            }
+            break;
+        case 20:
+            unk_3310 = *(f32 *)&ins->args[0] * *(f32 *)&ins->args[0];
+            break;
+        // interrupt
+        case 19:
+            stage->interrupt_vms(ins->args[0] + 7);
+            break;
+        }
+        cur_instr_offset += ins->size;
+        ins = (StdInstr *)((u8 *)stage->script + cur_instr_offset);
+    }
+    time_in_stage.tick();
+stopped:
+    if (camera_facing_i.end_time != 0)
+    {
+        camera.facing = camera_facing_i.step();
+    }
+    if (camera_pos_i.end_time != 0)
+    {
+        camera.position = camera_pos_i.step();
+    }
+    if (camera_sky_i.end_time != 0)
+    {
+        camera.sky = camera_sky_i.step();
+    }
+    if (camera_up_i.end_time != 0)
+    {
+        camera.up = camera_up_i.step();
+    }
+    if (rocking_mode() != 0)
+    {
+        switch (rocking_mode())
+        {
+        case 1:
+        {
+            f32 angle = normalize_angle(timer_1c.current_f * ZUN_PI * 2.0f / 512.0f);
+            f32 s = sinf(angle);
+            f32 x = s * -20.0f;
+            camera.rocking_vector_1.x = x;
+            f32 z = sinf(normalize_angle(angle * 2.0f)) * -10.0f;
+            camera.rocking_vector_1.z = z;
+            camera.up.x = s * -0.01f;
+            camera.rocking_vector_2.x = x * -0.5f;
+            camera.rocking_vector_2.z = z * -0.5f;
+            timer_1c++;
+            if (timer_1c.current >= 0x200)
+            {
+                timer_1c.set_value(0);
+            }
+            break;
+        }
+        case 2:
+        {
+            f32 angle = normalize_angle(timer_1c.current_f * ZUN_PI * 2.0f / 3072.0f);
+            camera.up.x = -sinf(angle);
+            camera.up.z = cosf(angle);
+            timer_1c++;
+            if (timer_1c.current >= 0xc00)
+            {
+                timer_1c.set_value(0);
+            }
+            break;
+        }
+        case 3:
+        {
+            f32 angle = normalize_angle(timer_1c.current_f * ZUN_PI * 2.0f / 2048.0f);
+            f32 s = sinf(angle);
+            f32 v = s * 50.0f;
+            camera.rocking_vector_1.x = v;
+            camera.rocking_vector_1.y = v;
+            camera.rocking_vector_1.z = sinf(normalize_angle(angle * 2.0f)) * -100.0f;
+            camera.rocking_vector_2.x = -v;
+            camera.rocking_vector_2.y = -v;
+            camera.up.x = s * -0.05f;
+            timer_1c++;
+            if (timer_1c.current >= 0x800)
+            {
+                timer_1c.set_value(0);
+            }
+            break;
+        }
+        case 4:
+        {
+            f32 angle = normalize_angle(timer_1c.current_f * ZUN_PI * 2.0f / 3072.0f);
+            camera.up.x = -sinf(angle);
+            camera.up.z = -cosf(angle);
+            timer_1c++;
+            if (timer_1c.current >= 0xc00)
+            {
+                timer_1c.set_value(0);
+            }
+            break;
+        }
+        case 7:
+        {
+            f32 angle = timer_1c.current_f * ZUN_PI * 2.0f / 2048.0f - ZUN_PI;
+            f32 s = sinf(angle);
+            camera.rocking_vector_1.x = s * 70.0f;
+            camera.rocking_vector_1.z = sinf(normalize_angle(angle + angle)) * 200.0f;
+            camera.up.x = s * -0.1f;
+            timer_1c++;
+            if (timer_1c.current >= 0x800)
+            {
+                timer_1c.set_value(0);
+            }
+            break;
+        }
+        case 8:
+        {
+            f32 s = sinf(timer_1c.current_f * ZUN_PI * 2.0f / 1024.0f - ZUN_PI);
+            camera.rocking_vector_1.x = s * -50.0f;
+            camera.up.x = s * -0.1f;
+            timer_1c++;
+            if (timer_1c.current >= 0x400)
+            {
+                timer_1c.set_value(0);
+            }
+            break;
+        }
+        case 9:
+        {
+            f32 s = sinf(timer_1c.current_f * ZUN_PI * 2.0f / 512.0f - ZUN_PI);
+            camera.up.x = s * -0.01f;
+            camera.rocking_vector_1.x = s * -15.0f;
+            timer_1c++;
+            if (timer_1c.current >= 0x200)
+            {
+                timer_1c.set_value(0);
+            }
+            break;
+        }
+        }
+    }
+    return 0;
+}
