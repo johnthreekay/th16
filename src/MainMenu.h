@@ -150,6 +150,8 @@ class TitleInf : public TaskInf
     i32 highlight_spell_row(i32 selected);
     // 0x452330 (ExpHP: sub_452330_replay_related). The player data.
     i32 do_player_data();
+    // 0x4532f0 (ExpHP: do_menu_sub_4532f0). The high score name entry.
+    i32 do_score_name_entry();
     // 0x452c30. The spell card page of the player data.
     i32 draw_spell_card_page();
     // The row of replay_slot on its page of 25.

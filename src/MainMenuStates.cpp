@@ -1834,6 +1834,215 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
     return 1;
 }
 
+// The high score name entry after a game (unk_5a58 is set when the score
+// did not make the top ten), then on to saving the replay unless the game
+// was continued.
+// TODO: the original realigns its frame (and esp, -8) and computes the % 13 column tests with a multiply; ours keeps 13 in ebx for idiv.
+// FUNCTION: TH16 0x4532f0
+i32 TitleInf::do_score_name_entry()
+{
+    switch (substate)
+    {
+    case 0:
+    {
+        menu.num_choices = 30;
+        g_Supervisor.play_bgm_wav(0, "th128_08");
+        g_Supervisor.play_bgm(0, 0x11);
+        if (anm_id_73c.id == 0)
+        {
+            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+        }
+        create_effect(0x6f);
+        set_substate(1);
+        create_effect(g_Globals.subshot + g_Globals.character + 0xa7);
+        create_effect(g_Globals.difficulty + 0xaf);
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x61]) == NULL)
+        {
+            create_effect(0x61);
+            AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
+        }
+        g_Globals.stage_num = 8;
+        i32 rank = ((ScorefileData *)g_Scorefile)->charas[g_Globals.subshot + g_Globals.character].insert_score();
+        g_stage_data = &g_stage_table[0];
+        g_Globals.stage_num = 0;
+        g_Globals.weird_stage_num = 0;
+        if (rank >= 0)
+        {
+            time_in_state.set_value(0);
+            menu.wraps = 1;
+            menu.set_cursor(rank);
+            menu_5a5c.set_cursor(0);
+            menu_5a5c.num_choices = 0x5b;
+            menu_5a5c.wraps = 1;
+            strcpy(replay_name, g_Scorefile->last_replay_name);
+            if (strcmp(replay_name, "        ") != 0)
+            {
+                menu_5a5c.move_cursor(-1);
+            }
+            i32 len;
+            for (len = 8; len > 0 && replay_name[len - 1] == ' '; len--)
+            {
+            }
+            replay_name_cursor = len;
+            unk_5a58 = 0;
+        }
+        else
+        {
+            menu.set_cursor(-1);
+            unk_5a58 = 1;
+        }
+    }
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        if (unk_5a58 == 0)
+        {
+            menu_save_selection(&menu_5a5c);
+            if (input_pressed_or_repeating(INPUT_UP))
+            {
+                menu_5a5c.move_cursor(-13);
+            }
+            if (input_pressed_or_repeating(INPUT_DOWN))
+            {
+                menu_5a5c.move_cursor(13);
+            }
+            if (input_pressed_or_repeating(INPUT_LEFT))
+            {
+                if (menu_5a5c.next_selection % 13 != 0)
+                {
+                    menu_5a5c.move_cursor(-1);
+                }
+                else
+                {
+                    menu_5a5c.move_cursor(12);
+                }
+            }
+            if (input_pressed_or_repeating(INPUT_RIGHT))
+            {
+                if (menu_5a5c.next_selection % 13 != 12)
+                {
+                    menu_5a5c.move_cursor(1);
+                }
+                else
+                {
+                    menu_5a5c.move_cursor(-12);
+                }
+            }
+            if (menu_selection_moved(&menu_5a5c))
+            {
+                g_SoundManager.play_sound_centered(10, 0);
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            if (unk_5a58 == 0)
+            {
+                i32 choice = menu_5a5c.next_selection;
+                if (choice < 88)
+                {
+                    if (replay_name_cursor < 8)
+                    {
+                        replay_name[replay_name_cursor] = g_name_entry_chars[choice];
+                        replay_name_cursor++;
+                        if (replay_name_cursor >= 8)
+                        {
+                            menu_5a5c.set_cursor(90);
+                        }
+                    }
+                    else
+                    {
+                        replay_name[replay_name_cursor - 1] = g_name_entry_chars[choice];
+                    }
+                }
+                else if (choice == 88)
+                {
+                    if (replay_name_cursor < 8)
+                    {
+                        replay_name[replay_name_cursor] = ' ';
+                        replay_name_cursor++;
+                        if (replay_name_cursor >= 8)
+                        {
+                            menu_5a5c.set_cursor(90);
+                        }
+                    }
+                    else
+                    {
+                        replay_name[replay_name_cursor - 1] = ' ';
+                    }
+                }
+                else if (choice == 89)
+                {
+                    if (replay_name_cursor == 0)
+                    {
+                        break;
+                    }
+                    replay_name_cursor--;
+                    replay_name[replay_name_cursor] = ' ';
+                }
+                else if (choice == 90)
+                {
+                    strcpy(((ScorefileData *)g_Scorefile)
+                               ->charas[g_Globals.subshot + g_Globals.character]
+                               .scores[g_Globals.difficulty][menu.next_selection]
+                               .name,
+                           replay_name);
+                    strcpy(g_Scorefile->last_replay_name, replay_name);
+                    set_substate(3);
+                }
+            }
+            else
+            {
+                set_substate(3);
+            }
+            g_SoundManager.play_sound_centered(7, 0);
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            if (unk_5a58 == 0)
+            {
+                if (replay_name_cursor == 0)
+                {
+                    break;
+                }
+                g_SoundManager.play_sound_centered(9, 0);
+                replay_name_cursor--;
+                replay_name[replay_name_cursor] = ' ';
+                return 1;
+            }
+            set_substate(3);
+            g_SoundManager.play_sound_centered(7, 0);
+            return 1;
+        }
+        break;
+    case 3:
+        if (time_in_state.current >= 6)
+        {
+            interrupt_and_clear(0x6f);
+            interrupt_and_clear(g_Globals.subshot + g_Globals.character + 0xa7);
+            interrupt_and_clear(g_Globals.difficulty + 0xaf);
+            if (g_Globals.continues_used == 0)
+            {
+                set_state(15);
+                return 1;
+            }
+            ReplayManager::destroy(g_ReplayManager);
+            AnmManager::interrupt_tree(anm_id_73c, 1);
+            anm_id_73c.id = 0;
+            menu.pop();
+            set_state(1);
+            g_Supervisor.play_bgm_wav(0, "th16_01");
+            g_Supervisor.play_bgm(0, 0);
+        }
+        break;
+    }
+    return 1;
+}
+
 // The high score name entry after a game: the top ten of the character and
 // difficulty played, and while a name is entered, the name and the
 // character grid.
