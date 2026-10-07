@@ -288,6 +288,19 @@ decompiled code the surroundings it had in the original:
 - Some matches depend on unrelated code existing: 0x43c940 stops matching
   as soon as write_screenshot is defined anywhere in the program.
 
+- LTCG folds a constant `this` into a HARNESS_CALLED callee when every
+  caller passes the same global. If the original keeps `this` in ecx, also
+  call it with a second object from the harness; if it addresses the global
+  directly, name the global in the body (open_bgm, preload_bgm).
+- A callee whose callers LTCG all sees does not realign its own frame; an
+  8-aligned harness caller (an address-taken double) restores it. Remove
+  stand-in harness callers once the real callers exist, or they keep
+  shaping the callee (FpsCounter::update, take_screenshots). This is
+  fragile: adding two unrelated DirectInput callbacks broke three matches.
+- A byte test of flags next to a dword `|=` on the same flags avoids common
+  subexpression reuse. Fall-through case order shows in jump table tail
+  merges.
+
 ### Known tooling gaps
 
 - Template members cannot be annotated: build.py's name parsing does not
@@ -306,7 +319,9 @@ decompiled code the surroundings it had in the original:
   named `__declspec`; use DECOMP_NOINLINE. An explicit specialization of an
   in-class template member also needs a user in its own .cpp to be emitted.
 - Dynamic initializers (0x401000-0x401250) and C-linkage UCRT inlines
-  (0x405530, 0x405540, 0x4090d0) cannot be annotated yet.
+  (0x405530, 0x405540, 0x4090d0 `sprintf`) cannot be annotated yet, and
+  sigscan does not locate `_chdir` or `_mkdir`; compare.py then reports
+  their callers below 100% although the code is identical.
 - SYNTHETIC only takes scalar deleting destructors, so implicit
   constructors and destructors (AnmFastVm at 0x46b770/0x46b790) need an
   explicit definition to be annotated.
