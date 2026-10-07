@@ -14,7 +14,7 @@
 #define BULLET_COUNT 0x7d0
 #define BULLET_LAYER_COUNT 6
 
-// The et_ex transform types (BulletEx::type). Each is one bit: a running
+// The et_ex transform types (BulletEx::type), for bullets and lasers. Each is one bit: a running
 // transform sets its bit in Bullet::active_ex_flags until it is done, and
 // the ones that run over several frames are stepped by Bullet::step_ex_NN,
 // NN being the bit. Names are the usual thecl ones.
@@ -69,6 +69,8 @@ enum BulletExType
     BULLET_EX_DELAY = 1 << 26,
     // Shoot a line or infinite laser.
     BULLET_EX_LASER = 1 << 27,
+    // Curvy lasers only: the segments stay where they are.
+    BULLET_EX_FREEZE_SEGMENTS = 1 << 28,
     // Set the hitbox size (the type's own if negative).
     BULLET_EX_HITBOX = 1 << 29,
     // Wait a frames before the next transform.

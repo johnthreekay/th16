@@ -29,13 +29,13 @@ void LaserInfiniteInf::run_ex()
         }
         switch (ex->type)
         {
-        case 0x80:
-            countdown_5c8 = ex->a;
+        case BULLET_EX_INVULN:
+            ex_invuln_remaining_frames = ex->a;
             break;
-        case 0x400:
+        case BULLET_EX_DELETE:
             state = 3;
             break;
-        case 0x100000:
+        case BULLET_EX_BLEND:
             if (ex->a != 0)
             {
                 vm_950.flags_lo = vm_950.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
@@ -65,7 +65,7 @@ i32 LaserInfiniteInf::method_30(Float3 *pos, f32 radius)
     f32 y = dx * s + dy * c;
     D3DXVECTOR2 lo(x - radius, y - radius);
     D3DXVECTOR2 hi(x + radius, y + radius);
-    if (lo.x > unk_70 || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
+    if (lo.x > hit_length || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
     {
         return 0;
     }
@@ -87,24 +87,24 @@ i32 LaserInfiniteInf::on_tick()
         {
             if (ex_state[5].timer.current <= 0)
             {
-                ex_flags ^= 0x80000000;
+                ex_flags ^= BULLET_EX_WAIT;
             }
             else
             {
                 ex_state[5].timer--;
             }
         }
-        if (countdown_5c8 != 0)
+        if (ex_invuln_remaining_frames != 0)
         {
-            countdown_5c8--;
+            ex_invuln_remaining_frames--;
         }
     }
-    if (unk_70 < inner.laser_new_arg_2)
+    if (hit_length < inner.laser_new_arg_2)
     {
-        unk_70 = length * g_game_speed + unk_70;
-        if (unk_70 > inner.laser_new_arg_2)
+        hit_length = length * g_game_speed + hit_length;
+        if (hit_length > inner.laser_new_arg_2)
         {
-            unk_70 = inner.laser_new_arg_2;
+            hit_length = inner.laser_new_arg_2;
         }
     }
     i32 i = 0;
@@ -175,7 +175,7 @@ i32 LaserInfiniteInf::on_tick()
     vm->flags_lo |= ANM_VM_SCALE_CHANGED;
     vm->scale.x = width / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_width;
     vm->flags_lo |= ANM_VM_SCALE_CHANGED;
-    vm->scale.y = unk_70 / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_height;
+    vm->scale.y = hit_length / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_height;
     vm->run();
     if (unk_7c == 0.0f)
     {

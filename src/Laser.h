@@ -25,30 +25,40 @@ class LaserDataInf
     // Nonzero once the laser is to be removed: LaserManager counts it up
     // and deletes the laser when it reaches 2.
     u32 pending_delete : 2;
-    // While set, LaserManager only runs check_graze_or_kill on the laser.
-    u32 flag_3 : 1;
+    // While set, LaserManager only runs check_graze_or_kill on the laser
+    // (like BULLET_FLAG_FROZEN).
+    u32 frozen : 1;
     u32 flags_rest : 28;
     // 1: skipped by on_draw and removed on the next tick.
     i32 state;
     i32 kind;
     ZunTimer timer;
-    ZunTimer timer_2c;
-    ZunTimer timer_40;
+    // Grazes count every third frame of it.
+    ZunTimer graze_timer;
+    // Curvy lasers: time since the head left, in segments.
+    ZunTimer segment_timer;
     Float3 position;
-    Float3 unk_60;
+    // From position to the tip: (cos angle, sin angle) * length.
+    Float3 tip_offset;
     f32 angle;
-    f32 unk_70;
+    // Length of the hitbox along the laser; infinite lasers grow it to
+    // laser_new_arg_2.
+    f32 hit_length;
     f32 width;
     f32 length;
     f32 unk_7c;
     i32 id;
     BulletExState ex_state[0x12];
+    // As Bullet::ex_index and active_ex_flags.
     i32 ex_index;
     u32 ex_flags;
     i32 unk_59c;
-    ZunTimer timer_5a0;
+    // 30 on creation; while it runs (or with BULLET_EX_OFFSCREEN) the laser
+    // may be off screen.
+    ZunTimer offscreen_grace;
     ZunTimer timer_5b4;
-    i32 countdown_5c8;
+    // Immune to cancels while nonzero (BULLET_EX_INVULN).
+    i32 ex_invuln_remaining_frames;
     // Index into g_bullet_types, and the color within it.
     i32 bullet_type;
     i32 bullet_color;
@@ -103,8 +113,9 @@ struct LaserDataFlagBits
 {
     u32 ticked : 1;
     u32 pending_delete : 2;
-    u32 flag_3 : 1;
-    // Curvy lasers: the segments stay where they are (et_ex 0x10000000).
+    u32 frozen : 1;
+    // Curvy lasers: the segments stay where they are
+    // (BULLET_EX_FREEZE_SEGMENTS).
     u32 segments_frozen : 1;
     u32 rest : 27;
 };
@@ -316,7 +327,7 @@ struct LaserCurveInner
     }
 };
 
-// One point of a curvy laser's body (LaserCurveInf::unk_1524 holds
+// One point of a curvy laser's body (LaserCurveInf::segments holds
 // segment_count of them).
 struct LaserCurveSegment
 {
@@ -334,8 +345,10 @@ class LaserCurveInf : public LaserDataInf
     LaserCurveInner inner;
     AnmVm vm_92c;
     AnmVm vm_f28;
-    void *unk_1524;
-    void *unk_1528;
+    // segment_count LaserCurveSegments.
+    void *segments;
+    // Two RenderVertex144 per segment, rebuilt for drawing.
+    void *vertices;
     // Head of a list of heap nodes; never a real node itself.
     LaserCurveNode nodes;
 
