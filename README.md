@@ -502,10 +502,20 @@ decompiled code the surroundings it had in the original:
     dwords for the rest) needs a field-wise operator= (LaserCurveNode).
   - A search loop whose normal exit returns: write `goto found` in the
     loop and `return` after it; `break` plus `if (i >= n)` re-tests n.
+  - The laser velocity steps add their vector with D3DXVec3Add
+    (`v = vel * g_game_speed; D3DXVec3Add(&unk_60, &unk_60, &v)`): its
+    stores through pointers give the original's add, store, add, store
+    order and reloads; `unk_60 += v` does not. Both method_3c matched.
   - Open: the original loads g_game_speed once for three position
     components (`position.x = v.x * g_game_speed + position.x` and so on);
     ours reloads it after each store. Defining g_timer_speed_ptrs in a /GL
-    file instead of the stub did not change that.
+    file instead of the stub did not change that, and neither did
+    D3DXVec3Scale/D3DXVec3Add (those load it once but add in a different
+    order).
+  - Operand order of a commutative add or multiply often does not follow
+    the source: swapping `a + b`, `a += b` or the timer tick's operands
+    gave identical code in several places (LaserCurveInf::initialize,
+    method_44, check_graze_or_kill); look for a different construct.
 
 ### Compiler-generated and CRT functions
 
