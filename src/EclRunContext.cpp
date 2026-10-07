@@ -1,6 +1,7 @@
 // ECL argument decoding: an argument flagged in variable_mask names a local
 // (>= 0, a byte offset from the frame base), a stack entry (-1 to -100,
 // counted back from the top) or a global variable of the VM (the rest).
+#include <stdlib.h>
 #include <string.h>
 
 #include "Ecl.h"
@@ -277,6 +278,78 @@ f32 *EclRunContext::get_float_arg_ptr(int index)
         return vm->get_float_global_ptr((i32)value);
     }
     return NULL;
+}
+
+// Adds an .ecl file: merges its subroutines into the table, kept sorted by
+// name, and loads its includes. Returns the file's index, -1 if it is not
+// an ECL file.
+// TODO: this and name swap registers (edi/ebx), and the original keeps the NULL check before free.
+// FUNCTION: TH16 0x474530
+int SptResourceInf::load_ecl_data(void *data)
+{
+    file_data_pointers[file_count] = data;
+    EclRawFile *file = (EclRawFile *)file_data_pointers[file_count];
+    if (file->magic != 'TPCS')
+    {
+        file_data_pointers[file_count] = NULL;
+        return -1;
+    }
+    if (file->version != 1)
+    {
+        file_data_pointers[file_count] = NULL;
+        return -1;
+    }
+    u32 *offsets = (u32 *)((u8 *)file + sizeof(EclRawFile) + file->include_length);
+    char *name = (char *)(offsets + file->sub_count);
+    subroutine_count += file->sub_count;
+    EclSubroutinePtrs *old = subroutines;
+    subroutines = (EclSubroutinePtrs *)malloc(subroutine_count * sizeof(EclSubroutinePtrs));
+    if (old == NULL)
+    {
+        for (i32 i = 0; i < subroutine_count; i++)
+        {
+            subroutines[i].bytecode = (u8 *)file_data_pointers[file_count] + *offsets;
+            subroutines[i].name = name;
+            name += strlen(name) + 1;
+            offsets++;
+        }
+    }
+    else
+    {
+        i32 count = subroutine_count - ((EclRawFile *)file_data_pointers[file_count])->sub_count;
+        memcpy(subroutines, old, count * sizeof(EclSubroutinePtrs));
+        if (old != NULL)
+        {
+            free(old);
+        }
+        for (i32 i = 0; i < ((EclRawFile *)file_data_pointers[file_count])->sub_count; i++)
+        {
+            i32 j;
+            for (j = 0; j < count; j++)
+            {
+                if (strcmp(name, subroutines[j].name) <= 0)
+                {
+                    break;
+                }
+            }
+            for (i32 k = subroutine_count - 1; k > j; k--)
+            {
+                subroutines[k] = subroutines[k - 1];
+            }
+            subroutines[j].bytecode = (u8 *)file_data_pointers[file_count] + *offsets;
+            subroutines[j].name = name;
+            name += strlen(name) + 1;
+            count++;
+            offsets++;
+        }
+    }
+    i32 index = file_count++;
+    file = (EclRawFile *)file_data_pointers[index];
+    if (file->include_length != 0)
+    {
+        load_includes((u8 *)file + sizeof(EclRawFile));
+    }
+    return index;
 }
 
 // FUNCTION: TH16 0x474740

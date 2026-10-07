@@ -138,6 +138,20 @@ struct EclRunContextHolder
     EclRunContext primary_context;
 };
 
+// The header of an .ecl file: the include list (ANIM/ECLI) follows it, then
+// the subroutine offsets and the subroutine names.
+struct EclRawFile
+{
+    u32 magic;
+    u16 version;
+    u16 include_length;
+    u32 include_offset;
+    u32 unk_c;
+    u16 sub_count;
+    u16 unk_12;
+    u32 unk_14[4];
+};
+
 struct EclSubroutinePtrs
 {
     const char *name;
