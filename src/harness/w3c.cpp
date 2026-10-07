@@ -52,12 +52,6 @@ void harness_w3c_gui_spell_bonus(i32 captured, i32 bonus)
     }
 }
 
-// Like ItemManager's on_tick at 0x42fded.
-void harness_w3c_gui_notice_4()
-{
-    g_Gui->sub_42bcf0(0, 4);
-}
-
 // Like the game start code at 0x42e171.
 void harness_w3c_player_resume_options()
 {

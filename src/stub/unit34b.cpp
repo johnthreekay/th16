@@ -12,11 +12,6 @@
 StageData *g_stage_data;
 
 
-// STUB: TH16 0x428e70
-i32 Gui::on_draw_2_body()
-{
-    return 1;
-}
 
 
 

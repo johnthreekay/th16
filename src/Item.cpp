@@ -122,6 +122,20 @@ static __forceinline f32 angle_to_player_inline(Float3 *pos)
     return (f32)atan2((double)dy, (double)dx);
 }
 
+// The original calls Player::angle_to_player in state 5 and has it inlined
+// in state 4. Either form makes LTCG realign on_tick_body early enough to
+// give Item::init_anm (0x430c90) a padded frame in our build, so both go
+// through these out-of-line helpers until that is understood.
+static DECOMP_NOINLINE f32 item_angle_to_player(Float3 *pos)
+{
+    return g_Player->angle_to_player(pos);
+}
+
+static DECOMP_NOINLINE f32 item_angle_to_player_4(Float3 *pos)
+{
+    return angle_to_player_inline(pos);
+}
+
 // Whether an item has left the bottom or a side of the play area.
 static __forceinline i32 item_offscreen(Item *item)
 {
@@ -132,7 +146,7 @@ static __forceinline i32 item_offscreen(Item *item)
 // items rising before they fall (2), season items (3), items flying to the
 // player (4: auto-collected, 5: attracted), then collection, attraction and
 // the sprite VMs.
-// TODO: register allocation and the order of the position updates differ; giving Item::init_anm (0x430c90) a padded frame, as the loop's realignment is known early in our build.
+// TODO: the original realigns its frame (and esp, -8); register allocation and the order of the position updates differ.
 // FUNCTION: TH16 0x42f4e0
 i32 ItemManager::on_tick_body()
 {
@@ -230,7 +244,7 @@ i32 ItemManager::on_tick_body()
         {
             goto autocollect;
         }
-        item_sincosmul(&item->velocity, player->angle_to_player(&item->position), item->speed_towards_player);
+        item_sincosmul(&item->velocity, item_angle_to_player(&item->position), item->speed_towards_player);
         item->position += item->velocity * g_game_speed;
         if (item->speed_towards_player < 12.0f)
         {
@@ -306,7 +320,7 @@ i32 ItemManager::on_tick_body()
         {
             g_Globals.unk_dc = 8;
         }
-        item_sincosmul(&item->velocity, angle_to_player_inline(&item->position), item->speed_towards_player);
+        item_sincosmul(&item->velocity, item_angle_to_player_4(&item->position), item->speed_towards_player);
         item->position += item->velocity * g_game_speed;
         if (item->speed_towards_player < 12.0f)
         {

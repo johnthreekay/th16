@@ -40,12 +40,3 @@ void harness_gui_sub_42c1b0()
 {
     g_Gui->sub_42c1b0();
 }
-
-// Like Gui::on_draw_2 at 0x4292dd.
-i32 harness_spellcard_decode_time_code()
-{
-    i32 seconds;
-    i32 hundredths;
-    g_Spellcard->decode_time_code(&seconds, &hundredths);
-    return seconds + hundredths;
-}

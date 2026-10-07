@@ -180,7 +180,8 @@ struct Gui
     // Like season_gauge_has_level, for the gauge on_tick_body updates.
     i32 unk_118;
     AnmId ids_11c[5];
-    u8 unk_130[0x134 - 0x130];
+    // Shown by on_draw_2_body with the count-down below.
+    i32 unk_130;
     // A count-down shown after a notice (on_tick_body): unk_144 is added
     // to unk_140 once per step of unk_134; unk_138 and unk_13c are the
     // final values.
@@ -189,7 +190,7 @@ struct Gui
     i32 unk_13c;
     i32 unk_140;
     i32 unk_144;
-    u8 unk_148[0x14c - 0x148];
+    i32 unk_148;
     // Set by sub_42bcf0's notices.
     i32 unk_14c;
     AnmId id_150;

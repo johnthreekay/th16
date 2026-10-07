@@ -2152,3 +2152,287 @@ i32 Gui::on_tick_body()
     time_in_stage.tick();
     return 1;
 }
+
+// The original formats the percentage inline. The double argument makes
+// LTCG realign on_draw_2_body early enough to pad the frame of
+// AsciiInf::create_number (0x4082b0) in our build; kept out of line until
+// that is understood.
+static DECOMP_NOINLINE void draw_percentage(Float3 *pos, f32 percentage)
+{
+    g_AsciiManager->create_stringf(pos, "%3.1f%%", (double)percentage);
+}
+
+// The HUD's text: the stage clear bonus, the spell card bonus count-down,
+// the spell card timers, the score, hiscore, next extend, bombs, power,
+// PIV and graze, the boss's spell counter and the season level.
+// TODO: written for behaviour; the original aligns its frame to 64 bytes, and register allocation and the text-setting store order are not matched yet.
+// FUNCTION: TH16 0x428e70
+i32 Gui::on_draw_2_body()
+{
+    Float3 pos;
+    AsciiInf *ascii;
+    if (g_AnmManager->get_vm_with_id(ids_11c[1]) == NULL)
+    {
+        ids_11c[1].id = 0;
+    }
+    else
+    {
+        pos = Float3(224.0f, 200.0f, 0.0f);
+        AnmVm *vm = get_vm_or_clear(ids_11c[1]);
+        ascii = g_AsciiManager;
+        ascii->color.a = vm->color_1.a;
+        ascii->group = 2;
+        ascii->font_id = 4;
+        ascii->align_h = 0;
+        ascii->align_v = 0;
+        ascii->create_number(&pos, stage_clear_bonus);
+        ascii = g_AsciiManager;
+        ascii->color.a = 0xff;
+        ascii->font_id = 0;
+        ascii->group = 0;
+        ascii->align_h = 1;
+        ascii->align_v = 1;
+    }
+    if (g_AnmManager->get_vm_with_id(ids_11c[4]) == NULL)
+    {
+        ids_11c[4].id = 0;
+    }
+    else
+    {
+        AnmVm *vm = g_AnmManager->get_vm_with_id(ids_11c[4]);
+        if (vm != NULL && (vm->flags_lo >> 1) & 1)
+        {
+            pos = Float3(300.0f, 226.0f, 0.0f);
+            vm = get_vm_or_clear(ids_11c[4]);
+            ascii = g_AsciiManager;
+            ascii->color.a = vm->color_1.a;
+            ascii->group = 2;
+            ascii->font_id = 2;
+            ascii->align_h = 2;
+            ascii->align_v = 0;
+            ascii->create_stringf(&pos, "%d", unk_130);
+            pos.x = 308.0f;
+            pos.y = 246.0f;
+            draw_percentage(&pos, unk_134);
+            pos.x = 300.0f;
+            pos.y = 266.0f;
+            g_AsciiManager->create_stringf(&pos, "%3d", unk_148);
+            pos.y = 286.0f;
+            g_AsciiManager->create_stringf(&pos, "%6d", unk_140);
+            pos.y = 296.0f;
+            ascii = g_AsciiManager;
+            ascii->color.d3d = 0xff8080ff;
+            ascii->create_stringf(&pos, "  +%d", unk_140 / 50000 * 10);
+            ascii = g_AsciiManager;
+            ascii->color.a = 0xff;
+            ascii->font_id = 0;
+            ascii->group = 0;
+            ascii->align_h = 1;
+            ascii->align_v = 1;
+            ascii->color.d3d = 0xffffffff;
+        }
+    }
+    ascii = g_AsciiManager;
+    if (unk_14c != 0)
+    {
+        pos = Float3(224.0f, 144.0f, 0.0f);
+        AnmVm *vm = g_AnmManager->get_vm_with_id(ids_11c[3]);
+        if (vm == NULL)
+        {
+            ids_11c[3].id = 0;
+        }
+        if (g_Spellcard == NULL)
+        {
+            unk_14c = 0;
+            g_AnmManager->delete_vm(ids_11c[3]);
+            ids_11c[3].id = 0;
+        }
+        else if (vm == NULL)
+        {
+            unk_14c = 0;
+        }
+        else
+        {
+            ascii->color.a = vm->color_1.a;
+            ascii->group = 2;
+            ascii->font_id = 4;
+            i32 seconds = g_Spellcard->unk_90 / 60;
+            ascii->create_stringf(&pos, "%3d.", seconds >= 1000 ? 999 : seconds);
+            pos.x = 268.0f;
+            pos.y = 150.0f;
+            ascii = g_AsciiManager;
+            ascii->scale.x = 0.6f;
+            ascii->scale.y = 0.6f;
+            i32 frames = g_Spellcard->unk_90;
+            ascii->create_stringf(&pos, "%.2ds", frames % 60 * 100 / 60);
+            ascii = g_AsciiManager;
+            pos.x = 224.0f;
+            pos.y = 160.0f;
+            ascii->color.d3d = 0xff808080;
+            ascii->color.a = vm->color_1.a;
+            ascii->scale.x = 1.0f;
+            ascii->scale.y = 1.0f;
+            i32 time_seconds;
+            i32 time_hundredths;
+            g_Spellcard->decode_time_code(&time_seconds, &time_hundredths);
+            ascii->create_stringf(&pos, "%3d.", time_seconds);
+            ascii = g_AsciiManager;
+            pos.x = 268.0f;
+            pos.y = 166.0f;
+            ascii->scale.x = 0.6f;
+            ascii->scale.y = 0.6f;
+            ascii->create_stringf(&pos, "%.2ds", time_hundredths);
+            ascii = g_AsciiManager;
+            ascii->color.a = 0xff;
+            ascii->scale.x = 1.0f;
+            ascii->scale.y = 1.0f;
+            ascii->font_id = 0;
+            ascii->group = 0;
+            ascii->color.d3d = 0xffffffff;
+        }
+    }
+
+    // Hiscore and score.
+    ascii->color.d3d = 0xff808080;
+    ascii->font_id = 4;
+    pos = Float3(620.0f, 42.0f, 0.0f);
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->align_h = 2;
+    ascii->align_v = 1;
+    ascii->create_number_with_digit(&pos, g_Globals.hiscore, g_Globals.hiscore_continues);
+    ascii = g_AsciiManager;
+    pos.y = 64.0f;
+    ascii->color.d3d = 0xffffffff;
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->create_number_with_digit(&pos, current_score, g_Globals.continues_used);
+
+    // The next extend.
+    ascii = g_AsciiManager;
+    ascii->align_h = 1;
+    ascii->align_v = 1;
+    ascii->color.d3d = 0xff80c0f0;
+    ascii->align_h = 2;
+    ascii->align_v = 1;
+    pos = Float3(618.0f, 118.0f, 0.0f);
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->scale.x = 0.6f;
+    ascii->scale.y = 0.6f;
+    if ((u32)get_score_extend_quota() < 900000000)
+    {
+        g_AsciiManager->create_number(&pos, get_score_extend_quota() * 10);
+    }
+
+    // Bomb fragments.
+    ascii = g_AsciiManager;
+    ascii->color.d3d = 0xffffffff;
+    ascii->align_h = 1;
+    ascii->align_v = 1;
+    pos = Float3(576.0f, 158.0f, 0.0f);
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->scale.x = 0.6f;
+    ascii->scale.y = 0.6f;
+    ascii->create_stringf(&pos, "%3d", g_Globals.bomb_fragments);
+    pos.x = 597.0f;
+    g_AsciiManager->create_stringf(&pos, "/%d", 5);
+
+    // Power.
+    ascii = g_AsciiManager;
+    pos = Float3(540.0f, 182.0f, 0.0f);
+    ascii->color.d3d = 0xffff8030;
+    ascii->scale.x = 1.0f;
+    ascii->scale.y = 1.0f;
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->create_stringf(&pos, "%d.", g_Globals.power / g_Globals.power_per_level);
+    ascii = g_AsciiManager;
+    pos.x = 560.0f;
+    pos.y += 7.0f;
+    ascii->scale.x = 0.6f;
+    ascii->scale.y = 0.6f;
+    ascii->create_stringf(&pos, "%.2d", g_Globals.power % g_Globals.power_per_level * 100 / g_Globals.power_per_level);
+    ascii = g_AsciiManager;
+    pos.x = 574.0f;
+    pos.y -= 7.0f;
+    ascii->scale.x = 1.0f;
+    ascii->scale.y = 1.0f;
+    ascii->create_stringf(&pos, "/%d.", g_Globals.max_power / g_Globals.power_per_level);
+    ascii = g_AsciiManager;
+    pos.x = 606.0f;
+    pos.y += 7.0f;
+    ascii->scale.x = 0.6f;
+    ascii->scale.y = 0.6f;
+    ascii->create_stringf(&pos, "00");
+
+    // PIV and graze.
+    ascii = g_AsciiManager;
+    ascii->color.d3d = 0xff40c0ff;
+    ascii->scale.x = 1.0f;
+    ascii->scale.y = 1.0f;
+    ascii->align_h = 2;
+    ascii->align_v = 1;
+    pos = Float3(620.0f, 204.0f, 0.0f);
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    i32 piv = g_Globals.piv / 100;
+    ascii->create_number(&pos, piv - piv % 10);
+    ascii = g_AsciiManager;
+    ascii->color.d3d = 0xffffffff;
+    pos.y = 226.0f;
+    ascii->color.a = life_counter_vms[0]->color_1.a;
+    ascii->create_number(&pos, g_Globals.graze);
+    ascii = g_AsciiManager;
+    ascii->color.d3d = 0xffffffff;
+    ascii->align_h = 1;
+    ascii->align_v = 1;
+    ascii->scale.x = 1.0f;
+    ascii->scale.y = 1.0f;
+    ascii->color.a = 0xff;
+    ascii->font_id = 0;
+    ascii->group = 0;
+
+    // The boss's spell card counter next to vm_94.
+    if (g_EnemyManager != NULL && unk_1d0 >= 0 && g_EnemyManager->get_boss(0) != NULL &&
+        !g_EnemyManager->inner.boss_bit && msg == NULL && !(*(u32 *)&g_GameThread->flags & 0x10000))
+    {
+        AnmVm *vm = vm_94;
+        f32 x = vm->pos.x + 16.0f;
+        f32 y = vm->pos.y - 7.0f;
+        pos = Float3(x, y, 0.0f);
+        ascii->color = vm->color_1;
+        ascii->font_id = 4;
+        ascii->group = 2;
+        ascii->create_stringf(&pos, ".");
+        ascii = g_AsciiManager;
+        pos.x = x + 8.0f;
+        pos.y = y + 6.0f;
+        ascii->scale.x = 0.6f;
+        ascii->scale.y = 0.6f;
+        ascii->create_stringf(&pos, "%.2d", unk_1d4);
+        ascii = g_AsciiManager;
+        ascii->scale.x = 1.0f;
+        ascii->scale.y = 1.0f;
+        ascii->color.d3d = 0xffffffff;
+        ascii->group = 0;
+        ascii->font_id = 0;
+    }
+
+    // The season level.
+    D3DCOLOR level_colors[7] = {0x60606060, 0xa0b0b080, 0xb0b8b880, 0xc0c0c080, 0xd0d0d080, 0xe0e0e080, 0xffffff30};
+    pos = Float3(-132.0f, 446.0f, 0.0f);
+    ascii->color.d3d = level_colors[g_Globals.season_level()];
+    if (flags_1ac & 1)
+    {
+        ascii->color.a = 0x40;
+    }
+    ascii->group = 1;
+    ascii->font_id = 2;
+    ascii->align_h = 0;
+    ascii->align_v = 2;
+    ascii->create_number(&pos, g_Globals.season_level());
+    ascii = g_AsciiManager;
+    ascii->color.d3d = 0xffffffff;
+    ascii->color.a = 0xff;
+    ascii->font_id = 0;
+    ascii->group = 0;
+    ascii->align_h = 1;
+    ascii->align_v = 1;
+    return 1;
+}
