@@ -419,6 +419,79 @@ i32 TitleInf::do_practice_stage_select()
     return 1;
 }
 
+// Player data, spell card page: ten spell cards of the chosen difficulty
+// (page menu_1d4 - 1), numbered with full-width digits, with their names
+// once seen and the chosen character's captures.
+// TODO: ours realigns the frame (and esp, -8) and divides by 10 with a multiply; the original uses idiv by a register.
+// FUNCTION: TH16 0x452c30
+i32 TitleInf::draw_spell_card_page()
+{
+    i32 skip = menu_1d4.next_selection * 10 - 10;
+    i32 id = 0;
+    for (i32 seen = 0; seen < skip; id++)
+    {
+        if (g_spell_difficulty[id] == menu_fc.next_selection)
+        {
+            seen++;
+        }
+    }
+    const char *digits[10] = {"\x82\x4f", "\x82\x50", "\x82\x51", "\x82\x52", "\x82\x53",
+                              "\x82\x54", "\x82\x55", "\x82\x56", "\x82\x57", "\x82\x58"};
+    char name[0xa5];
+    AnmId *row_id = anm_ids_740;
+    for (i32 row = 0; row < 10; row++, row_id++)
+    {
+        for (; id < 0x77; id++)
+        {
+            if (g_spell_difficulty[id] == menu_fc.next_selection)
+            {
+                break;
+            }
+        }
+        if (id >= 0x77)
+        {
+            for (; row < 10; row++)
+            {
+                g_AnmManager->draw_text_centered(get_vm_or_clear(anm_ids_740[row]), 0xffffffff, 0, 0, 0, " ");
+            }
+            return 0;
+        }
+        if (g_Scorefile->characters[4].spells[id].attempts[0] != 0)
+        {
+            strcpy(name, g_Scorefile->characters[4].spells[id].name);
+            i32 len = strlen(name);
+            while (len < 42)
+            {
+                strcpy(&name[len], "\x81\x40");
+                len += 2;
+            }
+            name[len] = '\0';
+            id++;
+            const char *ones = digits[id % 10];
+            const char *tens = id / 10 % 10 == 0 && id / 100 == 0 ? "\x81\x40" : digits[id / 10 % 10];
+            const char *hundreds = id / 100 != 0 ? digits[id / 100] : "\x81\x40";
+            ScorefileSpell *spell = &g_Scorefile->characters[menu.next_selection].spells[id - 1];
+            g_AnmManager->draw_text_centered(get_vm_or_clear(*row_id), spell->captures[0] != 0 ? 0xffff80 : 0xefefef, 0,
+                                             0, 0, "No.%s%s%s %s %4d/%4d", hundreds, tens, ones, name,
+                                             spell->captures[0], spell->attempts[0]);
+        }
+        else
+        {
+            id++;
+            const char *ones = digits[id % 10];
+            const char *tens = id / 10 % 10 == 0 && id / 100 == 0 ? "\x81\x40" : digits[id / 10 % 10];
+            const char *hundreds = id / 100 != 0 ? digits[id / 100] : "\x81\x40";
+            ScorefileSpell *spell = &g_Scorefile->characters[menu.next_selection].spells[id - 1];
+            g_AnmManager->draw_text_centered(
+                get_vm_or_clear(*row_id), 0x808080, 0, 0, 0,
+                "No.%s%s%s \x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H"
+                "\x81H\x81H\x81H\x81H %4d/%4d",
+                hundreds, tens, ones, spell->captures[0], spell->attempts[0]);
+        }
+    }
+    return 0;
+}
+
 // The stages and practice high scores of stage practice.
 // FUNCTION: TH16 0x4513c0
 HARNESS_CALLED i32 TitleInf::on_draw__practice_stage_select()
