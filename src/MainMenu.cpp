@@ -267,6 +267,40 @@ HARNESS_CALLED i32 Scorefile::all_cleared(i32 difficulty)
     return 0;
 }
 
+// The loops run past the arrays: six difficulties of five-entry arrays, and
+// a second spell counter 0x5210 bytes past each spell of the total entry,
+// beyond the end of the score data.
+// FUNCTION: TH16 0x44a930
+HARNESS_CALLED void Scorefile::unlock_all()
+{
+    memset(endings_seen, 0x11, 16);
+    for (i32 i = 0; i < 0x77; i++)
+    {
+        ScorefileSpell *spell = &characters[4].spells[i];
+        if (spell->attempts[0] < 99999)
+        {
+            spell->attempts[0]++;
+        }
+        i32 *count = (i32 *)((u8 *)spell + 0x5210);
+        if (*count < 99999)
+        {
+            (*count)++;
+        }
+    }
+    for (i32 c = 0; c < 4; c++)
+    {
+        for (i32 d = 0; d < 6; d++)
+        {
+            characters[c].play_counts[d]++;
+            characters[c].clears[d]++;
+            for (i32 s = 0; s < 8; s++)
+            {
+                characters[c].practices[d][s].unlocked = 1;
+            }
+        }
+    }
+}
+
 // Helpers of the music room and spell practice menus.
 
 // The spell cards of each stage (Extra last) in spell practice: one row per
