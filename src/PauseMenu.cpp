@@ -588,7 +588,7 @@ void replay_ended_43f240()
     menu->flags_3ec &= ~4;
 }
 
-// TODO: the original keeps an ebp frame with a 4-byte pad (push ebp; push ecx); ours has none.
+// TODO: the original keeps an ebp frame with a 4-byte pad (push ebp; push ecx), most likely known entry alignment through its callers (Player::on_tick_body, Gui::start_dialogue); ours has no frame (HARNESS_CALLED does not change it).
 // FUNCTION: TH16 0x43f350
 void pause_menu_43f350()
 {

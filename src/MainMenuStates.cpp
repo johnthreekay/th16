@@ -2899,7 +2899,7 @@ i32 g_spell_practice_last_stage = -1;
 i32 g_practice_last_stage = -1;
 
 // Spell practice: picking the subseason, then starting the game.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// TODO: as do_spell_practice_difficulty, the original keeps stage + 1 in ecx and computes the stage table pointer before the two stage number stores.
 // FUNCTION: TH16 0x455d50
 i32 TitleInf::do_spell_practice_subseason()
 {
@@ -2908,7 +2908,7 @@ i32 TitleInf::do_spell_practice_subseason()
     case 0:
         menu.num_choices = 4;
         menu.set_cursor(0);
-        if (get_vm_or_clear(anm_ids[0xd9]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0xd9]) == NULL)
         {
             anm_ids[0xd9] = title_anm->create_effect(0xd9, -1, NULL);
         }
@@ -2977,8 +2977,8 @@ i32 TitleInf::do_spell_practice_subseason()
             g_Globals.character = menu_5cec.next_selection;
             g_Globals.subshot = 0;
             g_Globals.subseason = menu.next_selection;
-            g_Supervisor.gamemode_to_switch_to = 7;
             g_Globals.difficulty = g_spell_difficulty[spell_ids[spell_index]];
+            g_Supervisor.gamemode_to_switch_to = 7;
             g_spell_practice_last_stage = spell_stage;
             g_spell_practice_last_row = spell_row;
             g_spell_practice_last_index = spell_index;
@@ -3002,7 +3002,7 @@ i32 TitleInf::do_spell_practice_subseason()
 
 // Spell practice: picking the spell card (the difficulty row). Extra stage
 // cards start the game right away; the others go on to the subseason.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// TODO: the original keeps stage + 1 in ecx and computes the stage table pointer before the two stage number stores (ours eax, after; not with a pointer local or reading g_Globals.stage_num back).
 // FUNCTION: TH16 0x456a20
 i32 TitleInf::do_spell_practice_difficulty()
 {
@@ -3090,9 +3090,9 @@ i32 TitleInf::do_spell_practice_difficulty()
                 g_Globals.spell_id = spell_ids[menu.next_selection];
                 g_Globals.character = menu_5cec.next_selection;
                 g_Globals.subshot = 0;
+                g_Globals.difficulty = g_spell_difficulty[spell_ids[menu.next_selection]];
                 g_Globals.subseason = 4;
                 g_Supervisor.gamemode_to_switch_to = 7;
-                g_Globals.difficulty = g_spell_difficulty[spell_ids[menu.next_selection]];
                 g_spell_practice_last_stage = spell_stage;
                 g_spell_practice_last_row = spell_row;
                 g_spell_practice_last_index = menu.next_selection;
