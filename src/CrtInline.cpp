@@ -11,3 +11,6 @@
 
 // LIBRARY: TH16 0x4090d0 SYMBOL
 // _sprintf
+
+// LIBRARY: TH16 0x43dcb0 SYMBOL
+// ___local_stdio_scanf_options
