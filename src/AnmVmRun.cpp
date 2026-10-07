@@ -283,33 +283,18 @@ static inline ZunColor anm_rgb(i32 r, i32 g, i32 b)
 // the on_tick and on_draw callbacks 4 and 6.
 int __fastcall anm_effect_4_init(AnmVm *vm);
 
-// Runs the script up to the current time and steps everything that
-// changes on its own. 1 once the VM should be deleted.
-// FUNCTION: TH16 0x45f980
-i32 AnmVm::run()
+// The interpreter proper: runs the instructions due by the current time,
+// then steps everything that changes on its own. 1 once the VM should be
+// deleted.
+__forceinline i32 AnmVm::run_script()
 {
     AnmRawInstr *ins;
-    f32 saved_game_speed = g_game_speed;
-    if (flags_hi & ANM_VM_IGNORE_GAME_SPEED)
-    {
-        g_game_speed = 1.0f;
-    }
-    if (get_slowdown_factor() > 0.0f)
-    {
-        g_game_speed = saved_game_speed - get_slowdown_factor() * saved_game_speed;
-        if (g_game_speed < 0.0f)
-        {
-            g_game_speed = 0.0f;
-        }
-    }
     if (index_of_on_tick != 0 && g_anm_on_tick_funcs[index_of_on_tick](this) != 0)
     {
-        g_game_speed = saved_game_speed;
         return 1;
     }
     if (instr_offset < 0 || (flags_lo & ANM_VM_FLAG_LO_100000))
     {
-        g_game_speed = saved_game_speed;
         return 0;
     }
     timer_1c++;
@@ -320,7 +305,6 @@ i32 AnmVm::run()
     if ((flags_hi & (ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000)) == ANM_VM_FLAG_HI_4000 && g_GameThread != NULL &&
         g_GameThread->flags.flag_1)
     {
-        g_game_speed = saved_game_speed;
         return 0;
     }
     goto run_script;
@@ -435,32 +419,59 @@ run_script:
             break;
         // iadd ... fmod
         case 102:
-            *ANM_INT_PTR(0) += ANM_INT(1);
+        {
+            i32 value = ANM_INT(1);
+            *ANM_INT_PTR(0) += value;
             break;
+        }
         case 103:
-            *ANM_FLOAT_PTR(0) += ANM_FLOAT(1);
+        {
+            f32 value = ANM_FLOAT(1);
+            *ANM_FLOAT_PTR(0) += value;
             break;
+        }
         case 104:
-            *ANM_INT_PTR(0) -= ANM_INT(1);
+        {
+            i32 value = ANM_INT(1);
+            *ANM_INT_PTR(0) -= value;
             break;
+        }
         case 105:
-            *ANM_FLOAT_PTR(0) -= ANM_FLOAT(1);
+        {
+            f32 value = ANM_FLOAT(1);
+            *ANM_FLOAT_PTR(0) -= value;
             break;
+        }
         case 106:
-            *ANM_INT_PTR(0) *= ANM_INT(1);
+        {
+            i32 value = ANM_INT(1);
+            *ANM_INT_PTR(0) *= value;
             break;
+        }
         case 107:
-            *ANM_FLOAT_PTR(0) *= ANM_FLOAT(1);
+        {
+            f32 value = ANM_FLOAT(1);
+            *ANM_FLOAT_PTR(0) *= value;
             break;
+        }
         case 108:
-            *ANM_INT_PTR(0) /= ANM_INT(1);
+        {
+            i32 value = ANM_INT(1);
+            *ANM_INT_PTR(0) /= value;
             break;
+        }
         case 109:
-            *ANM_FLOAT_PTR(0) /= ANM_FLOAT(1);
+        {
+            f32 value = ANM_FLOAT(1);
+            *ANM_FLOAT_PTR(0) /= value;
             break;
+        }
         case 110:
-            *ANM_INT_PTR(0) %= ANM_INT(1);
+        {
+            i32 value = ANM_INT(1);
+            *ANM_INT_PTR(0) %= value;
             break;
+        }
         case 111:
             *ANM_FLOAT_PTR(0) = fmodf(ANM_FLOAT(0), ANM_FLOAT(1));
             break;
@@ -472,24 +483,42 @@ run_script:
             break;
         }
         case 123:
-            *ANM_FLOAT_PTR(0) = g_replay_unsafe_rng.randf_0_to(ANM_FLOAT(1));
+        {
+            f32 value = g_replay_unsafe_rng.randf_0_to(ANM_FLOAT(1));
+            *ANM_FLOAT_PTR(0) = value;
             break;
+        }
         // fsin, fcos, ftan, facos, fatan
         case 124:
-            *ANM_FLOAT_PTR(0) = sinf(ANM_FLOAT(1));
+        {
+            f32 value = sinf(ANM_FLOAT(1));
+            *ANM_FLOAT_PTR(0) = value;
             break;
+        }
         case 125:
-            *ANM_FLOAT_PTR(0) = cosf(ANM_FLOAT(1));
+        {
+            f32 value = cosf(ANM_FLOAT(1));
+            *ANM_FLOAT_PTR(0) = value;
             break;
+        }
         case 126:
-            *ANM_FLOAT_PTR(0) = tanf(ANM_FLOAT(1));
+        {
+            f32 value = tanf(ANM_FLOAT(1));
+            *ANM_FLOAT_PTR(0) = value;
             break;
+        }
         case 127:
-            *ANM_FLOAT_PTR(0) = acosf(ANM_FLOAT(1));
+        {
+            f32 value = acosf(ANM_FLOAT(1));
+            *ANM_FLOAT_PTR(0) = value;
             break;
+        }
         case 128:
-            *ANM_FLOAT_PTR(0) = atanf(ANM_FLOAT(1));
+        {
+            f32 value = atanf(ANM_FLOAT(1));
+            *ANM_FLOAT_PTR(0) = value;
             break;
+        }
         // validRad
         case 129:
             *ANM_FLOAT_PTR(0) = add_normalize_angle(ANM_FLOAT(0), 0.0f);
@@ -515,99 +544,80 @@ run_script:
         case 202:
             if (ANM_INT(0) == ANM_INT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
         case 203:
             if (ANM_FLOAT(0) == ANM_FLOAT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
         case 204:
             if (ANM_INT(0) != ANM_INT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
         case 205:
             if (ANM_FLOAT(0) != ANM_FLOAT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
         case 206:
             if (ANM_INT(0) < ANM_INT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
         case 207:
             if (ANM_FLOAT(0) < ANM_FLOAT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
         case 208:
             if (ANM_INT(0) <= ANM_INT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
         case 209:
             if (ANM_FLOAT(0) <= ANM_FLOAT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
         case 210:
             if (ANM_INT(0) > ANM_INT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
         case 211:
             if (ANM_FLOAT(0) > ANM_FLOAT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
         case 212:
             if (ANM_INT(0) >= ANM_INT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
         case 213:
             if (ANM_FLOAT(0) >= ANM_FLOAT(1))
             {
-                script_time.set_value(ins->args[3].i);
-                instr_offset = ins->args[2].i;
-                continue;
+                goto jump;
             }
             break;
+        // The jump of ije ... fjge.
+        jump:
+            script_time.set_value(ins->args[3].i);
+            instr_offset = ins->args[2].i;
+            continue;
         // sprite
         case 300:
         {
@@ -1131,12 +1141,10 @@ run_script:
         case 1:
             flags_lo &= ~ANM_VM_VISIBLE;
             instr_offset = -1;
-            g_game_speed = saved_game_speed;
             return 1;
         // static
         case 2:
             instr_offset = -1;
-            g_game_speed = saved_game_speed;
             return 0;
         }
         instr_offset += ins->offset_to_next;
@@ -1166,12 +1174,33 @@ done:
     update_special_vertices();
     if (g_anm_on_wait_funcs[index_of_on_wait] != NULL && g_anm_on_wait_funcs[index_of_on_wait](this) != 0)
     {
-        g_game_speed = saved_game_speed;
         return 1;
     }
     script_time.tick();
-    g_game_speed = saved_game_speed;
     return 0;
+}
+
+// Steps the VM by one frame, at the game speed scaled down by the
+// slowdown of the VM (or its root). 1 once the VM should be deleted.
+// FUNCTION: TH16 0x45f980
+i32 AnmVm::run()
+{
+    f32 saved_game_speed = g_game_speed;
+    if (flags_hi & ANM_VM_IGNORE_GAME_SPEED)
+    {
+        g_game_speed = 1.0f;
+    }
+    if (get_slowdown_factor() > 0.0f)
+    {
+        g_game_speed = saved_game_speed - get_slowdown_factor() * saved_game_speed;
+        if (g_game_speed < 0.0f)
+        {
+            g_game_speed = 0.0f;
+        }
+    }
+    i32 result = run_script();
+    g_game_speed = saved_game_speed;
+    return result;
 }
 
 // FUNCTION: TH16 0x464dd0

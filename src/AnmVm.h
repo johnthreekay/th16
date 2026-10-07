@@ -383,6 +383,8 @@ struct AnmVm
     // 0x45f980. Nonzero once the script has ended (anm_effect_1_on_tick
     // counts on it).
     i32 run();
+    // run without the game speed handling around it; inlined into run.
+    i32 run_script();
     // 0x4632f0. Rebuilds the vertex data that the special render modes
     // (9 to 25: textured circles and arcs, rings, cylinders) keep in
     // ins_508_extra_data.
@@ -466,7 +468,8 @@ struct AnmVm
     // (ExpHP: leaf_4630f0__flag_534_24_only).
     void step_velocities();
     // Screen positions of the sprite's corners, by render mode.
-    void write_sprite_corners(Float3 *corners);
+    // The original keeps it out of line in AnmVm::run.
+    DECOMP_NOINLINE void write_sprite_corners(Float3 *corners);
     // 0x465c40, 0x4660b0
     static void __stdcall write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c,
                                                             Float3 *d);
