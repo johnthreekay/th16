@@ -36,6 +36,23 @@ struct EnemyManagerInner
 struct EnemyManager;
 extern EnemyManager *g_EnemyManager;
 
+// What a new enemy starts with (ECL's enmCreate arguments and the creating
+// enemy's variables).
+struct EnemyCreateParams
+{
+    Float3 pos;
+    i32 score_reward;
+    i32 item_drop;
+    i32 life;
+    // Mirrored: flips x movement (EnemyData::flags_low 0x80000).
+    i32 mirrored;
+    // EnemyData::flags_low 0x4000000.
+    i32 flag_4000000;
+    i32 ecl_int_vars[4];
+    f32 ecl_float_vars[8];
+    i32 parent_enemy_id;
+};
+
 // Owns every enemy (ExpHP: zEnemyManager).
 struct EnemyManager
 {
@@ -78,6 +95,9 @@ struct EnemyManager
     static int __fastcall on_draw_callback(EnemyManager *mgr);
     // Uses g_EnemyManager; callers pass no this.
     EnemyInf *get_boss(i32 i);
+    // 0x41aa70. Creates an enemy running the named subroutine and adds it
+    // to the active list. unused is 0 everywhere.
+    EnemyInf *allocate_new_enemy(const char *sub_name, EnemyCreateParams *params, i32 unused);
     // 0x41d900. Kills every enemy; reaches the manager through
     // g_EnemyManager.
     static void kill_all();

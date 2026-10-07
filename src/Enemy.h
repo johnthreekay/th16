@@ -105,6 +105,20 @@ struct EnemyInterrupt
     char sub_for_set_timeout[0x40];
 };
 
+// The bitfields of EnemyData::flags_low that code assigns (rather than
+// sets or clears); the assignments compile to xor/and/xor.
+struct EnemyFlagsLow
+{
+    u32 unk_0 : 19;
+    u32 mirrored : 1;
+    u32 unk_20 : 6;
+    u32 flag_4000000 : 1;
+    u32 unk_27 : 3;
+    // Life of 1000 or more.
+    u32 flag_40000000 : 1;
+    u32 unk_31 : 1;
+};
+
 // An enemy's state, embedded in EnemyInf (ExpHP: zEnemyData).
 struct EnemyData
 {
@@ -195,6 +209,8 @@ struct EnemyData
     // ECL instructions.
     // 0x423260. anmSetSprite(slot, script): replaces the VM in a slot.
     int ecl_anm_set_sprite();
+    // 0x423050. The enmCreate family.
+    int ecl_enm_create();
     i32 get_int_arg(int index);
     i32 *get_int_arg_ptr(int index);
     f32 get_float_arg(int index);

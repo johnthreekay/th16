@@ -1039,3 +1039,133 @@ int EnemyData::ecl_anm_set_sprite()
     }
     return 0;
 }
+
+// FUNCTION: TH16 0x41aa70
+EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, EnemyCreateParams *params, i32 unused)
+{
+    EnemyInf *enemy = new EnemyInf(sub_name);
+    enemy->enemy.abs_pos.pos = params->pos;
+    enemy->enemy.score_reward = params->score_reward;
+    enemy->enemy.life.current = params->life;
+    enemy->enemy.life.maximum = params->life;
+    enemy->enemy.drops.main_type = params->item_drop;
+    enemy->enemy.drops.extra_counts[15] = 10;
+    enemy->enemy.drop_season.bonus_timer = 60;
+    enemy->enemy.drop_season.max_time = 60;
+    enemy->enemy.drop_season.min_count = 1;
+    enemy->enemy.drop_season.damage_per_season_drop = 0;
+    ((EnemyFlagsLow *)&enemy->enemy.flags_low)->mirrored = params->mirrored;
+    enemy->context.primary_context.difficulty_mask = 1 << g_Globals.difficulty;
+    memcpy(enemy->enemy.ecl_int_vars, params->ecl_int_vars, sizeof(params->ecl_int_vars) + sizeof(params->ecl_float_vars));
+    enemy->enemy.set_invuln = 2;
+    ((EnemyFlagsLow *)&enemy->enemy.flags_low)->flag_4000000 = params->flag_4000000;
+    enemy->enemy.unk_278 = 0;
+    enemy->unk_5744 = params->parent_enemy_id;
+    if (params->life >= 1000)
+    {
+        ((EnemyFlagsLow *)&enemy->enemy.flags_low)->flag_40000000 = 1;
+    }
+    enemy->enemy.own_chapter = g_Globals.chapter;
+    enemy->on_tick();
+    enemy->enemy.death_sound = (enemy->enemy_id & 1) + 3;
+    if (enemy->enemy.death_anm_script == 0)
+    {
+        enemy->enemy.death_anm_script = 0x2c;
+        if (enemy->enemy.anm_slot_0_anm_index == 2)
+        {
+            switch (enemy->enemy.anm_slot_0_script)
+            {
+            case 0:
+            case 20:
+            case 59:
+            case 62:
+            case 87:
+                enemy->enemy.death_anm_script = 0x2c;
+                break;
+            case 5:
+            case 25:
+            case 53:
+            case 79:
+                enemy->enemy.death_anm_script = 0x28;
+                break;
+            case 15:
+            case 91:
+                enemy->enemy.death_anm_script = 0x34;
+                break;
+            case 10:
+            case 56:
+            case 83:
+                enemy->enemy.death_anm_script = 0x30;
+                break;
+            case 30:
+                enemy->enemy.death_anm_script = 0x3a;
+                break;
+            case 35:
+                enemy->enemy.death_anm_script = 0x39;
+                break;
+            case 40:
+                enemy->enemy.death_anm_script = 0x38;
+                break;
+            }
+        }
+        enemy->enemy.death_anm_index = 1;
+    }
+    if (active_enemy_list_head == NULL)
+    {
+        enemy_count_real++;
+        active_enemy_list_tail = &enemy->enemy.node_in_global_storage;
+        active_enemy_list_head = &enemy->enemy.node_in_global_storage;
+        return enemy;
+    }
+    active_enemy_list_tail->insert_after(&enemy->enemy.node_in_global_storage);
+    enemy_count_real++;
+    active_enemy_list_tail = &enemy->enemy.node_in_global_storage;
+    return enemy;
+}
+
+// TODO: the original reloads the current context after the memset and the opcode after the
+// position stores (as if params had escaped); ours keeps both in registers.
+// FUNCTION: TH16 0x423050
+int EnemyData::ecl_enm_create()
+{
+    if (g_EnemyManager->enemy_count_real >= g_EnemyManager->inner.enemy_limit)
+    {
+        return 0;
+    }
+    EnemyInf *vm = full;
+    EclRawInstr *instr = vm->context.current_context->current_instr();
+    i32 n = (instr->args[0].i + 4) / 4;
+    EnemyCreateParams params;
+    memset(&params, 0, sizeof(params));
+    params.pos.x = vm->context.current_context->get_float_arg_given_value(1, instr->args[n].f);
+    params.pos.y = this->full->context.current_context->get_float_arg_given_value(2, instr->args[n + 1].f);
+    if (instr->opcode == 300 || instr->opcode == 309 || instr->opcode == 321 || instr->opcode == 311 ||
+        instr->opcode == 304)
+    {
+        params.pos.x += final_pos.pos.x;
+        params.pos.y += final_pos.pos.y;
+    }
+    if (instr->opcode == 311 || instr->opcode == 304 || instr->opcode == 312 || instr->opcode == 305)
+    {
+        params.mirrored = 1;
+    }
+    if (flags_low & 0x80000)
+    {
+        params.pos.x *= -1.0f;
+        params.mirrored ^= 1;
+    }
+    params.life = this->full->context.current_context->get_int_arg_given_value(3, instr->args[n + 2].i);
+    params.score_reward = this->full->context.current_context->get_int_arg_given_value(4, instr->args[n + 3].i);
+    params.item_drop = this->full->context.current_context->get_int_arg_given_value(5, instr->args[n + 4].i);
+    for (i32 i = 0; i < 4; i++)
+    {
+        params.ecl_int_vars[i] = ecl_int_vars[i];
+    }
+    for (i32 i = 0; i < 8; i++)
+    {
+        params.ecl_float_vars[i] = ecl_float_vars[i];
+    }
+    params.parent_enemy_id = this->full->enemy_id;
+    g_EnemyManager->allocate_new_enemy((const char *)&instr->args[1], &params, 0);
+    return 0;
+}
