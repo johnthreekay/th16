@@ -248,7 +248,7 @@ extern MsgFile *g_msg_file_cache;
 // 0x43f350 (ExpHP: sub_43f350_pause) and 0x42e150, which end a dialogue
 // script that asks for it.
 void pause_menu_43f350();
-void stage_clear_42e150();
+i32 stage_clear_42e150();
 
 // ECL instruction 554: shows the stage logo.
 void show_stage_logo();

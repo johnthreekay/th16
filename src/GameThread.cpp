@@ -434,3 +434,128 @@ i32 GameThread::sub_42dee0()
     }
     return 0;
 }
+
+// The end of a stage: the clear bonus, then the next stage, the ending (stage
+// 6 and the extra stage, with their clear counts) or, in practice, the end
+// of the game with the practice records updated. Always 0.
+// FUNCTION: TH16 0x42e150
+i32 stage_clear_42e150()
+{
+    GameThread *thread = g_GameThread;
+    if (g_Globals.game_mode != 2)
+    {
+        Gui::show_stage_clear_bonus();
+    }
+    g_Player->resume_options();
+    if (g_MainBomb->in_use != 0)
+    {
+        g_MainBomb->method_14();
+    }
+    if (g_Globals.game_mode != 0)
+    {
+        if (g_GameThread->replay_mode != 0)
+        {
+            replay_ended_43f240();
+            return 0;
+        }
+        if (g_Globals.game_mode == 2)
+        {
+            ScorefileSpell *spell =
+                &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[g_Globals.spell_id];
+            if (spell->practice_score < (i32)(g_Globals.score / 10 * 10))
+            {
+                spell->practice_score = g_Globals.score / 10 * 10;
+            }
+        }
+        if (g_GameThread->replay_mode == 0 && g_Globals.game_mode != 2)
+        {
+            g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
+                .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
+                .cleared = 1;
+        }
+        game_over_43f500();
+        return 0;
+    }
+    if (g_Globals.stage_num == 6)
+    {
+        *(u32 *)&thread->flags |= 0x4000;
+        thread->fade_timer = 0;
+        g_Gui->flags_1ac |= 0x10;
+        GameThread::update_play_time();
+        i32 bonus = 0;
+        switch (g_Globals.difficulty)
+        {
+        case 0:
+            bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
+            break;
+        case 1:
+            bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
+            break;
+        case 2:
+            bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
+            break;
+        case 3:
+            bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
+            break;
+        }
+        g_Globals.add_to_score(bonus);
+        g_Gui->stage_clear_bonus += bonus;
+        if (g_GameThread->replay_mode != 0)
+        {
+            replay_ended_43f240();
+            return 0;
+        }
+        if (g_Scorefile->characters[g_Globals.subshot + g_Globals.character].play_counts[g_Globals.difficulty] < 99999)
+        {
+            g_Scorefile->characters[g_Globals.subshot + g_Globals.character].play_counts[g_Globals.difficulty]++;
+        }
+        if (g_Globals.continues_used == 0 &&
+            g_Scorefile->characters[g_Globals.subshot + g_Globals.character].clears[g_Globals.difficulty] < 99999)
+        {
+            g_Scorefile->characters[g_Globals.subshot + g_Globals.character].clears[g_Globals.difficulty]++;
+        }
+        return 0;
+    }
+    if (g_Globals.stage_num == 7)
+    {
+        g_Gui->flags_1ac |= 0x10;
+        i32 bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
+        g_Globals.add_to_score(bonus);
+        g_Gui->stage_clear_bonus += bonus;
+        if (g_GameThread->replay_mode != 0)
+        {
+            replay_ended_43f240();
+        }
+        else
+        {
+            i32 *play_count =
+                &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].play_counts[g_Globals.difficulty];
+            if (*play_count < 99999)
+            {
+                (*play_count)++;
+            }
+            if (g_Globals.continues_used == 0 &&
+                g_Scorefile->characters[g_Globals.subshot + g_Globals.character].clears[g_Globals.difficulty] < 99999)
+            {
+                g_Scorefile->characters[g_Globals.subshot + g_Globals.character].clears[g_Globals.difficulty]++;
+            }
+        }
+        GameThread::update_play_time();
+        *(u32 *)&thread->flags |= 0x4000;
+        thread->fade_timer = 0;
+        return 0;
+    }
+    if (g_GameThread->replay_mode == 0)
+    {
+        g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
+            .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
+            .cleared = 1;
+    }
+    g_Supervisor.gamemode_to_switch_to = 12;
+    if (g_Globals.stage_num < 7)
+    {
+        g_Globals.stage_num++;
+    }
+    g_stage_data = &g_stage_table[g_Globals.stage_num];
+    return 0;
+}
