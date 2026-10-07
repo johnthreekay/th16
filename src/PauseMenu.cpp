@@ -114,7 +114,7 @@ PauseMenu::~PauseMenu()
 {
     g_UpdateFuncRegistry->unregister_locked(on_tick_func);
     g_UpdateFuncRegistry->unregister_locked(on_draw_func);
-    for (i32 i = 0; i < 25; i++)
+    for (i32 i = 0; i < REPLAY_SLOTS; i++)
     {
         delete replays[i];
     }
@@ -257,7 +257,7 @@ HARNESS_CALLED void PauseMenu::draw_replay_entry(i32 index, Float3 *pos, RpyInfo
 void PauseMenu::draw_replay_list()
 {
     Float3 pos(36.0f, 64.0f, 0.0f);
-    for (i32 i = 0; i < 25; i++)
+    for (i32 i = 0; i < REPLAY_SLOTS; i++)
     {
         g_AsciiManager->color.d3d = item_menu.next_selection == i ? 0xffffff00 : 0xff808080;
         if (replays[i] != NULL)
@@ -1024,10 +1024,10 @@ void PauseMenu::tick_open()
         set_substate(PAUSE_SUB_REPLAY_SLOT_SELECT);
         menu_anm_id.clear_flag_lo_2_tree();
         item_menu.push();
-        item_menu.num_choices = 25;
+        item_menu.num_choices = REPLAY_SLOTS;
         item_menu.wraps = 1;
         item_menu.set_cursor(0);
-        for (i32 i = 1; i <= 25; i++)
+        for (i32 i = 1; i <= REPLAY_SLOTS; i++)
         {
             sprintf(path, "th16_%.2d.rpy", i);
             replays[i - 1] = ReplayManager::create_from_file(path);
@@ -1264,7 +1264,7 @@ void PauseMenu::tick_open()
             item_menu.num_choices = PAUSE_ITEM_COUNT;
             item_menu.wraps = 1;
             AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
-            for (i32 i = 0; i < 25; i++)
+            for (i32 i = 0; i < REPLAY_SLOTS; i++)
             {
                 ReplayManager::destroy(replays[i]);
                 replays[i] = NULL;

@@ -84,7 +84,7 @@ void TitleInf::load_replay_list()
     WIN32_FIND_DATAA find_data;
     TitleInf *menu = g_MainMenu;
 
-    for (i32 i = 1; i <= 25; i++)
+    for (i32 i = 1; i <= REPLAY_SLOTS; i++)
     {
         sprintf(filename, "th16_%.2d.rpy", i);
         menu->replays[i - 1] = create_replay_inline(filename);
@@ -98,7 +98,7 @@ void TitleInf::load_replay_list()
     HANDLE find = FindFirstFileA("th16_ud????.rpy", &find_data);
     if (find != INVALID_HANDLE_VALUE)
     {
-        for (i32 i = 25; i < 75; i++)
+        for (i32 i = REPLAY_SLOTS; i < REPLAY_SLOTS + REPLAY_USER_SLOTS; i++)
         {
             _chdir(g_GameWindow.exe_dir);
             menu->replays[i] = ReplayManager::create_from_file(find_data.cFileName);
@@ -128,13 +128,13 @@ i32 TitleInf::do_replay_save()
     switch (substate)
     {
     case 0:
-        menu.num_choices = 25;
+        menu.num_choices = REPLAY_SLOTS;
         menu.wraps = 1;
         menu.set_cursor(0);
         g_stage_data = &g_stage_table[8];
         g_Globals.stage_num = 8;
         g_Globals.weird_stage_num = 8;
-        for (i32 i = 1; i <= 25; i++)
+        for (i32 i = 1; i <= REPLAY_SLOTS; i++)
         {
             sprintf(path, "th16_%.2d.rpy", i);
             replays[i - 1] = ReplayManager::create_from_file(path);
@@ -311,7 +311,7 @@ i32 TitleInf::do_replay_save()
             ReplayManager::destroy(g_ReplayManager);
             g_Supervisor.play_bgm_wav(0, "th16_01");
             g_Supervisor.play_bgm(0, 0);
-            for (i32 i = 0; i < 25; i++)
+            for (i32 i = 0; i < REPLAY_SLOTS; i++)
             {
                 delete replays[i];
             }
@@ -1457,10 +1457,10 @@ i32 TitleInf::do_replay_menu()
     case 0:
     {
         i32 last = g_last_replay_slot;
-        menu.num_choices = 25;
-        menu.set_cursor(last % 25);
+        menu.num_choices = REPLAY_SLOTS;
+        menu.set_cursor(last % REPLAY_SLOTS);
         page_menu.num_choices = 3;
-        page_menu.set_cursor(last / 25);
+        page_menu.set_cursor(last / REPLAY_SLOTS);
         page_menu.wraps = 1;
         g_last_replay_slot = 0;
         if (submenu_ascii_id.id == 0)
@@ -1522,12 +1522,12 @@ i32 TitleInf::do_replay_menu()
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
-            if (replays[page_menu.next_selection * 25 + menu.next_selection] == NULL)
+            if (replays[page_menu.next_selection * REPLAY_SLOTS + menu.next_selection] == NULL)
             {
                 break;
             }
             set_substate(4);
-            replay_slot = page_menu.next_selection * 25 + menu.next_selection;
+            replay_slot = page_menu.next_selection * REPLAY_SLOTS + menu.next_selection;
             menu.push();
             g_SoundManager.play_sound_centered(SE_OK00, 0);
             menu.num_choices = 7;
@@ -1567,7 +1567,7 @@ i32 TitleInf::do_replay_menu()
             if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
             {
                 menu.pop();
-                menu.num_choices = 25;
+                menu.num_choices = REPLAY_SLOTS;
                 menu.num_disabled = 0;
                 set_substate(2);
                 g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
@@ -1674,10 +1674,10 @@ HARNESS_CALLED i32 TitleInf::on_draw__replay()
         pos.y = 80.0f;
         pos.z = 0.0f;
         g_AsciiManager->draw_shadows = 1;
-        for (i32 i = page_menu.next_selection * 25; i < (page_menu.next_selection + 1) * 25; i++)
+        for (i32 i = page_menu.next_selection * REPLAY_SLOTS; i < (page_menu.next_selection + 1) * REPLAY_SLOTS; i++)
         {
             ReplayManager **replay = &replays[i];
-            g_AsciiManager->color.d3d = menu.next_selection == i % 25 ? 0xffffff00 : 0xff808080;
+            g_AsciiManager->color.d3d = menu.next_selection == i % REPLAY_SLOTS ? 0xffffff00 : 0xff808080;
             if (*replay != NULL)
             {
                 RpyInfo *info = (*replay)->info;
@@ -2178,7 +2178,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__replay_save()
         pos.z = 0.0f;
         g_AsciiManager->draw_shadows = 1;
         ReplayManager **replay = replays;
-        for (i32 i = 0; i < 25; replay++)
+        for (i32 i = 0; i < REPLAY_SLOTS; replay++)
         {
             g_AsciiManager->color.d3d = menu.next_selection == i ? 0xffffff00 : 0xff808080;
             if (*replay != NULL)

@@ -19,6 +19,12 @@ constexpr u16 RPY_VERSION = 2;
 // "USER"
 constexpr u32 RPY_USER_MAGIC = 0x52455355;
 
+// The numbered replay slots (th16_01.rpy to th16_25.rpy), which is also
+// the replay menu's page size, and how many th16_ud????.rpy files the replay
+// menu lists after them.
+constexpr i32 REPLAY_SLOTS = 25;
+constexpr i32 REPLAY_USER_SLOTS = 50;
+
 // One frame of recorded input (the game's button bits). A frame of all
 // 0xffff marks where the replay ends.
 struct RpyFrameInput
