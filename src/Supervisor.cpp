@@ -584,7 +584,7 @@ int __fastcall Supervisor::on_draw_01(void *arg)
     AnmManager *anm = g_AnmManager;
     anm->last_texture_matrix_sprite = 0;
     anm->last_texture_id = -1;
-    anm->last_blend_mode = 10;
+    anm->last_blend_mode = ANM_BLEND_FORCE_RESET;
     anm->render_cache_184fbb5 = 0xff;
     anm->render_cache_184fbb7 = 0xff;
     anm->render_cache_184fbb8 = 0xff;

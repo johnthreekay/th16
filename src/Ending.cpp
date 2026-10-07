@@ -479,10 +479,10 @@ i32 EndingChildF0::run()
             continue;
         }
         case 13:
-            ScreenEffect::create_inline(0, instr->args[0], 0, 0, 0, 0x54);
+            ScreenEffect::create_inline(SCREEN_EFFECT_FADE_IN_VIEWPORT, instr->args[0], 0, 0, 0, 0x54);
             break;
         case 14:
-            ScreenEffect::create_inline(5, instr->args[0], 0, 0, 0, 0x54);
+            ScreenEffect::create_inline(SCREEN_EFFECT_FADE_OUT_VIEWPORT, instr->args[0], 0, 0, 0, 0x54);
             break;
         }
         instr = ENDING_NEXT_INSTR(instr);

@@ -12,6 +12,34 @@
 // Debug logging, compiled out of the release build (0x45d410).
 void screen_debug_log(const char *fmt, ...);
 
+// The modes: which tick and draw callbacks the effect gets. Unless said
+// otherwise arg_18 is the duration and arg_1c the color.
+enum ScreenEffectMode
+{
+    // Uncovers the window from a color (on_tick_fade_in), first resetting the
+    // viewport to the whole window.
+    SCREEN_EFFECT_FADE_IN_VIEWPORT = 0,
+    // Shakes the game area's cameras by arg_1c ramping to arg_20 pixels.
+    SCREEN_EFFECT_SHAKE = 1,
+    // Covers the window with a color (on_tick_fade_out).
+    SCREEN_EFFECT_FADE_OUT = 2,
+    // Uncovers it again (on_tick_fade_in, starting opaque).
+    SCREEN_EFFECT_FADE_IN = 3,
+    // Flashes the arcade area arg_1c times in arg_20's color and alpha.
+    SCREEN_EFFECT_PULSE = 4,
+    // SCREEN_EFFECT_FADE_OUT with the viewport reset first.
+    SCREEN_EFFECT_FADE_OUT_VIEWPORT = 5,
+    // Brings a color up to half alpha over the window (on_tick_flash), or
+    // over the arcade area.
+    SCREEN_EFFECT_FLASH = 6,
+    SCREEN_EFFECT_FLASH_ARCADE = 7,
+    // Shakes by arg_18 pixels: ramping up over arg_1c frames, holding for
+    // arg_20 and ramping down over arg_24.
+    SCREEN_EFFECT_SHAKE_WITH_RAMP = 8,
+    // Covers the window with a color for arg_18 frames.
+    SCREEN_EFFECT_HOLD = 9,
+};
+
 // Full-screen fades, flashes and screen shake. Layout from ExpHP's
 // th-re-data (zScreenEffect). The meaning of the creation arguments depends
 // on the mode; arg_18 is the duration in frames for most of them.
@@ -28,6 +56,7 @@ struct ScreenEffect
     i32 arg_1c;
     i32 arg_20;
     i32 arg_24;
+    // Nothing sets it: on_tick_flash would fade back out over 8 frames.
     i32 unk_28;
     ZunTimer timer;
 
@@ -89,7 +118,7 @@ __forceinline void ScreenEffect::initialize_inline(i32 mode, i32 arg_18, i32 arg
 
     switch (mode)
     {
-    case 0:
+    case SCREEN_EFFECT_FADE_IN_VIEWPORT:
         f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_fade_in);
         f->arg = this;
         f->flags |= UPDATE_FUNC_ACTIVE;
@@ -101,14 +130,14 @@ __forceinline void ScreenEffect::initialize_inline(i32 mode, i32 arg_18, i32 arg
         g_UpdateFuncRegistry->register_on_draw(f, draw_priority);
         on_draw = f;
         break;
-    case 1:
+    case SCREEN_EFFECT_SHAKE:
         f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_shake);
         f->arg = this;
         f->flags |= UPDATE_FUNC_ACTIVE;
         g_UpdateFuncRegistry->register_on_tick(f, 0x13);
         on_tick = f;
         break;
-    case 2:
+    case SCREEN_EFFECT_FADE_OUT:
         f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_fade_out);
         f->arg = this;
         f->flags |= UPDATE_FUNC_ACTIVE;
@@ -120,7 +149,7 @@ __forceinline void ScreenEffect::initialize_inline(i32 mode, i32 arg_18, i32 arg
         g_UpdateFuncRegistry->register_on_draw(f, draw_priority);
         on_draw = f;
         break;
-    case 3:
+    case SCREEN_EFFECT_FADE_IN:
         alpha = 255;
         f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_fade_in);
         f->arg = this;
@@ -133,7 +162,7 @@ __forceinline void ScreenEffect::initialize_inline(i32 mode, i32 arg_18, i32 arg
         g_UpdateFuncRegistry->register_on_draw(f, draw_priority);
         on_draw = f;
         break;
-    case 5:
+    case SCREEN_EFFECT_FADE_OUT_VIEWPORT:
         f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_fade_out);
         f->arg = this;
         f->flags |= UPDATE_FUNC_ACTIVE;
@@ -145,7 +174,7 @@ __forceinline void ScreenEffect::initialize_inline(i32 mode, i32 arg_18, i32 arg
         g_UpdateFuncRegistry->register_on_draw(f, draw_priority);
         on_draw = f;
         break;
-    case 4:
+    case SCREEN_EFFECT_PULSE:
         f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_pulse);
         f->flags |= UPDATE_FUNC_ACTIVE;
         f->arg = this;
@@ -157,7 +186,7 @@ __forceinline void ScreenEffect::initialize_inline(i32 mode, i32 arg_18, i32 arg
         g_UpdateFuncRegistry->register_on_draw(f, draw_priority);
         on_draw = f;
         break;
-    case 6:
+    case SCREEN_EFFECT_FLASH:
         f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_flash);
         f->arg = this;
         f->flags |= UPDATE_FUNC_ACTIVE;
@@ -169,7 +198,7 @@ __forceinline void ScreenEffect::initialize_inline(i32 mode, i32 arg_18, i32 arg
         g_UpdateFuncRegistry->register_on_draw(f, draw_priority);
         on_draw = f;
         break;
-    case 7:
+    case SCREEN_EFFECT_FLASH_ARCADE:
         f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_flash);
         f->flags |= UPDATE_FUNC_ACTIVE;
         f->arg = this;
@@ -181,14 +210,14 @@ __forceinline void ScreenEffect::initialize_inline(i32 mode, i32 arg_18, i32 arg
         g_UpdateFuncRegistry->register_on_draw(f, draw_priority);
         on_draw = f;
         break;
-    case 8:
+    case SCREEN_EFFECT_SHAKE_WITH_RAMP:
         f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_shake_with_ramp);
         f->arg = this;
         f->flags |= UPDATE_FUNC_ACTIVE;
         g_UpdateFuncRegistry->register_on_tick(f, 0x13);
         on_tick = f;
         break;
-    case 9:
+    case SCREEN_EFFECT_HOLD:
         f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_hold);
         f->arg = this;
         f->flags |= UPDATE_FUNC_ACTIVE;
@@ -209,14 +238,3 @@ __forceinline void ScreenEffect::initialize_inline(i32 mode, i32 arg_18, i32 arg
     this->arg_20 = arg_20;
     this->arg_24 = arg_24;
 }
-
-// The modes, named after their callbacks.
-enum ScreenEffectMode
-{
-    SCREEN_EFFECT_SHAKE = 1,
-    // Covers the screen with a color (on_tick_fade_out).
-    SCREEN_EFFECT_FADE_OUT = 2,
-    // Uncovers it again (on_tick_fade_in, starting opaque).
-    SCREEN_EFFECT_FADE_IN = 3,
-    SCREEN_EFFECT_SHAKE_WITH_RAMP = 8,
-};

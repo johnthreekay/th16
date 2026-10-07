@@ -415,7 +415,7 @@ void Supervisor::reset_render_state()
     g_Supervisor.d3d_device->SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_WRAP);
     if (g_AnmManager != NULL)
     {
-        g_AnmManager->last_blend_mode = 10;
+        g_AnmManager->last_blend_mode = ANM_BLEND_FORCE_RESET;
         g_AnmManager->render_cache_184fbb5 = 0xff;
         g_AnmManager->last_vertex_setup = ANM_VERTEX_SETUP_NONE;
         g_AnmManager->last_texture_id = -1;

@@ -329,7 +329,7 @@ i32 Stage::on_draw_03()
     {
         if (fade_timer.current < 30)
         {
-            ScreenEffect::create_inline(3, 30, 0, 0, 0, 10);
+            ScreenEffect::create_inline(SCREEN_EFFECT_FADE_IN, 30, 0, 0, 0, 10);
             stage_flags |= STAGE_FLAG_1;
             fade_timer.set_value(1);
         }

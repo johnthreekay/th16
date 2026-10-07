@@ -1846,7 +1846,7 @@ int EnemyData::ecl_run_over_300()
         break;
     // setScreenShake(a, b, c).
     case 517:
-        ScreenEffect::create(1, get_int_arg(0), get_int_arg(1), get_int_arg(2), 0, 0x54);
+        ScreenEffect::create(SCREEN_EFFECT_SHAKE, get_int_arg(0), get_int_arg(1), get_int_arg(2), 0, 0x54);
         break;
     // dialogRead(script): also clears every bullet, laser and enemy.
     case 518:

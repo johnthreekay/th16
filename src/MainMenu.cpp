@@ -1068,7 +1068,7 @@ i32 TitleInf::on_tick()
         }
         else if (g_unk_4a6f1c == 5)
         {
-            ScreenEffect::create(9, 30, 0, 0, 0, 0x54);
+            ScreenEffect::create(SCREEN_EFFECT_HOLD, 30, 0, 0, 0, 0x54);
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             set_state(17);
@@ -1078,7 +1078,7 @@ i32 TitleInf::on_tick()
         }
         else if (g_unk_4a6f1c == 4)
         {
-            ScreenEffect::create(9, 30, 0, 0, 0, 0x54);
+            ScreenEffect::create(SCREEN_EFFECT_HOLD, 30, 0, 0, 0, 0x54);
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             set_state(5);
