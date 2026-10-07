@@ -578,10 +578,11 @@ void AnmVm::write_sprite_corners(Float3 *corners)
 static __forceinline UpdateFunc *anm_create_func(UpdateFuncCallback function, AnmManager *arg)
 {
     UpdateFunc *f = new UpdateFunc;
-    f->flags |= UPDATE_FUNC_HEAP_ALLOCATED | UPDATE_FUNC_ACTIVE;
+    f->flags |= UPDATE_FUNC_HEAP_ALLOCATED;
     f->function = function;
     f->on_registration = NULL;
     f->on_cleanup = NULL;
+    f->flags |= UPDATE_FUNC_ACTIVE;
     f->arg = arg;
     return f;
 }
@@ -591,6 +592,7 @@ static __forceinline UpdateFunc *anm_create_func(UpdateFuncCallback function, An
 #define ANM_REGISTER_ON_DRAW(callback, priority)                                                                    \
     g_UpdateFuncRegistry->register_on_draw(anm_create_func((UpdateFuncCallback)(callback), this), (priority))
 
+// TODO: 99.9%; one inlined UpdateFunc constructor clears the heap flag two stores later in the original.
 // FUNCTION: TH16 0x46a3a0
 AnmManager::AnmManager()
 {

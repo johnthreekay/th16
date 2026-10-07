@@ -60,6 +60,7 @@ static inline ZunColor *diffuse_of(i32 i)
 // The quad in g_sprite_temp_buffer, moved by the camera offset, rounded to
 // pixel centers if flags bit 0 is set, culled against the viewport and
 // colored by the VM's color mode unless flags bit 1 is set.
+// TODO: 73%; the original keeps this on the stack and the parent-colored channels in dword stack slots.
 // FUNCTION: TH16 0x465280
 i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
 {
@@ -228,6 +229,7 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
 
 // Corners for render modes 0, 2 and 3: the anchored sprite rectangle,
 // scaled, at the VM's transformed position.
+// TODO: 39%; ours adds a /GS cookie for pos and walks the anchor tables differently.
 // FUNCTION: TH16 0x465c40
 void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
 {
@@ -306,6 +308,7 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
 
 // Corners for render modes 1 and 3: the same rectangle rotated by the
 // VM's total z rotation.
+// TODO: 48%; the original vectorizes the corner offsets through stack copies in another order.
 // FUNCTION: TH16 0x4660b0
 void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
 {
@@ -368,6 +371,7 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
     a->z = b->z = c->z = d->z = vm->entity_pos.z + vm->pos.z + vm->pos_2.z;
 }
 
+// TODO: 74%; register allocation of the corner offsets differs.
 // FUNCTION: TH16 0x466390
 i32 __stdcall AnmManager::write_sprite_corners__mode_4(AnmVm *vm)
 {
@@ -456,6 +460,7 @@ i32 __stdcall AnmManager::write_sprite_corners__mode_4(AnmVm *vm)
     return 0;
 }
 
+// TODO: 46%; the original keeps the scaled color channels in dword stack slots.
 // FUNCTION: TH16 0x466820
 i32 AnmManager::draw_vm__mode_6(AnmVm *vm)
 {
@@ -563,6 +568,7 @@ i32 AnmManager::draw_vm__mode_6(AnmVm *vm)
     }
 }
 
+// TODO: 93%; register allocation in the per-corner fog loop differs.
 // FUNCTION: TH16 0x467200
 i32 AnmManager::draw_vm__mode_7(AnmVm *vm)
 {
@@ -647,6 +653,7 @@ static inline void set_color_op_modulate()
     }
 }
 
+// TODO: 44%; the rotation order cases and the texture matrix copy are laid out differently.
 // FUNCTION: TH16 0x467410
 i32 AnmManager::draw_vm__mode_8(AnmVm *vm)
 {
@@ -838,6 +845,7 @@ i32 AnmManager::draw_vm__mode_8(AnmVm *vm)
     return 0;
 }
 
+// TODO: 39%; the identity matrix stores and the texture matrix copy are scheduled differently.
 // FUNCTION: TH16 0x467d00
 i32 AnmManager::draw_vm__mode_24(AnmVm *vm, RenderVertexXyzDiffuseTex *vertices, i32 vertex_count)
 {
@@ -915,6 +923,7 @@ static __forceinline BOOL is_transparent(AnmVm *vm)
     return vm->color_1.a == 0 && vm->color_2.a == 0;
 }
 
+// TODO: 70%; ours adds a /GS cookie for pos and keeps the anchors in ebx across the shape cases.
 // FUNCTION: TH16 0x468490
 HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
 {

@@ -340,6 +340,8 @@ void SoundManager::thread_load_sound_files(void *arg)
 
 // WinMain is the only caller; written against g_SoundManager, as LTCG
 // folded this into it.
+// TODO: 85%; matched while a harness called it, but LTCG does not fold this from the real WinMain, and with the
+// global written out the first loop walks a pointer where the original indexes.
 // FUNCTION: TH16 0x45d850
 HARNESS_CALLED i32 SoundManager::release()
 {
@@ -947,6 +949,7 @@ static inline IDirectSoundBuffer *bgm_buffer(CStreamingSound *sound)
 // Runs the first queued BGM command one step further (commands take several
 // calls, counted in unk_8) and plays or stops the queued sound effects.
 // Returns the BGM command now first in the queue.
+// TODO: 44%; the BGM command switch shares fewer tails than the original.
 // FUNCTION: TH16 0x45e330
 i32 SoundManager::update_sound_thread()
 {

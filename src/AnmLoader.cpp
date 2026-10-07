@@ -560,6 +560,7 @@ void AnmLoaded::release()
     }
 }
 
+// TODO: 97%; the device pointer and the locked buffer pointer are loaded at other points.
 // FUNCTION: TH16 0x46b900
 void AnmManager::setup_vertex_buffer()
 {

@@ -62,6 +62,7 @@ const ScreenSize g_screen_sizes[15] = {
 
 // Registers the window class and opens the game window: a popup covering
 // the screen, or a captioned window for the windowed sizes. 1 on failure.
+// TODO: 84%; the pacing stores and the window size computation are scheduled differently.
 // FUNCTION: TH16 0x45b330
 HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
 {
@@ -131,6 +132,7 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
 // Creates the device (or resets it) with the smallest back buffer that
 // holds the window. In full screen a mode that is not 60 Hz is only taken
 // on the second pass. 0 on success.
+// TODO: 91%; register allocation of the retry loop differs.
 // FUNCTION: TH16 0x45b530
 HARNESS_CALLED i32 create_d3d_device(i32 reset)
 {
@@ -238,6 +240,7 @@ retry:
 // Picks the presentation parameters from the display mode and the options,
 // creates the device and checks what it supports. 1 on failure (ExpHP:
 // sub_45b7d0_lots_of_d3d_init).
+// TODO: 68%; the presentation parameters are filled in another order.
 // FUNCTION: TH16 0x45b7d0
 HARNESS_CALLED i32 init_d3d()
 {
@@ -386,6 +389,8 @@ static inline void release_com(IUnknown **object)
 }
 
 // WinMain has C linkage, so it is annotated by its linker symbol.
+// TODO: 80%; the critical section loops count differently and some blocks are laid out in another order. Taking
+// SoundManager::thread_init's address here also makes LTCG realign SoundManager::initialize (both lost their match).
 // SYNTHETIC: TH16 0x459830 SYMBOL
 // _WinMain@16
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_line, int show)
