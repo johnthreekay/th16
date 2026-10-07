@@ -548,7 +548,11 @@ __forceinline f32 *EclRunContext::float_arg_ptr_at(EclLocation *loc, int index)
 
 // Instructions below 300; the VM handles the rest (run_over_300). Each
 // instruction runs once its time has come; time counts up by speed per
-// frame and jumps set it.
+// frame and jumps set it. Case bodies follow ZUN's order in the binary.
+// TODO: the original computes each operator's result before the inlined
+// push (ours sinks it into the push), so sub/mul and the comparisons do not
+// tail-merge into add's and eq's push; stack slots and base/index register
+// order in the stack addressing differ; the float_i loop keeps vm in esi.
 // FUNCTION: TH16 0x472030
 HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
 {
