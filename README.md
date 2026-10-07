@@ -403,6 +403,28 @@ decompiled code the surroundings it had in the original:
 - quickdiff's percentages are unreliable for functions with jump tables;
   use compare.py there.
 
+- An 8-byte struct local (a D3DXVECTOR2, a D3DLOCKED_RECT) makes LTCG
+  want an 8-aligned frame: the function realigns and so does every
+  visible caller, up the call graph. ZUN's draw_vm keeps width and height
+  in separate floats; with a Float2 three callers of draw_vm lost their
+  match. convert_texture (0x46c0d0) is parked under `#if 0` because its
+  caller load_texture_from_file realigns even with the lock rectangle
+  wrapped in a 12-byte struct.
+- LTCG's call graph is built before inlining, and an inline helper is its
+  own node there. Taking a function's address counts as a call: in a
+  function that realigns its frame (WinMain), it gives the target known
+  alignment, so SoundManager::thread_init got a padded frame and
+  SoundManager::initialize realigned. And a caller that also stores to a
+  global's fields does not get the global folded into a callee's `this`
+  (release, called right after `g_SoundManager.thread_state = ...`).
+  WinMain reaches both through inline helpers (start_sound,
+  stop_sound_threads), which restores all three; check WinMain's other
+  direct `g_X.method()` calls the same way.
+- The implicit constructors of the three vertex structs (0x46a370,
+  0x46a380, 0x46a390) stay out of line, called from the dynamic
+  initializers of g_quad_vertices_4df4a8, g_sprite_temp_buffer and
+  g_quad_vertices_4df8a0 (`// SYNTHETIC:` with `X::X`).
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
@@ -441,6 +463,9 @@ Name-based annotations: the marker, then a comment line naming the function.
 - build.py reads `template <> __declspec(noinline) X::f` as a function
   named `__declspec`; use DECOMP_NOINLINE. An explicit specialization of an
   in-class template member also needs a user in its own .cpp to be emitted.
+- `// FUNCTION:` only finds C++ symbols; WinMain (C linkage) is annotated
+  by its linker symbol: `// SYNTHETIC: TH16 0x459830 SYMBOL`, then
+  `// _WinMain@16`.
 - The TH06 decomp's `Chain` code (`src/Global.cpp` there) is a close ancestor
   of TH16's `UpdateFuncRegistry`: same callback result codes, same case
   order in the switch, same search-then-cut structure in `unregister`.

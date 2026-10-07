@@ -480,6 +480,21 @@ HARNESS_CALLED void ecl_log(const char *fmt, ...)
 }
 
 // TODO: the original walks the call arguments with a byte offset into args and spills differently.
+// This file's copy of ZunMath.h's sincosmul.
+// FUNCTION: TH16 0x474510
+static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
+
 // FUNCTION: TH16 0x471db0
 HARNESS_CALLED i32 EclRunContext::call_sub(EclRunContext *dest, i32 start, i32 unused)
 {
@@ -1032,7 +1047,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
             {
                 f32 angle = normalize_angle(get_float_arg(2));
                 Float3 pos;
-                sincosmul(&pos, angle, get_float_arg(3));
+                ecl_sincosmul(&pos, angle, get_float_arg(3));
                 *get_float_arg_ptr(0) = pos.x;
                 *get_float_arg_ptr(1) = pos.y;
                 break;
@@ -1150,7 +1165,7 @@ HARNESS_CALLED i32 EclRunContext::ecl_run(f32 speed)
                 f32 angle = g_replay_safe_rng.randf_neg_to(ZUN_PI);
                 f32 radius = g_replay_safe_rng.randf_neg_to(r2 - r1) + r1;
                 Float3 pos;
-                sincosmul(&pos, angle, radius);
+                ecl_sincosmul(&pos, angle, radius);
                 *get_float_arg_ptr(0) = pos.x;
                 *get_float_arg_ptr(1) = pos.y;
                 break;

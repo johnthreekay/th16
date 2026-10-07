@@ -286,7 +286,7 @@ scaled:
 // TODO: the original aligns the frame (for transform_coords) and adds
 // pos + entity_pos with the operands the other way round.
 // FUNCTION: TH16 0x406c40
-HARNESS_CALLED Float3 *AnmVm::get_own_transformed_pos(Float3 *out)
+Float3 *AnmVm::get_own_transformed_pos(Float3 *out)
 {
     *out = pos + entity_pos + pos_2;
     transform_coords(out);
