@@ -353,6 +353,10 @@ void Player::start_respawn()
 // 8-byte pointers ShtFile and ShtShooter are larger, so the port rebuilds
 // the file in the in-memory layout, leaving the offsets (converted to the
 // new shooter size) and indices for read_sht_file to resolve as usual.
+// A table ends at the first record with a negative fire rate, and the
+// file's terminators are shorter than a record (so table offsets are not
+// multiples of 0x58): each table is copied record by record, with a whole
+// terminator record after it.
 static ShtFile *port_convert_sht_file(const u8 *raw, i32 size)
 {
     const i32 header_size = offsetof(ShtFile, shooter_arrays);
@@ -360,26 +364,52 @@ static ShtFile *port_convert_sht_file(const u8 *raw, i32 size)
     const i32 raw_shooter_size = 0x58;
     const i32 raw_funcs_offset = offsetof(ShtShooter, func_on_init);
     const i32 raw_tail_offset = raw_funcs_offset + 4 * 4;
-    i32 count = (size - header_size - raw_tables_size) / raw_shooter_size;
-    ShtFile *sht = (ShtFile *)malloc(offsetof(ShtFile, shooters) + count * sizeof(ShtShooter));
-    memcpy(sht, raw, header_size);
+    const u8 *base = raw + header_size + raw_tables_size;
+    const i32 raw_size = size - header_size - raw_tables_size;
+    const i32 table_count = ((const ShtFile *)raw)->sht_off_count < 0xa ? ((const ShtFile *)raw)->sht_off_count : 0xa;
+    u32 offsets[0xa];
+    i32 total = 0;
     for (i32 i = 0; i < 0xa; i++)
     {
-        u32 offset = ((const u32 *)(raw + header_size))[i];
-        sht->shooter_arrays[i] = (ShtShooter *)(uptr)(offset / raw_shooter_size * sizeof(ShtShooter));
+        offsets[i] = ((const u32 *)(raw + header_size))[i];
+        if (i >= table_count)
+        {
+            continue;
+        }
+        for (i32 o = offsets[i]; o + raw_shooter_size <= raw_size && (i8)base[o] >= 0; o += raw_shooter_size)
+        {
+            total++;
+        }
+        total++;
     }
-    const u8 *src = raw + header_size + raw_tables_size;
-    for (i32 k = 0; k < count; k++, src += raw_shooter_size)
+    ShtFile *sht = (ShtFile *)malloc(offsetof(ShtFile, shooters) + (total + 1) * sizeof(ShtShooter));
+    memcpy(sht, raw, header_size);
+    i32 k = 0;
+    for (i32 i = 0; i < 0xa; i++)
     {
-        ShtShooter *dst = &sht->shooters[k];
-        const u32 *indices = (const u32 *)(src + raw_funcs_offset);
-        memcpy(dst, src, raw_funcs_offset);
-        dst->func_on_init = (ShtBulletFunc)(uptr)indices[0];
-        dst->func_on_tick = (ShtBulletFunc)(uptr)indices[1];
-        dst->func_3 = (ShtBulletFunc)(uptr)indices[2];
-        dst->func_on_hit = (ShtHitFunc)(uptr)indices[3];
-        memcpy(dst->unk_38, src + raw_tail_offset, sizeof(dst->unk_38));
+        sht->shooter_arrays[i] = (ShtShooter *)(uptr)(k * sizeof(ShtShooter));
+        if (i >= table_count)
+        {
+            continue;
+        }
+        for (i32 o = offsets[i]; o + raw_shooter_size <= raw_size && (i8)base[o] >= 0; o += raw_shooter_size, k++)
+        {
+            const u8 *src = base + o;
+            ShtShooter *dst = &sht->shooters[k];
+            const u32 *indices = (const u32 *)(src + raw_funcs_offset);
+            memcpy(dst, src, raw_funcs_offset);
+            dst->func_on_init = (ShtBulletFunc)(uptr)indices[0];
+            dst->func_on_tick = (ShtBulletFunc)(uptr)indices[1];
+            dst->func_3 = (ShtBulletFunc)(uptr)indices[2];
+            dst->func_on_hit = (ShtHitFunc)(uptr)indices[3];
+            memcpy(dst->unk_38, src + raw_tail_offset, sizeof(dst->unk_38));
+        }
+        memset(&sht->shooters[k], 0, sizeof(ShtShooter));
+        sht->shooters[k].fire_rate = -1;
+        k++;
     }
+    memset(&sht->shooters[k], 0, sizeof(ShtShooter));
+    sht->shooters[k].fire_rate = -1;
     return sht;
 }
 #endif

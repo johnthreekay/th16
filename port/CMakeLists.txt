@@ -29,7 +29,20 @@ set(TH16_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 file(GLOB TH16_GAME_SOURCES CONFIGURE_DEPENDS ${TH16_ROOT}/src/*.cpp)
 file(GLOB TH16_PORT_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
-add_executable(th16 ${TH16_GAME_SOURCES} ${TH16_PORT_SOURCES})
+# Renderer testing before the platform layer exists: port/test/platform_shim.cpp
+# replaces the file, thread and window stubs (linked first, duplicates
+# allowed, so its definitions win). Never needed once the real platform
+# layer is in.
+option(TH16_TEST_SHIM "Link the test-only platform shim over the stubs" OFF)
+set(TH16_SHIM_SOURCES)
+if(TH16_TEST_SHIM)
+    set(TH16_SHIM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test/platform_shim.cpp)
+endif()
+
+add_executable(th16 ${TH16_SHIM_SOURCES} ${TH16_GAME_SOURCES} ${TH16_PORT_SOURCES})
+if(TH16_TEST_SHIM)
+    target_link_options(th16 PRIVATE -Wl,--allow-multiple-definition)
+endif()
 
 target_include_directories(th16 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${TH16_ROOT}/src)
 target_compile_definitions(th16 PRIVATE TH16_PORT)
@@ -104,3 +117,13 @@ endif()
 
 find_package(Threads REQUIRED)
 target_link_libraries(th16 PRIVATE Threads::Threads m)
+
+# SDL2 (window, OpenGL context). The renderer loads its GL functions
+# through SDL, so nothing links libGL. For -m32, look in the 32-bit
+# pkg-config directory.
+find_package(PkgConfig REQUIRED)
+if(TH16_M32 AND EXISTS /usr/lib32/pkgconfig AND NOT DEFINED ENV{PKG_CONFIG_LIBDIR})
+    set(ENV{PKG_CONFIG_LIBDIR} "/usr/lib32/pkgconfig:/usr/share/pkgconfig")
+endif()
+pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+target_link_libraries(th16 PRIVATE PkgConfig::SDL2)
