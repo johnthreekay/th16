@@ -5,12 +5,15 @@
 #include "Crypt.h"
 #include "Lzss.h"
 
+// th16.dat, opened at startup.
 // GLOBAL: TH16 0x4c10b8
 Arcfile g_Arcfile;
 // SYNTHETIC: TH16 0x401000
 // ??__Eg_Arcfile@@YAXXZ
 // SYNTHETIC: TH16 0x48ac10
 // ??__Fg_Arcfile@@YAXXZ
+// Twenty more archives that nothing in TH16 opens; only their constructors
+// and destructors run.
 // GLOBAL: TH16 0x4d7ba0
 Arcfile g_arcfiles[0x14];
 // Its dynamic initializer and atexit destructor:
@@ -19,11 +22,13 @@ Arcfile g_arcfiles[0x14];
 // SYNTHETIC: TH16 0x48ac60
 // ??__Fg_arcfiles@@YAXXZ
 
-// Decryption parameters, picked by the sum of an entry name's bytes.
+// Decryption parameters for an entry (zun_decrypt's arguments), picked by
+// the sum of the entry name's bytes.
 struct ArcfileKey
 {
     u8 key;
     u8 step;
+    // Never read.
     u8 unk_2;
     i32 block;
     i32 limit;
@@ -72,6 +77,7 @@ Arcfile::~Arcfile()
     close();
 }
 
+// Reads the archive's directory and keeps the file open for read_file.
 // FUNCTION: TH16 0x456fe0
 HARNESS_CALLED bool Arcfile::open(const char *path)
 {
@@ -90,6 +96,7 @@ HARNESS_CALLED bool Arcfile::open(const char *path)
     return false;
 }
 
+// Frees the directory and closes the file.
 // FUNCTION: TH16 0x457060
 void Arcfile::close()
 {
@@ -174,6 +181,7 @@ fail:
     return NULL;
 }
 
+// The entry with the given name (case-insensitive), or NULL.
 // FUNCTION: TH16 0x457290
 ArcfileEntry *Arcfile::find_entry(const char *name)
 {
@@ -202,6 +210,23 @@ struct ArcfileHeader
     u32 entry_count;
 };
 
+// "THA1", read as a little-endian u32.
+const u32 ARCFILE_MAGIC = '1AHT';
+// What the header's fields have added to them.
+const u32 ARCFILE_UNPACKED_SIZE_BIAS = 123456789;
+const u32 ARCFILE_PACKED_SIZE_BIAS = 987654321;
+const u32 ARCFILE_ENTRY_COUNT_BIAS = 135792468;
+// zun_decrypt's key and step for the header, and key, step and block size
+// for the directory.
+const u8 ARCFILE_HEADER_KEY = 0x1b;
+const u8 ARCFILE_HEADER_STEP = 0x37;
+const u8 ARCFILE_DIRECTORY_KEY = 0x3e;
+const u8 ARCFILE_DIRECTORY_STEP = 0x9b;
+const i32 ARCFILE_DIRECTORY_BLOCK = 0x80;
+
+// Opens the archive at path and reads its directory into g_Arcfile: the
+// header at the start, then the directory at the end of the file
+// (encrypted and compressed).
 // FUNCTION: TH16 0x4572e0
 HARNESS_CALLED bool Arcfile::read_directory(const char *path)
 {
@@ -217,12 +242,13 @@ HARNESS_CALLED bool Arcfile::read_directory(const char *path)
     {
         if (g_Arcfile.file->read(&header, sizeof(header)) != 0)
         {
-            zun_decrypt((u8 *)&header, sizeof(header), 0x1b, 0x37, sizeof(header), sizeof(header));
-            if (header.magic == '1AHT')
+            zun_decrypt((u8 *)&header, sizeof(header), ARCFILE_HEADER_KEY, ARCFILE_HEADER_STEP, sizeof(header),
+                        sizeof(header));
+            if (header.magic == ARCFILE_MAGIC)
             {
-                header.unpacked_size -= 123456789;
-                header.packed_size -= 987654321;
-                g_Arcfile.entry_count = header.entry_count - 135792468;
+                header.unpacked_size -= ARCFILE_UNPACKED_SIZE_BIAS;
+                header.packed_size -= ARCFILE_PACKED_SIZE_BIAS;
+                g_Arcfile.entry_count = header.entry_count - ARCFILE_ENTRY_COUNT_BIAS;
                 u32 dir_offset = g_Arcfile.file->get_size() - header.packed_size;
                 g_Arcfile.file->seek(dir_offset, FILE_BEGIN);
                 u32 packed_size = header.packed_size;
@@ -231,7 +257,8 @@ HARNESS_CALLED bool Arcfile::read_directory(const char *path)
                 {
                     if (g_Arcfile.file->read(packed, packed_size) != 0)
                     {
-                        zun_decrypt(packed, packed_size, 0x3e, 0x9b, 0x80, packed_size);
+                        zun_decrypt(packed, packed_size, ARCFILE_DIRECTORY_KEY, ARCFILE_DIRECTORY_STEP,
+                                    ARCFILE_DIRECTORY_BLOCK, packed_size);
                         unpacked = lzss_decompress(packed, packed_size, NULL, header.unpacked_size);
                         if (unpacked != NULL)
                         {
@@ -263,6 +290,9 @@ HARNESS_CALLED bool Arcfile::read_directory(const char *path)
 
 // TODO: count + 1 and entries swap stack slots; the original loads data
 // before the count test and keeps the loop counter in data's argument slot.
+// Turns the unpacked directory (per entry: the name, zero-padded to a
+// multiple of 4 bytes, then offset, size and unk_c) into count entries plus
+// the end entry at end_offset.
 // FUNCTION: TH16 0x4574b0
 HARNESS_CALLED ArcfileEntry *Arcfile::parse_directory(u8 *data, i32 count, u32 end_offset)
 {
@@ -325,10 +355,9 @@ HARNESS_CALLED void make_full_path(char *out, const char *path)
     strcat(out, path);
 }
 
-// The scalar deleting destructors of Pbg::IFile (0x457af0) and Pbg::File
-// (0x4576b0) match, but build.py's SYNTHETIC parsing does not take names
-// inside a namespace yet, so they are not annotated.
-
+// Opens path (relative to the executable's directory) for reading ("r"),
+// writing ("w", replacing the file) or appending ("a"); the first of those
+// letters in mode wins.
 // FUNCTION: TH16 0x457700
 bool Pbg::File::open(const char *path, const char *mode)
 {

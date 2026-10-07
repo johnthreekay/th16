@@ -18,40 +18,25 @@
 #include "Gui.h"
 #include "UpdateFunc.h"
 #include "ZunAngle.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
 // GLOBAL: TH16 0x4a6dac
 BulletManager *g_BulletManager;
 
-// This file's copy of ZunMath.h's sincosmul, which TH16 keeps once per
+// This file's copy of sincosmul (ZunAsm.h), which TH16 keeps once per
 // object file. A static of its own so that it can be annotated.
 // FUNCTION: TH16 0x417510
 static void __fastcall bullet_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // A second copy, which only step_ex_08 calls.
 // FUNCTION: TH16 0x4173a0
 static void __fastcall bullet_sincosmul_2(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // FUNCTION: TH16 0x411880

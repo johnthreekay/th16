@@ -9,6 +9,15 @@
 // GLOBAL: TH16 0x4a6db8
 EffectManager *g_EffectManager;
 
+// The effect kinds that EffectManager::create_effect sets up. In the
+// original each row names its ANM script and points at its init callback
+// (anm_masked_effect_init, anm_gather_effect_init,
+// anm_jagged_line_blue_init and anm_jagged_line_gray_init in
+// AnmVmCallbacks.cpp) with the matching on_tick/on_draw/on_destroy indices;
+// not filled in here.
+// GLOBAL: TH16 0x4a2250
+EffectData g_effect_table[4];
+
 // FUNCTION: TH16 0x418790
 i32 preload_bullet_and_effect_anm()
 {
@@ -119,7 +128,7 @@ i32 __fastcall EffectManager::on_draw_callback(EffectManager *self)
 
 // TODO: this and last_used_index's old value trade ebx and the stack slot
 // with the original since get_vm_with_id has a visible body (it matched
-// against the opaque stub).
+// while get_vm_with_id was an opaque placeholder).
 // FUNCTION: TH16 0x40e6c0
 i32 EffectManager::next_index()
 {

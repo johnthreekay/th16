@@ -9,6 +9,8 @@
 #include "Rng.h"
 #include "Supervisor.h"
 
+// Nonzero: running fades and pulses end on their next tick (defined in
+// GameThread.cpp).
 extern i32 g_cancel_screen_effects;
 
 struct ZunRect

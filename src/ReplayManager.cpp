@@ -458,10 +458,10 @@ void clear_input_state()
     g_InputState.hold_time[0x20] = 0;
     g_InputState.input = 0;
     g_InputState.input_prev = 0;
-    g_InputState.unk_8c = 0;
+    g_InputState.input_repeat = 0;
     g_InputState.input_rising = 0;
     g_InputState.input_falling = 0;
-    g_InputState.unk_9c = 0;
+    g_InputState.input_held_long = 0;
 }
 
 // TODO: register allocation in the unregister_locked blocks (the original

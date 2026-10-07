@@ -638,4 +638,3 @@ HARNESS_CALLED WAVEFORMATEX *__stdcall get_wav_chunk(u8 *data, const char *tag, 
 extern const char *const g_sound_file_names[SOUND_FILE_COUNT];
 extern SoundEffectData g_sound_effect_table[SOUND_EFFECT_COUNT];
 
-void play_sound_centered_stub(i32 id, i32 unused);

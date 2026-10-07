@@ -419,7 +419,6 @@ i32 TitleInf::do_options()
 
 // Rows above the cursor get interrupt 30, rows below it 31; the digits of
 // the two volumes follow their rows.
-// TODO: the original keeps g_AnmManager in esi/ebx across the lookups (get_vm_with_id is an opaque stub here), which changes the inlined searches' registers.
 // FUNCTION: TH16 0x44c8c0
 void TitleInf::update_options_cursor()
 {
@@ -656,7 +655,6 @@ i32 TitleInf::do_key_config()
 }
 
 // Two digits per action, in two layers of sprites.
-// TODO: the original keeps g_AnmManager in edi across the lookups (get_vm_with_id is an opaque stub here).
 // FUNCTION: TH16 0x44ec60
 void TitleInf::update_key_config_sprites()
 {

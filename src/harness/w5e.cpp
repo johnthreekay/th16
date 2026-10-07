@@ -1,26 +1,20 @@
-// Stand-in callers for wave 5 range E (0x458000-0x4748e0: WinMain, the
-// sound thread, AnmManager's drawing and setup) whose shape depends on how
-// the rest of the game calls them.
+// A stand-in caller for AnmVm::get_own_transformed_pos.
+//
+// Not ZUN's code and never run: it gives link-time code generation calls
+// or address uses the decompiled code does not have, so that it compiles
+// the real functions as in the original (see README.md, "Placeholders and
+// stand-in callers"). The harness files are split the way the work was;
+// regrouping them changes LTCG's choices for unrelated functions.
 #include "../AnmManager.h"
 
+// Takes the address of a local double out of LTCG's view
+// (src/stub/Opaque.cpp), which makes the caller's frame 8-byte aligned.
 void w4b_opaque_double(double *value);
 
-// Like the ANM on_draw callbacks (0x4073a0 and others in
-// g_anm_on_draw_funcs), which call draw_vm themselves. Called through a
-// pointer.
-static i32 __fastcall harness_w5e_on_draw(AnmVm *vm)
-{
-    g_AnmManager->draw_vm(vm);
-    return 0;
-}
-
-AnmVmFunc harness_w5e_on_draw_ptr()
-{
-    return harness_w5e_on_draw;
-}
-
-// Like the undecompiled callers of get_own_transformed_pos with aligned
-// frames (the original realigns get_own_transformed_pos itself).
+// A caller of AnmVm::get_own_transformed_pos (0x406c40) with an 8-byte
+// aligned frame, like several of its original callers. Without it LTCG
+// compiles get_own_transformed_pos and the ANM drawing code around it
+// (0x406a70, 0x465c40, 0x468490, ...) differently.
 f32 harness_w5e_transformed_pos(AnmVm *vm)
 {
     double aligned = 0.0;
@@ -29,4 +23,3 @@ f32 harness_w5e_transformed_pos(AnmVm *vm)
     vm->get_own_transformed_pos(&pos);
     return pos.x;
 }
-

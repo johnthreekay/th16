@@ -21,6 +21,7 @@
 #include "Stage.h"
 #include "Supervisor.h"
 #include "ZunAngle.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
 // create_vm, inserted at the front of the world list like create_vm_front
@@ -88,22 +89,15 @@ int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage);
 extern EnemyExtDamageFunc const g_ecl_ext_damage_funcs[3] = {NULL, ecl_ext_damage_stored, ecl_ext_damage_anm_hurtbox};
 
 // The hooks ECL 634 installs; only entry 0 (NULL).
-extern void *g_ecl_unknown_634_funcs[1];
+// GLOBAL: TH16 0x4a6dc4
+void *g_ecl_unknown_634_funcs[1];
 
-// This file's copy of ZunMath.h's sincosmul (TH16 keeps one per object
+// This file's copy of sincosmul (ZunAsm.h; TH16 keeps one per object
 // file).
 // FUNCTION: TH16 0x426260
 static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // Where shooter i fires from: its absolute origin plus the offset when the
@@ -881,7 +875,7 @@ int EnemyData::ecl_run_over_300()
         f32 speed = get_float_arg(1);
         f32 radius = get_float_arg(2);
         f32 radial_speed = get_float_arg(3);
-        if ((pv->flags & 0xf) != POSVEL_MODE_CIRCLE)
+        if ((pv->flags & POSVEL_MODE_MASK) != POSVEL_MODE_CIRCLE)
         {
             pv->velocity = pv->pos;
         }
@@ -970,7 +964,7 @@ int EnemyData::ecl_run_over_300()
         f32 radial_speed = get_float_arg(3);
         f32 ellipse_angle = get_float_arg(4);
         f32 ellipse_ratio = get_float_arg(5);
-        if ((pv->flags & 0xf) != POSVEL_MODE_CIRCLE)
+        if ((pv->flags & POSVEL_MODE_MASK) != POSVEL_MODE_CIRCLE)
         {
             pv->velocity = pv->pos;
         }

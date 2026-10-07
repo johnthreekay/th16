@@ -11,7 +11,7 @@
 // 0x403d30. Whether a circle touches a rectangle of size w x h centered on
 // (rect_x, rect_y) and rotated by angle.
 HARNESS_CALLED i32 __stdcall collision_test_circle_rect(f32 rect_x, f32 rect_y, f32 w, f32 h, f32 angle, f32 circle_x,
-                                              f32 circle_y, f32 radius);
+                                                        f32 circle_y, f32 radius);
 
 // 0x403a90. Whether any of four points lies in a rectangle of size w x h
 // centered on (x, y) and rotated by angle. The points arrive in ecx.

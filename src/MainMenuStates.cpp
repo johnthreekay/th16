@@ -3166,7 +3166,7 @@ static __forceinline i32 spell_row_captured(const i32 *row, i32 count)
 // their names once attempted and the chosen character's captures
 // highlighted. Rows are highlighted with interrupt 2 when they are the
 // selected one (-1 at every call site; LTCG folded it).
-// TODO: the original keeps g_AnmManager in edi across the first lookups (get_vm_with_id is an opaque stub here) and this in ebx in the main loop.
+// TODO: the original keeps g_AnmManager in edi across the first lookups and this in ebx in the main loop.
 // FUNCTION: TH16 0x4560b0
 HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 selected)
 {

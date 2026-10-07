@@ -1,4 +1,11 @@
-// Stand-in callers for unit 1 (0x402e70-0x409490).
+// An escaping address of a screen global (see s6.cpp) and a stand-in caller
+// for ECL's random angles.
+//
+// Not ZUN's code and never run: it gives link-time code generation calls
+// or address uses the decompiled code does not have, so that it compiles
+// the real functions as in the original (see README.md, "Placeholders and
+// stand-in callers"). The harness files are split the way the work was;
+// regrouping them changes LTCG's choices for unrelated functions.
 #include "../AnmVm.h"
 #include "../AsciiManager.h"
 #include "../CriticalSections.h"
@@ -7,36 +14,17 @@
 #include "../Rng.h"
 #include "../ZunMath.h"
 
-// ECL and the per-object updates write g_game_speed all the time. Without a
-// write LTCG would treat it as the constant 1.0.
-void harness_set_game_speed(f32 speed)
-{
-    g_game_speed = speed;
-}
-
-// Like the file loader at 0x402440 (0x40250b), which leaves CS_FILE this
-// way; switch_gamemodes and SoundManager::preload_bgm are the other callers.
-void harness_leave_cs(int i)
-{
-    g_CriticalSections.leave(CS_FILE);
-    g_CriticalSections.leave(i);
-}
-
-// Like the interpolators' step functions (0x406e10 and others).
-f32 harness_interp_common_methods(i32 mode, i32 time, i32 end_time)
-{
-    return interp_common_methods(mode, (f32)time, (f32)end_time);
-}
-
-// Some globals have their address taken elsewhere in the game, so LTCG
-// must assume stores through pointers may change them. Without that it
-// moves loads of them across such stores.
+// AsciiInf::create_string (0x408140) and draw_string (0x408650) reload
+// the screen scale.
 f32 *harness_screen_coord_scale_ptr()
 {
     return &g_screen_coord_scale;
 }
 
-// Like the ECL movement code around 0x41ffed.
+// Stands for ECL's random movement (0x41ffed and three more calls), the
+// only callers of randf_neg_1_to_1_times_pi (0x406320). With just those in
+// view, all on g_replay_safe_rng, the function compiles one instruction
+// longer than the original; a call on another Rng keeps it as it was.
 f32 harness_rand_angle(Rng *rng)
 {
     return rng->randf_neg_1_to_1_times_pi() / 3.0f;

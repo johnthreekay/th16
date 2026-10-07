@@ -7,12 +7,15 @@
 
 struct UpdateFunc;
 
-// Intrusive doubly linked list node; entry points back at the owner.
+// Intrusive doubly linked list node; entry points back at the owner. The
+// same shape as ZunList.
 struct UpdateFuncList
 {
     UpdateFunc *entry;
     UpdateFuncList *next;
     UpdateFuncList *prev;
+    // Never set by the registry; inserting after a node with a non-NULL
+    // value would point it at the new node (ZunList::insert_after).
     UpdateFuncList *unk_c;
 };
 
@@ -45,13 +48,19 @@ enum UpdateFuncFlags
     UPDATE_FUNC_ACTIVE = 1 << 1,
 };
 
-// One per-frame callback.
+// One per-frame callback in the registry's on_tick or on_draw chain
+// (TH06: ChainElem). Each callback gets arg in ecx.
 struct UpdateFunc
 {
+    // Position in the chain: lower runs first.
     int priority;
+    // UpdateFuncFlags.
     unsigned int flags;
     UpdateFuncCallback function;
+    // Called once when the function is registered.
     UpdateFuncCallback on_registration;
+    // Called when an on_tick function returns UPDATE_FUNC_CLEANUP, and for
+    // every on_tick function when the registry is destroyed.
     UpdateFuncCallback on_cleanup;
     UpdateFuncList list_node;
     void *arg;

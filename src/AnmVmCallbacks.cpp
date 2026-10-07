@@ -10,23 +10,16 @@
 #include "AnmVm.h"
 #include "EffectManager.h"
 #include "Rng.h"
+#include "ZunAsm.h"
 #include "ZunMath.h"
 
-// The copy of ZunMath.h's sincosmul that the jagged line's object file has
+// The copy of sincosmul (ZunAsm.h) that the jagged line's object file has
 // (TH16 keeps one per object file). A static of its own so that it can be
 // annotated.
 // FUNCTION: TH16 0x406cc0
 static void __fastcall jagged_line_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // Extra data of the gather effect (EffectManager effect 1): up to 200
@@ -58,19 +51,11 @@ int __fastcall anm_gather_effect_init(AnmVm *vm, i32 arg)
     return 0;
 }
 
-// The copy of ZunMath.h's sincosmul that the gather effect's object file has.
+// The copy of sincosmul (ZunAsm.h) that the gather effect's object file has.
 // FUNCTION: TH16 0x406470
 static void __fastcall gather_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // Gives a new child VM its color and flight time.
@@ -234,8 +219,8 @@ static AnmId snapshot_of_vm_id(AnmId id)
 // Copies the child VMs along with the VM: into snapshots (mode 0) or back
 // out of them (mode 1).
 // TODO: the mode 0 loop spills its counter (the original keeps it in ebx)
-// since get_vm_with_id has a visible body (it matched against the opaque
-// stub).
+// since get_vm_with_id has a visible body (it matched while
+// get_vm_with_id was an opaque placeholder).
 // FUNCTION: TH16 0x405fa0
 int __fastcall anm_gather_effect_on_copy(AnmVm *vm, const AnmVm *other, i32 mode)
 {
@@ -536,3 +521,45 @@ int __fastcall anm_masked_effect_on_destroy(AnmVm *vm)
 {
     return 0;
 }
+
+// The callback tables AnmVm's index_of_* fields select from (declared in
+// AnmVm.h). In the original they are constant tables whose entry 0 is NULL
+// and whose other entries point at the callbacks named below; here they
+// are left zero.
+
+// anm_masked_effect_on_switch, anm_gather_effect_on_switch,
+// anm_jagged_line_on_switch.
+// GLOBAL: TH16 0x491b0c
+AnmVmSwitchFunc g_anm_on_switch_funcs[4];
+
+// anm_masked_effect_on_destroy, anm_gather_effect_on_destroy,
+// anm_jagged_line_on_destroy.
+// GLOBAL: TH16 0x491b58
+AnmVmFunc g_anm_on_destroy_funcs[4];
+
+// anm_masked_effect_on_tick, anm_gather_effect_on_tick,
+// anm_jagged_line_on_tick, anm_on_tick_fan.
+// GLOBAL: TH16 0x4919e8
+AnmVmFunc g_anm_on_tick_funcs[5];
+
+// bullet_map_sprite, LaserLineInf::on_sprite_set,
+// LaserCurveInf::on_sprite_set.
+// GLOBAL: TH16 0x491b1c
+AnmVmSpriteFunc g_anm_sprite_mapping_funcs[4];
+
+// Only the NULL entry (in .data, not .rdata, in the original).
+// GLOBAL: TH16 0x4c0f44
+AnmVmFunc g_anm_on_wait_funcs[1];
+
+// anm_on_draw_masked, anm_gather_effect_on_draw, anm_jagged_line_on_draw,
+// anm_effect_4_on_draw (Fog.cpp), Gui::textbox_on_draw, anm_on_draw_fan.
+// GLOBAL: TH16 0x491b2c
+AnmVmFunc g_anm_on_draw_funcs[7];
+
+// anm_gather_effect_on_copy.
+// GLOBAL: TH16 0x491b50
+AnmVmCopyFunc g_anm_on_copy_funcs[2];
+
+// anm_gather_effect_on_serialize.
+// GLOBAL: TH16 0x491b48
+AnmVmSerializeFunc g_anm_serialize_funcs[2];

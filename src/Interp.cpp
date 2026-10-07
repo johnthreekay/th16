@@ -2,6 +2,12 @@
 
 #include "Interp.h"
 
+// A zero vector that is never written (ExpHP:
+// SEEMINGLY_CONST_ZERO_VEC_4d9dc4); interpolators take their unused bezier
+// control points from it, and bullet code passes it by address.
+// GLOBAL: TH16 0x4d9dc4
+Float3 g_zero_vec;
+
 // A parabola through (a, 0) rescaled to run from 0 to 1, so it dips below 0
 // first.
 static inline f32 ease_in_back(f32 x, f32 a)
@@ -167,7 +173,7 @@ HARNESS_CALLED f32 InterpFloat::step()
         {
             time.set(end_time);
             end_time = 0;
-            if (method == 7 || method == 17)
+            if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
             {
                 return initial;
             }
@@ -176,20 +182,20 @@ HARNESS_CALLED f32 InterpFloat::step()
     }
     else if (end_time == 0)
     {
-        if (method == 7 || method == 17)
+        if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
         {
             return initial;
         }
         return goal;
     }
-    if (method == 7)
+    if (method == INTERP_CONSTANT_VELOCITY)
     {
         // Constant velocity: goal is the step.
         initial += goal;
         current = initial;
         return current;
     }
-    else if (method == 17)
+    else if (method == INTERP_CONSTANT_ACCEL)
     {
         // Constant acceleration: goal is added to the step.
         initial += bezier_2;
@@ -199,7 +205,7 @@ HARNESS_CALLED f32 InterpFloat::step()
         *(i32 *)&current = *(i32 *)&initial;
         return current;
     }
-    else if (method == 8)
+    else if (method == INTERP_BEZIER)
     {
         // Cubic Hermite curve; the bezier fields are the tangents.
         f32 t = time.current_f / (f32)end_time;
@@ -239,7 +245,7 @@ i32 InterpInt::step()
         {
             time.set(end_time);
             end_time = 0;
-            if (method == 7 || method == 17)
+            if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
             {
                 return initial;
             }
@@ -248,19 +254,19 @@ i32 InterpInt::step()
     }
     else if (end_time == 0)
     {
-        if (method == 7 || method == 17)
+        if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
         {
             return initial;
         }
         return goal;
     }
-    if (method == 7)
+    if (method == INTERP_CONSTANT_VELOCITY)
     {
         initial += goal;
         current = initial;
         return current;
     }
-    else if (method == 17)
+    else if (method == INTERP_CONSTANT_ACCEL)
     {
         initial += bezier_2;
         bezier_2 = bezier_2 + goal;
@@ -269,7 +275,7 @@ i32 InterpInt::step()
         *(i32 *)&current = *(i32 *)&initial;
         return current;
     }
-    else if (method == 8)
+    else if (method == INTERP_BEZIER)
     {
         f32 t = time.current_f / (f32)end_time;
         current = t * t * (3.0f - 2.0f * t) * goal + (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f) * initial +
@@ -280,7 +286,7 @@ i32 InterpInt::step()
     return current;
 }
 
-// TODO: ours aligns the frame (and esp, -8) and orders the bezier terms and the method 17 adds differently.
+// TODO: ours aligns the frame (and esp, -8) and orders the bezier terms and the constant-acceleration adds differently.
 // FUNCTION: TH16 0x463d40
 HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step()
 {
@@ -291,7 +297,7 @@ HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step()
         {
             time.set(end_time);
             end_time = 0;
-            if (method == 7 || method == 17)
+            if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
             {
                 return initial;
             }
@@ -300,26 +306,26 @@ HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step()
     }
     else if (end_time == 0)
     {
-        if (method == 7 || method == 17)
+        if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
         {
             return initial;
         }
         return goal;
     }
-    if (method == 7)
+    if (method == INTERP_CONSTANT_VELOCITY)
     {
         D3DXVECTOR2 tmp = initial;
         initial = tmp + goal;
         current = initial;
     }
-    else if (method == 17)
+    else if (method == INTERP_CONSTANT_ACCEL)
     {
         D3DXVECTOR2 tmp = initial;
         initial = bezier_2 + tmp;
         bezier_2 = bezier_2 + goal;
         current = initial;
     }
-    else if (method == 8)
+    else if (method == INTERP_BEZIER)
     {
         f32 t = time.current_f / (f32)end_time;
         f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
@@ -337,7 +343,7 @@ HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step()
 }
 
 // TODO: the timer tick and the bezier terms differ in register allocation,
-// and method 17 loads goal.x before bezier_2.x.
+// and the constant-acceleration case loads goal.x before bezier_2.x.
 // FUNCTION: TH16 0x406e10
 D3DXVECTOR3 InterpFloat3::step()
 {
@@ -348,7 +354,7 @@ D3DXVECTOR3 InterpFloat3::step()
         {
             time.set(end_time);
             end_time = 0;
-            if (method == 7 || method == 17)
+            if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
             {
                 return initial;
             }
@@ -357,26 +363,26 @@ D3DXVECTOR3 InterpFloat3::step()
     }
     else if (end_time == 0)
     {
-        if (method == 7 || method == 17)
+        if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
         {
             return initial;
         }
         return goal;
     }
-    if (method == 7)
+    if (method == INTERP_CONSTANT_VELOCITY)
     {
         D3DXVECTOR3 tmp = initial;
         initial = goal + tmp;
         current = initial;
     }
-    else if (method == 17)
+    else if (method == INTERP_CONSTANT_ACCEL)
     {
         D3DXVECTOR3 tmp = initial;
         initial = tmp + bezier_2;
         bezier_2 = bezier_2 + goal;
         current = initial;
     }
-    else if (method == 8)
+    else if (method == INTERP_BEZIER)
     {
         f32 t = time.current_f / (f32)end_time;
         f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
@@ -404,7 +410,7 @@ D3DXVECTOR2 InterpFloat2::step_radial_dist()
         {
             time.set(end_time);
             end_time = 0;
-            if (method == 7 || method == 17)
+            if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
             {
                 return initial;
             }
@@ -413,26 +419,26 @@ D3DXVECTOR2 InterpFloat2::step_radial_dist()
     }
     else if (end_time == 0)
     {
-        if (method == 7 || method == 17)
+        if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
         {
             return initial;
         }
         return goal;
     }
-    if (method == 7)
+    if (method == INTERP_CONSTANT_VELOCITY)
     {
         D3DXVECTOR2 tmp = initial;
         initial = tmp + goal;
         current = initial;
     }
-    else if (method == 17)
+    else if (method == INTERP_CONSTANT_ACCEL)
     {
         D3DXVECTOR2 tmp = initial;
         initial = bezier_2 + tmp;
         bezier_2 = bezier_2 + goal;
         current = initial;
     }
-    else if (method == 8)
+    else if (method == INTERP_BEZIER)
     {
         f32 t = time.current_f / (f32)end_time;
         f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
@@ -449,7 +455,7 @@ D3DXVECTOR2 InterpFloat2::step_radial_dist()
     return current;
 }
 
-// TODO: some vector adds load their operands the other way round, and method 17 per axis keeps
+// TODO: some vector adds load their operands the other way round, and the per-axis constant acceleration keeps
 // the sum in xmm0 where the original copies it back through eax.
 // FUNCTION: TH16 0x4258b0
 D3DXVECTOR3 InterpStrange1::step()
@@ -461,7 +467,7 @@ D3DXVECTOR3 InterpStrange1::step()
         {
             time.set(end_time);
             end_time = 0;
-            if (method_for_3d == 7 || method_for_3d == 17)
+            if (method_for_3d == INTERP_CONSTANT_VELOCITY || method_for_3d == INTERP_CONSTANT_ACCEL)
             {
                 return initial;
             }
@@ -470,7 +476,7 @@ D3DXVECTOR3 InterpStrange1::step()
     }
     else if (end_time == 0)
     {
-        if (method_for_3d == 7 || method_for_3d == 17)
+        if (method_for_3d == INTERP_CONSTANT_VELOCITY || method_for_3d == INTERP_CONSTANT_ACCEL)
         {
             return initial;
         }
@@ -478,20 +484,20 @@ D3DXVECTOR3 InterpStrange1::step()
     }
     if (!(flag_1d & 1))
     {
-        if (method_for_3d == 7)
+        if (method_for_3d == INTERP_CONSTANT_VELOCITY)
         {
             D3DXVECTOR3 tmp = initial;
             initial = goal + tmp;
             current = initial;
         }
-        else if (method_for_3d == 17)
+        else if (method_for_3d == INTERP_CONSTANT_ACCEL)
         {
             D3DXVECTOR3 tmp = initial;
             initial = bezier_2 + tmp;
             bezier_2 = bezier_2 + goal;
             current = initial;
         }
-        else if (method_for_3d == 8)
+        else if (method_for_3d == INTERP_BEZIER)
         {
             f32 t = time.current_f / (f32)end_time;
             f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
@@ -510,18 +516,18 @@ D3DXVECTOR3 InterpStrange1::step()
     {
         for (i32 i = 0; i < 3; i++)
         {
-            if (methods_1d[i] == 7)
+            if (methods_1d[i] == INTERP_CONSTANT_VELOCITY)
             {
                 initial[i] = goal[i] + initial[i];
                 current[i] = initial[i];
             }
-            else if (methods_1d[i] == 17)
+            else if (methods_1d[i] == INTERP_CONSTANT_ACCEL)
             {
                 initial[i] = bezier_2[i] + initial[i];
                 current[i] = initial[i];
                 bezier_2[i] = bezier_2[i] + goal[i];
             }
-            else if (methods_1d[i] == 8)
+            else if (methods_1d[i] == INTERP_BEZIER)
             {
                 f32 t = time.current_f / (f32)end_time;
                 current[i] = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f) * initial[i] +
@@ -538,7 +544,7 @@ D3DXVECTOR3 InterpStrange1::step()
     return current;
 }
 
-// TODO: the timer tick: with tick() the stores match, but the result goes to the speed's xmm1 (the original loads current_f into xmm0, see README); method 17's bezier_2 + goal gets x or y/z operand order right, never both; one lea swaps its operands.
+// TODO: the timer tick: with tick() the stores match, but the result goes to the speed's xmm1 (the original loads current_f into xmm0, see README); the constant acceleration's bezier_2 + goal gets x or y/z operand order right, never both; one lea swaps its operands.
 // FUNCTION: TH16 0x464590
 HARNESS_CALLED Int3 InterpInt3::step()
 {
@@ -549,7 +555,7 @@ HARNESS_CALLED Int3 InterpInt3::step()
         {
             time.set(end_time);
             end_time = 0;
-            if (method == 7 || method == 17)
+            if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
             {
                 return initial;
             }
@@ -558,26 +564,26 @@ HARNESS_CALLED Int3 InterpInt3::step()
     }
     else if (end_time == 0)
     {
-        if (method == 7 || method == 17)
+        if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
         {
             return initial;
         }
         return goal;
     }
-    if (method == 7)
+    if (method == INTERP_CONSTANT_VELOCITY)
     {
         Int3 tmp = initial;
         initial = tmp + goal;
         current = initial;
     }
-    else if (method == 17)
+    else if (method == INTERP_CONSTANT_ACCEL)
     {
         Int3 tmp = initial;
         initial = tmp + bezier_2;
         bezier_2 = bezier_2 + goal;
         current = initial;
     }
-    else if (method == 8)
+    else if (method == INTERP_BEZIER)
     {
         f32 t = time.current_f / (f32)end_time;
         f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
@@ -604,7 +610,7 @@ HARNESS_CALLED ZunAngle InterpAngle::step()
         {
             time.set(end_time);
             end_time = 0;
-            if (method == 7 || method == 17)
+            if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
             {
                 return initial;
             }
@@ -613,20 +619,20 @@ HARNESS_CALLED ZunAngle InterpAngle::step()
     }
     else if (end_time == 0)
     {
-        if (method == 7 || method == 17)
+        if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
         {
             return initial;
         }
         return goal;
     }
-    if (method == 7)
+    if (method == INTERP_CONSTANT_VELOCITY)
     {
         ZunAngle tmp = initial;
         initial.value = wrap_angle(goal.value + tmp.value);
         current = initial;
         return current;
     }
-    else if (method == 17)
+    else if (method == INTERP_CONSTANT_ACCEL)
     {
         ZunAngle tmp = initial;
         initial.value = wrap_angle(bezier_2.value + tmp.value);
@@ -634,7 +640,7 @@ HARNESS_CALLED ZunAngle InterpAngle::step()
         current = initial;
         return current;
     }
-    else if (method == 8)
+    else if (method == INTERP_BEZIER)
     {
         f32 t = time.current_f / (f32)end_time;
         current = initial * ((t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f))

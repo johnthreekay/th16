@@ -15,6 +15,7 @@
 #include "Gui.h"
 #include "Rng.h"
 #include "SoundManager.h"
+#include "ZunAsm.h"
 
 // Scripts of the player's ANM files: the sparks along Marisa's laser (in
 // pl0X.anm and pl0Xsub.anm), and where a main shot type's bullet scripts
@@ -436,19 +437,11 @@ i32 __fastcall sht_on_hit_spark_grow(PlayerBullet *bullet, i32 enemy_pos, i32 en
     return bullet->hit();
 }
 
-// This file's copy of ZunMath.h's sincosmul.
+// This file's copy of sincosmul (ZunAsm.h).
 // FUNCTION: TH16 0x4476b0
 static void __fastcall player_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // ZunAngle's subtraction (shortest signed difference) as the laser code

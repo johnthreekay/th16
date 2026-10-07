@@ -20,9 +20,17 @@
 #include "Supervisor.h"
 #include "Stage.h"
 #include "UpdateFunc.h"
+#include "ZunAsm.h"
 
 // GLOBAL: TH16 0x4a6db0
 Spellcard *g_Spellcard;
+
+// The difficulty of each spell card, indexed by spell id (0 Easy to 3
+// Lunatic, 4 Extra). A constant table in the original (0, 1, 2, 3 repeated
+// per card for the main game, then 4 for the Extra cards); not filled in
+// here.
+// GLOBAL: TH16 0x491700
+i8 g_spell_difficulty[0x78];
 
 Spellcard::Spellcard()
 {
@@ -187,7 +195,7 @@ HARNESS_CALLED void Spellcard::decode_time_code(i32 *seconds, i32 *hundredths)
 // FUNCTION: TH16 0x417f00
 void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_index)
 {
-    __asm finit;
+    ZUN_ASM_FINIT();
     time = 0;
     this->spell_id = spell_id;
     strcpy(this->name, name);

@@ -15,6 +15,8 @@
 #define LZSS_END_OF_STREAM 0
 #define LZSS_MOD_WINDOW(a) ((a) & (LZSS_WINDOW_SIZE - 1))
 
+// A node of the binary search tree over the window's strings, one per
+// window position (Nelson's tree[]); 0 (LZSS_UNUSED) means no link.
 struct LzssTreeNode
 {
     i32 parent;
@@ -22,11 +24,14 @@ struct LzssTreeNode
     i32 larger_child;
 };
 
+// The tree, with an extra root node at LZSS_TREE_ROOT, and the sliding
+// window, shared by lzss_compress and lzss_decompress.
 // GLOBAL: TH16 0x4a6f30
 LzssTreeNode g_lzss_tree[LZSS_WINDOW_SIZE + 1];
 // GLOBAL: TH16 0x4bef40
 u8 g_lzss_window[LZSS_WINDOW_SIZE];
 
+// Clears the window and the tree (Nelson: InitTree, plus the window).
 // FUNCTION: TH16 0x4580e0
 HARNESS_CALLED void lzss_init()
 {
@@ -42,6 +47,7 @@ HARNESS_CALLED void lzss_init()
     }
 }
 
+// Replaces old_node by its only child new_node (Nelson: ContractNode).
 // FUNCTION: TH16 0x4583d0
 void LTCG_FASTCALL lzss_contract_node(i32 old_node, i32 new_node)
 {
@@ -57,6 +63,7 @@ void LTCG_FASTCALL lzss_contract_node(i32 old_node, i32 new_node)
     g_lzss_tree[old_node].parent = LZSS_UNUSED;
 }
 
+// Puts new_node where old_node is in the tree (Nelson: ReplaceNode).
 // FUNCTION: TH16 0x458430
 void LTCG_FASTCALL lzss_replace_node(i32 old_node, i32 new_node)
 {
@@ -75,6 +82,7 @@ void LTCG_FASTCALL lzss_replace_node(i32 old_node, i32 new_node)
     g_lzss_tree[old_node].parent = LZSS_UNUSED;
 }
 
+// The largest node smaller than node (Nelson: FindNextNode).
 // FUNCTION: TH16 0x4584b0
 i32 LTCG_FASTCALL lzss_find_next_node(i32 node)
 {
@@ -86,6 +94,8 @@ i32 LTCG_FASTCALL lzss_find_next_node(i32 node)
     return next;
 }
 
+// Removes the string at window position p from the tree (Nelson:
+// DeleteString).
 // FUNCTION: TH16 0x458370
 void LTCG_FASTCALL lzss_delete_string(i32 p)
 {
@@ -109,6 +119,10 @@ void LTCG_FASTCALL lzss_delete_string(i32 p)
     }
 }
 
+// Inserts the string at window position new_node into the tree and returns
+// the length of the longest match found on the way, its position going to
+// *match_position (Nelson: AddString). A full-length match replaces the old
+// node.
 // FUNCTION: TH16 0x458130
 HARNESS_CALLED i32 lzss_add_string(i32 new_node, i32 *match_position)
 {

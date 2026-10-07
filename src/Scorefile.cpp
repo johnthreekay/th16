@@ -15,6 +15,9 @@
 #include "Rng.h"
 #include "Spellcard.h"
 
+// GLOBAL: TH16 0x4a6f0c
+Scorefile *g_Scorefile;
+
 // A new character section: a default top ten on every difficulty and the
 // spell cards' ids and difficulties.
 // FUNCTION: TH16 0x4493c0

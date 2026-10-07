@@ -23,6 +23,7 @@
 #include "Stage.h"
 #include "Spellcard.h"
 #include "StageData.h"
+#include "ZunAsm.h"
 
 // GLOBAL: TH16 0x4a6dd4
 GameThread *g_GameThread;
@@ -33,8 +34,6 @@ GameThread *g_GameThread;
 double g_play_time_runtime;
 
 double LTCG_VECTORCALL get_runtime();
-
-i32 unit5_placeholder(void *object);
 
 // While nonzero, the fade and pulse screen effects end at once. Set when a
 // game ends (so its effects do not carry over), counted down by the game's
@@ -150,7 +149,7 @@ i32 GameThread::thread_start()
 {
     GameThread *thread = g_GameThread;
     GAME_THREAD_FLAG_WORD(thread) |= GAME_THREAD_LOADING;
-    __asm finit;
+    ZUN_ASM_FINIT();
     // Wait for the loading screen's screen copy to finish.
     while (g_AnmManager->screen_copies[0].anm_slot >= 0)
     {

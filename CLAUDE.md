@@ -30,7 +30,9 @@ Matching decomp of TH16 1.00a. See README.md for the toolchain evidence and work
   gives `ret`, and `__stdcall`/cdecl statics get rewritten to register args.
 - Args in registers (ecx/edx, floats in xmm, `ebx`, ...): LTCG custom
   convention, which only happens when LTCG sees every caller. Mark the
-  definition HARNESS_CALLED and call it from src/harness/ (see ZunAngle).
+  definition HARNESS_CALLED so that its callers alone keep it alive (see
+  ZunAngle.h); add a stand-in caller in src/harness/ only if the real ones
+  do not reproduce the original's convention.
 - A class with a vtable must use the RTTI name from the binary.
 - Redundant stores kept, or flag updates not merged: something blocks MSVC's
   dead store elimination. Plain-int flags with `&=`/`|=` (not bitfields),
@@ -38,9 +40,14 @@ Matching decomp of TH16 1.00a. See README.md for the toolchain evidence and work
   compile to xor/and/xor are real bitfields (EnemyFlagsLow). Check every function that inlines the
   same struct code before settling on a struct-level change.
 - Our build inlines a callee the original calls: mark it `DECOMP_NOINLINE`.
-- Callee not decompiled yet: placeholder in `src/stub/` (built without /GL,
-  so LTCG treats it as opaque). Function shaped by an undecompiled caller:
-  recreate the call site in `src/harness/`.
+- Matching scaffolding (README.md, "Placeholders and stand-in callers"):
+  every function is decompiled, so there are no placeholder bodies any
+  more. `src/stub/` (built without /GL, opaque to LTCG) holds only
+  `Opaque.cpp`: values LTCG must not see into (`g_zero_vec2`) and two sinks
+  for the harness. A function whose shape depends on a call our build does
+  not reproduce (a constant argument LTCG would fold, an address the
+  original lets escape, an 8-byte aligned caller frame) gets a documented
+  stand-in caller in `src/harness/`.
 - Register allocation mismatch with identical instructions: reorder loads,
   swap loop forms (for/while/goto), split or merge variables. The TH06
   decomp (happyhavoc/th06) shows ZUN's habits, including switch case order.
@@ -60,9 +67,11 @@ then build. List your functions with
 
 To keep branches mergeable:
 - New code goes in files named after the class or module (`src/Bullet.cpp`).
-- Placeholders for callees from other ranges go in `src/stub/<unit>.cpp`
-  (opaque) or `src/placeholder/<unit>.cpp` (visible to LTCG), stand-in
-  callers in `src/harness/<unit>.cpp` (one file per unit).
+- Stand-in callers go in `src/harness/<unit>.cpp` (one file per unit; the
+  split is the way the work was, and regrouping the files changes LTCG's
+  choices elsewhere), each with a comment naming the original call site it
+  stands for and why it is needed. Values LTCG must not see into go in
+  `src/stub/Opaque.cpp`; there is no `src/placeholder/` any more.
 - Before merging, check for clashes: every `// (FUNCTION|STUB|GLOBAL|
   SYNTHETIC|VTABLE): TH16 0x...` address must appear once across src/.
 - Shared headers (Supervisor.h, CriticalSections.h, decomp.h, types.h, ...):
@@ -103,10 +112,11 @@ unchanged (save the baseline with `--save` before starting), and
 - Inline asm is ZUN's own (fsincos multiply helpers, `__asm finit`); keep it,
   but behind documented helpers (src/ZunAsm.h) that say in C terms what each
   computes.
-- Matching scaffolding: src/harness/ stays, with a comment on each stand-in
-  saying which original call it stands for and why it is needed. src/stub/ and
-  src/placeholder/ should end up empty (move any remaining sinks or real
-  GLOBALs to proper files).
+- Matching scaffolding: src/harness/ holds only the stand-in callers that
+  are still needed, each with a comment saying which original call it stands
+  for and why. src/stub/ is only Opaque.cpp (the opaque g_zero_vec2 and the
+  harness sinks); src/placeholder/ is gone. Real GLOBALs belong in their
+  modules, not in scaffolding files.
 - Parallel work: each agent owns a set of headers and .cpp files. Rename the
   fields and functions it owns and update their uses everywhere (small edits
   in other agents' files are expected and merge cleanly); do not rename

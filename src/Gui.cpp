@@ -23,6 +23,7 @@
 #include "StageData.h"
 #include "Supervisor.h"
 #include "UpdateFunc.h"
+#include "ZunAsm.h"
 
 // GLOBAL: TH16 0x4a6dcc
 Gui *g_Gui;
@@ -1307,9 +1308,10 @@ void Gui::show_chapter_result_vm()
 }
 
 // The id of the first descendant of the VM running the script (0 if there
-// is none, forgetting the id if the VM is gone). LTCG knows get_vm_with_id
-// leaves g_AnmManager alone and loads it once; with the opaque stub we have
-// to pass it in.
+// is none, forgetting the id if the VM is gone). The original loads
+// g_AnmManager once, since LTCG knows get_vm_with_id leaves it alone; this
+// takes it as a parameter instead (written while get_vm_with_id was an
+// opaque placeholder).
 static inline AnmId find_child_id_of(AnmManager *anm, AnmId &id, i32 script)
 {
     AnmVm *child = NULL;
@@ -1335,7 +1337,7 @@ static inline AnmId find_child_id_of(AnmManager *anm, AnmId &id, i32 script)
 // Fills the season gauge bar towards the next level and shows the level
 // (interrupt 7 + level), switching the gauge's look (interrupt 2 or 3) when
 // the first level is reached or lost.
-// TODO: the original keeps g_AnmManager and then the level in ebx; ours spills both (get_vm_with_id is an opaque stub here).
+// TODO: the original keeps g_AnmManager and then the level in ebx; ours spills both.
 // FUNCTION: TH16 0x42c600
 void Gui::update_season_gauge()
 {
@@ -1543,7 +1545,7 @@ GuiMsgVm::GuiMsgVm(void *script)
 // FUNCTION: TH16 0x429ff0
 void Gui::start_dialogue(i32 script)
 {
-    __asm finit;
+    ZUN_ASM_FINIT();
     if (script == -1 || script == -3)
     {
         i32 boss = script == -1;

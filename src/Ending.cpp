@@ -30,7 +30,7 @@ extern i32 g_cancel_screen_effects;
 
 // Holding skip, or shot for 20 frames, fast-forwards.
 #define ENDING_FAST_FORWARD_HELD()                                                                                     \
-    (g_hardware_input & INPUT_SKIP || (g_hardware_input & INPUT_SHOT && g_hardware_input_held_4a51c4 >= 20))
+    (g_hardware_input & INPUT_SKIP || (g_hardware_input & INPUT_SHOT && g_hardware_shot_hold_frames >= 20))
 
 i32 ending_load_anm();
 

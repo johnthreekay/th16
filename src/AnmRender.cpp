@@ -6,6 +6,7 @@
 #include "Rng.h"
 #include "Supervisor.h"
 #include "UpdateFunc.h"
+#include "ZunAsm.h"
 
 static_assert(offsetof(AnmManager, last_texture_id) == 0x184fbb0, "AnmManager layout");
 static_assert(offsetof(AnmManager, last_blend_mode) == 0x184fbb4, "AnmManager layout");
@@ -455,19 +456,11 @@ struct AnmFanData
     u8 unk_4ac[4];
 };
 
-// This file's copy of ZunMath.h's sincosmul.
+// This file's copy of sincosmul (ZunAsm.h).
 // FUNCTION: TH16 0x46a350
 static void __fastcall fan_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
-    __asm {
-        mov eax, dst
-        fld angle
-        fsincos
-        fmul radius
-        fstp [eax]
-        fmul radius
-        fstp [eax+4]
-    }
+    ZUN_ASM_SINCOSMUL(dst, angle, radius);
 }
 
 // Sets up render mode 10 (ANM instruction 302): a fan of random radii

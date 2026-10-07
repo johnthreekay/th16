@@ -7,8 +7,10 @@
 
 // Pointers to the speed multipliers a ZunTimer can follow; entry 0 is the
 // game speed. Lives in .rdata, but code still loads it at run time.
+// Defined in ZunTimer.cpp.
 extern f32 *const g_timer_speed_ptrs[];
 
+// ZunTimer::control bits.
 enum ZunTimerControl
 {
     ZUN_TIMER_INITIALIZED = 1 << 0,
@@ -42,6 +44,7 @@ struct ZunTimer
         current_f = 0.0f;
     }
 
+    // Frame 0, following the game speed.
     void initialize()
     {
         clear();
@@ -57,6 +60,8 @@ struct ZunTimer
         }
     }
 
+    // Back to frame 0 (initializing the timer first if it never was), with
+    // frame -1 as the previous one so that frame 0 counts as new.
     void reset()
     {
         initialize_if_needed();
@@ -82,6 +87,7 @@ struct ZunTimer
         previous = -1;
     }
 
+    // Jumps to the given frame, with the frame before it as the previous one.
     void set(i32 time)
     {
         initialize_if_needed();
@@ -90,6 +96,7 @@ struct ZunTimer
         previous = time - 1;
     }
 
+    // set(time).
     void operator=(i32 time)
     {
         set(time);
@@ -112,7 +119,7 @@ struct ZunTimer
         previous = time - 1;
     }
 
-    // 0x406490. The out-of-line copy of set.
+    // 0x406490. The out-of-line copy of set().
     HARNESS_CALLED void set_value(i32 time);
 
     // set to a fractional frame (a curvy laser split off by a bomb).
@@ -238,7 +245,7 @@ struct ZunTimer
         current = (i32)current_f;
     }
 
-    // 0x40d490
+    // 0x40d490. The out-of-line copy of decrement(1).
     HARNESS_CALLED void operator--(int);
 
     // tick as AnmVm::run has it: current_f is stored in each branch.

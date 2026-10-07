@@ -1024,8 +1024,8 @@ void Stage::interrupt_vms(i32 n)
 // calls the out-of-line sinf and cosf (0x405510, 0x4054f0), which LTCG
 // keeps out of line here (this function has an EH frame).
 // TODO: the original realigns its frame (and esp, -8 with an ebx frame),
-// which moves every stack slot; its callees that realign (AnmVm::run) are
-// stubs here.
+// which moves every stack slot; ours does not, also now that its callees
+// that realign (AnmVm::run) are decompiled.
 // FUNCTION: TH16 0x40b3b0
 i32 StageInner::run_std()
 {
