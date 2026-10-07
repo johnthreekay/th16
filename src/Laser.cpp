@@ -1492,7 +1492,7 @@ i32 LaserInfiniteInf::check_graze_or_kill(i32 graze_only)
 
 // The same for curvy lasers, piece by piece past the first 16 units; one
 // graze per frame at most.
-// TODO: the original adds segment->pos.z to the loaded mid.z (operand order) and calls cancel_as_bomb_rectangle without speculative devirtualization.
+// TODO: the original reloads grazed, 0.5 and dist from their spill slots in a different order and place after the hit test.
 // FUNCTION: TH16 0x437cf0
 i32 LaserCurveInf::check_graze_or_kill(i32 graze_only)
 {
@@ -1525,7 +1525,7 @@ i32 LaserCurveInf::check_graze_or_kill(i32 graze_only)
     {
         g_Player->do_graze(&graze_pos);
     }
-    timer_2c.tick();
+    timer_2c.tick_split();
     return 0;
 }
 
