@@ -142,7 +142,7 @@ i32 Spellcard::on_draw_body()
     pos.x = 360.0f;
     pos.y = 35.0f;
     pos.z = 0.0f;
-    i32 practice = g_Globals.game_mode == 2;
+    i32 practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE;
     i32 captures = g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id].captures[practice];
     if (captures >= 100)
     {
@@ -194,7 +194,7 @@ void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
     if (g_ReplayManager->mode != 1)
     {
         strcpy(g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id].name, name);
-        i32 practice = g_Globals.game_mode == 2;
+        i32 practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE;
         ScorefileSpell *spell = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id];
         if (spell->attempts[practice] < 99999)
         {
@@ -278,7 +278,7 @@ HARNESS_CALLED void Spellcard::end()
         g_Gui->show_notice(bonus, GUI_NOTICE_SPELL_BONUS);
         if (g_ReplayManager->mode != 1)
         {
-            i32 practice = g_Globals.game_mode == 2;
+            i32 practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE;
             ScorefileSpell *spell = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id];
             if (spell->captures[practice] < 99999)
             {

@@ -1284,7 +1284,7 @@ int EnemyData::ecl_run_over_300()
     // dropItems(): drops everything now (not in spell practice). Season
     // items shrink with the bonus timer, as in EnemyInf::die.
     case 509:
-        if (g_Globals.game_mode == 2)
+        if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE)
         {
             break;
         }
@@ -1798,7 +1798,7 @@ int EnemyData::ecl_run_over_300()
     case 514:
     {
         const char *sub = (const char *)&instr->args[4];
-        if (g_Globals.game_mode == 2 && (flags_low & 0x800000))
+        if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE && (flags_low & 0x800000))
         {
             if (own_boss_id == 0)
             {

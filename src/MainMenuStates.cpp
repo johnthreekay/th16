@@ -457,7 +457,7 @@ i32 TitleInf::do_difficulty_select()
         {
             AnmManager::interrupt_tree(anm_ids[0x68], 1);
             anm_ids[0x68].id = 0;
-            if (g_Globals.game_mode != 0)
+            if (g_Globals.game_mode != GAME_MODE_NORMAL)
             {
                 g_last_difficulty = menu.next_selection;
                 g_Globals.difficulty = g_last_difficulty;
@@ -727,7 +727,7 @@ i32 TitleInf::do_subseason_select()
             g_SoundManager.play_sound_centered(7, 0);
             set_substate(3);
             g_SoundManager.play_sound_centered(50, 0);
-            if (g_Globals.game_mode == 0)
+            if (g_Globals.game_mode == GAME_MODE_NORMAL)
             {
                 g_Supervisor.fade_out_bgm(0.05f);
                 return 1;
@@ -737,7 +737,7 @@ i32 TitleInf::do_subseason_select()
     case 3:
         if (time_in_state.current == 10)
         {
-            if (g_Globals.game_mode != 0)
+            if (g_Globals.game_mode != GAME_MODE_NORMAL)
             {
                 goto confirm;
             }
@@ -1609,12 +1609,12 @@ i32 TitleInf::do_replay_menu()
             g_Globals.difficulty = info->difficulty;
             if (info->flags_a & 2)
             {
-                g_Globals.set_game_mode(2);
+                g_Globals.set_game_mode(GAME_MODE_SPELL_PRACTICE);
                 g_Globals.spell_id = info->spell_id;
             }
             else
             {
-                g_Globals.set_game_mode(0);
+                g_Globals.set_game_mode(GAME_MODE_NORMAL);
                 g_Globals.spell_id = -1;
             }
             g_last_replay_slot = replay_slot;

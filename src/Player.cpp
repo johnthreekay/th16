@@ -480,7 +480,7 @@ Player::~Player()
     g_UpdateFuncRegistry->unregister_locked(on_tick);
     g_UpdateFuncRegistry->unregister_locked(on_draw);
     g_Player = NULL;
-    if (g_Globals.flags_lo_45c & 1)
+    if (g_Globals.flags_lo_45c & GLOBALS_SAME_STAGE_AGAIN)
     {
         g_AnmManager->disable_vms_from_anm_file(anm_file);
         g_AnmManager->disable_vms_from_anm_file(subseason_anm_file);
