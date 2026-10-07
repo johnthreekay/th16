@@ -369,7 +369,7 @@ int EnemyData::ecl_run_over_300()
         break;
     // enm322(index, value)
     case 322:
-        unk_224[full->context.current_context->get_int_arg(0)] = full->context.current_context->get_int_arg(1);
+        anm_parent_slot[full->context.current_context->get_int_arg(0)] = full->context.current_context->get_int_arg(1);
         break;
     // stageLogo
     case 554:
@@ -455,7 +455,7 @@ int EnemyData::ecl_run_over_300()
         {
             flags_low |= ENEMY_FLAG_DIRECTIONAL_ANM;
             anm_slot_0_script = anm_set_main = script;
-            unk_274 = 0;
+            anm_direction = 0;
             anm_slot_0_anm_index = selected_anm_index;
         }
         break;
@@ -467,7 +467,7 @@ int EnemyData::ecl_run_over_300()
             g_EnemyManager->anim_statement_anms[selected_anm_index]->create_vm_front(anm_set_main, anm_layers + 7, 0);
         flags_low &= ~ENEMY_FLAG_DIRECTIONAL_ANM;
         anm_slot_0_script = anm_set_main;
-        unk_274 = 0;
+        anm_direction = 0;
         anm_slot_0_anm_index = selected_anm_index;
         break;
     // anmSelectedPlay(slot)
@@ -1187,9 +1187,9 @@ int EnemyData::ecl_run_over_300()
     case 500:
         hurtbox_size.x = get_float_arg(0);
         hurtbox_size.y = get_float_arg(1);
-        if (unk_452c == 0)
+        if (chapter_count == 0)
         {
-            unk_452c = 1;
+            chapter_count = 1;
             g_Globals.enemies_spawned_in_chapter++;
         }
         break;
@@ -1201,26 +1201,26 @@ int EnemyData::ecl_run_over_300()
     // unknown569(count): how many enemies this one counts as in the chapter
     // statistics.
     case 569:
-        if (unk_452c == 0)
+        if (chapter_count == 0)
         {
-            unk_452c = get_int_arg(0);
-            if (unk_452c > 0)
+            chapter_count = get_int_arg(0);
+            if (chapter_count > 0)
             {
-                g_Globals.enemies_spawned_in_chapter += unk_452c;
+                g_Globals.enemies_spawned_in_chapter += chapter_count;
             }
         }
-        else if (unk_452c == 1)
+        else if (chapter_count == 1)
         {
-            unk_452c = get_int_arg(0);
-            g_Globals.enemies_spawned_in_chapter += unk_452c - 1;
+            chapter_count = get_int_arg(0);
+            g_Globals.enemies_spawned_in_chapter += chapter_count - 1;
         }
         break;
     // unknown570(): counts the enemy as destroyed now.
     case 570:
-        if (unk_452c != 0 && own_chapter == g_Globals.chapter)
+        if (chapter_count != 0 && own_chapter == g_Globals.chapter)
         {
-            g_Globals.enemies_destroyed_in_chapter += unk_452c;
-            unk_452c = 0;
+            g_Globals.enemies_destroyed_in_chapter += chapter_count;
+            chapter_count = 0;
         }
         break;
     // unknown563(on)
@@ -1359,9 +1359,9 @@ int EnemyData::ecl_run_over_300()
     case 541:
         no_hitbox_dur.set_value(get_int_arg(0));
         break;
-    // unknown551(value): kills the enemies whose unk_278 is value.
+    // unknown551(value): kills the enemies whose kill_group is value.
     case 551:
-        EnemyManager::kill_all_with_unk_278(get_int_arg(0));
+        EnemyManager::kill_all_in_group(get_int_arg(0));
         break;
     // unknown571(): kills every enemy without running set_death.
     case 571:
@@ -2102,7 +2102,7 @@ int EnemyData::ecl_run_over_300()
         g_Globals.chapter = chapter;
         g_GameThread->chapter = chapter;
         own_chapter = chapter;
-        unk_452c = 0;
+        chapter_count = 0;
         break;
     }
     // rankF3(var, a, b, c): only two tiers survive in the binary.
@@ -2252,10 +2252,10 @@ int EnemyData::ecl_run_over_300()
         }
         fog.fog_ptr = NULL;
         fog.fog_radius = get_float_arg(0);
-        fog.unk_c = 16.0f;
+        fog.cur_radius = 16.0f;
         fog.fog_color = get_int_arg(1);
-        *(ZunAngle *)&fog.unk_14 = 0.0f;
-        *(ZunAngle *)&fog.unk_18 = 0.0f;
+        *(ZunAngle *)&fog.wave_angle_x = 0.0f;
+        *(ZunAngle *)&fog.wave_angle_y = 0.0f;
         if (fog.fog_radius > 0.0f)
         {
             fog.fog_ptr = new_enemy_fog();
@@ -2283,7 +2283,7 @@ int EnemyData::ecl_run_over_300()
         break;
     // unknown550(value)
     case 550:
-        unk_278 = get_int_arg(0);
+        kill_group = get_int_arg(0);
         break;
     // enmAlive(var, id)
     case 555:

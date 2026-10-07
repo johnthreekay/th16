@@ -113,13 +113,16 @@ struct EnemyDropSeason
 // ExpHP: zEnemyFog.
 struct EnemyFog
 {
+    // The Fog mesh (NULL without fog).
     void *fog_ptr;
     u8 unk_4[4];
+    // Target radius; cur_radius grows towards it by 2 per frame from 16.
     f32 fog_radius;
-    f32 unk_c;
+    f32 cur_radius;
     i32 fog_color;
-    f32 unk_14;
-    f32 unk_18;
+    // Phases of the mesh's wobble, turning by pi/16 and pi/32 per frame.
+    f32 wave_angle_x;
+    f32 wave_angle_y;
 };
 
 // ExpHP: zEnemyInterrupt.
@@ -252,14 +255,19 @@ struct EnemyData
     D3DXVECTOR2 hitbox_size;
     f32 rotation;
     AnmId anm_ids[16];
+    // Offset of each slot's VM from final_pos.
     D3DXVECTOR3 anm_pos_array[16];
-    i32 unk_224[16];
+    // Slot whose VM position each slot's VM also follows; -1 for none
+    // (ECL 322).
+    i32 anm_parent_slot[16];
     i32 selected_anm_index;
     i32 anm_slot_0_anm_index;
     i32 anm_slot_0_script;
     i32 anm_set_main;
-    i32 unk_274;
-    i32 unk_278;
+    // Which way the directional main VM faces: -1 left, 0 still, 1 right.
+    i32 anm_direction;
+    // Group for ECL 551 (EnemyManager::kill_all_in_group), set by ECL 550.
+    i32 kill_group;
     i32 anm_layers;
     D3DXVECTOR3 last_damage_pos;
     i32 ecl_int_vars[4];
@@ -288,16 +296,19 @@ struct EnemyData
     i32 score_reward;
     EnemyLife life;
     EnemyDrop drops;
-    i32 unk_3fe0;
+    // Damage added to the next frame's damage, then cleared.
+    i32 pending_damage;
     i32 death_sound;
     i32 death_anm_script;
     i32 death_anm_index;
-    i32 unk_3ff0;
+    // Frames until the next damage flash may start (4 after one).
+    i32 hit_flash_timer;
     i32 unk_3ff4;
     i32 hit_sound;
     ZunTimer set_invuln;
     ZunTimer no_hitbox_dur;
-    ZunTimer unk_4024;
+    // Restarted at 30 whenever the enemy takes damage; counts down.
+    ZunTimer damaged_timer;
     f32 bomb_damage_multiplier;
     EnemyDropSeason drop_season;
     u32 flags_low;
@@ -315,7 +326,10 @@ struct EnemyData
     void *func_from_ecl_flag_ext_dmg;
     void *func_from_ecl_unknown_634;
     i32 own_chapter;
-    i32 unk_452c;
+    // How many enemies this one counts as in the chapter statistics
+    // (setHurtbox's first call makes it 1, ECL 569 sets it); added to
+    // enemies_destroyed_in_chapter once when it dies, then cleared.
+    i32 chapter_count;
 
     EnemyData();
     // 0x41d2e0. One frame: interpolators, ECL, movement, fog and the
@@ -491,7 +505,8 @@ class EnemyInf : public SptInf
     EnemyData enemy;
     void *on_death_callback;
     i32 enemy_id;
-    i32 unk_5744;
+    // Id of the enemy whose enmCreate made this one (ECL PARENT_ID).
+    i32 parent_enemy_id;
     i32 unk_5748;
 
     EnemyInf(const char *sub_name);

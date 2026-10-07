@@ -15,13 +15,13 @@ void EnemyData::update_fog()
         return;
     }
     D3DXVECTOR3 *points = (D3DXVECTOR3 *)mesh->buffer_18;
-    f32 radius = fog.unk_c;
+    f32 radius = fog.cur_radius;
     // The angles are ZunAngles in ZUN's struct: copied as such.
-    ZunAngle angle_x = *(ZunAngle *)&fog.unk_14;
-    ZunAngle angle_y = *(ZunAngle *)&fog.unk_18;
+    ZunAngle angle_x = *(ZunAngle *)&fog.wave_angle_x;
+    ZunAngle angle_y = *(ZunAngle *)&fog.wave_angle_y;
     if (fog.fog_radius > radius)
     {
-        fog.unk_c = g_game_speed * 2.0f + radius;
+        fog.cur_radius = g_game_speed * 2.0f + radius;
     }
     Float3 pos = final_pos.pos;
     mesh->set_rect(pos.x - radius - 20.0f, pos.y - radius - 20.0f, radius + radius + 40.0f, radius + radius + 40.0f);
@@ -95,6 +95,6 @@ void EnemyData::update_fog()
             vertex++;
         }
     }
-    fog.unk_14 = wrap_angle(g_game_speed * (ZUN_PI / 16) + fog.unk_14);
-    fog.unk_18 = wrap_angle(g_game_speed * (ZUN_PI / 32) + fog.unk_18);
+    fog.wave_angle_x = wrap_angle(g_game_speed * (ZUN_PI / 16) + fog.wave_angle_x);
+    fog.wave_angle_y = wrap_angle(g_game_speed * (ZUN_PI / 32) + fog.wave_angle_y);
 }

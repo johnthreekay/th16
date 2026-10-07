@@ -112,10 +112,10 @@ EnemyInf::EnemyInf(const char *sub_name)
     }
     for (int i = 0; i < 16; i++)
     {
-        enemy.unk_224[i] = -1;
+        enemy.anm_parent_slot[i] = -1;
     }
     enemy.bomb_damage_multiplier = 1.0f;
-    enemy.unk_452c = 0;
+    enemy.chapter_count = 0;
 }
 
 // FUNCTION: TH16 0x41a8c0
@@ -638,10 +638,10 @@ int EnemyData::step_logic()
         {
             damage += ((EnemyExtDamageFunc)func_from_ecl_flag_ext_dmg)(this, damage);
         }
-        if (unk_3fe0 > 0)
+        if (pending_damage > 0)
         {
-            damage += unk_3fe0;
-            unk_3fe0 = 0;
+            damage += pending_damage;
+            pending_damage = 0;
         }
         if (g_Player->inner.state == 2 || g_Player->inner.state == 0)
         {
@@ -698,7 +698,7 @@ int EnemyData::step_logic()
                                               g_replay_safe_rng.randf_0_to_1() + 1.2f, 0, 0);
                 }
             }
-            unk_4024.set_value(30);
+            damaged_timer.set_value(30);
             sub = full->check_life_interrupts();
             if (sub != NULL)
             {
@@ -773,7 +773,7 @@ int EnemyData::step_logic()
     {
         anm_ids[0].id = 0;
     }
-    else if (unk_3ff0 == 0)
+    else if (hit_flash_timer == 0)
     {
         // Bit 31: EnemyFlagsLow::magenta_flash.
         if (flags_low >= 0x80000000)
@@ -792,7 +792,7 @@ int EnemyData::step_logic()
         {
             vm->color_2.d3d = 0xff0000ff;
             vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
-            unk_3ff0 = 4;
+            hit_flash_timer = 4;
             if (hit_sound < 0)
             {
                 enemy_play_hit_sound(this, 200, 900);
@@ -821,11 +821,11 @@ int EnemyData::step_logic()
     else
     {
         vm->flags_lo &= ~0x60000;
-        unk_3ff0--;
+        hit_flash_timer--;
     }
-    if (unk_4024.current > 0)
+    if (damaged_timer.current > 0)
     {
-        unk_4024--;
+        damaged_timer--;
     }
     return 0;
 }
@@ -1030,9 +1030,9 @@ int EnemyData::on_tick()
             f32 x = anm_pos_array[i].x + final_pos.pos.x;
             f32 y = anm_pos_array[i].y + final_pos.pos.y;
             f32 z = anm_pos_array[i].z + final_pos.pos.z;
-            if (unk_224[i] >= 0)
+            if (anm_parent_slot[i] >= 0)
             {
-                AnmVm *base = anm_ids[unk_224[i]].find_or_clear();
+                AnmVm *base = anm_ids[anm_parent_slot[i]].find_or_clear();
                 if (base != NULL)
                 {
                     x += base->pos.x;
@@ -1141,10 +1141,10 @@ int EnemyInf::die()
             enemy.drop_season.min_count;
     }
     enemy.drops.eject_all_drops(&enemy.final_pos.pos);
-    if (enemy.unk_452c > 0 && enemy.own_chapter == g_Globals.chapter)
+    if (enemy.chapter_count > 0 && enemy.own_chapter == g_Globals.chapter)
     {
-        g_Globals.enemies_destroyed_in_chapter += enemy.unk_452c;
-        enemy.unk_452c = 0;
+        g_Globals.enemies_destroyed_in_chapter += enemy.chapter_count;
+        enemy.chapter_count = 0;
     }
     if (enemy.set_death[0] != '\0')
     {
@@ -1178,7 +1178,7 @@ void EnemyManager::kill_all()
             enemy->enemy.drops.reset();
             enemy->enemy.last_damage_pos.x = 0.0f;
             enemy->enemy.last_damage_pos.y = 192.0f;
-            enemy->enemy.unk_452c = 0;
+            enemy->enemy.chapter_count = 0;
             enemy->die();
             enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
         }
@@ -1188,7 +1188,7 @@ void EnemyManager::kill_all()
 
 // TODO: register allocation: the original keeps value in ebx and spills next to the argument slot.
 // FUNCTION: TH16 0x41da30
-void __stdcall EnemyManager::kill_all_with_unk_278(i32 value)
+void __stdcall EnemyManager::kill_all_in_group(i32 value)
 {
     EnemyManager *mgr = g_EnemyManager;
     EnemyList *node = mgr->active_enemy_list_head;
@@ -1196,12 +1196,12 @@ void __stdcall EnemyManager::kill_all_with_unk_278(i32 value)
     {
         EnemyList *next = node->next;
         EnemyInf *enemy = node->entry;
-        if ((!(enemy->enemy.flags_low & ENEMY_FLAGS_SURVIVE_KILL_ALL) || enemy->enemy.flags_low & ENEMY_FLAG_ALWAYS_KILLABLE) && enemy->enemy.unk_278 == value)
+        if ((!(enemy->enemy.flags_low & ENEMY_FLAGS_SURVIVE_KILL_ALL) || enemy->enemy.flags_low & ENEMY_FLAG_ALWAYS_KILLABLE) && enemy->enemy.kill_group == value)
         {
             enemy->enemy.drops.reset();
             enemy->enemy.last_damage_pos.x = 0.0f;
             enemy->enemy.last_damage_pos.y = 192.0f;
-            enemy->enemy.unk_452c = 0;
+            enemy->enemy.chapter_count = 0;
             enemy->die();
             enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
         }
@@ -1226,7 +1226,7 @@ void EnemyManager::kill_all_no_set_death()
             enemy->enemy.drops.reset();
             enemy->enemy.last_damage_pos.x = 0.0f;
             enemy->enemy.last_damage_pos.y = 192.0f;
-            enemy->enemy.unk_452c = 0;
+            enemy->enemy.chapter_count = 0;
             enemy->enemy.set_death[0] = '\0';
             enemy->die();
             enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
@@ -1253,10 +1253,10 @@ const char *EnemyInf::check_life_interrupts()
         {
             return NULL;
         }
-        if (enemy.unk_452c != 0 && enemy.own_chapter == g_Globals.chapter)
+        if (enemy.chapter_count != 0 && enemy.own_chapter == g_Globals.chapter)
         {
-            g_Globals.enemies_destroyed_in_chapter += enemy.unk_452c;
-            enemy.unk_452c = 0;
+            g_Globals.enemies_destroyed_in_chapter += enemy.chapter_count;
+            enemy.chapter_count = 0;
         }
         enemy.life.current = enemy.interrupts[i].life;
         enemy.interrupts[i].life = -1;
@@ -1320,9 +1320,9 @@ const char *EnemyInf::check_time_interrupts()
         }
         else if ((spellcard->flags & 9) == 9)
         {
-            g_Globals.enemies_destroyed_in_chapter += enemy.unk_452c;
+            g_Globals.enemies_destroyed_in_chapter += enemy.chapter_count;
         }
-        enemy.unk_452c = 0;
+        enemy.chapter_count = 0;
         return enemy.interrupts[i].sub_for_set_timeout;
     }
     return NULL;
@@ -1382,8 +1382,8 @@ EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, EnemyCreatePara
     memcpy(enemy->enemy.ecl_int_vars, params->ecl_int_vars, sizeof(params->ecl_int_vars) + sizeof(params->ecl_float_vars));
     enemy->enemy.set_invuln = 2;
     ((EnemyFlagsLow *)&enemy->enemy.flags_low)->flag_4000000 = params->flag_4000000;
-    enemy->enemy.unk_278 = 0;
-    enemy->unk_5744 = params->parent_enemy_id;
+    enemy->enemy.kill_group = 0;
+    enemy->parent_enemy_id = params->parent_enemy_id;
     if (params->life >= 1000)
     {
         ((EnemyFlagsLow *)&enemy->enemy.flags_low)->big_life = 1;
@@ -1799,7 +1799,7 @@ int EnemyInf::get_int_global(int var)
         }
         break;
     case ECL_VAR_PARENT_ID:
-        return unk_5744;
+        return parent_enemy_id;
     case ECL_VAR_I0:
         return enemy.ecl_int_vars[0];
     case ECL_VAR_I1:
@@ -2027,7 +2027,7 @@ f32 EnemyInf::get_float_global(int var)
     case ECL_VAR_DS3:
         return (f32)(g_GameThread->replay_mode == 0) && g_Supervisor.unk_700 != 0;
     case ECL_VAR_PARENT_ID:
-        return (u32)unk_5744;
+        return (u32)parent_enemy_id;
     case ECL_VAR_GI0:
         return g_EnemyManager->inner.ecl_int_vars[0];
     case ECL_VAR_GI1:
@@ -2235,10 +2235,10 @@ int EnemyData::step_interpolators()
     if (((EnemyFlagsLow *)&flags_low)->directional_anm)
     {
         i32 dir = -0.03f > final_pos.velocity.x ? -1 : final_pos.velocity.x > 0.03f;
-        if (unk_274 != dir)
+        if (anm_direction != dir)
         {
             i32 script_offset = 0;
-            switch (unk_274)
+            switch (anm_direction)
             {
             case -1:
                 script_offset = dir != 0 ? 2 : 3;
@@ -2287,7 +2287,7 @@ int EnemyData::step_interpolators()
             id = g_AnmManager->insert_in_world_list_back(new_vm);
             LEAVE_CS(CS_ANM_MANAGER);
             anm_ids[0] = id;
-            unk_274 = dir;
+            anm_direction = dir;
         }
     }
     AnmVm *vm = get_vm_or_clear(anm_ids[0]);
