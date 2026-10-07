@@ -38,3 +38,10 @@ i32 harness_w4f_save_replay(const char *path, const char *name)
 {
     return g_ReplayManager->save(path, name, 0, 1);
 }
+
+// AnmManager::draw_vm (0x468ae2) draws rings for render mode 19.
+i32 harness_w4f_ring(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 radius)
+{
+    return g_AnmManager->draw_ring(x, y, radius, vm->scale.x, vm->rotation.z, vm->int_vars[0], vm->color_1.d3d) +
+           other->draw_ring(x, y, radius, vm->scale.y, vm->rotation.z, vm->int_vars[1], vm->color_1.d3d);
+}
