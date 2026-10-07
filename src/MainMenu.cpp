@@ -241,6 +241,155 @@ extern u32 g_hardware_input_repeat;
 extern u32 g_hardware_input_pressed;
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 
+// TODO: the original realigns its frame to 8 bytes; the volume clamps use al/ecx where ours uses cl/eax.
+// FUNCTION: TH16 0x44c570
+i32 TitleInf::do_options()
+{
+    switch (substate)
+    {
+    case 0:
+        menu.num_choices = 5;
+        menu.set_cursor(0);
+        anm_ids[1] = title_anm->create_effect(1, -1, NULL);
+        update_options_sprites();
+        set_substate(1);
+    case 1:
+        if (time_in_state.current > 6)
+        {
+            set_substate(2);
+            AnmManager::interrupt_tree_and_run(anm_ids[1], 3);
+            AnmManager::interrupt_tree(anm_ids[1], (i16)(menu.next_selection + 0x11));
+            update_options_cursor();
+            return 1;
+        }
+        break;
+    case 2:
+        menu.current_selection = menu.next_selection;
+        if (input_pressed_or_repeating(INPUT_UP))
+        {
+            menu.move_cursor(-1);
+        }
+        if (input_pressed_or_repeating(INPUT_DOWN))
+        {
+            menu.move_cursor(1);
+        }
+        if (menu.current_selection != menu.next_selection)
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            AnmManager::interrupt_tree_and_run(anm_ids[1], 3);
+            AnmManager::interrupt_tree(anm_ids[1], (i16)(menu.next_selection + 7));
+            update_options_cursor();
+        }
+        if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
+        {
+            if (menu.next_selection != 4)
+            {
+                g_SoundManager.play_sound_centered(9, 0);
+                menu.set_cursor(4);
+                AnmManager::interrupt_tree_and_run(anm_ids[1], 3);
+                AnmManager::interrupt_tree(anm_ids[1], (i16)(menu.next_selection + 7));
+                update_options_cursor();
+                return 1;
+            }
+            goto leave;
+        }
+        if (menu.next_selection == 1 && time_in_state.ticked_on_multiple_of(60))
+        {
+            g_SoundManager.play_sound_centered(2, 0);
+        }
+        if (input_pressed_or_repeating(INPUT_LEFT))
+        {
+            switch (menu.next_selection)
+            {
+            case 0:
+                if (g_Supervisor.config.bgm_volume < 5)
+                {
+                    g_Supervisor.config.bgm_volume = 0;
+                }
+                else
+                {
+                    g_Supervisor.config.bgm_volume -= 5;
+                }
+                update_options_sprites();
+                break;
+            case 1:
+                if (g_Supervisor.config.se_volume < 5)
+                {
+                    g_Supervisor.config.se_volume = 0;
+                }
+                else
+                {
+                    g_Supervisor.config.se_volume -= 5;
+                }
+                update_options_sprites();
+                break;
+            }
+        }
+        if (input_pressed_or_repeating(INPUT_RIGHT))
+        {
+            switch (menu.next_selection)
+            {
+            case 0:
+            {
+                i8 volume = g_Supervisor.config.bgm_volume + 5;
+                g_Supervisor.config.bgm_volume = volume > 100 ? 100 : volume;
+                update_options_sprites();
+                break;
+            }
+            case 1:
+            {
+                i8 volume = g_Supervisor.config.se_volume + 5;
+                g_Supervisor.config.se_volume = volume > 100 ? 100 : volume;
+                update_options_sprites();
+                break;
+            }
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
+        {
+            switch (menu.next_selection)
+            {
+            case 2:
+                AnmManager::interrupt_tree(anm_ids[1], 6);
+                g_SoundManager.play_sound_centered(7, 0);
+                set_substate(4);
+                return 1;
+            case 3:
+                g_Supervisor.config.bgm_volume = 100;
+                g_Supervisor.config.se_volume = 80;
+                g_Supervisor.config.unk_28 = 0;
+                update_options_sprites();
+                g_SoundManager.play_sound_centered(7, 0);
+                return 1;
+            case 4:
+            leave:
+                AnmManager::interrupt_tree(anm_ids[1], 6);
+                g_SoundManager.play_sound_centered(9, 0);
+                set_substate(4);
+                return 1;
+            }
+        }
+        break;
+    case 4:
+        if (time_in_state.current >= 10)
+        {
+            switch (menu.next_selection)
+            {
+            case 2:
+                set_state(4);
+                menu.push();
+                break;
+            case 4:
+                set_state(1);
+                menu.pop();
+                return 1;
+            }
+        }
+        break;
+    }
+    return 1;
+}
+
 // TODO: the original realigns its frame to 8 bytes, and does not merge the two input tests into (pressed | repeat) & mask.
 // FUNCTION: TH16 0x44e930
 i32 TitleInf::do_key_config()

@@ -86,6 +86,12 @@ class TitleInf : public TaskInf
     void update_key_config_cursor();
     // 0x44e930 (ExpHP: MainMenu::do_key_config). The key config screen.
     i32 do_key_config();
+    // 0x44dc70. Shows the option values.
+    void update_options_sprites();
+    // 0x44c8c0. Moves the options screen's highlight to the selected row.
+    void update_options_cursor();
+    // 0x44c570 (ExpHP: MainMenu::do_options). The options screen.
+    i32 do_options();
 
     i32 on_tick();
     i32 on_draw();
