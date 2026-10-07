@@ -788,7 +788,7 @@ void AnmVm::copy_from(const AnmVm &other, i32 arg)
 }
 
 // FUNCTION: TH16 0x46fac0
-void AnmManager::save_vm_tree(AnmVm *dst, AnmVm *src, i32 *size)
+HARNESS_CALLED void AnmManager::save_vm_tree(AnmVm *dst, AnmVm *src, i32 *size)
 {
     if (src == NULL)
     {
@@ -877,8 +877,9 @@ AnmId AnmManager::load_vm_tree(AnmVm *src, AnmVm *parent, i32 *size)
     return result;
 }
 
+// TODO: the original keeps src and src + 1 in stack slots (and a pointer to index_of_on_copy_2); ours keeps src + 1 in edi.
 // FUNCTION: TH16 0x46ffb0
-void AnmVm::load_from(const AnmVm *src, i32 *size)
+HARNESS_CALLED void AnmVm::load_from(const AnmVm *src, i32 *size)
 {
     memcpy(this, src, offsetof(AnmVm, id));
     ZunTimer timer = src->script_time;

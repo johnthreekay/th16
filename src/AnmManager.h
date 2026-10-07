@@ -367,7 +367,7 @@ struct AnmManager
     AnmId restore_snapshot_vm(AnmVm *snapshot, AnmVm *parent);
     // 0x46fac0. Writes a VM, its extra data and its children to dst, adding
     // the bytes used to *size.
-    void save_vm_tree(AnmVm *dst, AnmVm *src, i32 *size);
+    HARNESS_CALLED void save_vm_tree(AnmVm *dst, AnmVm *src, i32 *size);
     // 0x46fc30. Reads a tree written by save_vm_tree back into snapshot VMs.
     AnmId load_vm_tree(AnmVm *src, AnmVm *parent, i32 *size);
     // 0x46e7d0 and the next three. Every caller goes through g_AnmManager,

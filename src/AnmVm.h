@@ -379,7 +379,7 @@ struct AnmVm
     // 0x46ffb0 (ExpHP: AnmVm::constructor(const AnmVm&, uhh, erm)). The same
     // for a VM written by AnmManager::save_vm_tree, whose extra data follows
     // it; adds the bytes read to *size.
-    void load_from(const AnmVm *src, i32 *size);
+    HARNESS_CALLED void load_from(const AnmVm *src, i32 *size);
 };
 
 // out = in / (640, 480), clamped at 0.
