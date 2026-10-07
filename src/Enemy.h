@@ -221,6 +221,10 @@ class EnemyInf : public SptInf
     int on_tick();
     // 0x41d520. Death effects, drops and the set_death subroutine; always 1.
     int die();
+    // 0x424f00 and 0x425010. The subroutine to switch to once the life or
+    // time of the next interrupt is reached, NULL until then.
+    const char *check_life_interrupts();
+    const char *check_time_interrupts();
     void set_interrupt(int index, int time, const char *sub);
     void set_timeout(int index, const char *sub);
     virtual int run_over_300();

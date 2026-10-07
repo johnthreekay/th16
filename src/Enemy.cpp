@@ -12,6 +12,8 @@
 #include "Laser.h"
 #include "Player.h"
 #include "Rng.h"
+#include "Bomb.h"
+#include "Spellcard.h"
 #include "SoundManager.h"
 #include "Supervisor.h"
 #include "UpdateFunc.h"
@@ -901,4 +903,97 @@ void EnemyManager::kill_all_no_set_death()
         }
     }
     mgr->inner.time_in_stage.tick();
+}
+
+// FUNCTION: TH16 0x424f00
+const char *EnemyInf::check_life_interrupts()
+{
+    i32 life = enemy.life.current;
+    enemy.life.remaining_for_cur_attack = life;
+    enemy.life.starting_value_for_next_attack = 0;
+    for (u32 i = 0; i < 8; i++)
+    {
+        if (enemy.interrupts[i].life < 0)
+        {
+            continue;
+        }
+        enemy.life.remaining_for_cur_attack = life - enemy.interrupts[i].life;
+        enemy.life.starting_value_for_next_attack = enemy.interrupts[i].life;
+        if (life > enemy.interrupts[i].life)
+        {
+            return NULL;
+        }
+        if (enemy.unk_452c != 0 && enemy.own_chapter == g_Globals.chapter)
+        {
+            g_Globals.enemies_destroyed_in_chapter += enemy.unk_452c;
+            enemy.unk_452c = 0;
+        }
+        enemy.life.current = enemy.interrupts[i].life;
+        enemy.interrupts[i].life = -1;
+        enemy.time_in_ecl.reset();
+        enemy.flags_low &= ~0x1000000;
+        return enemy.interrupts[i].sub_for_set_next;
+    }
+    return NULL;
+}
+
+// TODO: the original divides by 60 with one idiv (quotient and remainder) and keeps i in a stack
+// slot; ours strength-reduces the division.
+// FUNCTION: TH16 0x425010
+const char *EnemyInf::check_time_interrupts()
+{
+    for (u32 i = 0; i < 8; i++)
+    {
+        if (enemy.interrupts[i].life < 0 || enemy.interrupts[i].time <= 0)
+        {
+            continue;
+        }
+        if (enemy.flags_low & 0x800000)
+        {
+            i32 remaining = enemy.interrupts[i].time - enemy.time_in_ecl.current;
+            i32 seconds = remaining / 60;
+            i32 hundredths = remaining % 60 * 100 / 60;
+            if (seconds > 99)
+            {
+                seconds = 99;
+                hundredths = 99;
+            }
+            g_Gui->unk_1d0 = seconds;
+            g_Gui->unk_1d4 = hundredths;
+        }
+        if (enemy.time_in_ecl.current < enemy.interrupts[i].time)
+        {
+            return NULL;
+        }
+        enemy.life.current = enemy.interrupts[i].life;
+        enemy.interrupts[i].life = -1;
+        enemy.time_in_ecl.reset();
+        enemy.flags_low |= 0x1000000;
+        Spellcard *spellcard = g_Spellcard;
+        if (!(spellcard->flags & 8))
+        {
+            enemy.flags_low &= ~0x1000000;
+            spellcard->flags |= 0x80;
+            if (spellcard->flags & 1)
+            {
+                if (spellcard->time.current >= 60)
+                {
+                    spellcard->bonus = 0;
+                    spellcard->flags &= ~0x22;
+                }
+                else if (g_MainBomb->in_use == 1)
+                {
+                    spellcard->flags |= 0x20;
+                }
+            }
+            g_EnemyManager->inner.can_still_capture_spell = 0;
+        }
+        else if ((spellcard->flags & 9) == 9)
+        {
+            g_Globals.enemies_destroyed_in_chapter += enemy.unk_452c;
+        }
+        enemy.unk_452c = 0;
+        return enemy.interrupts[i].sub_for_set_timeout;
+    }
+    return NULL;
 }
