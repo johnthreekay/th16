@@ -1067,12 +1067,6 @@ bool write_png(const char *path, const uint32_t *pixels, uint32_t width, uint32_
 // ---------------------------------------------------------------------------
 // The device
 
-struct VertexLayout
-{
-    uint32_t key; // fvf | stride << 32 does not fit; see layout_key
-    GLuint vao;
-};
-
 struct PortDevice final : public IDirect3DDevice9
 {
     std::atomic<uint32_t> ref_count{1};
@@ -2551,11 +2545,6 @@ void PortDevice::apply_state(bool pretransformed)
     GLuint tex = white_texture;
     if (texture != NULL)
     {
-        if (texture->render_target && as_surface(render_target)->owner == texture)
-        {
-            // Sampling the texture being drawn to is undefined in both
-            // APIs; the game never does it on purpose.
-        }
         texture->sync_gl();
         tex = texture->gl_texture;
     }
