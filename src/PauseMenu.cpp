@@ -707,7 +707,19 @@ static __forceinline void replay_set_end_stage_inline(ReplayManager *replay, i32
 
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 
-// TODO: ours keeps the Q key's shared tail in case 6 (the original's is in case 7), uses idiv for % 13, and keeps name's address in esi around the replay save.
+// Small MenuHelper steps the menu code inlines (as in MainMenuStates.cpp);
+// they address the fields through the menu pointer.
+static __forceinline void menu_save_selection(MenuHelper *m)
+{
+    m->current_selection = m->next_selection;
+}
+
+static __forceinline i32 menu_selection_moved(MenuHelper *m)
+{
+    return m->current_selection != m->next_selection;
+}
+
+// TODO: ours keeps the Q key's shared tail in case 6 (the original's is in case 7), and around the replay save loads the slot index after create_from_file (the original before, keeping it in esi where ours keeps name's address).
 // FUNCTION: TH16 0x43f980
 void PauseMenu::tick_open()
 {
@@ -785,7 +797,7 @@ void PauseMenu::tick_open()
         return;
     case 6:
         // The menu itself.
-        menu_34.current_selection = menu_34.next_selection;
+        menu_save_selection(&menu_34);
         if (input_pressed_or_repeating(INPUT_UP))
         {
             menu_34.move_cursor(-1);
@@ -794,7 +806,7 @@ void PauseMenu::tick_open()
         {
             menu_34.move_cursor(1);
         }
-        if (menu_34.current_selection != menu_34.next_selection)
+        if (menu_selection_moved(&menu_34))
         {
             AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 7));
             g_SoundManager.play_sound_centered(10, 0);
@@ -906,7 +918,7 @@ void PauseMenu::tick_open()
         {
             AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 15));
         }
-        menu_34.current_selection = menu_34.next_selection;
+        menu_save_selection(&menu_34);
         if (input_pressed_or_repeating(INPUT_UP))
         {
             menu_34.move_cursor(-1);
@@ -915,7 +927,7 @@ void PauseMenu::tick_open()
         {
             menu_34.move_cursor(1);
         }
-        if (menu_34.current_selection != menu_34.next_selection)
+        if (menu_selection_moved(&menu_34))
         {
             AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 15));
             g_SoundManager.play_sound_centered(10, 0);
@@ -1019,7 +1031,7 @@ void PauseMenu::tick_open()
         {
             break;
         }
-        menu.current_selection = menu.next_selection;
+        menu_save_selection(&menu);
         if (input_pressed_or_repeating(INPUT_UP))
         {
             menu.move_cursor(-13);
@@ -1030,7 +1042,8 @@ void PauseMenu::tick_open()
         }
         if (input_pressed_or_repeating(INPUT_LEFT))
         {
-            if (menu.next_selection % 13 != 0)
+            i32 selection = menu.next_selection;
+            if (selection % 13 != 0)
             {
                 menu.move_cursor(-1);
             }
@@ -1041,7 +1054,8 @@ void PauseMenu::tick_open()
         }
         if (input_pressed_or_repeating(INPUT_RIGHT))
         {
-            if (menu.next_selection % 13 != 12)
+            i32 selection = menu.next_selection;
+            if (selection % 13 != 12)
             {
                 menu.move_cursor(1);
             }
@@ -1050,7 +1064,7 @@ void PauseMenu::tick_open()
                 menu.move_cursor(-12);
             }
         }
-        if (menu.current_selection != menu.next_selection)
+        if (menu_selection_moved(&menu))
         {
             g_SoundManager.play_sound_centered(10, 0);
         }
@@ -1187,7 +1201,7 @@ void PauseMenu::tick_open()
         {
             break;
         }
-        menu_34.current_selection = menu_34.next_selection;
+        menu_save_selection(&menu_34);
         if (input_pressed_or_repeating(INPUT_UP))
         {
             menu_34.move_cursor(-1);
@@ -1196,7 +1210,7 @@ void PauseMenu::tick_open()
         {
             menu_34.move_cursor(1);
         }
-        if (menu_34.current_selection != menu_34.next_selection)
+        if (menu_selection_moved(&menu_34))
         {
             g_SoundManager.play_sound_centered(10, 0);
         }

@@ -666,7 +666,7 @@ HRESULT CSound::Play(DWORD dwPriority, DWORD dwFlags, DWORD offset)
     return pDSB->Play(0, dwPriority, dwFlags);
 }
 
-// TODO: the original has a call in each branch with the buffer loaded late; ours shares one call.
+// TODO: the original has a call in each branch, pushing -10000 directly and loading the buffer early in the first; written that way ours hoists the buffer load above the test.
 // FUNCTION: TH16 0x4711f0
 HRESULT CSound::SetVolume(i32 volume)
 {

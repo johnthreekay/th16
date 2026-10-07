@@ -139,7 +139,7 @@ i32 TitleInf::do_replay_save()
             sprintf(path, "th16_%.2d.rpy", i);
             replays[i - 1] = ReplayManager::create_from_file(path);
         }
-        if (get_vm_or_clear(anm_ids[0x61]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x61]) == NULL)
         {
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
@@ -205,7 +205,8 @@ i32 TitleInf::do_replay_save()
         }
         if (pressed_or_repeating_inline(INPUT_LEFT))
         {
-            if (menu_5a5c.next_selection % 13 != 0)
+            i32 selection = menu_5a5c.next_selection;
+            if (selection % 13 != 0)
             {
                 menu_5a5c.move_cursor(-1);
             }
@@ -216,7 +217,8 @@ i32 TitleInf::do_replay_save()
         }
         if (pressed_or_repeating_inline(INPUT_RIGHT))
         {
-            if (menu_5a5c.next_selection % 13 != 12)
+            i32 selection = menu_5a5c.next_selection;
+            if (selection % 13 != 12)
             {
                 menu_5a5c.move_cursor(1);
             }
@@ -1470,7 +1472,7 @@ i32 TitleInf::do_replay_menu()
         flags_5ce8 &= ~0xc;
         unk_5b44 = 0;
         thread.restart((ThreadStart)replay_list_thread, this);
-        if (get_vm_or_clear(anm_ids[0x61]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x61]) == NULL)
         {
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
@@ -1935,7 +1937,8 @@ i32 TitleInf::do_score_name_entry()
             }
             if (input_pressed_or_repeating(INPUT_LEFT))
             {
-                if (menu_5a5c.next_selection % 13 != 0)
+                i32 selection = menu_5a5c.next_selection;
+                if (selection % 13 != 0)
                 {
                     menu_5a5c.move_cursor(-1);
                 }
@@ -1946,7 +1949,8 @@ i32 TitleInf::do_score_name_entry()
             }
             if (input_pressed_or_repeating(INPUT_RIGHT))
             {
-                if (menu_5a5c.next_selection % 13 != 12)
+                i32 selection = menu_5a5c.next_selection;
+                if (selection % 13 != 12)
                 {
                     menu_5a5c.move_cursor(1);
                 }
@@ -2622,11 +2626,11 @@ i32 TitleInf::do_spell_practice_stage_select()
             anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
         }
         menu.num_choices = 7;
-        if (get_vm_or_clear(anm_ids[0x11c]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x11c]) == NULL)
         {
             anm_ids[0x11c] = title_anm->create_effect(0x11c, -1, NULL);
         }
-        if (get_vm_or_clear(anm_ids[0xd7]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0xd7]) == NULL)
         {
             anm_ids[0xd7] = title_anm->create_effect(0xd7, -1, NULL);
         }
@@ -2772,7 +2776,7 @@ i32 TitleInf::do_spell_practice_character()
 
 // Spell practice: picking the boss attack (the row of spell cards) of the
 // stage.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// TODO: the two cleanup loops in case 4 address [esi + edi + disp] where the original has [edi + esi + disp] (this as the base register); not i[array] or (array + n)[i].
 // FUNCTION: TH16 0x455900
 i32 TitleInf::do_spell_practice_row()
 {
@@ -2781,11 +2785,11 @@ i32 TitleInf::do_spell_practice_row()
     {
     case 0:
         menu.num_choices = row_counts[spell_stage];
-        if (get_vm_or_clear(anm_ids[0x6b]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x6b]) == NULL)
         {
             anm_ids[0x6b] = title_anm->create_effect(0x6b, -1, NULL);
         }
-        if (get_vm_or_clear(anm_ids[0xd8]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0xd8]) == NULL)
         {
             anm_ids[0xd8] = title_anm->create_effect(0xd8, -1, NULL);
         }

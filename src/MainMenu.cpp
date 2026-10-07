@@ -934,7 +934,7 @@ i32 g_demo_replay_index;
 // GLOBAL: TH16 0x49371c
 const char *const g_demo_replay_names[3] = {"demo/demo1.rpy", "demo/demo2.rpy", "demo/demo3.rpy"};
 
-// TODO: the original computes the demo index with a multiply (ours idiv), calls the Supervisor members without this and keeps the replay info in ecx.
+// TODO: the original computes the demo index as x % -3 would (imul 0x55555555; sub; sar 1); ours uses idiv, or the /3 magic through a local (also with % -3); it also calls the Supervisor members without this and keeps the replay info in ecx.
 // FUNCTION: TH16 0x44af80
 i32 TitleInf::on_tick()
 {

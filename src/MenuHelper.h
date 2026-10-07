@@ -48,11 +48,11 @@ struct MenuHelper
         stack_selection[stack_depth] = next_selection;
         stack_num_choices[stack_depth] = num_choices;
         stack_depth++;
-        num_disabled = 0;
         if (stack_depth >= 0x10)
         {
             stack_depth = 0xf;
         }
+        num_disabled = 0;
     }
 
     __forceinline void pop_inline()
