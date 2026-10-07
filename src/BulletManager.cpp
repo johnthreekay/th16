@@ -672,3 +672,73 @@ i32 Bullet::step_ex_19()
     ex_state[9].timer.reset();
     return 0;
 }
+
+static void add_angle_twice(ZunAngle *a, f32 delta)
+{
+    a->value = wrap_angle(wrap_angle(a->value + delta));
+}
+
+// TODO: in the inlined timer tick the original keeps the frame in xmm0 on
+// the unscaled path (ours shares xmm1 with the scaled path).
+// FUNCTION: TH16 0x4153e0
+i32 Bullet::step_ex_03()
+{
+    if (ex_state[2].timer.current >= ex_state[2].ints[0])
+    {
+        active_ex_flags &= ~8;
+        return 1;
+    }
+    add_angle_twice(&angle_ref(), ex_state[2].floats[1] * g_game_speed);
+    speed += ex_state[2].floats[0] * g_game_speed;
+    bullet_sincosmul(&velocity, angle, speed);
+    ex_state[2].timer.tick();
+    return 0;
+}
+
+// TODO: in the inlined timer tick the original loads current_f into xmm0
+// and adds the speed (ours adds current_f into the speed's xmm1).
+// FUNCTION: TH16 0x415570
+i32 Bullet::step_ex_04()
+{
+    f32 new_speed;
+    if (ex_state[3].timer.current >= ex_state[3].ints[0])
+    {
+        if (bounce_sound >= 0)
+        {
+            g_SoundManager.play_sound_centered(bounce_sound, 0);
+        }
+        ex_state[3].ints[2]++;
+        switch (ex_state[3].ints[3])
+        {
+        case 0:
+        case 5:
+            angle_ref() += ex_state[3].floats[1];
+            break;
+        case 1:
+        case 6:
+            angle_ref() = g_Player->angle_to_player(&pos) + ex_state[3].floats[1];
+            break;
+        case 2:
+        case 3:
+        case 4:
+            angle_ref() = ex_state[3].floats[1];
+            break;
+        }
+        new_speed = ex_state[3].floats[0];
+        speed = new_speed;
+        ex_state[3].timer.reset();
+        if (ex_state[3].ints[2] >= ex_state[3].ints[1])
+        {
+            bullet_sincosmul(&velocity, angle, new_speed);
+            active_ex_flags &= ~0x10;
+            return 1;
+        }
+    }
+    else
+    {
+        new_speed = speed - ex_state[3].timer.current_f * speed / ex_state[3].ints[0];
+    }
+    bullet_sincosmul(&velocity, angle, new_speed);
+    ex_state[3].timer.tick();
+    return 0;
+}

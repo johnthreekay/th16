@@ -5,6 +5,7 @@
 #include "AnmManager.h"
 #include "AnmVm.h"
 #include "UpdateFunc.h"
+#include "ZunAngle.h"
 #include "ZunList.h"
 #include "ZunTimer.h"
 #include "decomp.h"
@@ -130,6 +131,17 @@ struct Bullet
     // 0x4161f0. Moves by a fixed vector until the slot's timer reaches its
     // duration.
     i32 step_ex_19();
+    // 0x4153e0. Turns and accelerates for a number of frames.
+    i32 step_ex_03();
+    // 0x415570. Slows to a stop over a number of frames, then picks a new
+    // angle and speed, some number of times.
+    i32 step_ex_04();
+
+    // ZUN's angle is a ZunAngle; some transforms call its operators.
+    ZunAngle &angle_ref()
+    {
+        return *(ZunAngle *)&angle;
+    }
 };
 
 // 0x417140. The sprite mapping callback of bullet VMs: picks the sprite for
