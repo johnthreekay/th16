@@ -69,17 +69,17 @@ i32 __fastcall GameThread::on_draw_callback(GameThread *thread)
     return 1;
 }
 
-// TODO: stores 0x18-0x1f are combined differently (dwords at 0x18 and 0x1c,
-// where the original has a word at 0x18, a dword at 0x1a and a word at 0x1e).
+// The store order decides how MSVC combines the byte and word stores: the
+// original has a word at 0x18, a dword at 0x1a and a word at 0x1e.
 // FUNCTION: TH16 0x42e630
 void ConfigData::set_defaults()
 {
     memset(this, 0, sizeof(ConfigData));
     flags |= 0x100;
-    deadzone_x = deadzone_y = 600;
     unk_1c = 0;
     unk_1d = 1;
     version = 0x160002;
+    deadzone_x = deadzone_y = 600;
     unk_1e = 1;
     unk_1f = 5;
     unk_20 = 0;
