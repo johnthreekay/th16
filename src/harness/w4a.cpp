@@ -1,14 +1,11 @@
 // Stand-in callers for the wave 4 interpreter work (EnemyData's ECL
-// instructions).
-#include <math.h>
+// instructions and fog).
+#include "../Supervisor.h"
 
-#include "../ZunMath.h"
-
-// More of the undecompiled atan2f users (see harness_homing_angle): the
-// ECL instructions added enough code without double temporaries that LTCG
-// stopped inlining the CRT math helpers into zun_fabsf, zun_cosf and
-// shoot_bullets.
-f32 harness_w4a_atan2(Float3 *a, Float3 *b)
+// The window setup code takes the arcade offset's address (like the
+// resolution globals in harness/w3a.cpp), so stores through float pointers
+// may change it: EnemyData::update_fog reloads it after each store.
+i32 *harness_w4a_arcade_offset()
 {
-    return atan2f(b->y - a->y, b->x - a->x) + atan2f(a->y - b->y, a->x - b->x);
+    return &g_early_arcade_offset_x;
 }
