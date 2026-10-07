@@ -130,11 +130,19 @@ i32 LaserCurveInf::method_44()
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x439730
+// Counts down ex_state[11]'s timer; when it runs out, flips ex_flags bit
+// 0x100 and returns 1.
+// TODO: the original keeps the multiply of the speed by 1.0f (see ZunTimer::operator--).
+// FUNCTION: TH16 0x439730
 i32 LaserCurveInf::method_60()
 {
-    return unit5_placeholder(this);
+    ex_state[11].timer.decrement(1.0f);
+    if (ex_state[11].timer.current <= 0)
+    {
+        ex_flags ^= 0x100;
+        return 1;
+    }
+    return 0;
 }
 
 // FUNCTION: TH16 0x431190

@@ -13,11 +13,44 @@ i32 LaserInfiniteInf::initialize(void *params)
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x436fd0
+// Runs the laser's pending et_ex transforms.
+// TODO: in the blend mode case the original increments ex_index in memory (inc, reload) instead of from the loaded index.
+// FUNCTION: TH16 0x436fd0
 void LaserInfiniteInf::run_ex()
 {
-    unit5_placeholder(this);
+    while (ex_index < 0x12)
+    {
+        BulletEx *ex = &inner.ex[ex_index];
+        if (ex->type == 0)
+        {
+            return;
+        }
+        if (ex->slot == 0 && ex_flags != 0)
+        {
+            return;
+        }
+        switch (ex->type)
+        {
+        case 0x80:
+            countdown_5c8 = ex->a;
+            break;
+        case 0x400:
+            state = 3;
+            break;
+        case 0x100000:
+            if (ex->a != 0)
+            {
+                vm_950.flags_lo = vm_950.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+            }
+            else
+            {
+                vm_950.flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
+            }
+            ex_index++;
+            continue;
+        }
+        ex_index++;
+    }
 }
 
 // Placeholder (not decompiled yet).
