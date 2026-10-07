@@ -166,6 +166,9 @@ struct Supervisor
     // draw callbacks, which use disable_d3d_fog_inline.
     DECOMP_NOINLINE HRESULT disable_d3d_fog();
     HRESULT disable_d3d_fog_inline();
+    HRESULT enable_d3d_fog_inline();
+    HRESULT enable_zwrite_inline();
+    HRESULT disable_zwrite_inline();
     HRESULT enable_zwrite();
     HRESULT disable_zwrite();
     void swap_transform_matrices(Camera *camera);
@@ -253,6 +256,41 @@ enum SupervisorFlags
 };
 
 extern Supervisor g_Supervisor;
+
+// enable_d3d_fog, enable_zwrite and disable_zwrite as the stage drawing code
+// has them inline.
+inline HRESULT Supervisor::enable_d3d_fog_inline()
+{
+    if (fog_enabled != 1)
+    {
+        g_AnmManager->flush_sprites();
+        fog_enabled = 1;
+        return d3d_device->SetRenderState(D3DRS_FOGENABLE, TRUE);
+    }
+    return 0;
+}
+
+inline HRESULT Supervisor::enable_zwrite_inline()
+{
+    if (zwrite_enabled != 1)
+    {
+        g_AnmManager->flush_sprites();
+        zwrite_enabled = 1;
+        return d3d_device->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
+    }
+    return 0;
+}
+
+inline HRESULT Supervisor::disable_zwrite_inline()
+{
+    if (zwrite_enabled != 0)
+    {
+        g_AnmManager->flush_sprites();
+        zwrite_enabled = 0;
+        return d3d_device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+    }
+    return 0;
+}
 
 inline HRESULT Supervisor::disable_d3d_fog_inline()
 {

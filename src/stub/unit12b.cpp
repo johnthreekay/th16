@@ -5,16 +5,6 @@
 #include "../EffectManager.h"
 #include "../Stage.h"
 
-// STUB: TH16 0x409f90
-i32 Stage::on_draw_03()
-{
-    return 1;
-}
-
-// STUB: TH16 0x40a410
-void Stage::on_draw_06()
-{
-}
 
 // StageInner::run_std (0x40b3b0) is in src/Stage.cpp.
 

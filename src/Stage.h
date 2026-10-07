@@ -35,26 +35,40 @@ struct InterpCameraSky
 // One ANM quad of an STD object. vm_index is filled in at load time.
 struct StdQuad
 {
-    // Negative ends the list.
+    // Negative ends the list; only type 0 is drawn.
     i16 type;
     i16 size;
     i16 script;
     i16 vm_index;
+    // Offset from the instance, and the size to scale the sprite to (0
+    // keeps the sprite's own).
+    D3DXVECTOR3 pos;
+    f32 width;
+    f32 height;
 };
 
 struct StdObject
 {
-    u8 unk_0[3];
-    // Bit 0: its VMs are still running.
+    u8 unk_0[2];
+    // Stage::draw_layer draws the object with its layer.
+    i8 layer;
+    // Bit 0: its VMs are still running. Bit 1: drawn at least once.
     u8 flags;
-    u8 unk_4[0x1c - 0x4];
+    // The bounding box: its center and size.
+    D3DXVECTOR3 center;
+    D3DXVECTOR3 size;
     StdQuad quads[1];
+
+    // 0x40a7d0. Whether the object, placed at pos, is too far from the
+    // camera or projects entirely outside the arcade region.
+    HARNESS_CALLED i32 is_culled(D3DXVECTOR3 *pos, f32 max_distance_sq, Camera *camera);
 };
 
 struct StdInstance
 {
     i16 object_id;
-    i16 unk_2;
+    // Bit 0: drawn this frame.
+    u16 unk_2;
     D3DXVECTOR3 pos;
 };
 
@@ -112,7 +126,15 @@ struct StageInner
     // Instruction 17's argument: 1 picks the fog with 7 points per strip.
     i32 fog_kind;
     // Color passed to the ANM manager; the top byte flags a new value.
-    u32 color_3344;
+    union
+    {
+        u32 color_3344;
+        struct
+        {
+            u8 unk_3344[3];
+            u8 color_changed;
+        };
+    };
 
     // Only destroys the VMs; Stage's unwind code calls it out of line.
     ~StageInner();
@@ -129,6 +151,9 @@ struct StageInner
     }
     // 0x40c4a0
     void step_fog();
+    // 0x40c280. Draws the VMs set for a layer with camera 3, without fog
+    // and depth writes.
+    void draw_vms(i32 layer);
 };
 
 enum StageFlags
@@ -158,7 +183,11 @@ struct Stage
     StdInstance *instances;
     StdInstr *script;
     AnmLoaded *stage_anm;
-    u8 unk_66b8[0x66c4 - 0x66b8];
+    // Counted by draw_layer each frame: instances drawn, instances culled
+    // and quads drawn.
+    i32 instances_drawn;
+    i32 instances_culled;
+    i32 quads_drawn;
     // StageFlags.
     u32 stage_flags;
     ZunTimer fade_timer;
@@ -179,11 +208,14 @@ struct Stage
     HARNESS_CALLED i32 load_data(const char *path, i32 unused);
     i32 load_std(const char *path);
     i32 on_tick();
-    i32 on_draw_03();
-    void on_draw_06();
+    DECOMP_NOINLINE i32 on_draw_03();
+    DECOMP_NOINLINE i32 on_draw_06();
     i32 update_std_vms();
     // 0x40af70
-    void draw_layer(i32 layer);
+    i32 draw_layer(i32 layer);
+    // Makes camera 3 a copy of the stage's camera (keeping camera 3's
+    // unk_fc) and applies it.
+    void use_camera();
     // 0x40b2f0. Sends interrupt n to every quad VM and the stage's own VMs
     // and runs them (STD instruction 16).
     void interrupt_vms(i32 n);
