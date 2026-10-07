@@ -7,12 +7,14 @@
 #include "../TextHelper.h"
 #include "../Thread.h"
 
-// Like WinMain and the Window frame functions around a device reset.
-void harness_w3e_device_reset()
+// Like WinMain around a device reset (0x45a043, 0x45a05f).
+void harness_w3e_release_textures()
 {
     g_AnmManager->release_textures();
-    g_AnmManager->create_d3d_textures_for_loaded_anms();
-    g_AnmManager->release_textures();
+}
+
+void harness_w3e_create_textures()
+{
     g_AnmManager->create_d3d_textures_for_loaded_anms();
 }
 

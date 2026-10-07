@@ -153,6 +153,7 @@ HARNESS_CALLED i32 GameWindow::do_frame_sleeping()
     return 0;
 }
 
+// TODO: ours realigns its frame (ebx form); matches when the DirectInput enum callbacks are left out (whole-program effect).
 // FUNCTION: TH16 0x45a9f0
 HARNESS_CALLED void GameWindow::update_window_sleeping()
 {
@@ -295,6 +296,7 @@ HARNESS_CALLED i32 GameWindow::do_frame_frameskip()
     return 0;
 }
 
+// TODO: ours lacks the push ecx padding; matches when the DirectInput enum callbacks are left out (whole-program effect).
 // FUNCTION: TH16 0x45adf0
 HARNESS_CALLED void GameWindow::present()
 {
@@ -319,7 +321,6 @@ HARNESS_CALLED void GameWindow::present()
     }
 }
 
-// TODO: ours pads the stack with push ecx (for the alignment update_window gets); the original does not.
 // FUNCTION: TH16 0x45ae70
 HARNESS_CALLED i32 GameWindow::do_frame()
 {

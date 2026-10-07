@@ -51,10 +51,14 @@ i32 Supervisor::compute_exe_checksum()
     return -1;
 }
 
-// uuid.lib is not linked; the shell GUIDs the original takes from it.
-static const GUID s_IID_IShellLinkA = {0x000214ee, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
-static const GUID s_IID_IPersistFile = {0x0000010b, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
-static const GUID s_CLSID_ShellLink = {0x00021401, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
+// uuid.lib is not linked; these are the shell GUIDs the original takes
+// from it.
+// GLOBAL: TH16 0x48b81c
+extern const GUID g_IID_IShellLinkA = {0x000214ee, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
+// GLOBAL: TH16 0x48b82c
+extern const GUID g_IID_IPersistFile = {0x0000010b, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
+// GLOBAL: TH16 0x48b83c
+extern const GUID g_CLSID_ShellLink = {0x00021401, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
 
 // Created by WinMain so that only one instance runs.
 // GLOBAL: TH16 0x4dfb4c
@@ -115,9 +119,9 @@ HARNESS_CALLED BOOL __stdcall resolve_shortcut(const char *link_path, char *out,
     }
     BOOL ok = FALSE;
     CoInitialize(NULL);
-    if (SUCCEEDED(CoCreateInstance(s_CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, s_IID_IShellLinkA, (void **)&link)))
+    if (SUCCEEDED(CoCreateInstance(g_CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, g_IID_IShellLinkA, (void **)&link)))
     {
-        if (SUCCEEDED(link->QueryInterface(s_IID_IPersistFile, (void **)&file)))
+        if (SUCCEEDED(link->QueryInterface(g_IID_IPersistFile, (void **)&file)))
         {
             WCHAR *wide_path = new WCHAR[MAX_PATH];
             MultiByteToWideChar(CP_ACP, 0, link_path, -1, wide_path, MAX_PATH);
