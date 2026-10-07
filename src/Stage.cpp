@@ -33,8 +33,6 @@ void StageInner::set_sky_interp(i32 end_time, i32 method, CameraSky *goal)
 // SYNTHETIC: TH16 0x409d90
 // Fog::`scalar deleting destructor'
 
-// TODO: the original computes &vm_ids[i] after pushing it and loads the
-// child list only after storing flags_hi.
 // FUNCTION: TH16 0x409550
 Fog::~Fog()
 {

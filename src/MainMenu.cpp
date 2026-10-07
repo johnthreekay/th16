@@ -70,8 +70,6 @@ void TitleInf::interrupt_and_clear(i32 index)
     anm_ids[index].id = 0;
 }
 
-// TODO: the original keeps g_AnmManager in edi across the lookups, which
-// needs get_vm_with_id visible to LTCG (an opaque stub for now).
 // FUNCTION: TH16 0x44a680
 HARNESS_CALLED void TitleInf::interrupt_child(i32 index, i32 script, i32 interrupt)
 {
@@ -456,7 +454,6 @@ void TitleInf::update_options_cursor()
 
 // Applies the volumes and shows them: three digits each, in two layers of
 // sprites, with leading zeros hidden.
-// TODO: the original keeps g_AnmManager in edi across the lookups (get_vm_with_id is an opaque stub here).
 // FUNCTION: TH16 0x44dc70
 void TitleInf::update_options_sprites()
 {

@@ -115,13 +115,12 @@ HARNESS_CALLED AnmId AnmManager::insert_in_ui_list_front(AnmVm *vm)
     return vm->id;
 }
 
-// TODO: get_vm_with_id (0x46efa0) matches as written below, but with its
-// body visible to LTCG our build adds /GS cookies to BombAyaSubInf::on_tick
-// and Spellcard::on_draw_body and allocates registers differently in
-// EffectManager::next_index. Until more of the program exists, an opaque
-// stub stands in for it (src/stub/unit8b.cpp).
-#if 0
-AnmVm *AnmManager::get_vm_with_id(AnmId id)
+// Callers reach this through inline helpers (get_vm_or_clear, get_vm,
+// find_child_of) as a rule: a function that calls it directly and passes a
+// local's address elsewhere gets a /GS cookie the original does not have
+// (README).
+// FUNCTION: TH16 0x46efa0
+HARNESS_CALLED AnmVm *AnmManager::get_vm_with_id(AnmId id)
 {
     if (id.id == 0)
     {
@@ -156,7 +155,6 @@ AnmVm *AnmManager::get_vm_with_id(AnmId id)
     }
     return &fast_array[fast_id].vm;
 }
-#endif
 
 // FUNCTION: TH16 0x46f040
 HARNESS_CALLED AnmVm *AnmManager::get_snapshot_vm_with_id(AnmId id)

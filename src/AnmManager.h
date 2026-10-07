@@ -686,6 +686,14 @@ inline void delete_vm_inline_and_clear(AnmId &id)
 }
 
 // Looks the VM up and forgets the id if it is gone.
+// The VM with the id, or NULL; the id is kept either way. Like
+// get_vm_or_clear, an inline node between the caller and get_vm_with_id,
+// which keeps /GS cookies away from callers (README).
+inline AnmVm *get_vm(AnmId id)
+{
+    return g_AnmManager->get_vm_with_id(id);
+}
+
 inline AnmVm *get_vm_or_clear(AnmId &id)
 {
     AnmVm *vm = g_AnmManager->get_vm_with_id(id);

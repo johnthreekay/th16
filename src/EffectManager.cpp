@@ -118,6 +118,9 @@ i32 __fastcall EffectManager::on_draw_callback(EffectManager *self)
     return 1;
 }
 
+// TODO: this and last_used_index's old value trade ebx and the stack slot
+// with the original since get_vm_with_id has a visible body (it matched
+// against the opaque stub).
 // FUNCTION: TH16 0x40e6c0
 i32 EffectManager::next_index()
 {

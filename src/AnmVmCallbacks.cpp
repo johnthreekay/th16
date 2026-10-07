@@ -229,6 +229,9 @@ static AnmId snapshot_of_vm_id(AnmId id)
 
 // Copies the child VMs along with the VM: into snapshots (mode 0) or back
 // out of them (mode 1).
+// TODO: the mode 0 loop spills its counter (the original keeps it in ebx)
+// since get_vm_with_id has a visible body (it matched against the opaque
+// stub).
 // FUNCTION: TH16 0x405fa0
 int __fastcall anm_effect_2_on_copy_2(AnmVm *vm, const AnmVm *other, i32 mode)
 {

@@ -339,26 +339,9 @@ i32 g_continues_remaining;
 int PauseMenu::on_draw()
 {
     g_AsciiManager->draw_shadows = 1;
-    // get_vm_or_clear and find_child_of, with g_AnmManager read once: the
-    // original's LTCG knew get_vm_with_id leaves it alone, which the opaque
-    // stub hides from ours.
-    AnmManager *anm_manager = g_AnmManager;
-    if (anm_manager->get_vm_with_id(anm_id_1e8) == NULL)
+    if (get_vm_or_clear(anm_id_1e8) != NULL)
     {
-        anm_id_1e8.id = 0;
-    }
-    else if (anm_manager->get_vm_with_id(anm_id_1e8) == NULL)
-    {
-        anm_id_1e8.id = 0;
-    }
-    else
-    {
-        AnmVm *vm = anm_manager->get_vm_with_id(anm_id_1e8);
-        if (vm == NULL)
-        {
-            anm_id_1e8.id = 0;
-        }
-        vm = vm->search_children(0x39, 0);
+        AnmVm *vm = find_child_of(anm_id_1e8, 0x39);
         if (vm != NULL)
         {
             g_Supervisor.vm_1c4->color_1.d3d = vm->color_1.d3d | 0xff000000;

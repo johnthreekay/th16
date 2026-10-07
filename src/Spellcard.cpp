@@ -116,10 +116,9 @@ i32 Spellcard::on_draw_body()
     {
         return 1;
     }
-    AnmVm *vm = g_AnmManager->get_vm_with_id(text_anm_ids[2]);
+    AnmVm *vm = get_vm_or_clear(text_anm_ids[2]);
     if (vm == NULL)
     {
-        text_anm_ids[2].id = 0;
         return 1;
     }
     D3DXVECTOR3 pos;

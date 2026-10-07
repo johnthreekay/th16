@@ -3,13 +3,6 @@
 #include "../AnmManager.h"
 #include "../Camera.h"
 
-// The real code is in AnmManagerVms.cpp; see the TODO there.
-// STUB: TH16 0x46efa0
-AnmVm *AnmManager::get_vm_with_id(AnmId id)
-{
-    return NULL;
-}
-
 // GLOBAL: TH16 0x491b58
 AnmVmFunc g_anm_on_destroy_funcs[4];
 

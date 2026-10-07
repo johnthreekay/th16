@@ -149,7 +149,7 @@ i32 BombAyaSubInf::on_tick()
         return -1;
     }
     vm->entity_pos = player->inner.pos;
-    AnmVm *vm_2 = g_AnmManager->get_vm_with_id(anm_id_64);
+    AnmVm *vm_2 = get_vm(anm_id_64);
     if (vm_2 != NULL)
     {
         vm_2->entity_pos = player->inner.pos;

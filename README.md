@@ -195,9 +195,10 @@ decompiled code the surroundings it had in the original:
 
 - Whole-program effects show up in single functions:
   - Giving a callee a visible /GL body can add a /GS cookie to callers that
-    pass a local's address elsewhere (get_vm_with_id stays an opaque stub
-    for that reason; its matching code is kept under `#if 0`). Check callers
-    for new cookies whenever a stub becomes real code.
+    pass a local's address elsewhere: with get_vm_with_id, only callers that
+    call it directly get one; going through an inline helper avoids it (see
+    the get_vm_with_id entry below). Check callers for new cookies whenever
+    a stub becomes real code.
   - LTCG realigns frames (`and esp,-8`) for spilled doubles only once enough
     of the program uses them; a harness function with a few inlined
     `atan2f` calls keeps that threshold (harness_homing_angle).
@@ -405,12 +406,31 @@ decompiled code the surroundings it had in the original:
   - Spelling the wrappers out as `(f32)cos((double)x)` dodges the inliner
     but not the alignment: the copies then skip their realignment and other
     frames shift (update_final_pos).
-  - Open: the original has the same dead EH state in Player::create and
-    still inlines, so something on its create, initialize, on_tick chain
-    stops it (its on_tick_callback pads the call with `push ecx` where ours
-    tail jumps). Until that is found zun_sinf, zun_cosf and zun_floorf are
-    TODOs. A local double in on_tick_body restores all three (and
-    lose_life) but is not ZUN's code.
+  - Solved (wave 6): 0x405510, 0x4054f0 and 0x405260 are not ZUN
+    wrappers but LTCG's out-of-line copies of the UCRT inlines, annotated as
+    `_sinf`, `_cosf`, `_floorf` (CrtInline.cpp). What the pass reaches is a
+    call graph node, and an inline helper is a node of its own: ZUN's call
+    sites go through small inline helpers (`zun_sinf`, `zun_cosf`,
+    `zun_floorf` in ZunMath.h, plain `inline`). The pass reaches the helper
+    nodes, so LTCG keeps the UCRT body out of line for them, then inlines
+    the helpers, which leaves each caller calling the copy: our callers of
+    the copies are now the same set as the original's (PosVel::step, the
+    laser and collision rotations, check_hit_rotated_rect, ecl_run,
+    run_std, ...). A large function that calls sinf directly is not
+    affected the same way: it inlines it and realigns its own frame
+    (PosVel::step then realigns, update_final_pos loses its padded frame and
+    the floorf copy loses its 64-byte realignment). The earlier noinline
+    wrappers were reached nodes too and became `push ecx; call; pop ecx`
+    thunks to separate copies. A DECOMP_NOINLINE redeclaration keeps floorf
+    out of line program-wide but has no effect on sinf and cosf.
+  - `push ecx; call f; pop ecx; ret` (instead of `jmp f`) in a thunk is
+    stack alignment padding: LTCG knows the thunk is entered 8-aligned.
+    Player::on_tick_callback gets it once Player::create is HARNESS_CALLED
+    and its stand-in caller realigns its frame like GameThread::thread_start
+    (0x42cb60, `and esp, -8`), the original's only caller; taking the
+    callback's address in Player::initialize passes the alignment on.
+    lose_life matches with it, and on_tick_body gets the original's ebx
+    frame.
 - A caller that realigns its frame gives its callees known alignment: they
   get padded frames and lose edi shrink-wrapping, even with other callers.
   Whether a function realigns is decided over the whole function, not per
@@ -441,11 +461,21 @@ decompiled code the surroundings it had in the original:
 - Shared tail blocks come from duplicated statements the compiler
   tail-merged, not from goto: write the statements twice.
 - AnmId::find_or_clear is called at all 25 original sites (DECOMP_NOINLINE).
-- Making get_vm_with_id visible (with DECOMP_NOINLINE) wins five matches
-  (Fog::~Fog, PauseMenu::open, interrupt_child, the options/key config
-  sprite updates) and loses five (anm_effect_2_on_copy_2,
-  EffectManager::next_index, BombAyaSubInf::on_tick, Spellcard::on_draw_body,
-  PauseMenu::on_draw); it stays an opaque stub until that is resolved.
+- get_vm_with_id (0x46efa0) is real code now (HARNESS_CALLED). With its
+  body visible, a function that calls it directly from its own body and
+  passes a local's address elsewhere (a D3DXVECTOR3 to create_stringf,
+  world_pos or create_vm) gets a /GS cookie the original does not have;
+  the same lookup through an inline helper node (get_vm_or_clear, the new
+  get_vm, find_child_of) does not. Seven functions gained cookies that way;
+  PauseMenu::on_draw (get_vm_or_clear then find_child_of, three lookups),
+  Spellcard::on_draw_body (get_vm_or_clear) and BombAyaSubInf::on_tick
+  (get_vm for the second VM) match again written with the helpers, which
+  also replaces the old hand-written "g_AnmManager read once" forms. Fog's
+  destructor, interrupt_child and update_options_sprites match since. Open:
+  EffectManager::next_index and anm_effect_2_on_copy_2 matched against the
+  opaque stub and now allocate registers differently (this and the saved
+  index trade ebx and a stack slot; a loop counter is spilled); no source
+  form found yet. The original has 552 direct calls to get_vm_with_id.
 - An 8-byte struct local (a D3DXVECTOR2, a D3DLOCKED_RECT) makes LTCG
   want an 8-aligned frame: the function realigns and so does every
   visible caller, up the call graph. ZUN's draw_vm keeps width and height
