@@ -33,11 +33,6 @@ i32 Gui::on_tick_body()
 }
 
 
-// STUB: TH16 0x406c40
-void AnmVm::get_own_transformed_pos(Float3 *out)
-{
-}
-
 // STUB: TH16 0x416f40
 void __stdcall BulletManager::clear_all(i32 unused)
 {

@@ -76,3 +76,19 @@ void harness_gui_spell_vms()
     g_Gui->interrupt_spell_vms_2();
     g_Gui->interrupt_spell_vms_3();
 }
+
+// Bullet code passes the zero vector by address (0x412282, 0x412605), so
+// stores through pointers may change it as far as LTCG knows.
+Float3 *harness_zero_vec_ptr()
+{
+    return &g_zero_vec;
+}
+
+// Like AnmManager::draw_vm (0x468754) and the sprite corner writers
+// (0x465fb8), which place a VM by its transformed position.
+f32 harness_vm_transformed_x(AnmVm *vm)
+{
+    Float3 pos;
+    vm->get_own_transformed_pos(&pos);
+    return pos.x + pos.y;
+}

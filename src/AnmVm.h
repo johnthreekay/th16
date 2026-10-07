@@ -292,9 +292,12 @@ struct AnmVm
     HARNESS_CALLED void scale_to(i32 end_time, i32 method, f32 x, f32 y);
     // 0x406a70. Scales a position by the screen scale and applies the
     // parents' rotation.
-    Float3 *transform_coords(Float3 *pos);
-    // 0x406c40
-    void get_own_transformed_pos(Float3 *out);
+    // Every caller keeps its stack 8-byte aligned for it (LTCG moved the
+    // alignment its sinf/cosf calls need out of the callee).
+    HARNESS_CALLED Float3 *transform_coords(Float3 *pos);
+    // 0x406c40. The VM's position (pos + entity_pos + pos_2) through
+    // transform_coords; returns out.
+    HARNESS_CALLED Float3 *get_own_transformed_pos(Float3 *out);
     // 0x46f510. The nth descendant (depth first) running the given script
     // (unk_49c; -1 for any).
     AnmVm *search_children(i32 script, i32 nth);
@@ -322,6 +325,8 @@ struct AnmVm
         }
     }
 
+    // 0x4173f0. Starts moving pos_i from initial to goal.
+    void set_pos_time(i32 end_time, i32 method, Float3 *initial, Float3 *goal);
     // 0x406240. Starts moving pos_i along a bezier curve.
     void set_pos_bezier(i32 end_time, Float3 *initial, Float3 *bezier_1, Float3 *goal, Float3 *bezier_2);
     // 0x447550. Starts interpolating the scale from initial to goal.
@@ -378,6 +383,17 @@ struct AnmVm
     // another VM's state, but not its place in any list.
     void copy_from(const AnmVm &other, i32 arg);
 };
+
+// Where HUD elements drawn at full resolution inside the arcade region are
+// placed: half the window width and the arcade's top edge, scaled (ExpHP:
+// ARCADE_HUD_ORIGIN_X/Y).
+extern i32 g_arcade_hud_origin_x;
+extern i32 g_arcade_hud_origin_y;
+
+// A zero vector that is never written (ExpHP:
+// SEEMINGLY_CONST_ZERO_VEC_4d9dc4); interpolators take their unused bezier
+// control points from it.
+extern Float3 g_zero_vec;
 
 // out = in / (640, 480), clamped at 0.
 void LTCG_FASTCALL divide_vec2_by_640_480(Float2 *out, Float2 *in);

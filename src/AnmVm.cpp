@@ -4,6 +4,7 @@
 
 #include "AnmManager.h"
 #include "AnmVm.h"
+#include "Supervisor.h"
 
 // FUNCTION: TH16 0x4093f0
 AnmVm::AnmVm()
@@ -197,4 +198,86 @@ void AnmVm::set_pos_bezier(i32 end_time, Float3 *initial, Float3 *bezier_1, Floa
 void AnmVm::interrupt_out_of_line(i32 n)
 {
     interrupt(n);
+}
+
+// FUNCTION: TH16 0x4173f0
+void AnmVm::set_pos_time(i32 end_time, i32 method, Float3 *initial, Float3 *goal)
+{
+    pos_i.end_time = end_time;
+    pos_i.bezier_1 = g_zero_vec;
+    pos_i.bezier_2 = g_zero_vec;
+    pos_i.method = method;
+    pos_i.initial = *initial;
+    pos_i.goal = *goal;
+    pos_i.time.reset();
+}
+
+// The real body only touches pos itself and its own local, so LTCG's /GS
+// analysis leaves callers that pass a local's address without a cookie.
+// TODO: ours aligns the frame (the original's callers align theirs for it),
+// multiplies and adds with swapped operands and shares one epilogue.
+// FUNCTION: TH16 0x406a70
+HARNESS_CALLED Float3 *AnmVm::transform_coords(Float3 *pos)
+{
+    f32 scale;
+    u32 mode = flags_hi & ANM_VM_COORD_MODE_MASK;
+    if (mode == 1 << 20 || mode == 3 << 20)
+    {
+        scale = g_screen_coord_scale;
+    }
+    else if (mode == 2 << 20 || mode == 4 << 20)
+    {
+        scale = g_screen_coord_scale * 0.5f;
+    }
+    else
+    {
+        goto scaled;
+    }
+    pos->x *= scale;
+    pos->y *= scale;
+    pos->z *= scale;
+scaled:
+    if (parent != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+    {
+        if (flags_hi & ANM_VM_ROTATE_WITH_PARENT)
+        {
+            f32 s = zun_sinf(parent->rotation.z);
+            f32 c = zun_cosf(parent->rotation.z);
+            f32 x = pos->x;
+            f32 y = pos->y;
+            pos->x = x * c - y * s;
+            pos->y = y * c + x * s;
+        }
+        Float3 offset;
+        parent->get_own_transformed_pos(&offset);
+        pos->x += offset.x;
+        pos->y += offset.y;
+        pos->z += offset.z;
+        return pos;
+    }
+    u32 kind = flags_hi & ANM_VM_LAYER_KIND_MASK;
+    if (kind != 0)
+    {
+        if (kind == ANM_VM_LAYER_SET)
+        {
+            pos->x += g_game_2d_origin_x;
+            pos->y += g_game_2d_origin_y;
+        }
+        else
+        {
+            pos->x += g_arcade_hud_origin_x;
+            pos->y += g_arcade_hud_origin_y;
+        }
+    }
+    return pos;
+}
+
+// TODO: the original aligns the frame (for transform_coords) and adds
+// pos + entity_pos with the operands the other way round.
+// FUNCTION: TH16 0x406c40
+HARNESS_CALLED Float3 *AnmVm::get_own_transformed_pos(Float3 *out)
+{
+    *out = pos + entity_pos + pos_2;
+    transform_coords(out);
+    return out;
 }

@@ -6,6 +6,16 @@
 #include "../BulletManager.h"
 #include "../EffectManager.h"
 
+// Written by window setup code that is not decompiled yet.
+// GLOBAL: TH16 0x4d9d48
+i32 g_arcade_hud_origin_x;
+// GLOBAL: TH16 0x4d9d4c
+i32 g_arcade_hud_origin_y;
+
+// Defined here so LTCG cannot see that it stays zero.
+// GLOBAL: TH16 0x4d9dc4
+Float3 g_zero_vec;
+
 // GLOBAL: TH16 0x49f2e0
 BulletTypeData g_bullet_types[44];
 
