@@ -35,13 +35,6 @@ void LaserLineInf::run_ex()
     unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x432f40
-i32 LaserLineInf::on_tick()
-{
-    return unit5_placeholder(this);
-}
-
 
 // Placeholder (not decompiled yet).
 // STUB: TH16 0x434010

@@ -1758,3 +1758,137 @@ void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
     }
     }
 }
+
+// One frame: the et_ex steps until none asks to run again, growth (or, at
+// full length, moving and shrinking to laser_new_arg_3), leaving the screen
+// once the two delay timers ran out, then the graze check and the VMs.
+// Nonzero once the laser is done.
+// TODO: ours speculatively devirtualizes run_ex, method_3c and method_50 (the first and last still stubs); the original calls them through the vtable.
+// FUNCTION: TH16 0x432f40
+i32 LaserLineInf::on_tick()
+{
+    i32 again;
+    do
+    {
+        run_ex();
+        if (ex_flags == 0)
+        {
+            break;
+        }
+        again = 0;
+        if (ex_flags & 1)
+        {
+            again = method_38();
+        }
+        if (ex_flags & 4)
+        {
+            again += method_3c();
+        }
+        if (ex_flags & 8)
+        {
+            again += method_40();
+        }
+        if (ex_flags & 0x10)
+        {
+            switch (ex_state[3].ints[3])
+            {
+            case 0:
+                again += method_44();
+                break;
+            case 1:
+                again += method_4c();
+                break;
+            case 4:
+                again += method_48();
+                break;
+            }
+        }
+        if (ex_flags & 0x40)
+        {
+            again += method_50();
+        }
+        if (ex_flags & 0x1000)
+        {
+            again += method_54();
+        }
+        if ((i32)ex_flags < 0)
+        {
+            if (ex_state[5].timer.current <= 0)
+            {
+                ex_flags ^= 0x80000000;
+                again++;
+            }
+            else
+            {
+                ex_state[5].timer.decrement(1.0f);
+            }
+        }
+        if (countdown_5c8 != 0)
+        {
+            countdown_5c8--;
+        }
+    } while (again != 0);
+    f32 step = length * g_game_speed;
+    if (unk_70 < inner.laser_new_arg_2)
+    {
+        unk_70 = step + unk_70;
+        if (unk_70 > inner.laser_new_arg_2)
+        {
+            unk_70 = inner.laser_new_arg_2;
+        }
+    }
+    else
+    {
+        unk_7c = step + unk_7c;
+        position.x = unk_60.x * g_game_speed + position.x;
+        position.y = position.y + unk_60.y * g_game_speed;
+        position.z = position.z + unk_60.z * g_game_speed;
+        if (inner.laser_new_arg_3 > 0.0f && unk_70 + unk_7c > inner.laser_new_arg_3)
+        {
+            unk_70 = inner.laser_new_arg_3 - unk_7c;
+            inner.laser_new_arg_2 = unk_70;
+            if (0.0f >= unk_70)
+            {
+                return 1;
+            }
+        }
+    }
+    if (timer_5a0.current > 0 || timer_5b4.current > 0)
+    {
+        if (timer_5a0.current > 0)
+        {
+            timer_5a0.decrement(1.0f);
+        }
+        if (timer_5b4.current > 0)
+        {
+            timer_5b4.decrement(1.0f);
+        }
+    }
+    else
+    {
+        Float3 tip;
+        laser_sincosmul(&tip, angle, unk_70);
+        f32 tip_x = position.x + tip.x;
+        f32 tip_y = position.y + tip.y;
+        if ((position.x + width <= -192.0f || position.x - width >= 192.0f || position.y + width <= 0.0f ||
+             position.y - width >= 448.0f) &&
+            (tip_x + width <= -192.0f || tip_x - width >= 192.0f || tip_y + width <= 0.0f || tip_y - width >= 448.0f))
+        {
+            return 1;
+        }
+    }
+    check_graze_or_kill(0);
+    AnmVm *vm = &vm_92c;
+    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm->scale.x = width / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_width;
+    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm->scale.y = unk_70 / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_height;
+    vm->run();
+    if (unk_7c == 0.0f)
+    {
+        vm_f28.run();
+    }
+    vm_1524.run();
+    timer.tick();
+    return 0;
+}
