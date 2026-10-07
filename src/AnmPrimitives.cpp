@@ -110,6 +110,97 @@ HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f3
     return 0;
 }
 
+// The outline of draw_rect's rectangle, as a line strip.
+// TODO: the float register allocation of the corner coordinates differs (the original reuses height's stack slot).
+// FUNCTION: TH16 0x468fc0
+HARNESS_CALLED i32 AnmManager::draw_rect_outline(f32 x, f32 y, f32 width, f32 height, f32 angle, D3DCOLOR color_1,
+                                         D3DCOLOR color_2, i32 anchor_x, i32 anchor_y)
+{
+    RenderVertex044 *vertices = primitive_write_cursor;
+    if (vertices + 5 >= primitive_vertex_data + 0x8000)
+    {
+        return 0;
+    }
+    flush_sprites();
+    f32 c;
+    f32 s;
+    f32 a = angle;
+    __asm {
+        fld a
+        fsincos
+        fstp c
+        fstp s
+    }
+    f32 x0, x1, x2, x3;
+    f32 y0, y1, y2, y3;
+    switch (anchor_x)
+    {
+    case 0:
+        x1 = x3 = width * 0.5f;
+        x0 = x2 = width * -0.5f;
+        break;
+    case 1:
+        x1 = x3 = width;
+        x0 = x2 = 0.0f;
+        break;
+    case 2:
+        x1 = x3 = 0.0f;
+        x0 = x2 = -width;
+        break;
+    }
+    switch (anchor_y)
+    {
+    case 0:
+        y2 = y3 = height * 0.5f;
+        y0 = y1 = height * -0.5f;
+        break;
+    case 1:
+        y2 = y3 = height;
+        y0 = y1 = 0.0f;
+        break;
+    case 2:
+        y2 = y3 = 0.0f;
+        y0 = y1 = -height;
+        break;
+    }
+    vertices[0].pos.x = x0 * c - y0 * s + x;
+    vertices[0].pos.y = x0 * s + y0 * c + y;
+    vertices[1].pos.x = x1 * c - y1 * s + x;
+    vertices[1].pos.y = x1 * s + y1 * c + y;
+    vertices[3].pos.x = x2 * c - y2 * s + x;
+    vertices[3].pos.y = x2 * s + y2 * c + y;
+    vertices[2].pos.x = x3 * c - y3 * s + x;
+    vertices[2].pos.y = x3 * s + y3 * c + y;
+    *(D3DXVECTOR2 *)&vertices[4].pos = *(D3DXVECTOR2 *)&vertices[0].pos;
+    vertices[0].diffuse = vertices[3].diffuse = vertices[4].diffuse = color_1;
+    vertices[0].pos.z = vertices[1].pos.z = vertices[2].pos.z = vertices[3].pos.z = vertices[4].pos.z = 0.0f;
+    vertices[0].pos.w = vertices[1].pos.w = vertices[2].pos.w = vertices[3].pos.w = vertices[4].pos.w = 1.0f;
+    vertices[1].diffuse = vertices[2].diffuse = color_2;
+    if (g_Supervisor.zwrite_enabled != 0)
+    {
+        g_AnmManager->flush_sprites();
+        g_Supervisor.zwrite_enabled = 0;
+        g_Supervisor.d3d_device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+    }
+    if (g_AnmManager->last_color_op != 0)
+    {
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
+        g_AnmManager->last_color_op = 0;
+    }
+    if (render_cache_184fbb6 != 1)
+    {
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        render_cache_184fbb6 = 1;
+    }
+    g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_LINESTRIP, 4, primitive_write_cursor, sizeof(RenderVertex044));
+    primitive_write_cursor += 5;
+    unk_cc++;
+    return 0;
+}
+
 // draw_rect with a one pixel wider border at half the alpha behind it.
 // FUNCTION: TH16 0x469570
 HARNESS_CALLED i32 AnmManager::draw_rect_bordered(f32 x, f32 y, f32 width, f32 height, f32 angle, D3DCOLOR color_1,

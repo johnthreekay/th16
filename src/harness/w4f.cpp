@@ -79,3 +79,12 @@ i32 harness_w4f_rect_bordered(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 wi
            other->draw_rect_bordered(x, y, width, vm->scale.x, vm->rotation.x, vm->color_2.d3d, vm->color_1.d3d,
                                      vm->int_vars[0], vm->int_vars[1]);
 }
+
+// AnmManager::draw_vm (0x468919) draws rectangle outlines for render mode 18.
+i32 harness_w4f_rect_outline(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 width)
+{
+    return g_AnmManager->draw_rect_outline(x, y, width, vm->scale.y, vm->rotation.z, vm->color_1.d3d,
+                                           vm->color_2.d3d, (vm->flags_hi >> 21) & 3, (vm->flags_hi >> 23) & 3) +
+           other->draw_rect_outline(x, y, width, vm->scale.x, vm->rotation.x, vm->color_2.d3d, vm->color_1.d3d,
+                                    vm->int_vars[0], vm->int_vars[1]);
+}
