@@ -278,6 +278,7 @@ void __stdcall camera_update_43c780(Camera *camera)
                                (f32)camera->viewport.Width / (f32)camera->viewport.Height, 1.0f, 10000.0f);
 }
 
+// TODO: matches until write_screenshot exists (in any file, any body): then LTCG stops keeping &camera->up in ebx. Whole-program effect.
 // FUNCTION: TH16 0x43c940
 void __stdcall camera_apply_43c940(Camera *camera)
 {
