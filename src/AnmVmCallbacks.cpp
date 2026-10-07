@@ -174,7 +174,7 @@ int __fastcall anm_effect_2_on_tick(AnmVm *vm)
     {
         return -1;
     }
-    data->timer.tick_in_place();
+    data->timer.tick_split();
     return 0;
 }
 
@@ -347,8 +347,6 @@ int __fastcall anm_effect_3_init(AnmVm *vm, D3DXVECTOR3 *pos)
     return 0;
 }
 
-// TODO: in the timer tick the original loads the speed pointer before
-// storing previous (ours stores first, so registers differ).
 // FUNCTION: TH16 0x406690
 int __fastcall anm_effect_3_on_tick(AnmVm *vm)
 {
@@ -375,7 +373,7 @@ int __fastcall anm_effect_3_on_tick(AnmVm *vm)
             point->y += point[-1].y;
             data->angle = wrap_angle(g_replay_unsafe_rng.randf_neg_to(ZUN_PI) / 5.0f + data->angle);
         }
-        data->timer.tick_in_place();
+        data->timer.tick_split();
         return 0;
     }
     return 1;
@@ -466,8 +464,7 @@ int __fastcall anm_effect_1_init(AnmVm *vm, D3DXVECTOR3 *pos)
     return 0;
 }
 
-// TODO: the original aligns its frame to 8 bytes (LTCG; AnmVm::run is
-// still a stub here).
+// TODO: the original aligns its frame to 8 bytes (and esp, -8; not from AnmVm::run, whose other direct callers do not).
 // FUNCTION: TH16 0x407330
 int __fastcall anm_effect_1_on_tick(AnmVm *vm)
 {
