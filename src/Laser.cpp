@@ -1537,7 +1537,7 @@ i32 LaserInfiniteInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32
 
 // Sets the laser up from its parameters: the body and its origin VM, the
 // shot sound, and the start offset along the aim.
-// TODO: the original realigns the frame (and esp, -8) and sets the VM's callbacks after the bullet type lookup.
+// TODO: the original realigns the frame (and esp, -8); everything else matches.
 // FUNCTION: TH16 0x435050
 i32 LaserInfiniteInf::initialize(void *params)
 {
@@ -1548,8 +1548,8 @@ i32 LaserInfiniteInf::initialize(void *params)
     bullet_color = inner.color;
     AnmVm *vm = &vm_950;
     vm->wipe();
-    vm->index_of_sprite_mapping_func = 2;
-    vm->associated_game_entity = this;
+    vm_950.index_of_sprite_mapping_func = 2;
+    vm_950.associated_game_entity = this;
     g_LaserManager->bullet_anm->set_vm_script(vm, g_bullet_types[bullet_type].script);
     vm->interrupt(2);
     vm->run();
@@ -2203,4 +2203,89 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
         }
         ex_index++;
     }
+}
+
+// Sets the laser up from its parameters: the body, origin and tip VMs, the
+// delay timers, the shot sound and the start offset along the aim.
+// TODO: the original realigns the frame (and esp, -8); everything else matches.
+// FUNCTION: TH16 0x431b30
+i32 LaserLineInf::initialize(void *params)
+{
+    inner = *(LaserLineInner *)params;
+    bullet_type = inner.bullet_type;
+    state = 2;
+    kind = LASER_LINE;
+    bullet_color = inner.bullet_color;
+    AnmVm *vm = &vm_92c;
+    vm->wipe();
+    vm_92c.index_of_sprite_mapping_func = 2;
+    vm_92c.associated_game_entity = this;
+    g_LaserManager->bullet_anm->set_vm_script(vm, g_bullet_types[bullet_type].script);
+    vm->interrupt(2);
+    vm->run();
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    AnmVmFlagsLoFields *fields = (AnmVmFlagsLoFields *)&vm_92c.flags_lo;
+    fields->anchor_x = 0;
+    fields->anchor_y = 2;
+    fields->render_mode = 1;
+    vm_92c.flags_hi = vm_92c.flags_hi & ~0x80000 | 0x40000;
+    vm = &vm_f28;
+    g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x38);
+    vm->unk_5b0 = NULL;
+    vm->parent = NULL;
+    vm->run();
+    vm->interrupt(2);
+    vm->run();
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    ((AnmVmFlagsLoFields *)&vm_f28.flags_lo)->render_mode = 1;
+    vm_f28.flags_hi = vm_f28.flags_hi & ~0x80000 | 0x40000;
+    if (bullet_type > 0x11 && bullet_type != 0x26)
+    {
+        vm = &vm_1524;
+        g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x53);
+        vm->unk_5b0 = NULL;
+        vm->parent = NULL;
+        vm->run();
+    }
+    else
+    {
+        vm = &vm_1524;
+        g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x5b);
+        vm->unk_5b0 = NULL;
+        vm->parent = NULL;
+        vm->run();
+        vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    }
+    vm_1524.flags_hi = vm_1524.flags_hi & ~0x80000 | 0x40000;
+    timer_5a0.set_inline(30);
+    timer_5b4.set_inline(3);
+    if (inner.shot_sfx >= 0)
+    {
+        g_SoundManager.play_sound_at_position(inner.shot_sfx, 0.0f);
+    }
+    timer_2c.reset();
+    timer_40.reset();
+    position = inner.start_pos;
+    if (inner.distance != 0.0f)
+    {
+        Float3 offset;
+        laser_sincosmul(&offset, inner.ang_aim, inner.distance);
+        position.x += offset.x;
+        position.y += offset.y;
+    }
+    width = inner.laser_new_arg_4;
+    unk_70 = inner.laser_new_arg_1;
+    length = inner.speed;
+    angle = inner.ang_aim;
+    if (inner.laser_new_arg_1 > inner.laser_new_arg_2)
+    {
+        unk_7c = 0.01f;
+    }
+    else
+    {
+        unk_7c = 0.0f;
+    }
+    laser_sincosmul(&unk_60, angle, length);
+    ex_index = inner.unk_30;
+    return 0;
 }
