@@ -867,3 +867,85 @@ i32 Bullet::step_ex_17()
     ex_state[8].timer.tick();
     return 0;
 }
+
+// TODO: the original saves ebx and edi in the prologue, keeps
+// cancel_script in ecx and the manager in eax, and puts goal 4 bytes lower.
+// FUNCTION: TH16 0x4124b0
+i32 Bullet::sub_4124b0(i32 graze_only)
+{
+    vm0.flags_lo &= ~0x60000;
+    vm0.pos = g_zero_vec;
+    if ((flags & 2) && hitbox_diameter > 0.0f)
+    {
+        Float3 *hitbox = (Float3 *)&hitbox_diameter;
+        Float3 *p = &pos;
+        i32 result;
+        if (!(flags & BULLET_FLAG_SCALED))
+        {
+            if (!(flags & 0x10))
+            {
+                result = g_Player->check_hit_rect(p, hitbox, graze_only);
+            }
+            else
+            {
+                result = g_Player->check_hit_circle(p, hitbox_diameter, graze_only);
+            }
+        }
+        else if (!(flags & 0x10))
+        {
+            D3DXVECTOR3 size;
+            size.x = (*hitbox)[0] * scale;
+            size.y = (*hitbox)[1] * scale;
+            result = g_Player->check_hit_rect(p, &size, graze_only);
+        }
+        else
+        {
+            result = g_Player->check_hit_circle(p, scale * hitbox_diameter, graze_only);
+        }
+        if (result == 1)
+        {
+            if (ex_invuln_remaining_frames == 0)
+            {
+                state = 3;
+                vm0.interrupt_out_of_line(result);
+                if (vm1.flags_lo & 1)
+                {
+                    vm1.interrupt_out_of_line(result);
+                }
+                if (cancel_script >= 0)
+                {
+                    BulletManager *mgr = g_BulletManager;
+                    AnmVm *vm = mgr->bullet_anm->create_vm(cancel_script, p, 0.0f, -1, 0).find_or_clear();
+                    D3DXVECTOR3 goal = g_game_speed * velocity * 10.0f;
+                    vm->set_pos_time(30, 6, &g_zero_vec, &goal);
+                }
+            }
+        }
+        else if (result == 2 && !(flags & 4))
+        {
+            g_Player->do_graze(p);
+            flags |= 4;
+        }
+        return result;
+    }
+    return 0;
+}
+
+// FUNCTION: TH16 0x412670
+void Bullet::sub_412670()
+{
+    if (state == BULLET_STATE_FREE)
+    {
+        return;
+    }
+    state = BULLET_STATE_FREE;
+    timer_144c.reset();
+    timer_1460.reset();
+    timer_1420.reset();
+    timer_1434.reset();
+    flags &= ~0x341;
+    unk_c7c = 0;
+    unk_c4c = 0;
+    g_BulletManager->freelist_head.insert_after(&freelist_node);
+    tick_list_node.unlink_inline();
+}

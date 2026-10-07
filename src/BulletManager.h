@@ -72,7 +72,8 @@ struct Bullet
     f32 speed;
     f32 angle;
     f32 hitbox_diameter;
-    u8 unk_c44[4];
+    // With hitbox_diameter, the size of a rectangular hitbox.
+    f32 hitbox_height;
     // Position in BulletManager::bullets.
     i32 index;
     // 1 while the bullet is active; ECL's funcset 1 cancels bullets near
@@ -90,7 +91,7 @@ struct Bullet
     u8 unk_c74[0xc78 - 0xc74];
     // Next bullet drawn in the same layer.
     Bullet *next_in_layer;
-    u8 unk_c7c[0xc80 - 0xc7c];
+    i32 unk_c7c;
     // Sound played when the bullet bounces off a wall (none if negative).
     i32 bounce_sound;
     i32 layer;
@@ -113,7 +114,12 @@ struct Bullet
     ~Bullet();
 
     i32 on_tick();
-    i32 sub_4124b0(i32 arg);
+    // 0x4124b0. Tests the bullet against the player (graze_only is passed
+    // on): 1 if it hit (the bullet then starts its cancel animation), 2 if
+    // it grazed.
+    i32 sub_4124b0(i32 graze_only);
+    // 0x412670. Frees the bullet: back to the free list, off the tick list.
+    void sub_412670();
     // 0x414ec0. The first et_ex transform: a speed boost that fades over
     // 16 frames; 1 once it is over.
     i32 step_ex_00();

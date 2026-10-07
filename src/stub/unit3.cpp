@@ -37,9 +37,3 @@ i32 Bullet::on_tick()
     return 0;
 }
 
-// STUB: TH16 0x4124b0
-i32 Bullet::sub_4124b0(i32 arg)
-{
-    return 0;
-}
-
