@@ -726,6 +726,7 @@ static __forceinline void replay_set_end_stage_inline(ReplayManager *replay, i32
 
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 
+// TODO: ours keeps the Q key's shared tail in case 6 (the original's is in case 7), uses idiv for % 13, and keeps name's address in esi around the replay save.
 // FUNCTION: TH16 0x43f980
 void PauseMenu::tick_open()
 {
