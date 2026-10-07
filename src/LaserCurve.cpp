@@ -56,9 +56,9 @@ static __forceinline void allocate_curve_laser_inline(void *params)
 // becomes a new curvy laser continuing this one's nodes.
 // TODO: the original keeps center, size and the loop state in different registers and stack slots; the run loops are laid out differently.
 // FUNCTION: TH16 0x4397d0
-i32 LaserCurveInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 e)
+i32 LaserCurveInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln)
 {
-    if (e != 0 && ex_invuln_remaining_frames != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }
@@ -192,9 +192,9 @@ done:
 // dropped, and otherwise everything before the end of the first hit run.
 // Returns the number of segments hit.
 // FUNCTION: TH16 0x43a2f0
-i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 mode, i32 d)
+i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 mode, i32 skip_invuln)
 {
-    if (d != 0 && ex_invuln_remaining_frames != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }
@@ -314,9 +314,9 @@ static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECT
 
 // Cancels the laser, leaving a cancel effect on every third segment.
 // FUNCTION: TH16 0x43a620
-i32 LaserCurveInf::cancel(i32 mode, i32 b)
+i32 LaserCurveInf::cancel(i32 mode, i32 skip_invuln)
 {
-    if (b != 0 && ex_invuln_remaining_frames != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }

@@ -473,7 +473,7 @@ LaserCurveInf::LaserCurveInf()
 
 // TODO: the original has an 8-byte frame (sub esp, 8) where ours has 4.
 // FUNCTION: TH16 0x431950
-HARNESS_CALLED i32 LaserManager::cancel_in_rectangle(Float3 *a, Float3 *b, f32 angle, i32 mode, i32 e)
+HARNESS_CALLED i32 LaserManager::cancel_in_rectangle(Float3 *a, Float3 *b, f32 angle, i32 mode, i32 skip_invuln)
 {
     LaserManager *mgr = g_LaserManager;
     LaserDataInf *laser = mgr->list_head.next;
@@ -485,7 +485,7 @@ HARNESS_CALLED i32 LaserManager::cancel_in_rectangle(Float3 *a, Float3 *b, f32 a
         LaserDataInf *next = laser->next;
         if (laser->state != LASER_STATE_CANCELLED && laser->ticked)
         {
-            count += laser->cancel_as_bomb_rectangle(a, b, angle, mode, e);
+            count += laser->cancel_as_bomb_rectangle(a, b, angle, mode, skip_invuln);
         }
         laser = next;
     }
@@ -509,7 +509,7 @@ i32 LaserManager::cancel_all()
 
 // TODO: the original has an 8-byte frame (sub esp, 8) where ours has 4.
 // FUNCTION: TH16 0x431a70
-HARNESS_CALLED i32 LaserManager::cancel_in_radius(Float3 *pos, f32 radius, i32 c, i32 d)
+HARNESS_CALLED i32 LaserManager::cancel_in_radius(Float3 *pos, f32 radius, i32 mode, i32 skip_invuln)
 {
     LaserManager *mgr = g_LaserManager;
     LaserDataInf *laser = mgr->list_head.next;
@@ -523,13 +523,13 @@ HARNESS_CALLED i32 LaserManager::cancel_in_radius(Float3 *pos, f32 radius, i32 c
         {
             continue;
         }
-        count += laser->cancel_as_bomb_circle(pos, radius, c, d);
+        count += laser->cancel_as_bomb_circle(pos, radius, mode, skip_invuln);
     }
     return count;
 }
 
 // FUNCTION: TH16 0x431af0
-HARNESS_CALLED i32 LaserManager::clear_all(i32 mode, i32 b)
+HARNESS_CALLED i32 LaserManager::clear_all(i32 mode, i32 skip_invuln)
 {
     LaserDataInf *laser = g_LaserManager->list_head.next;
     while (laser != NULL)
@@ -537,7 +537,7 @@ HARNESS_CALLED i32 LaserManager::clear_all(i32 mode, i32 b)
         LaserDataInf *next = laser->next;
         if (laser->state != LASER_STATE_CANCELLED)
         {
-            laser->cancel(mode, b);
+            laser->cancel(mode, skip_invuln);
         }
         laser = next;
     }
@@ -829,9 +829,9 @@ i32 LaserCurveInf::step_ex_angle()
 // it. Returns the number of points.
 // TODO: the original builds the first point as one vector copied to pos and the effect copy, and copies it again at the loop end; ours copies it inside the inlined create_vm.
 // FUNCTION: TH16 0x434cd0
-i32 LaserLineInf::cancel(i32 mode, i32 b)
+i32 LaserLineInf::cancel(i32 mode, i32 skip_invuln)
 {
-    if (b != 0 && ex_invuln_remaining_frames != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }
@@ -873,9 +873,9 @@ i32 LaserLineInf::cancel(i32 mode, i32 b)
 // get an effect and items.
 // TODO: the original copies step.x and adds position.x from memory (ours loads position.x first; swapping the operands or step += step does not help) and stores step.z = 0 late from a second zero register.
 // FUNCTION: TH16 0x436c70
-i32 LaserInfiniteInf::cancel(i32 mode, i32 b)
+i32 LaserInfiniteInf::cancel(i32 mode, i32 skip_invuln)
 {
-    if (b != 0 && ex_invuln_remaining_frames != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }
@@ -920,9 +920,9 @@ i32 LaserInfiniteInf::cancel(i32 mode, i32 b)
 // hit.
 // TODO: register allocation differs throughout (the original keeps center in ebx and count in memory) and the run loops are laid out differently.
 // FUNCTION: TH16 0x434730
-i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 d)
+i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln)
 {
-    if (d != 0 && ex_invuln_remaining_frames != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }
@@ -1337,9 +1337,9 @@ i32 LaserCurveInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 // Returns the number of points hit.
 // TODO: the original zeroes i (ebx) before the memset and stores step.z first; the run loops' register use and the params copy differ.
 // FUNCTION: TH16 0x436670
-i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 d)
+i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln)
 {
-    if (d != 0 && ex_invuln_remaining_frames != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }
@@ -1629,9 +1629,9 @@ i32 LaserCurveInf::check_graze_or_kill(i32 graze_only)
 // rect_angle): the points are tested in the rectangle's frame.
 // TODO: register allocation differs throughout (the original keeps this in esi and copies center and size to locals first).
 // FUNCTION: TH16 0x433860
-i32 LaserLineInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 e)
+i32 LaserLineInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln)
 {
-    if (e != 0 && ex_invuln_remaining_frames != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }
@@ -1794,9 +1794,9 @@ i32 LaserLineInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rec
 // frame. The pieces after the first hit run become straight lasers.
 // TODO: register allocation differs throughout, as in LaserLineInf::cancel_as_bomb_rectangle.
 // FUNCTION: TH16 0x435880
-i32 LaserInfiniteInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 e)
+i32 LaserInfiniteInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln)
 {
-    if (e != 0 && ex_invuln_remaining_frames != 0)
+    if (skip_invuln != 0 && ex_invuln_remaining_frames != 0)
     {
         return 0;
     }

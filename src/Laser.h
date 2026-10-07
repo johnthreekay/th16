@@ -94,13 +94,16 @@ class LaserDataInf
     // rect_damage_sum for each point of the laser inside a rotated
     // rectangle (only the infinite laser's version is called).
     virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
-    virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
-    virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
-    virtual i32 cancel(i32 mode, i32 b);
+    // The cancels: inside a rotated rectangle, inside a circle, or the
+    // whole laser. mode is a BulletCancelMode for the items; with
+    // skip_invuln set, a laser under BULLET_EX_INVULN is spared.
+    virtual i32 cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln);
+    virtual i32 cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln);
+    virtual i32 cancel(i32 mode, i32 skip_invuln);
     virtual i32 method_2c(i32 a, i32 b, i32 c, i32 d);
     // ExpHP: method_30. 2 if a circle at pos touches the laser, else 0.
     virtual i32 touches_circle(Float3 *pos, f32 radius);
-    virtual i32 check_graze_or_kill(i32 a);
+    virtual i32 check_graze_or_kill(i32 graze_only);
     // The et_ex steps (ExpHP: method_38 to method_60), as Bullet::step_ex_NN
     // for the BulletExType of the same name; BULLET_EX_ANGLE picks one of
     // three by its mode (ex_state[3].ints[3]: 0, 1 or 4).
@@ -199,11 +202,11 @@ class LaserLineInf : public LaserDataInf
     virtual i32 on_draw();
     virtual i32 on_destroy();
     virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
-    virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
-    virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
-    virtual i32 cancel(i32 mode, i32 b);
+    virtual i32 cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln);
+    virtual i32 cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln);
+    virtual i32 cancel(i32 mode, i32 skip_invuln);
     virtual i32 touches_circle(Float3 *pos, f32 radius);
-    virtual i32 check_graze_or_kill(i32 a);
+    virtual i32 check_graze_or_kill(i32 graze_only);
     virtual i32 step_ex_accel();
     virtual i32 step_ex_angle();
     virtual i32 step_ex_bounce();
@@ -271,11 +274,11 @@ class LaserInfiniteInf : public LaserDataInf
     virtual i32 on_draw();
     virtual i32 on_destroy();
     virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
-    virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
-    virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
-    virtual i32 cancel(i32 mode, i32 b);
+    virtual i32 cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln);
+    virtual i32 cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln);
+    virtual i32 cancel(i32 mode, i32 skip_invuln);
     virtual i32 touches_circle(Float3 *pos, f32 radius);
-    virtual i32 check_graze_or_kill(i32 a);
+    virtual i32 check_graze_or_kill(i32 graze_only);
 };
 
 // One stretch of a curvy laser's path: its head follows the nodes in
@@ -393,11 +396,11 @@ class LaserCurveInf : public LaserDataInf
     virtual i32 on_draw();
     virtual i32 on_destroy();
     virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
-    virtual i32 cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32 d, i32 e);
-    virtual i32 cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d);
-    virtual i32 cancel(i32 mode, i32 b);
+    virtual i32 cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rect_angle, i32 mode, i32 skip_invuln);
+    virtual i32 cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln);
+    virtual i32 cancel(i32 mode, i32 skip_invuln);
     virtual i32 touches_circle(Float3 *pos, f32 radius);
-    virtual i32 check_graze_or_kill(i32 a);
+    virtual i32 check_graze_or_kill(i32 graze_only);
     virtual i32 step_ex_accel();
     virtual i32 step_ex_angle_accel();
     virtual i32 step_ex_angle();
@@ -458,7 +461,7 @@ class LaserBeamInf : public LaserDataInf
     virtual i32 on_draw();
     virtual i32 on_destroy();
     virtual i32 sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f);
-    virtual i32 cancel(i32 mode, i32 b);
+    virtual i32 cancel(i32 mode, i32 skip_invuln);
     virtual i32 touches_circle(Float3 *pos, f32 radius);
 };
 
@@ -506,10 +509,10 @@ struct LaserManager
 
     // These reach the manager through g_LaserManager; LTCG drops this.
     i32 allocate_new_laser(i32 kind, void *params);
-    HARNESS_CALLED i32 cancel_in_rectangle(Float3 *a, Float3 *b, f32 angle, i32 mode, i32 e);
+    HARNESS_CALLED i32 cancel_in_rectangle(Float3 *center, Float3 *size, f32 angle, i32 mode, i32 skip_invuln);
     i32 cancel_all();
-    HARNESS_CALLED i32 cancel_in_radius(Float3 *pos, f32 radius, i32 c, i32 d);
-    HARNESS_CALLED i32 clear_all(i32 mode, i32 b);
+    HARNESS_CALLED i32 cancel_in_radius(Float3 *pos, f32 radius, i32 mode, i32 skip_invuln);
+    HARNESS_CALLED i32 clear_all(i32 mode, i32 skip_invuln);
     // 0x41aa40. The laser with the given id, NULL if there is none. The
     // second argument is the same at every call site; LTCG folded it.
     HARNESS_CALLED LaserDataInf *find_by_id(i32 id, i32 unused);

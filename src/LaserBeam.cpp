@@ -25,9 +25,9 @@ i32 LaserBeamInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 }
 
 // FUNCTION: TH16 0x43ac40
-i32 LaserBeamInf::cancel(i32 mode, i32 b)
+i32 LaserBeamInf::cancel(i32 mode, i32 skip_invuln)
 {
-    if (b == 0)
+    if (skip_invuln == 0)
     {
         pending_delete = 1;
     }
