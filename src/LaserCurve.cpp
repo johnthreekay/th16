@@ -30,6 +30,25 @@ i32 LaserCurveInf::on_destroy()
     return 0;
 }
 
+// allocate_new_laser(LASER_CURVE, params) as LTCG inlined it into the bomb
+// cancel, constructor included.
+static __forceinline void allocate_curve_laser_inline(void *params)
+{
+    LaserManager *mgr = g_LaserManager;
+    if (mgr->list_length < 0x200)
+    {
+        mgr->last_id++;
+        if (mgr->last_id < 0x10000)
+        {
+            mgr->last_id = 0x10000;
+        }
+        LaserDataInf *laser = new LaserCurveInf();
+        laser->id = mgr->last_id;
+        mgr->append(laser);
+        laser->initialize(params);
+    }
+}
+
 // Cancels the segments inside a bomb's rectangle (an effect and items on
 // every tenth), then cuts the laser: a hit head is dropped, the laser ends
 // at the first hit run, and every later unhit run of at least 4 segments
@@ -147,7 +166,7 @@ i32 LaserCurveInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 re
                 params.shot_sfx = -1;
                 params.source_nodes = &nodes;
                 params.source_time = timer_40.current_f - (f32)start;
-                g_LaserManager->allocate_new_laser(LASER_CURVE, &params);
+                allocate_curve_laser_inline(&params);
             }
         }
         if (head >= 4)
