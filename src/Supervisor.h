@@ -220,7 +220,7 @@ struct Supervisor
     HARNESS_CALLED i32 start_thread(ThreadStart start, void *arg);
     HARNESS_CALLED i32 play_bgm_wav(i32 arg, const char *name);
     HARNESS_CALLED i32 play_bgm(i32 arg, i32 track);
-    i32 stop_bgm();
+    HARNESS_CALLED i32 stop_bgm();
     HARNESS_CALLED i32 fade_out_bgm(f32 seconds);
     // 0x43b480. Opens th16.dat and reads the version file from it, for
     // on_registration.

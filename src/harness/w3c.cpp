@@ -58,12 +58,6 @@ void harness_w3c_gui_notice_4()
     g_Gui->sub_42bcf0(0, 4);
 }
 
-// Like GameThread::thread_start at 0x42d0a9.
-void harness_w3c_enemy_manager_reset()
-{
-    g_EnemyManager->reset_for_stage(0);
-}
-
 // Like the game start code at 0x42e171.
 void harness_w3c_player_resume_options()
 {

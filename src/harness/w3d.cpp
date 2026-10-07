@@ -29,12 +29,6 @@ i32 harness_w3d_replay_end_stage(i32 stage)
     return g_ReplayManager->set_end_stage(stage);
 }
 
-// GameThread::thread_start (0x42d027).
-void harness_w3d_replay_start_stage()
-{
-    g_ReplayManager->start_stage();
-}
-
 // GameThread's stage setup (0x42dd2d, 0x42df45).
 void harness_w3d_replay_begin_stage()
 {
@@ -73,20 +67,6 @@ i32 *harness_w3d_unk_4d9d90()
 i32 harness_w3d_scorefile(Scorefile *scorefile, i32 character)
 {
     return scorefile->has_cleared(character);
-}
-
-// GameThread creates the player (0x42ce15) and deletes it in its
-// destructor (0x42d439).
-void harness_w3d_player(i32 create)
-{
-    if (create)
-    {
-        Player::create();
-    }
-    else if (g_Player != NULL)
-    {
-        delete g_Player;
-    }
 }
 
 // GameThread's stage setup (0x42dcf3, 0x42df0b).

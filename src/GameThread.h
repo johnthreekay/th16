@@ -113,7 +113,7 @@ struct GameThread
 
     HARNESS_CALLED static GameThread *create(i32 replay_mode);
     static void destroy();
-    static void thread_start();
+    static i32 thread_start();
     static void thread_start_callback();
     HARNESS_CALLED i32 on_tick_body();
     // 0x418420. Reactivates on_tick and on_draw.
