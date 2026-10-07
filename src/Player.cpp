@@ -73,6 +73,67 @@ HARNESS_CALLED void Player::set_position(f32 x, f32 y)
     inner.main_options[3].should_instajump = 1;
 }
 
+// TODO: ours gets a /GS cookie (from pos and the inlined set_entity_pos) and keeps the option pointer in esi, not edi+0x60.
+// FUNCTION: TH16 0x442380
+HARNESS_CALLED i32 Player::update_options(PlayerOption *options, i32 count)
+{
+    for (i32 i = 0; i < count; i++)
+    {
+        PlayerOption *option = &options[i];
+        if (!option->active)
+        {
+            continue;
+        }
+        if (!(inner.flags & 2))
+        {
+            i32 focused = inner.is_focused != 0;
+            option->scaled_preferred_pos.x = (&option->scaled_preferred_pos_rel_to_player)[focused].x + inner.pos_subpixel.x;
+            option->scaled_preferred_pos.y = inner.pos_subpixel.y + (&option->scaled_preferred_pos_rel_to_player)[focused].y;
+            if (option->on_update != NULL)
+            {
+                option->on_update(&inner.main_options[i]);
+            }
+        }
+        else
+        {
+            option->scaled_preferred_pos.x = inner.pos_subpixel.x;
+            option->scaled_preferred_pos.y = inner.pos_subpixel.y;
+            if (inner.unk_16074 >= 30)
+            {
+                option->active = 0;
+                AnmManager::interrupt_tree(option->anm_id_b0, 1);
+                AnmManager::interrupt_tree(option->anm_id_b4, 1);
+                continue;
+            }
+        }
+        if (!option->should_instajump)
+        {
+            if (inner.percent_moved_by_options < 30)
+            {
+                goto place;
+            }
+            i32 dx = (option->scaled_preferred_pos.x - option->scaled_cur_pos.x) * inner.percent_moved_by_options / 100;
+            i32 dy = (option->scaled_preferred_pos.y - option->scaled_cur_pos.y) * inner.percent_moved_by_options / 100;
+            if (dx != 0 || dy != 0)
+            {
+                option->scaled_cur_pos.x += dx;
+                option->scaled_cur_pos.y += dy;
+                goto place;
+            }
+        }
+        else
+        {
+            option->should_instajump = 0;
+        }
+        option->scaled_cur_pos = option->scaled_preferred_pos;
+    place:
+        Float3 pos(option->scaled_cur_pos.x / 128.0f, option->scaled_cur_pos.y / 128.0f, 0.0f);
+        option->anm_id_b0.set_entity_pos(&pos);
+        option->anm_id_b4.set_entity_pos(&pos);
+    }
+    return 0;
+}
+
 // FUNCTION: TH16 0x443840
 HARNESS_CALLED f32 Player::angle_to_player(Float3 *pos)
 {

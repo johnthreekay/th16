@@ -44,7 +44,11 @@ struct PlayerOption
     u8 unk_cc[0xd4 - 0xcc];
     // Next update moves the option straight to its preferred position.
     i32 should_instajump;
-    u8 unk_d8[0xe4 - 0xd8];
+    u8 unk_d8[0xdc - 0xd8];
+    // Called each frame before the option moves (with the main option of
+    // the same index, even for season options).
+    void(__fastcall *on_update)(PlayerOption *option);
+    u8 unk_e0[0xe4 - 0xe0];
 };
 
 struct PlayerBullet
@@ -134,7 +138,11 @@ struct PlayerInner
     u8 unk_16040[0x16050 - 0x16040];
     // Scaled by 1/128; aims and sizes Aya's bomb.
     f32 unk_16050;
-    u8 unk_16054[0x16074 - 0x16054];
+    u8 unk_16054[0x16070 - 0x16054];
+    // How far (in percent) options move toward their preferred position
+    // each frame; below 30 they stay put.
+    i32 percent_moved_by_options;
+    // Frames since the stage ended (ExpHP: frames_after_stage_end).
     i32 unk_16074;
     // Set every frame by the autumn release.
     f32 speed_multiplier;
@@ -319,6 +327,9 @@ struct Player
     i32 tick_shooting_state();
     // Enters state 1 for 60 frames.
     void start_respawn();
+    // 0x442380. Moves the options toward their positions around the
+    // player and places their VMs.
+    HARNESS_CALLED i32 update_options(PlayerOption *options, i32 count);
     // 0x442560
     i32 on_tick_body();
     static i32 __fastcall on_tick_callback(Player *player);
