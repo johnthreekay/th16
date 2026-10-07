@@ -66,7 +66,6 @@ i32 EffectManager::initialize()
     return 0;
 }
 
-// TODO: register allocation in the unregister part (this in ebx, one spill).
 // FUNCTION: TH16 0x4188d0
 EffectManager::~EffectManager()
 {
@@ -219,8 +218,6 @@ HARNESS_CALLED AnmId EffectManager::create_ui_effect(i32 effect, D3DXVECTOR3 *po
     return id;
 }
 
-// TODO: same as create_ui_effect: the original saves esi before the
-// critical section.
 // FUNCTION: TH16 0x418fe0
 HARNESS_CALLED AnmId AnmLoaded::create_ui_vm_at_origin(i32 script, i32 unused)
 {

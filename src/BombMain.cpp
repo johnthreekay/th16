@@ -69,7 +69,8 @@ static inline void spellcard_on_bomb()
 }
 
 // TODO: player and &pos trade registers (esi/edi) with the original, which
-// also pushes the sound argument later.
+// also pushes the sound argument later (get_vm instead of a direct
+// get_vm_with_id call removed the /GS cookie).
 // FUNCTION: TH16 0x40e780
 i32 BombAyaAInf::begin()
 {
@@ -83,7 +84,7 @@ i32 BombAyaAInf::begin()
     g_SoundManager.play_sound_centered(30, 0);
 
     anm_id = player->anm_file->create_vm(14, &pos, 0.0f, -1, 0);
-    AnmVm *vm = g_AnmManager->get_vm_with_id(anm_id);
+    AnmVm *vm = get_vm(anm_id);
     if (vm != NULL)
     {
         vm->rotation.z = angle;
@@ -151,8 +152,6 @@ i32 BombCirnoAInf::begin()
 
 // Sparkles inside the growing circle for most of the bomb, then all over
 // the screen.
-// TODO: the first sparkle's x adds pos.x to the offset where the original
-// adds the offset to pos.x (operand order of one addss).
 // FUNCTION: TH16 0x40f240
 i32 BombCirnoAInf::on_tick()
 {
@@ -179,7 +178,8 @@ i32 BombCirnoAInf::on_tick()
         D3DXVECTOR3 effect_pos;
         cirno_sincosmul(&effect_pos, angle, g_replay_safe_rng.randf_0_to_1() * scale);
         effect_pos.z = 0.0f;
-        effect_pos += pos;
+        Float3 *center = &pos;
+        effect_pos += *center;
         AnmVm *effect = g_EffectManager->get_tracked_vm(g_EffectManager->create_tracked(3, &effect_pos, 0));
         effect->flags_lo &= ~0x1c0;
         effect->flags_lo |= 0x20;
@@ -219,17 +219,13 @@ i32 BombMarisaAInf::begin()
 
 // Marisa's master spark: turns with the player's movement and keeps three
 // stretches of damage along the beam.
-// TODO: ours gets a /GS cookie for beam_pos and swaps edi/ebx (the ANM
-// manager and the VM).
+// TODO: ours gets a /GS cookie for beam_pos (it goes away without the
+// interrupt_tree calls, also when those go through an inline helper), and
+// sums beam_pos and pos in a different operand order.
 // FUNCTION: TH16 0x40fb00
 i32 BombMarisaAInf::on_tick()
 {
-    AnmManager *anm = g_AnmManager;
-    AnmVm *vm = anm->get_vm_with_id(anm_id);
-    if (vm == NULL)
-    {
-        anm_id.id = 0;
-    }
+    AnmVm *vm = get_vm_or_clear(anm_id);
     g_Player->inner.iframes = 40;
     if (vm == NULL)
     {
@@ -247,8 +243,8 @@ i32 BombMarisaAInf::on_tick()
         g_Player->inner.flags &= ~4;
         g_Player->inner.speed_multiplier = 1.0f;
     }
-    vm->flags_lo |= 4;
     vm->rotation.z = angle;
+    vm->flags_lo |= 4;
     Player *player = g_Player;
     if (0.0f > player->inner.unk_16050)
     {
@@ -265,27 +261,21 @@ i32 BombMarisaAInf::on_tick()
         D3DXVECTOR3 beam_pos;
         beam_pos.z = 0.0f;
         marisa_sincosmul(&beam_pos, angle, 208.0f);
-        beam_pos.x = pos.x + beam_pos.x;
-        beam_pos.y = pos.y + beam_pos.y;
-        beam_pos.z = pos.z + beam_pos.z;
+        beam_pos += pos;
         g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 32.0f, angle, 0, 60))->flags |= 4;
         marisa_sincosmul(&beam_pos, angle, 240.0f);
-        beam_pos.x = pos.x + beam_pos.x;
-        beam_pos.y = pos.y + beam_pos.y;
-        beam_pos.z = pos.z + beam_pos.z;
+        beam_pos += pos;
         g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 128.0f, angle, 0, 20))->flags |= 4;
         marisa_sincosmul(&beam_pos, angle, 304.0f);
-        beam_pos.x = pos.x + beam_pos.x;
-        beam_pos.y = pos.y + beam_pos.y;
-        beam_pos.z = pos.z + beam_pos.z;
+        beam_pos += pos;
         g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 256.0f, angle, 0, 20))->flags |= 4;
     }
-    vm = anm->get_vm_with_id(anm_id);
+    vm = get_vm(anm_id);
     if (vm != NULL)
     {
         vm->entity_pos = pos;
     }
-    vm = anm->get_vm_with_id(anm_id_64);
+    vm = get_vm(anm_id_64);
     if (vm != NULL)
     {
         vm->entity_pos = pos;
@@ -333,18 +323,11 @@ i32 BombMarisaAInf::method_10()
 {
     for (i32 i = 0;; i++)
     {
-        AnmManager *anm = g_AnmManager;
-        if (anm->get_vm_with_id(anm_id) == NULL)
+        if (get_vm_or_clear(anm_id) == NULL)
         {
-            anm_id.id = 0;
             return 0;
         }
-        AnmVm *parent = anm->get_vm_with_id(anm_id);
-        if (parent == NULL)
-        {
-            anm_id.id = 0;
-        }
-        AnmVm *vm = parent->search_children(0x18, i);
+        AnmVm *vm = get_vm_or_clear(anm_id)->search_children(0x18, i);
         if (vm == NULL)
         {
             return 0;
@@ -379,33 +362,34 @@ i32 BombCirnoAInf::method_10()
 // The orb's motion: its pos is the first field of a PosVel.
 static inline PosVel *orb_motion(BombReimuAOrb *orb)
 {
-    return (PosVel *)&orb->pos;
+    return &orb->motion;
 }
 
-// TODO: the original addresses the PosVel through this (a member at +4), ours through a second pointer register; the ifs after the timer check also differ in block order.
+// TODO: this is in esi where the original has edi (both save esi and edi and
+// leave the other unused), and the radial_dist update is scheduled into the
+// start_pos copy.
 // FUNCTION: TH16 0x410550
 void BombReimuAOrb::update()
 {
-    PosVel *motion = orb_motion(this);
     if (timer.current != timer.previous)
     {
         i32 time = timer.current;
         if (time < 90)
         {
             start_pos = g_Player->inner.pos;
-            motion->radial_dist += 1.5f;
-            motion->angle.value = wrap_angle(motion->angle.value + ZUN_PI / 30);
+            motion.radial_dist += 1.5f;
+            motion.angle.value = wrap_angle(motion.angle.value + ZUN_PI / 30);
         }
         else if (time < (index + 9) * 10)
         {
             start_pos = g_Player->inner.pos;
-            motion->angle.value = wrap_angle(motion->angle.value + ZUN_PI / 30);
+            motion.angle.value = wrap_angle(motion.angle.value + ZUN_PI / 30);
         }
         else if (time == (index + 9) * 10)
         {
-            motion->flags &= ~0xf;
-            motion->set_angle(atan2(move.y, move.x));
-            motion->speed = sqrtf(move.x * move.x + move.y * move.y);
+            motion.flags &= ~0xf;
+            motion.set_angle(atan2(move.y, move.x));
+            motion.speed = sqrtf(move.x * move.x + move.y * move.y);
         }
         else
         {
@@ -420,7 +404,7 @@ void BombReimuAOrb::update()
                 {
                     f32 goal = atan2(target_enemy->enemy.final_pos.pos.y - pos.y,
                                      target_enemy->enemy.final_pos.pos.x - pos.x);
-                    f32 angle = motion->angle.value;
+                    f32 angle = motion.angle.value;
                     f32 delta;
                     if (goal - angle > ZUN_PI)
                     {
@@ -434,7 +418,7 @@ void BombReimuAOrb::update()
                     {
                         delta = goal - angle;
                     }
-                    f32 speed = motion->speed;
+                    f32 speed = motion.speed;
                     f32 abs_delta = fabs(delta);
                     if (abs_delta >= ZUN_PI / 4)
                     {
@@ -444,20 +428,20 @@ void BombReimuAOrb::update()
                     {
                         speed = speed + 0.2f > 8.0f ? 8.0f : speed + 0.2f;
                     }
-                    motion->set_angle((motion->angle + delta * 0.1f).value);
-                    motion->speed = speed;
+                    motion.set_angle((motion.angle + delta * 0.1f).value);
+                    motion.speed = speed;
                 }
             }
             else if (pos.x < -160.0f || pos.x > 160.0f || pos.y < 32.0f || pos.y > 416.0f)
             {
-                motion->speed *= 0.9f;
+                motion.speed *= 0.9f;
             }
         }
     }
     D3DXVECTOR3 old_pos = pos;
-    motion->update_secondary_fields();
-    motion->step();
-    AnmVm *vm = g_AnmManager->get_vm_with_id(anm_id);
+    motion.update_secondary_fields();
+    motion.step();
+    AnmVm *vm = get_vm(anm_id);
     if (vm != NULL)
     {
         vm->entity_pos = pos;
@@ -573,13 +557,12 @@ i32 BombReimuAInf::method_10()
     return 0;
 }
 
-// TODO: register choice around the create_vm call (the original keeps the
-// return slot in ecx and g_Player in eax).
 // FUNCTION: TH16 0x4109d0
 void BombReimuAOrb::start(i32 index, D3DXVECTOR3 *pos)
 {
     start_pos = *pos;
-    anm_id = g_Player->anm_file->create_vm(0xf, &this->pos, 0.0f, -1, 0);
+    AnmLoaded *anm = g_Player->anm_file;
+    anm_id = anm->create_vm(0xf, &this->pos, 0.0f, -1, 0);
     active = 1;
     timer.reset();
     this->index = index;
@@ -616,8 +599,6 @@ void BombReimuAOrb::finish()
 }
 
 // finish for every orb, with the laser cancel and the VM deletion inlined.
-// TODO: the original loads the VM's child list after storing flags_hi (as
-// in ~EnemyInf).
 // FUNCTION: TH16 0x410bb0
 void BombReimuAOrbs::finish_all()
 {

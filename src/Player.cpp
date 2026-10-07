@@ -196,8 +196,9 @@ HARNESS_CALLED i32 Player::check_hit_rect(Float3 *pos, Float3 *size, i32 graze_o
     return 1;
 }
 
-// TODO: the original has an 8-byte frame, subtracts y before x, and puts
-// the return 0 for an open dialogue right after its test.
+// TODO: the original loads inner.pos.y first and sums x*x + y*y (ours
+// y*y + x*x, swapped registers), and puts the return 0 for an open dialogue
+// right after its test.
 // FUNCTION: TH16 0x4439e0
 HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_only)
 {
@@ -237,8 +238,6 @@ HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_o
     return 1;
 }
 
-// TODO: the original reserves 8 bytes of locals where ours has 4.
-// TODO: the original realigns its frame to 8 bytes (ebx-based form); the body matches.
 // FUNCTION: TH16 0x443cd0
 void Player::lose_life()
 {
@@ -326,8 +325,9 @@ i32 __fastcall Player::on_tick_callback(Player *player)
     return player->on_tick_body();
 }
 
-// TODO: the original pushes the player (push ecx/pop ecx) as an unused
-// stack slot, like on_tick_callback.
+// TODO: the original pads the draw_vm call with push ecx/pop ecx for 8-byte
+// alignment, like on_tick_callback; ours does not, most likely because LTCG
+// does not see draw_vm needing alignment early (draw_vm does not match yet).
 // FUNCTION: TH16 0x443730
 i32 __fastcall Player::on_draw_callback(Player *player)
 {
@@ -588,8 +588,8 @@ i32 Player::shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner)
     return bullet->create(shooter_ref, time, inner) != 0 ? -1 : 0;
 }
 
-// TODO: the original realigns its frame (and esp, -8), most likely for
-// PlayerBullet::create, an opaque stub here.
+// TODO: the original realigns its frame (ebx form); the body matches. Not
+// for PlayerBullet::create (real code now, no realignment of its own).
 // FUNCTION: TH16 0x445470
 i32 Player::do_shooting(i32 short_time, i32 long_time)
 {
@@ -704,28 +704,29 @@ i32 Player::tick_shooting_state()
     return 0;
 }
 
-// TODO: our spawn_item is an ordinary thiscall (/INCLUDE keeps it so),
-// where the original's LTCG dropped this and folded unk_3 and unk_6; the
-// graze counters and the midpoint are also scheduled differently.
+// atan2 is spelled out so that it stays inline (see angle_to_player); the
+// double math realigns the frame, which also gives spawn_item known
+// alignment.
 // FUNCTION: TH16 0x444cf0
 HARNESS_CALLED void Player::do_graze(Float3 *pos)
 {
-    g_Globals.graze = g_Globals.graze + 1 > 99999999 ? 99999999 : g_Globals.graze + 1;
-    g_Globals.graze_in_chapter = g_Globals.graze_in_chapter + 1 > 99999999 ? 99999999 : g_Globals.graze_in_chapter + 1;
     Player *player = g_Player;
-    Float3 mid;
-    mid.x = (player->inner.pos.x + pos->x) * 0.5f;
-    mid.y = (pos->y + player->inner.pos.y) * 0.5f;
+    i32 graze_in_chapter = g_Globals.graze_in_chapter + 1;
+    i32 graze = g_Globals.graze + 1;
+    g_Globals.graze = graze > 99999999 ? 99999999 : graze;
+    g_Globals.graze_in_chapter = graze_in_chapter > 99999999 ? 99999999 : graze_in_chapter;
+    Float3 mid = (player->inner.pos + *pos) * 0.5f;
     mid.z = 0.0f;
     g_EffectManager->effect_anm->create_vm(0x18, &mid, 0.0f, -1, 0);
     g_PopupManager->generate_small_score_popup(&mid, g_Globals.graze_in_chapter, 0xffc0c0ff);
     g_SoundManager.play_sound_at_position(0x2a, pos->x);
-    g_ItemManager->spawn_item(0x10, pos, 0, atan2f(pos->y - player->inner.pos.y, pos->x - player->inner.pos.x), 1.9f,
-                              0, 0);
+    g_ItemManager->spawn_item(0x10, pos, 0,
+                              (f32)atan2((double)(pos->y - player->inner.pos.y), (double)(pos->x - player->inner.pos.x)),
+                              1.9f, 0, 0);
 }
 
-// TODO: the original realigns its frame (and esp, -8) and orders the
-// rotation and the bounds differently (same convention and logic).
+// TODO: d.x and d.y take swapped stack slots and the scaled hurtbox bounds
+// are computed in a different order (frame and convention match).
 // FUNCTION: TH16 0x443af0
 HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only)
 {
@@ -963,7 +964,6 @@ const char *const g_player_anm_names[4] = {"pl00.anm", "pl02.anm", "pl03.anm", "
 const char *const g_subseason_anm_names[5] = {"pl00sub.anm", "pl02sub.anm", "pl03sub.anm", "pl01sub.anm",
                                               "pl04sub.anm"};
 
-// TODO: block order of the .sht loading branch and the VM pointer register differ.
 // FUNCTION: TH16 0x440fb0
 i32 Player::initialize()
 {
@@ -1015,10 +1015,13 @@ i32 Player::initialize()
         g_UpdateFuncRegistry->register_on_draw(f, 0x1d);
         on_draw = f;
     }
-    anm_file->copy_vm(&vm, 0);
-    vm.unk_5b0 = NULL;
-    vm.parent = NULL;
-    vm.run();
+    {
+        AnmVm *player_vm = &vm;
+        anm_file->copy_vm(player_vm, 0);
+        player_vm->unk_5b0 = NULL;
+        player_vm->parent = NULL;
+        player_vm->run();
+    }
     set_position(0.0f, 400.0f);
     for (i32 i = 0; i < 4; i++)
     {
