@@ -1878,9 +1878,9 @@ int EnemyData::ecl_run_over_300()
     case ECL_OP_FLAG_MIRROR:
         ((EnemyFlagsLow *)&flags_low)->mirrored = get_int_arg(0);
         break;
-    // spell(id, a, b, name) and its per-difficulty forms: 537 to 539 add
-    // the difficulty (minus 0, 1 or 2) to the id. The name is stored
-    // encrypted.
+    // spell(id, time_limit, boss_index, name) and its per-difficulty forms:
+    // 537 to 539 add the difficulty (minus 0, 1 or 2) to the id. The name
+    // is stored encrypted.
     case ECL_OP_SPELL:
     case ECL_OP_SPELL_528:
     case ECL_OP_SPELL_537:
