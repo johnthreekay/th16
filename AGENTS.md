@@ -65,7 +65,8 @@ Several agents may work at once, each in its own git worktree and branch,
 each owning one address range. In a fresh worktree run
 `python3 scripts/worktree_setup.py` first (links prefix/, orig/, .venv/),
 then build. List your functions with
-`TH_RE_DATA=~/.cache/claude-builds/th16-ref/th-re-data .venv/bin/python scripts/list_functions.py <lo> <hi>`.
+`.venv/bin/python scripts/list_functions.py <lo> <hi>`; with `TH_RE_DATA`
+set to a checkout of ExpHP's th-re-data it also shows their names.
 
 To keep branches mergeable:
 - New code goes in files named after the class or module (`src/Bullet.cpp`).
