@@ -76,7 +76,9 @@ struct Supervisor
     i32 gamemode_to_switch_to;
     i32 gamemode_prev;
     i32 unk_6fc;
-    u8 unk_700[0x728 - 0x700];
+    // Read by ECL variable -9927.
+    i32 unk_700;
+    u8 unk_704[0x728 - 0x704];
     // text.anm: dialogue text and furigana lines.
     struct AnmLoaded *text_anm;
     u8 unk_72c[0x730 - 0x72c];

@@ -111,7 +111,10 @@ struct EnemyFlagsLow
 {
     u32 unk_0 : 19;
     u32 mirrored : 1;
-    u32 unk_20 : 6;
+    u32 unk_20 : 4;
+    // Set while a time interrupt is running (check_time_interrupts).
+    u32 flag_1000000 : 1;
+    u32 unk_25 : 1;
     u32 flag_4000000 : 1;
     u32 unk_27 : 3;
     // Life of 1000 or more.

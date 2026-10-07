@@ -52,3 +52,9 @@ EnemyInf *harness_w3b_get_boss(i32 i)
 {
     return g_EnemyManager->get_boss(i);
 }
+
+// The ECL reads the enemy count.
+int harness_w3b_get_enemy_count()
+{
+    return g_EnemyManager->get_enemy_count();
+}

@@ -86,7 +86,8 @@ struct EnemyManager
     static HARNESS_CALLED EnemyManager *create(const char *ecl_filename);
     int initialize(const char *ecl_filename);
     void destroy_all();
-    int get_enemy_count();
+    // Uses g_EnemyManager; LTCG dropped this.
+    HARNESS_CALLED int get_enemy_count();
     HARNESS_CALLED void set_boss_id(int index, EnemyInf *enemy);
     HARNESS_CALLED void set_boss_bit(int value);
     HARNESS_CALLED void remove_from_active_list(EnemyInf *enemy);
