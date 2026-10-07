@@ -888,7 +888,7 @@ struct AnmVm
     // transform_coords; returns out.
     Float3 *get_own_transformed_pos(Float3 *out);
     // 0x46f510. The nth descendant (depth first) running the given script
-    // (unk_49c; -1 for any).
+    // (script_id_short; -1 for any).
     HARNESS_CALLED AnmVm *search_children(i32 script, i32 nth);
     // 0x46f380 and 0x46f3b0 (ExpHP: set/clear_ins_316_flag_recursively).
     HARNESS_CALLED void show_tree();

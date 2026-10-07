@@ -59,8 +59,8 @@ void AnmVm::wipe()
     uv_scale.y = 1.0f;
     color_1.d3d = 0xffffffff;
     D3DXMatrixIdentity(&sprite_matrix);
-    // A 16-bit store in the original.
-    *(u16 *)&flags_lo = 7;
+    // Visible, shown, rotation changed. A 16-bit store in the original.
+    *(u16 *)&flags_lo = ANM_VM_VISIBLE | ANM_VM_SHOWN | ANM_VM_ROTATION_CHANGED;
     script_time.clear();
     time_in_script.clear();
     pos_i.end_time = 0;

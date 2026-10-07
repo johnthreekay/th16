@@ -550,7 +550,7 @@ i32 AsciiInf::draw_group(i32 group)
     return 1;
 }
 
-// Group 1 is drawn with layer kind 2 coordinates on the first camera.
+// Group 1 is drawn with camera 0, placed from the arcade HUD origin.
 // FUNCTION: TH16 0x408ef0
 i32 AsciiInf::draw_group_1()
 {

@@ -12,7 +12,7 @@
 #include "Rng.h"
 #include "ZunMath.h"
 
-// The copy of ZunMath.h's sincosmul that effect kind 3's object file has
+// The copy of ZunMath.h's sincosmul that the jagged line's object file has
 // (TH16 keeps one per object file). A static of its own so that it can be
 // annotated.
 // FUNCTION: TH16 0x406cc0
@@ -58,7 +58,7 @@ int __fastcall anm_gather_effect_init(AnmVm *vm, i32 arg)
     return 0;
 }
 
-// The copy of ZunMath.h's sincosmul that effect kind 2's object file has.
+// The copy of ZunMath.h's sincosmul that the gather effect's object file has.
 // FUNCTION: TH16 0x406470
 static void __fastcall gather_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
@@ -309,8 +309,8 @@ int __fastcall anm_gather_effect_on_serialize(AnmVm *vm, u8 *buffer, i32 *size, 
     return 0;
 }
 
-// ins_508 data of effect kind 3: a fan of colored points that grows by
-// one each frame.
+// Extra data of the jagged line (EffectManager effects 2 and 3): up to 64
+// points, one more each frame, each a random step from the one before.
 struct AnmJaggedLineData
 {
     Float2 offsets[64];
@@ -438,11 +438,14 @@ int __fastcall anm_jagged_line_on_switch(AnmVm *vm, i32 n)
     return 0;
 }
 
-// ins_508 data of effect kind 1: four VMs, then a fifth that runs until
-// those have all ended.
+// Extra data of the masked effect (EffectManager effect 0): four VMs drawn as
+// an alpha mask and a fifth drawn through it (anm_on_draw_masked, which reads
+// it as AnmMaskData), until the four have ended.
 struct AnmMaskedEffectData
 {
     AnmVm vms[5];
+    // AnmMaskData::mode: 2 masks the arcade region, 0 the whole screen.
+    // Interrupts 7-10 change it along with the layer.
     i32 mask_mode;
     i32 frame_count;
 };

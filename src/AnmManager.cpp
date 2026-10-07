@@ -12,7 +12,7 @@ void AnmLoaded::copy_vm_and_run(AnmVm *vm, i32 script)
     vm->run();
 }
 
-// TODO: only difference: ours adds a /GS cookie for the recursive call's parent_pos (with the body in an inline helper the cookie goes, but parent stays cached in edi).
+// TODO: only difference: ours adds a /GS cookie for the recursive call's parent_pos (with the body in an inline helper the cookie goes, but root_vm stays cached in edi).
 // FUNCTION: TH16 0x40e490
 D3DXVECTOR3 AnmVm::world_pos()
 {
