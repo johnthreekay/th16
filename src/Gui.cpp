@@ -62,7 +62,9 @@ Gui::Gui()
 }
 
 // TODO: the original frame has 4 more bytes and saves esi in the
-// prologue; ours saves it after the early returns.
+// prologue; ours saves it after the early returns. Known alignment from
+// GameThread::thread_start, which realigns in the original; matches once it
+// does (tested with a stand-in double there).
 // FUNCTION: TH16 0x426b00
 i32 Gui::initialize()
 {
@@ -105,7 +107,8 @@ i32 Gui::initialize()
 }
 
 // TODO: ours saves esi/edi only around the strcpy branch; the original
-// saves them in the prologue.
+// saves them in the prologue (known alignment from GameThread::thread_start,
+// which realigns in the original; 98.8% once it does).
 // FUNCTION: TH16 0x426c10
 i32 Gui::load_stage_files()
 {
@@ -253,7 +256,8 @@ Gui *Gui::create()
 }
 
 // TODO: the original calls on_tick_body with the stack realigned (push ecx)
-// instead of jumping to it; LTCG did that for the real body's sake.
+// instead of jumping to it; matches once GameThread::thread_start realigns
+// its frame like the original (tested with a stand-in double there).
 // FUNCTION: TH16 0x429af0
 i32 __fastcall Gui::on_tick_callback(Gui *self)
 {
@@ -1412,8 +1416,8 @@ void __fastcall anm_vm_interrupt_2_run(AnmVm *vm)
     vm->run();
 }
 
-// TODO: the original keeps g_AnmManager in edi across the lookups (LTCG
-// knows get_vm_with_id leaves it alone).
+// TODO: ours gets a /GS cookie and keeps the create_effect results in a
+// local; the original has no cookie and reuses script's argument slot for them.
 // FUNCTION: TH16 0x429b20
 GuiMsgVm::GuiMsgVm(void *script)
 {

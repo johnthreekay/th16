@@ -76,7 +76,8 @@ StageInner::~StageInner()
 }
 
 // TODO: ours saves esi/edi after the load_std check (shrink-wrapped); the
-// original saves them in the prologue.
+// original saves them in the prologue. Matches once GameThread::thread_start
+// realigns like the original (tested with a stand-in double there).
 // FUNCTION: TH16 0x4097c0
 HARNESS_CALLED i32 Stage::load_data(const char *path, i32 unused)
 {
@@ -197,7 +198,9 @@ Stage::~Stage()
     }
 }
 
-// TODO: the original reserves one more 4-byte stack slot (sub esp, 8).
+// TODO: the original reserves one more 4-byte stack slot (sub esp, 8): a
+// padded frame from GameThread::thread_start's realignment, which ours lacks;
+// matches once thread_start realigns (tested with a stand-in double there).
 // FUNCTION: TH16 0x409db0
 HARNESS_CALLED Stage *Stage::create(const char *path)
 {
@@ -363,7 +366,7 @@ i32 Stage::on_draw_03()
 
 // Draws layers 32 and 33 of the ANM manager and layers 8-11 of the stage,
 // and runs the fade timer.
-// TODO: the original realigns its frame through ebx and stores 0xff into the color byte after loading the flags.
+// TODO: the original realigns its frame through ebx and stores 0xff into the color byte after loading the flags. Matches once GameThread::thread_start realigns like the original (tested).
 // FUNCTION: TH16 0x40a410
 i32 Stage::on_draw_06()
 {
@@ -754,7 +757,8 @@ int __fastcall Stage::on_draw_06_callback(void *arg)
 }
 
 // TODO: ours saves esi/edi late (shrink-wrapped) and merges the stack
-// cleanups of malloc/memcpy/memset.
+// cleanups of malloc/memcpy/memset. Matches once GameThread::thread_start
+// realigns like the original (tested with a stand-in double there).
 // FUNCTION: TH16 0x40ac30
 i32 Stage::load_std(const char *path)
 {
@@ -815,7 +819,8 @@ HARNESS_CALLED void Stage::start_std_vms()
 
 // Runs the VMs of objects still marked as running; unmarks objects whose
 // VMs have all finished.
-// TODO: ours saves ebx/edi after the loop guard (shrink-wrapped).
+// TODO: ours saves ebx/edi after the loop guard (shrink-wrapped). Matches
+// once GameThread::thread_start realigns like the original (tested).
 // FUNCTION: TH16 0x40aed0
 i32 Stage::update_std_vms()
 {
@@ -965,7 +970,9 @@ HARNESS_CALLED CameraSky::CameraSky(f32 begin_distance, f32 end_distance, f32 c0
     }
 }
 
-// TODO: the original frame has 4 more (unused) bytes.
+// TODO: the original frame has 4 more (unused) bytes: padding for the
+// known alignment run_std's realignment gives it (run_std does not realign
+// in ours).
 // FUNCTION: TH16 0x40b2f0
 void Stage::interrupt_vms(i32 n)
 {

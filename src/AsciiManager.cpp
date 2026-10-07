@@ -91,7 +91,9 @@ AsciiInf::~AsciiInf()
 }
 
 // Drops the strings whose time ran out, keeping the others in order.
-// TODO: same loop shape, but the induction variables land in other registers.
+// TODO: same loop shape, but i and the remaining_time pointer trade eax and
+// edx, and esi is pushed before the loop guard (for/while, index copies and a
+// separate decrement do not change it).
 // FUNCTION: TH16 0x408fb0
 void AsciiInf::tick()
 {

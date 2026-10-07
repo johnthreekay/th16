@@ -117,6 +117,15 @@ static const i32 g_initial_piv_per_difficulty[6] = {10000, 10000, 10000, 10000, 
 // The game thread: waits for the loading screen, sets up a new game (or
 // the next stage) and creates the game objects. 0 on success; -1 (with the
 // thread flagged as failed) if something could not be created.
+// TODO: the original realigns its frame (and esp, -8; sub esp, 8) and tests
+// GLOBALS_FLAGS_45C & 0x40 as a byte. Forcing the realignment (a volatile
+// double here, harness_w3d_player's removed) gains 12 matches below it
+// (Stage::create, load_data, load_std, update_std_vms, on_draw_06,
+// Gui::initialize, LaserManager::initialize, ...), loses start_std_vms and
+// AsciiInf::create_number, and gives GameThread::on_tick_callback the
+// aligned thunk where the original jumps. HARNESS_CALLED on its callees (the
+// managers' create, get_runtime, AnmVm::run, repopulate_options) does not
+// make LTCG realign it.
 // FUNCTION: TH16 0x42cb60
 i32 GameThread::thread_start()
 {
