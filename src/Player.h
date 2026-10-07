@@ -37,7 +37,10 @@ struct PlayerOption
     i32 unk_70;
     u8 unk_74[0x80 - 0x74];
     i32 unk_80;
-    u8 unk_84[0xb0 - 0x84];
+    u8 unk_84[0xa8 - 0x84];
+    // The direction shooters with an angle of 995 and up fire in.
+    f32 angle;
+    u8 unk_ac[0xb0 - 0xac];
     AnmId anm_id_b0;
     AnmId anm_id_b4;
     ZunTimer timer_b8;
@@ -49,6 +52,15 @@ struct PlayerOption
     // the same index, even for season options).
     void(__fastcall *on_update)(PlayerOption *option);
     u8 unk_e0[0xe4 - 0xe0];
+};
+
+// The bitfields of PlayerBullet::flags that code assigns.
+struct PlayerBulletFlags
+{
+    u32 unk_0 : 1;
+    // Fired while focused.
+    u32 focused : 1;
+    u32 unk_2 : 30;
 };
 
 struct PlayerBullet
@@ -71,7 +83,12 @@ struct PlayerBullet
         // Marisa's laser (sht_on_tick_446260): its current length.
         f32 laser_length;
     };
-    i32 unk_a4;
+    union
+    {
+        i32 unk_a4;
+        // Copied to the damage source's unk_18 (rectangle height).
+        f32 unk_a4_f;
+    };
     i32 unk_a8;
     // Which shooter of the .sht file fired it: index in the low byte,
     // shooter array above it, 0xf0000 set for the season file.
@@ -196,8 +213,16 @@ struct ShtShooter
     i32 unk_1c;
     u8 option;
     u8 unk_21;
-    u8 anm;
-    u8 anm_hit;
+    union
+    {
+        struct
+        {
+            u8 anm;
+            u8 anm_hit;
+        };
+        // How PlayerBullet::create reads the script number.
+        i16 anm_script;
+    };
     i16 sfx_id;
     i8 fire_rate_long;
     i8 start_delay_long;
@@ -345,6 +370,9 @@ struct Player
     i32 do_shooting(i32 short_time, i32 long_time);
     // 0x4455d0. Runs the shot key timers while the player is alive.
     i32 tick_shooting_state();
+    // 0x4456d0. Runs every live bullet: its shot type callback, movement,
+    // the off-screen check and its damage source.
+    i32 tick_bullets();
     // Enters state 1 for 60 frames.
     void start_respawn();
     // 0x442380. Moves the options toward their positions around the

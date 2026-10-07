@@ -19,6 +19,7 @@
 #include "PopupManager.h"
 #include "Input.h"
 #include "UpdateFunc.h"
+#include "Supervisor.h"
 
 // FUNCTION: TH16 0x440d50
 void Player::set_shoot_key_short_timer(i32 time)
@@ -852,4 +853,77 @@ HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f3
         g_Globals.add_to_score(total / 10 + 10);
     }
     return total;
+}
+
+// Whether a point lies inside the playfield.
+static __forceinline i32 is_on_screen(Float3 *pos)
+{
+    return g_early_arcade_offset_x < pos->x && pos->x < g_early_arcade_offset_x + 384.0f &&
+           g_early_arcade_offset_y < pos->y && pos->y < g_early_arcade_offset_y + 448.0f;
+}
+
+// FUNCTION: TH16 0x4456d0
+i32 Player::tick_bullets()
+{
+    for (i32 i = 0; i < 0x100; i++)
+    {
+        PlayerBullet *bullet = &inner.bullets[i];
+        if (bullet->state == 0)
+        {
+            continue;
+        }
+        ShtShooter *shooter = g_Player->get_shooter(bullet->shooter_ref);
+        if (shooter->func_on_tick != NULL && shooter->func_on_tick(bullet) != 0)
+        {
+            continue;
+        }
+        bullet->pos.update_secondary_fields();
+        bullet->pos.step();
+        AnmVm *vm = g_AnmManager->get_vm_with_id(bullet->anm_id);
+        if (vm == NULL)
+        {
+            bullet->state = 0;
+            bullet->anm_id.id = 0;
+            if (bullet->damage_source_index != 0)
+            {
+                g_Player->inner.damage_sources[bullet->damage_source_index - 1].flags &= ~1;
+            }
+            continue;
+        }
+        if (shooter->unk_21 != 2)
+        {
+            Float3 corners[4];
+            vm->write_sprite_corners(corners);
+            if (bullet->timer_c.current >= 15 && !is_on_screen(&corners[0]) && !is_on_screen(&corners[1]) &&
+                !is_on_screen(&corners[2]) && !is_on_screen(&corners[3]))
+            {
+                {
+                    delete_vm_and_clear(bullet->anm_id);
+                    bullet->state = 0;
+                    if (bullet->damage_source_index != 0)
+                    {
+                        g_Player->inner.damage_sources[bullet->damage_source_index - 1].flags &= ~1;
+                    }
+                    continue;
+                }
+            }
+        }
+        if (bullet->damage_source_index != 0 && (bullet->flags & 1))
+        {
+            PlayerDamageSource *source = &g_Player->inner.damage_sources[bullet->damage_source_index - 1];
+            source->pos.pos = bullet->pos.pos;
+            source->unk_c = bullet->pos.angle.value;
+            source->unk_14 = bullet->laser_length;
+            source->unk_18 = bullet->unk_a4_f;
+            source->damage = bullet->unk_9c;
+        }
+        vm->entity_pos = bullet->pos.pos;
+        if (vm->flags_hi & 0x80)
+        {
+            vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
+            vm->rotation.z = bullet->pos.angle.value;
+        }
+        bullet->timer_c.tick();
+    }
+    return 0;
 }

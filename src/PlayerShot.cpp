@@ -486,7 +486,7 @@ i32 __fastcall sht_on_tick_446260(PlayerBullet *bullet)
     ZunAngle current = bullet->pos.angle;
     ZunAngle target;
     target.value = wrap_angle(g_Player->inner.is_focused ? -ZUN_PI / 2 : shooter->angle);
-    if (fabs(angle_sub(current, target).value) < 0.001f)
+    if ((f32)fabs(angle_sub(current, target).value) < 0.001f)
     {
         bullet->pos.angle.value = wrap_angle(angle_add(current, angle_mul(angle_sub(target, current), 0.1f)).value);
     }
@@ -562,9 +562,9 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
         AnmManager::interrupt_tree(bullet->anm_id, 2);
         bullet->unk_98 = 1;
     }
+    PlayerDamageSource *source = bullet->damage_source();
     if (enemy_size == NULL)
     {
-        PlayerDamageSource *source = bullet->damage_source();
         f32 radius = source->unk_18 * 0.5f + y;
         f32 dx = enemy_pos->x - bullet->pos.pos.x;
         f32 dy = enemy_pos->y - bullet->pos.pos.y;
@@ -574,7 +574,7 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
         f32 rx = dx * c - dy * s;
         f32 ry = dy * c + dx * s;
         f32 length;
-        if (fabs(ry) > radius || -radius > rx || (0.0f > rx && rx * rx + ry * ry > radius * radius))
+        if ((f32)fabs(ry) > radius || -radius > rx || (0.0f > rx && rx * rx + ry * ry > radius * radius))
         {
             length = rx;
         }
@@ -592,7 +592,6 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     }
     else
     {
-        PlayerDamageSource *source = bullet->damage_source();
         Float3 *start = &bullet->pos.pos;
         Float3 hit;
         Float3 exit;
@@ -600,7 +599,7 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
                                source->unk_18 + enemy_size->x, enemy_size->y + source->unk_18, x))
         {
             f32 angle = atan2f(hit.y - bullet->pos.pos.y, hit.x - bullet->pos.pos.x);
-            if (fabs(angle_sub_unwrapped(angle, bullet->pos.angle.value)) < ZUN_PI / 2)
+            if ((f32)fabs(angle_sub_unwrapped(angle, bullet->pos.angle.value)) < ZUN_PI / 2)
             {
                 f32 dx = hit.x - start->x;
                 f32 dy = hit.y - start->y;
@@ -667,5 +666,105 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
     {
         return bullet->damage_source()->damage;
     }
+    return 0;
+}
+
+// A shooter's on_init callback also gets the shot key timer.
+typedef i32(__fastcall *ShtInitFunc)(PlayerBullet *bullet, i32 time);
+
+// TODO: the original loads the script number after choosing the file and
+// shares one push and call; ours has a call per branch.
+// FUNCTION: TH16 0x444e10
+i32 PlayerBullet::create(i32 shooter_ref, i32 time, PlayerInner *inner)
+{
+    Player *player = g_Player;
+    ShtShooter *shooter = player->get_shooter(shooter_ref);
+    state = 1;
+    this->shooter_ref = shooter_ref;
+    timer_c.reset_inline();
+    unk_9c = shooter->damage;
+    laser_length = shooter->hitbox.x;
+    unk_a4_f = shooter->hitbox.y;
+    ((PlayerBulletFlags *)&flags)->focused = player->inner.is_focused;
+    memset(&pos, 0, sizeof(pos));
+    if (shooter->option == 0)
+    {
+        pos.pos = inner->pos;
+    }
+    else
+    {
+        Int2 *option = option_pos(player, (i8)shooter->option - 1);
+        pos.pos = Float3(option->x / 128.0f, option->y / 128.0f, 0.0f);
+    }
+    if (shooter->unk_21 == 2)
+    {
+        player->inner.option_lasers[option_laser_index(shooter, shooter_ref)] =
+            g_Globals.power / g_Globals.power_per_level;
+    }
+    pos.speed = shooter->speed;
+    if (shooter->angle >= 1000.0f)
+    {
+        if (shooter->option == 0)
+        {
+            pos.angle.value = wrap_angle(shooter->angle);
+        }
+        else
+        {
+            f32 base = player->get_option((i8)shooter->option - 1)->angle;
+            pos.angle.value = wrap_angle(g_replay_safe_rng.randf_neg_1_to_1() * ZUN_PI / 12.0f + base);
+            pos.speed = g_replay_safe_rng.randf_neg_1_to_1() * 2.0f + shooter->speed;
+        }
+    }
+    else if (shooter->angle >= 995.0f)
+    {
+        if (shooter->option == 0)
+        {
+            pos.angle.value = wrap_angle(shooter->angle);
+        }
+        else
+        {
+            pos.angle.value = wrap_angle(player->get_option((i8)shooter->option - 1)->angle);
+        }
+    }
+    else
+    {
+        pos.angle.value = wrap_angle(shooter->angle);
+    }
+    pos.update_secondary_fields();
+    pos.pos.x += shooter->offset_from_option.x - pos.velocity.x;
+    pos.pos.y += shooter->offset_from_option.y - pos.velocity.y;
+    if (!(shooter_ref & 0xf0000))
+    {
+        anm_id = g_Player->anm_file->create_effect(shooter->anm_script + 5, -1, NULL);
+    }
+    else
+    {
+        anm_id = g_Player->subseason_anm_file->create_effect(shooter->anm_script, -1, NULL);
+    }
+    AnmVm *vm = get_vm_or_clear(anm_id);
+    if (vm->flags_hi & 0x80)
+    {
+        vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
+        vm->rotation.z = shooter->angle;
+    }
+    damage_source_index =
+        g_Player->create_rect_damage_source(&pos.pos, laser_length, unk_a4_f, pos.angle.value, 9999999, unk_9c);
+    PlayerDamageSource *source = damage_source();
+    source->unk_90 = 1;
+    source->unk_7c = 10000000;
+    source->bullet_index = index_of_self;
+    flags |= 1;
+    if (shooter->func_on_init != NULL && ((ShtInitFunc)shooter->func_on_init)(this, time) != 0)
+    {
+        state = 0;
+        delete_vm_and_clear(anm_id);
+        source->flags &= ~1;
+        return -1;
+    }
+    if (shooter->sfx_id >= 0)
+    {
+        g_SoundManager.play_sound_at_position(shooter->sfx_id, pos.pos.x);
+    }
+    vm->entity_pos = pos.pos;
     return 0;
 }

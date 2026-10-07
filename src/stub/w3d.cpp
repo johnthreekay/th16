@@ -15,8 +15,3 @@ i32 Player::initialize()
     return 0;
 }
 
-// STUB: TH16 0x444e10
-i32 PlayerBullet::create(i32 shooter_ref, i32 time, PlayerInner *inner)
-{
-    return 0;
-}
