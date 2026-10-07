@@ -1,6 +1,22 @@
 // Stand-in callers for wave 3 range E (0x44f710-0x4630f0) functions whose
 // shape depends on how the rest of the game calls them.
+#include "../AnmManager.h"
 #include "../TextHelper.h"
+
+// Like WinMain and the Window frame functions around a device reset.
+void harness_w3e_device_reset()
+{
+    g_AnmManager->release_textures();
+    g_AnmManager->create_d3d_textures_for_loaded_anms();
+    g_AnmManager->release_textures();
+    g_AnmManager->create_d3d_textures_for_loaded_anms();
+}
+
+// Like the frame function at 0x45b080.
+void harness_w3e_screenshots()
+{
+    g_AnmManager->take_screenshots();
+}
 
 // Like Supervisor::teardown_everything (0x43b6e5).
 void harness_w3e_teardown_text()

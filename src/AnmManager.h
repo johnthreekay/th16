@@ -40,6 +40,8 @@ struct AnmLoadedD3D
 
     // 0x46f490. Fills the top level of the texture with zeroes.
     void clear_texture();
+    // Creates the texture as a render target of the given size.
+    void create_render_target(i32 width, i32 height);
 };
 
 // The header of one entry of an .anm file (ExpHP: zAnmRawEntry); the
@@ -170,11 +172,31 @@ struct RenderVertex044
     D3DCOLOR diffuse;
 };
 
+// A request to copy a region of the back buffer into the texture of an ANM
+// entry (TH06: AnmManager::RequestScreenshot).
+struct AnmScreenshot
+{
+    // -1 when there is no request.
+    i32 anm_slot;
+    i32 entry;
+    i32 src_left;
+    i32 src_top;
+    i32 src_width;
+    i32 src_height;
+    i32 dst_left;
+    i32 dst_top;
+    i32 dst_width;
+    i32 dst_height;
+};
+
 // Loads and runs every ANM file.
 struct AnmManager
 {
     ThreadInf thread;
-    u8 unk_1c[0xc0 - 0x1c];
+    u8 unk_1c[0x20 - 0x1c];
+    // Requests to copy part of the back buffer into a texture, served by
+    // take_screenshots.
+    AnmScreenshot screenshots[4];
     // Cleared every frame by GameThread's on_draw.
     i32 unk_c0;
     i32 unk_c4;
@@ -279,6 +301,13 @@ struct AnmManager
             }
         }
     }
+
+    // Release the render target textures before the device is reset, and
+    // create them again afterwards. Every caller goes through g_AnmManager.
+    HARNESS_CALLED void release_textures();
+    HARNESS_CALLED void create_d3d_textures_for_loaded_anms();
+    // Serves the screenshot requests.
+    HARNESS_CALLED void take_screenshots();
 
     // 0x46f270 (ExpHP: AnmBehemoth::disable_vms_from_anm_file).
     void disable_vms_from_anm_file(AnmLoaded *anm);

@@ -55,7 +55,12 @@ struct Supervisor
     u8 unk_28[0xdc - 0x28];
     // The full-window viewport, set by screen effects before they draw.
     D3DVIEWPORT9 viewport_dc;
-    u8 unk_f4[0x1ac - 0xf4];
+    // What the device was created with (BackBufferFormat picks the
+    // texture formats).
+    D3DPRESENT_PARAMETERS present_params;
+    u8 unk_12c[0x19c - 0x12c];
+    // The adapter's display mode at startup.
+    D3DDISPLAYMODE display_mode;
     // Render targets for the arcade region while it is drawn at the
     // default resolution (the "@R" surfaces), and the back buffer.
     IDirect3DSurface9 *arcade_surface_0;
