@@ -430,7 +430,11 @@ and scoreth16.dat in the save folder, keyboard input through DirectInput,
 quitting from the menu and on SIGINT/SIGTERM, screenshots (P/Home:
 `_beginthread`, `_mkdir`, a 1280x960 BMP in snapshot/), Alt+Enter both
 ways, Japanese text, and starting a game (Z through the menus) and letting
-it run for 90 s without input. SDL's HIDAPI controller probing (libusb) can take a
+it run for 90 s without input. With the OpenGL renderer (normal build,
+`TH16_GL_DUMP_DIR` for frames; offscreen on NVIDIA, Xvfb on Mesa
+llvmpipe): the loading screen and title menu, the music room's text, and
+stage 1 played holding Z (`xdotool keydown z`) through the midboss to the
+boss dialogue, whose text shows in the speech bubbles. SDL's HIDAPI controller probing (libusb) can take a
 second or more at startup, much longer under gdb; `SDL_JOYSTICK_HIDAPI=0`
 skips it for tests.
 
