@@ -19,9 +19,3 @@ void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
 {
 }
 
-// STUB: TH16 0x425410
-// One of the damage hooks ECL's flagExtDmg installs.
-int __fastcall ecl_ext_damage_425410(EnemyData *enemy, int damage)
-{
-    return damage;
-}

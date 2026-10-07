@@ -11,8 +11,3 @@ int w3b_placeholder_sink(void *object, int value)
     return value;
 }
 
-// STUB: TH16 0x41c330
-int EnemyData::step_logic()
-{
-    return 0;
-}

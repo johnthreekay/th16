@@ -370,3 +370,11 @@ inline PlayerDamageSource *PlayerBullet::damage_source()
     }
     return &g_Player->inner.damage_sources[damage_source_index - 1];
 }
+
+// 0x445a30 (ExpHP: enm_compute_damage_sources). The damage the player's
+// damage sources deal to a circle of the given radius (size NULL) or to a
+// rectangle of the given size and angle at pos; sets *hit when one hits.
+// A placeholder until it is decompiled (src/placeholder/w5a.cpp): LTCG
+// passes angle in xmm3 and the rest on the stack.
+i32 enm_compute_damage_sources(D3DXVECTOR3 *pos, D3DXVECTOR2 *size, f32 radius, f32 angle, i32 *hit,
+                               D3DXVECTOR3 *hit_pos, i32 is_bomb, i32 enemy_id);
