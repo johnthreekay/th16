@@ -100,3 +100,9 @@ void harness_w3d_player_reset()
 {
     g_Player->reset();
 }
+
+// Bullets, enemies and lasers graze the player (0x412651, 0x4336f1, ...).
+void harness_w3d_graze(Float3 *pos)
+{
+    g_Player->do_graze(pos);
+}

@@ -323,6 +323,9 @@ struct Player
     static i32 __fastcall on_draw_callback(Player *player);
 
     // Members that reach the player through g_Player; LTCG dropped this.
+    // 0x444cf0. Counts a graze at pos: effect, popup, sound and a graze
+    // item flying away from the player.
+    HARNESS_CALLED void do_graze(Float3 *pos);
     // Angle from pos to the player.
     HARNESS_CALLED f32 angle_to_player(Float3 *pos);
     // Whether a rectangle (pos, size) or circle hits the player: 0 no, 1

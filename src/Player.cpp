@@ -13,6 +13,8 @@
 #include "SoundManager.h"
 #include "Spellcard.h"
 #include "Globals.h"
+#include "Item.h"
+#include "PopupManager.h"
 #include "Input.h"
 #include "UpdateFunc.h"
 
@@ -514,4 +516,24 @@ i32 Player::tick_shooting_state()
         unk_2c794 = 0;
     }
     return 0;
+}
+
+// TODO: our spawn_item is an ordinary thiscall (/INCLUDE keeps it so),
+// where the original's LTCG dropped this and folded unk_3 and unk_6; the
+// graze counters and the midpoint are also scheduled differently.
+// FUNCTION: TH16 0x444cf0
+HARNESS_CALLED void Player::do_graze(Float3 *pos)
+{
+    g_Globals.graze = g_Globals.graze + 1 > 99999999 ? 99999999 : g_Globals.graze + 1;
+    g_Globals.graze_in_chapter = g_Globals.graze_in_chapter + 1 > 99999999 ? 99999999 : g_Globals.graze_in_chapter + 1;
+    Player *player = g_Player;
+    Float3 mid;
+    mid.x = (player->inner.pos.x + pos->x) * 0.5f;
+    mid.y = (pos->y + player->inner.pos.y) * 0.5f;
+    mid.z = 0.0f;
+    g_EffectManager->effect_anm->create_vm(0x18, &mid, 0.0f, -1, 0);
+    g_PopupManager->generate_small_score_popup(&mid, g_Globals.graze_in_chapter, 0xffc0c0ff);
+    g_SoundManager.play_sound_at_position(0x2a, pos->x);
+    g_ItemManager->spawn_item(0x10, pos, 0, atan2f(pos->y - player->inner.pos.y, pos->x - player->inner.pos.x), 1.9f,
+                              0, 0);
 }
