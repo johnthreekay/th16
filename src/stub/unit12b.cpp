@@ -8,10 +8,6 @@
 
 // StageInner::run_std (0x40b3b0) is in src/Stage.cpp.
 
-// STUB: TH16 0x40c4a0
-void StageInner::step_fog()
-{
-}
 
 // STUB: TH16 0x40fe80
 i32 BombMarisaAInf::method_10()

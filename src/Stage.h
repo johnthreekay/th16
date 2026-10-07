@@ -121,8 +121,9 @@ struct StageInner
     f32 unk_331c;
     i32 unk_3320;
     ZunTimer fog_timer;
-    i32 unk_3338;
-    i32 unk_333c;
+    // Angles that step_fog advances.
+    f32 unk_3338;
+    f32 unk_333c;
     // Instruction 17's argument: 1 picks the fog with 7 points per strip.
     i32 fog_kind;
     // Color passed to the ANM manager; the top byte flags a new value.

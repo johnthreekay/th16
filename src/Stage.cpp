@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -7,8 +8,11 @@
 #include "FileSystem.h"
 #include "GameErrorContext.h"
 #include "Globals.h"
+#include "Rng.h"
 #include "ScreenEffect.h"
+#include "Spellcard.h"
 #include "Supervisor.h"
+#include "ZunAngle.h"
 
 // GLOBAL: TH16 0x4a6da0
 Stage *g_Stage;
@@ -631,6 +635,113 @@ void StageInner::draw_vms(i32 layer)
         g_Supervisor.enable_zwrite_inline();
         stage_apply_camera_3();
     }
+}
+
+// TODO: register and stack slot allocation differ (the original keeps 255.0f in memory and adds d.x to pos.x the other way round).
+// Moves the fog mesh: kind 1 waves the bottom of the screen while no spell
+// card is active, kind 2 bulges a disc around the center of the game area
+// whose radius shrinks towards unk_3318.
+// FUNCTION: TH16 0x40c4a0
+void StageInner::step_fog()
+{
+    if (fog == NULL)
+    {
+        return;
+    }
+    // The angles are ZunAngles in ZUN's struct: copied as such.
+    ZunAngle angle_a = *(ZunAngle *)&unk_3338;
+    ZunAngle angle_b = *(ZunAngle *)&unk_333c;
+    D3DXVECTOR3 *point = (D3DXVECTOR3 *)fog->buffer_18;
+    D3DXVECTOR3 d;
+    if (fog_kind == 1)
+    {
+        if (g_Spellcard != NULL && (g_Spellcard->flags & 1))
+        {
+            goto tick;
+        }
+        fog->set_rect(-192.0f, 320.0f, 384.0f, 128.0f);
+        f32 amplitude;
+        if (fog_timer.current_f < 60.0f)
+        {
+            amplitude = fog_timer.current_f * 6.0f / 60.0f;
+        }
+        else
+        {
+            amplitude = 6.0f;
+        }
+        FogVertex *vertex = (FogVertex *)fog->buffer_14;
+        for (i32 i = 0; i < fog->vm_count; i++)
+        {
+            for (i32 j = 0; j < fog->unk_4; j++)
+            {
+                ((u8 *)&vertex->diffuse)[3] = 0x80;
+                f32 t = j * amplitude / (fog->unk_4 - 1);
+                d.x = sinf(angle_a.value) * t;
+                d.y = sinf(angle_b.value) * t;
+                if (i != 0 && j != 0 && i != fog->vm_count - 1 && j != fog->unk_4 - 1)
+                {
+                    vertex->pos.x = vertex->pos.x + d.x;
+                    vertex->pos.y = vertex->pos.y + d.y;
+                    vertex->pos.z = 0.0f;
+                    point->z = 0.0f;
+                }
+                angle_a.value = wrap_angle(angle_a.value + 0.66842401f);
+                vertex++;
+                point++;
+            }
+            angle_b.value = wrap_angle(angle_b.value - ZUN_PI * 10.0f / 21.0f);
+        }
+        unk_3338 = wrap_angle(unk_3338 + ZUN_PI / 64);
+        unk_333c = wrap_angle(unk_333c + ZUN_PI / 80);
+    }
+    else if (fog_kind == 2)
+    {
+        f32 radius = unk_331c;
+        if (radius > unk_3318)
+        {
+            unk_331c = radius - 2.0f;
+        }
+        fog->set_rect(-radius, 224.0f - radius, radius + radius, radius + radius);
+        FogVertex *vertex = (FogVertex *)fog->buffer_14;
+        for (i32 i = 0; i < fog->vm_count; i++)
+        {
+            for (i32 j = 0; j < fog->unk_4; j++)
+            {
+                d = D3DXVECTOR3(point->x - 224.0f, point->y - 240.0f, point->z - radius * radius);
+                f32 t = radius * radius - (d.x * d.x + d.y * d.y);
+                if (t >= 0.0f)
+                {
+                    t /= radius * radius;
+                    vertex->diffuse = 0xffffffff;
+                    ((u8 *)&vertex->diffuse)[3] = 0x60;
+                    ((u8 *)&vertex->diffuse)[2] = 255.0f - (255 - ((u8 *)&vertex->diffuse)[2]) * t;
+                    ((u8 *)&vertex->diffuse)[1] = 255.0f - (255 - ((u8 *)&vertex->diffuse)[1]) * t;
+                    ((u8 *)&vertex->diffuse)[0] = 255.0f - (255 - ((u8 *)&vertex->diffuse)[0]) * t;
+                    f32 scale = t * 32.0f;
+                    D3DXVec3Normalize(&d, &d);
+                    d *= scale;
+                    d.x += sinf(angle_a.value) * t * 8.0f;
+                    d.y += sinf(angle_b.value) * t * 8.0f;
+                    vertex->pos.x += d.x;
+                    vertex->pos.y += d.y;
+                    vertex->pos.z = 0.0f;
+                    point->z = 0.0f;
+                }
+                else
+                {
+                    ((u8 *)&vertex->diffuse)[3] = 0;
+                }
+                angle_a.value = wrap_angle(angle_a.value + ZUN_PI / 2);
+                angle_b.value = wrap_angle(angle_b.value - ZUN_PI * 2 / 9);
+                vertex++;
+                point++;
+            }
+        }
+        unk_3338 = wrap_angle(unk_3338 + ZUN_PI / 64);
+        unk_333c = wrap_angle(g_replay_unsafe_rng.randf_0_to_1() * ZUN_PI / 40.0f + ZUN_PI / 80 + unk_333c);
+    }
+tick:
+    fog_timer.tick_in_place();
 }
 
 // FUNCTION: TH16 0x40a7b0
