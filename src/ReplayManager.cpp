@@ -9,6 +9,7 @@
 #include "Scorefile.h"
 #include "FpsCounter.h"
 #include "Supervisor.h"
+#include "AsciiManager.h"
 
 // GLOBAL: TH16 0x4a6f08
 ReplayManager *g_ReplayManager;
@@ -386,6 +387,49 @@ void clear_input_state()
     g_InputState.input_rising = 0;
     g_InputState.input_falling = 0;
     g_InputState.unk_9c = 0;
+}
+
+// TODO: register allocation in the unregister_locked blocks (the original
+// keeps each func in ebx and loads the registry inside the null check) and
+// our loops get alignment padding the original lacks.
+// FUNCTION: TH16 0x447c80
+ReplayManager::~ReplayManager()
+{
+    delete (RpyHeader *)rpy_file;
+    for (i32 i = 0; i < 8; i++)
+    {
+        free_chunks(i);
+    }
+    delete info;
+    info = NULL;
+    for (i32 i = 0; i < 8; i++)
+    {
+        delete (RpyGamestate *)stage_gamestate_snapshots[i];
+        stage_gamestate_snapshots[i] = NULL;
+    }
+    g_UpdateFuncRegistry->unregister_locked(on_tick_func);
+    g_UpdateFuncRegistry->unregister_locked(on_tick_22_func);
+    g_UpdateFuncRegistry->unregister_locked(on_draw_func);
+    if (g_ReplayManager == this)
+    {
+        g_ReplayManager = NULL;
+    }
+}
+
+// Shows the frame rate recorded in the replay while it plays back.
+// FUNCTION: TH16 0x4482f0
+int __fastcall ReplayManager::on_draw_47_body(void *arg)
+{
+    ReplayManager *replay = (ReplayManager *)arg;
+    if (g_GameThread != NULL && replay->mode != REPLAY_RECORDING && replay->mode == REPLAY_PLAYBACK)
+    {
+        D3DXVECTOR3 pos(383.0f, 450.0f, 0.0f);
+        f32 fps = replay->current_fps;
+        g_AsciiManager->color.d3d = fps < 30.0f ? 0xff5050ff : fps < 50.0f ? 0xffa0a0ff : 0xffffffff;
+        g_AsciiManager->create_stringf(&pos, "%3d", replay->current_fps);
+        g_AsciiManager->color.d3d = 0xffffffff;
+    }
+    return 1;
 }
 
 // FUNCTION: TH16 0x448e20

@@ -67,6 +67,13 @@ struct RpyInfo
 };
 #pragma pack(pop)
 
+// The start of a .rpy file as the replay manager builds it (ExpHP:
+// zRpyRawFile; "t16r", version 2).
+struct RpyHeader
+{
+    u8 data[0x24];
+};
+
 // A block of recorded input, 900 frames long. ExpHP: zRpyChunk.
 struct RpyChunk
 {
