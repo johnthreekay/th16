@@ -629,6 +629,40 @@ i32 LaserCurveInf::method_40()
     return 0;
 }
 
+// The same et_ex step for straight lasers.
+// TODO: as LaserCurveInf::method_44: the new angle in xmm0 (ours xmm1), ints[2] incremented later, current_f added into the speed register.
+// FUNCTION: TH16 0x432c20
+i32 LaserLineInf::method_44()
+{
+    f32 len;
+    if (ex_state[3].timer.current >= ex_state[3].ints[0])
+    {
+        if (inner.shot_transform_sfx >= 0)
+        {
+            g_SoundManager.play_sound_centered(inner.shot_transform_sfx, 0);
+        }
+        f32 a = ex_state[3].floats[1] + angle;
+        ex_state[3].ints[2]++;
+        len = ex_state[3].floats[0];
+        length = len;
+        angle = a;
+        ex_state[3].timer.reset();
+        if (ex_state[3].ints[2] >= ex_state[3].ints[1])
+        {
+            laser_sincosmul(&unk_60, a, len);
+            ex_flags &= ~0x10;
+            return 1;
+        }
+    }
+    else
+    {
+        len = length - ex_state[3].timer.current_f * length / ex_state[3].ints[0];
+    }
+    laser_sincosmul(&unk_60, angle, len);
+    ex_state[3].timer.tick();
+    return 0;
+}
+
 // An et_ex step: retracts the curve over ex_state[3]'s time, then turns it
 // and gives it a new length; after ints[1] rounds the step ends.
 // TODO: the original keeps the new angle in xmm0 (ours xmm1), increments ints[2] later and adds current_f into the speed register in the timer tick.

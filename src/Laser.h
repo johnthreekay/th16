@@ -100,7 +100,9 @@ class LaserDataInf
 
 struct LaserLineInner
 {
-    u8 data[0x358];
+    u8 data[0x350];
+    i32 shot_sfx;
+    i32 shot_transform_sfx;
 
     LaserLineInner()
     {
