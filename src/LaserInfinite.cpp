@@ -88,13 +88,6 @@ i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x436c70
-i32 LaserInfiniteInf::cancel(i32 mode, i32 b)
-{
-    return unit5_placeholder(this);
-}
-
 // 2 if a circle at pos touches the laser's rectangle, else 0.
 // TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
 // FUNCTION: TH16 0x436ef0

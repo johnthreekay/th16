@@ -98,9 +98,25 @@ class LaserDataInf
     }
 };
 
+// Parameters of a straight laser. Layout from ExpHP (zLaserLineInner); his
+// field names say which BulletManager shooter field each one comes from.
 struct LaserLineInner
 {
-    u8 data[0x350];
+    D3DXVECTOR3 start_pos;
+    f32 ang_aim;
+    // ExpHP: __bmgr_00c__was_128, __bmgr_008__was_16.
+    f32 laser_new_arg_2;
+    f32 laser_new_arg_1;
+    f32 laser_new_arg_3;
+    f32 laser_new_arg_4;
+    // ExpHP: spd1.
+    f32 speed;
+    i32 bullet_type;
+    i32 bullet_color;
+    f32 distance;
+    i32 unk_30;
+    u32 flags;
+    BulletEx ex[0x12];
     i32 shot_sfx;
     i32 shot_transform_sfx;
 
@@ -109,6 +125,8 @@ struct LaserLineInner
         memset(this, 0, sizeof(*this));
     }
 };
+static_assert(offsetof(LaserLineInner, ex) == 0x38, "LaserLineInner::ex");
+static_assert(offsetof(LaserLineInner, shot_sfx) == 0x350, "LaserLineInner::shot_sfx");
 
 // VTABLE: TH16 0x492424
 class LaserLineInf : public LaserDataInf

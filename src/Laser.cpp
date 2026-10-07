@@ -697,3 +697,92 @@ i32 LaserCurveInf::method_44()
     ex_state[3].timer.tick();
     return 0;
 }
+
+// Cancels the laser: a cancel effect and cancel items every 16 units along
+// it. Returns the number of points.
+// TODO: the original builds the first point as one vector copied to pos and the effect copy, and copies it again at the loop end; ours copies it inside the inlined create_vm.
+// FUNCTION: TH16 0x434cd0
+i32 LaserLineInf::cancel(i32 mode, i32 b)
+{
+    if (b != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    f32 dist = 8.0f;
+    i32 count = 0;
+    Float3 step;
+    Float3 pos;
+    laser_sincosmul(&step, angle, 8.0f);
+    step.z = 0.0f;
+    pos = step + position;
+    step.x += step.x;
+    step.y += step.y;
+    while (unk_70 > dist + 8.0f)
+    {
+        D3DXVECTOR3 effect_pos = pos;
+        count++;
+        if (bullet_type <= 0x11 || bullet_type == 0x22 || bullet_type == 0x26)
+        {
+            AnmLoaded *anm = g_BulletManager->bullet_anm;
+            anm->create_vm_inline(inner.bullet_color * 2 + 0xd1, &effect_pos, 0.0f, -1);
+        }
+        else if (bullet_type <= 0x1f || bullet_type == 0x1b)
+        {
+            g_BulletManager->bullet_anm->create_vm(inner.bullet_color * 2 + 0x101, &pos, 0.0f, -1, 0);
+        }
+        else if (bullet_type <= 0x21)
+        {
+            g_BulletManager->bullet_anm->create_vm(inner.bullet_color * 2 + 0x119, &pos, 0.0f, -1, 0);
+        }
+        gen_items_from_cancel(&pos, mode);
+        pos += step;
+        dist += 16.0f;
+    }
+    state = 1;
+    return count;
+}
+
+// Cancels the laser like LaserLineInf::cancel, but only the points on screen
+// get an effect and items.
+// TODO: the original doubles step.x after loading position (scheduling) and stores step.z = 0 late from a second zero register.
+// FUNCTION: TH16 0x436c70
+i32 LaserInfiniteInf::cancel(i32 mode, i32 b)
+{
+    if (b != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    f32 dist = 8.0f;
+    i32 count = 0;
+    Float3 step;
+    Float3 pos;
+    laser_sincosmul(&step, angle, 8.0f);
+    step.z = 0.0f;
+    pos = step + position;
+    step.x += step.x;
+    step.y += step.y;
+    while (unk_70 > dist + 8.0f)
+    {
+        count++;
+        if (!(pos.x + 16.0f <= -192.0f || pos.x - 16.0f >= 192.0f || pos.y + 16.0f <= 0.0f || pos.y - 16.0f >= 448.0f))
+        {
+            if (bullet_type <= 0x11 || bullet_type == 0x22 || bullet_type == 0x26)
+            {
+                g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0xd1, &pos, 0.0f, -1, 0);
+            }
+            else if (bullet_type <= 0x1f || bullet_type == 0x1b)
+            {
+                g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x101, &pos, 0.0f, -1, 0);
+            }
+            else if (bullet_type <= 0x21)
+            {
+                g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0x119, &pos, 0.0f, -1, 0);
+            }
+            gen_items_from_cancel(&pos, mode);
+        }
+        pos += step;
+        dist += 16.0f;
+    }
+    state = 1;
+    return count;
+}
