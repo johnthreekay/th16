@@ -14,10 +14,27 @@
 #include "GameErrorContext.h"
 #include "GameThread.h"
 #include "UpdateFunc.h"
+#include "ZunAngle.h"
 #include "ZunMath.h"
 
 // GLOBAL: TH16 0x4a6dac
 BulletManager *g_BulletManager;
+
+// This file's copy of ZunMath.h's sincosmul, which TH16 keeps once per
+// object file. A static of its own so that it can be annotated.
+// FUNCTION: TH16 0x417510
+static void __fastcall bullet_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
 
 // FUNCTION: TH16 0x411880
 BulletManager::BulletManager()
@@ -476,10 +493,182 @@ i32 Bullet::step_ex_00()
 {
     if (ex_state[0].timer.current <= 16)
     {
-        sincosmul(&velocity, angle, 5.0f - ex_state[0].timer.current_f * 5.0f / 16.0f + speed);
+        bullet_sincosmul(&velocity, angle, 5.0f - ex_state[0].timer.current_f * 5.0f / 16.0f + speed);
         ex_state[0].timer.tick();
         return 0;
     }
     active_ex_flags ^= 1;
     return 1;
+}
+
+// FUNCTION: TH16 0x415790
+i32 Bullet::bounce_left()
+{
+    f32 width = g_BulletManager->ecl_unknown_560.x;
+    if (width <= 0.0f)
+    {
+        width = ex_state[4].floats[2];
+    }
+    if (width * -0.5f > pos[0])
+    {
+        if (!(ex_state[4].ints[3] & 0x10))
+        {
+            angle = wrap_angle(-angle - ZUN_PI);
+            angle = wrap_angle(wrap_angle(angle + 0.0f));
+            pos[0] = -width - pos[0];
+        }
+        return 1;
+    }
+    return 0;
+}
+
+// FUNCTION: TH16 0x4158d0
+i32 Bullet::bounce_right()
+{
+    f32 width = g_BulletManager->ecl_unknown_560.x;
+    if (width <= 0.0f)
+    {
+        width = ex_state[4].floats[2];
+    }
+    if (pos[0] >= width * 0.5f)
+    {
+        if (!(ex_state[4].ints[3] & 0x10))
+        {
+            angle = wrap_angle(-angle - ZUN_PI);
+            angle = wrap_angle(wrap_angle(angle + 0.0f));
+            pos[0] = width - pos[0];
+        }
+        return 1;
+    }
+    return 0;
+}
+
+// FUNCTION: TH16 0x415a10
+i32 Bullet::bounce_top()
+{
+    f32 height = g_BulletManager->ecl_unknown_560.y;
+    if (height <= 0.0f)
+    {
+        height = ex_state[4].floats[3];
+    }
+    if (pos[1] < 224.0f - height * 0.5f)
+    {
+        if (!(ex_state[4].ints[3] & 0x10))
+        {
+            angle = wrap_angle(-angle);
+            pos[1] = 448.0f - height - pos[1];
+        }
+        return 1;
+    }
+    return 0;
+}
+
+// FUNCTION: TH16 0x415ae0
+i32 Bullet::bounce_bottom()
+{
+    f32 height = g_BulletManager->ecl_unknown_560.y;
+    if (height <= 0.0f)
+    {
+        height = ex_state[4].floats[3];
+    }
+    if (pos[1] >= height * 0.5f + 224.0f)
+    {
+        if (!(ex_state[4].ints[3] & 0x10))
+        {
+            angle = wrap_angle(-angle);
+            pos[1] = height + 448.0f - pos[1];
+        }
+        return 1;
+    }
+    return 0;
+}
+
+// Whether a point (grown by radius) is outside the rectangle of the given
+// size centered on the playfield's middle.
+static inline i32 outside_bounce_rect(D3DXVECTOR3 *p, f32 radius, f32 width, f32 height)
+{
+    f32 x = p->x;
+    if (x + radius <= width * -0.5f || x - radius >= width * 0.5f)
+    {
+        return 1;
+    }
+    f32 y = p->y;
+    if (y + radius <= 224.0f - height * 0.5f || y - radius >= height * 0.5f + 224.0f)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+// FUNCTION: TH16 0x415bb0
+i32 Bullet::step_ex_06()
+{
+    BulletManager *mgr = g_BulletManager;
+    if ((mgr->ecl_unknown_560.x <= 0.0f &&
+         outside_bounce_rect(&pos, 0.0f, ex_state[4].floats[2], ex_state[4].floats[3])) ||
+        (mgr->ecl_unknown_560.x > 0.0f &&
+         outside_bounce_rect(&pos, 0.0f, mgr->ecl_unknown_560.x, mgr->ecl_unknown_560.y)))
+    {
+        i32 bounced = 0;
+        if (ex_state[4].ints[3] & 1)
+        {
+            if (bounce_top())
+            {
+                bounced = 1;
+            }
+        }
+        if (ex_state[4].ints[3] & 2)
+        {
+            if (bounce_bottom())
+            {
+                bounced = 1;
+            }
+        }
+        if (ex_state[4].ints[3] & 8)
+        {
+            if (bounce_right())
+            {
+                bounced = 1;
+            }
+        }
+        if (ex_state[4].ints[3] & 4)
+        {
+            if (bounce_left())
+            {
+                bounced = 1;
+            }
+        }
+        if (ex_state[4].floats[0] > -990.0f)
+        {
+            speed = ex_state[4].floats[0];
+        }
+        bullet_sincosmul(&velocity, angle, speed);
+        if (bounced)
+        {
+            ex_state[4].ints[0]++;
+            if (bounce_sound >= 0)
+            {
+                g_SoundManager.play_sound_centered(bounce_sound, 0);
+            }
+        }
+        if (ex_state[4].ints[0] >= ex_state[4].ints[1])
+        {
+            active_ex_flags &= ~0x40;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// FUNCTION: TH16 0x4161f0
+i32 Bullet::step_ex_19()
+{
+    if (ex_state[9].timer.current >= ex_state[9].ints[0])
+    {
+        active_ex_flags &= 0xfffffff6;
+        return 1;
+    }
+    pos += *(D3DXVECTOR3 *)&ex_state[9].floats[5] * g_game_speed;
+    ex_state[9].timer.reset();
+    return 0;
 }

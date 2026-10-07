@@ -89,7 +89,9 @@ struct Bullet
     u8 unk_c74[0xc78 - 0xc74];
     // Next bullet drawn in the same layer.
     Bullet *next_in_layer;
-    u8 unk_c7c[0xc84 - 0xc7c];
+    u8 unk_c7c[0xc80 - 0xc7c];
+    // Sound played when the bullet bounces off a wall (none if negative).
+    i32 bounce_sound;
     i32 layer;
     BulletEx et_ex[0x12];
     BulletExState ex_state[0xe];
@@ -117,6 +119,17 @@ struct Bullet
     // 0x416840. Turns the bullet into its cancel animation, dropping items
     // by mode.
     i32 cancel(i32 mode);
+    // The wall bounce transform (et_ex type 6) and its four walls: each
+    // reflects the bullet off its wall of the bounce rectangle and returns
+    // 1 if it was past it.
+    i32 step_ex_06();
+    i32 bounce_left();
+    i32 bounce_right();
+    i32 bounce_top();
+    i32 bounce_bottom();
+    // 0x4161f0. Moves by a fixed vector until the slot's timer reaches its
+    // duration.
+    i32 step_ex_19();
 };
 
 // 0x417140. The sprite mapping callback of bullet VMs: picks the sprite for
