@@ -140,6 +140,9 @@ struct Bullet
     // frames, steering the angle and speed to follow the velocity.
     i32 step_ex_02();
     i32 step_ex_21();
+    // 0x415d80. Wraps the bullet around to the other side once it has left
+    // the playfield, some number of times.
+    i32 step_ex_12();
 
     // ZUN's angle is a ZunAngle; some transforms call its operators.
     ZunAngle &angle_ref()

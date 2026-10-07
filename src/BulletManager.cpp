@@ -781,3 +781,60 @@ i32 Bullet::step_ex_21()
     ex_state[10].timer.tick();
     return 0;
 }
+
+// The sprite a VM shows. Not inline: the original looks it up again for
+// every use.
+static AnmLoadedSprite *vm_sprite(AnmVm *vm)
+{
+    return &g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id];
+}
+
+// Whether something of the given size at x is entirely outside [lo, hi].
+static i32 outside_range(f32 x, f32 size, f32 lo, f32 hi)
+{
+    f32 half = size * 0.5f;
+    return x + half <= lo || x - half >= hi;
+}
+
+// TODO: the original keeps all five constants in registers from the start
+// and adds the half size to the position (ours the other way round).
+// FUNCTION: TH16 0x415d80
+i32 Bullet::step_ex_12()
+{
+    if (outside_range(pos.x, vm_sprite(&vm0)->sprite_width, -192.0f, 192.0f) ||
+        outside_range(pos.y, vm_sprite(&vm0)->sprite_height, 0.0f, 448.0f))
+    {
+        i32 sides = ex_state[6].ints[2];
+        if ((sides & 1) && pos.y < 0.0f)
+        {
+            pos.y = vm_sprite(&vm0)->sprite_height + 448.0f + pos.y;
+        }
+        else if ((sides & 2) && pos.y > 448.0f)
+        {
+            pos.y = pos.y - (vm_sprite(&vm0)->sprite_height + 448.0f);
+        }
+        else if ((sides & 4) && pos.x < -192.0f)
+        {
+            pos.x = vm_sprite(&vm0)->sprite_width + 384.0f + pos.x;
+        }
+        else if ((sides & 8) && pos.x > 192.0f)
+        {
+            pos.x = pos.x - (vm_sprite(&vm0)->sprite_width + 384.0f);
+        }
+        else
+        {
+            return 0;
+        }
+        ex_state[6].ints[0]++;
+        if (bounce_sound >= 0)
+        {
+            g_SoundManager.play_sound_centered(bounce_sound, 0);
+        }
+        if (ex_state[6].ints[0] >= ex_state[6].ints[1])
+        {
+            active_ex_flags ^= 0x1000;
+            return 1;
+        }
+    }
+    return 0;
+}
