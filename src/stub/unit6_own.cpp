@@ -10,11 +10,6 @@ SoundManager g_SoundManager;
 // GLOBAL: TH16 0x4a6f0c
 Scorefile *g_Scorefile;
 
-// STUB: TH16 0x45e330
-i32 SoundManager::update_sound_thread()
-{
-    return 0;
-}
 
 void play_sound_centered_stub(i32 id, i32 unused)
 {

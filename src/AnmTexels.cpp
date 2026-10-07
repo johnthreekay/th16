@@ -1,5 +1,16 @@
-// AnmManager::convert_texture: fixing up the colors of transparent texels.
+// AnmManager::convert_texture (0x46c0d0): fixing up the colors of
+// transparent texels.
+//
+// TODO: parked. The code below is functionally complete, but giving it a
+// visible body makes LTCG realign the frame of its caller
+// load_texture_from_file (0x46c920), which then stops matching. The
+// D3DLOCKED_RECT is wrapped in a 12-byte struct because as a plain 8-byte
+// local it makes convert_texture realign its own frame (the original does
+// not); the caller's realignment has no known fix yet. Until then the
+// opaque stub in src/stub/w5e.cpp stands in.
 #include "AnmManager.h"
+
+#if 0
 
 // Pixel layouts of the texture formats convert_texture handles.
 struct TexelA8R8G8B8
@@ -98,7 +109,7 @@ struct TexelA8R3G3B2
         }                                                                                                           \
     }
 
-// FUNCTION: TH16 0x46c0d0
+// Not annotated while parked: 0x46c0d0
 void __stdcall AnmManager::convert_texture(IDirect3DTexture9 *texture)
 {
     IDirect3DSurface9 *surface = NULL;
@@ -130,3 +141,4 @@ void __stdcall AnmManager::convert_texture(IDirect3DTexture9 *texture)
     surface->UnlockRect();
     surface->Release();
 }
+#endif

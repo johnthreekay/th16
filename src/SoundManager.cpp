@@ -350,10 +350,11 @@ HARNESS_CALLED i32 SoundManager::release()
     }
     for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
     {
-        if (g_SoundManager.sound_buffers[i].buffer != NULL)
+        SoundBufferEntry *entry = &g_SoundManager.sound_buffers[i];
+        if (entry->buffer != NULL)
         {
-            g_SoundManager.sound_buffers[i].buffer->Release();
-            g_SoundManager.sound_buffers[i].buffer = NULL;
+            entry->buffer->Release();
+            entry->buffer = NULL;
         }
     }
     for (i32 i = 0; i < SOUND_FILE_COUNT; i++)
@@ -924,4 +925,290 @@ i32 SoundBufferEntry::load(const char *name)
 // FUNCTION: TH16 0x45eda0
 void sound_debug_log(const char *fmt, ...)
 {
+}
+
+// The DirectSound sample's CSound::GetBuffer, inlined.
+static inline IDirectSoundBuffer *bgm_buffer(CStreamingSound *sound)
+{
+    if (sound->m_apDSBuffer == NULL)
+    {
+        return NULL;
+    }
+    if (sound->m_dwNumBuffers <= 0)
+    {
+        return NULL;
+    }
+    return sound->m_apDSBuffer[0];
+}
+
+// bgm_stream as what it is.
+#define BGM_STREAM ((CStreamingSound *)g_SoundManager.bgm_stream)
+
+// Runs the first queued BGM command one step further (commands take several
+// calls, counted in unk_8) and plays or stops the queued sound effects.
+// Returns the BGM command now first in the queue.
+// FUNCTION: TH16 0x45e330
+i32 SoundManager::update_sound_thread()
+{
+    ENTER_CS(CS_SOUND);
+    if (g_SoundManager.manager == NULL)
+    {
+        LEAVE_CS(CS_SOUND);
+        return 0;
+    }
+    BgmCommandEntry *cmd = g_SoundManager.bgm_commands;
+    i32 again;
+    do
+    {
+        again = 0;
+        switch (cmd->command)
+        {
+        case 8:
+            if (BGM_STREAM != NULL)
+            {
+                BGM_STREAM->SetVolume(0);
+            }
+            goto pop;
+        case 1:
+            if (g_Supervisor.config.flags_2c & 0x10)
+            {
+                if (cmd->unk_8 != 0)
+                {
+                    goto step;
+                }
+                g_SoundManager.stop_bgm();
+            }
+            g_SoundManager.preload_bgm(cmd->arg, cmd->name);
+            again = 1;
+            goto pop;
+        case 2:
+            if ((g_Supervisor.config.flags_2c & 0x10) && cmd->arg >= 0)
+            {
+                switch (cmd->unk_8)
+                {
+                case 0:
+                    if (g_SoundManager.play_preloaded_bgm(cmd->arg) == 0)
+                    {
+                        goto step;
+                    }
+                    goto pop;
+                case 2:
+                    if (BGM_STREAM == NULL)
+                    {
+                        goto step;
+                    }
+                    if (BGM_STREAM->Reset(0) >= 0)
+                    {
+                        goto step;
+                    }
+                    goto pop;
+                case 5: {
+                    IDirectSoundBuffer *buffer = bgm_buffer(BGM_STREAM);
+                    cmd->arg = BGM_STREAM->m_pWaveFile->m_track->total_size != 0;
+                    if (BGM_STREAM->FillBufferWithSound(buffer, cmd->arg, 0) >= 0)
+                    {
+                        goto step;
+                    }
+                    goto pop;
+                }
+                case 7:
+                    BGM_STREAM->Play(0, DSBPLAY_LOOPING, 0);
+                    goto step;
+                }
+                if (cmd->unk_8 < 0x14)
+                {
+                    goto step;
+                }
+                goto pop;
+            }
+            if (BGM_STREAM == NULL)
+            {
+                goto pop;
+            }
+            switch (cmd->unk_8)
+            {
+            case 0:
+                BGM_STREAM->Stop(FALSE);
+                goto step;
+            case 1: {
+                if (BGM_STREAM->m_refilling)
+                {
+                    goto done;
+                }
+                char *name = cmd->arg >= 0 ? g_SoundManager.preload_names[cmd->arg] : cmd->name;
+                strcpy(g_SoundManager.bgm_name, name);
+                cmd->arg = g_SoundManager.find_bgm(name);
+                BGM_STREAM->recreate_buffers(&g_SoundManager.bgm_format[cmd->arg]);
+                goto step;
+            }
+            case 2:
+                BGM_STREAM->m_pWaveFile->open_bgm(&g_SoundManager.bgm_format[cmd->arg], 0);
+                goto step;
+            case 3: {
+                IDirectSoundBuffer *buffer = bgm_buffer(BGM_STREAM);
+                BGM_STREAM->Reset(0);
+                cmd->arg = BGM_STREAM->m_pWaveFile->m_track->total_size != 0;
+                if (BGM_STREAM->FillBufferWithSound(buffer, cmd->arg, 0) >= 0)
+                {
+                    goto step;
+                }
+                goto pop;
+            }
+            case 4:
+                BGM_STREAM->Play(0, DSBPLAY_LOOPING, 0);
+                goto step;
+            }
+            if (cmd->unk_8 < 7)
+            {
+                goto step;
+            }
+            goto pop;
+        case 4:
+            if (BGM_STREAM == NULL)
+            {
+                goto pop;
+            }
+            switch (cmd->unk_8)
+            {
+            case 0:
+                BGM_STREAM->Stop(TRUE);
+                goto step;
+            case 1:
+                if (g_SoundManager.bgm_thread == NULL)
+                {
+                    goto pop;
+                }
+                PostThreadMessageA(g_SoundManager.bgm_thread_id, WM_QUIT, 0, 0);
+                goto step;
+            case 2:
+                if (WaitForSingleObject(g_SoundManager.bgm_thread, 0x100) != WAIT_OBJECT_0)
+                {
+                    PostThreadMessageA(g_SoundManager.bgm_thread_id, WM_QUIT, 0, 0);
+                    cmd->unk_8--;
+                    goto step;
+                }
+                g_SoundManager.bgm_thread = NULL;
+                goto step;
+            case 3:
+                CloseHandle(g_SoundManager.bgm_thread);
+                CloseHandle(g_SoundManager.bgm_event);
+                g_SoundManager.bgm_thread = NULL;
+                if (BGM_STREAM != NULL)
+                {
+                    delete BGM_STREAM;
+                }
+                g_SoundManager.bgm_stream = NULL;
+                goto step;
+            case 10:
+                goto pop;
+            }
+            goto step;
+        case 3:
+            if (BGM_STREAM == NULL)
+            {
+                goto pop;
+            }
+            switch (cmd->unk_8)
+            {
+            case 0:
+                BGM_STREAM->Stop(TRUE);
+                goto step;
+            case 1:
+                goto pop;
+            }
+            goto step;
+        case 5: {
+            i32 frames = cmd->arg * 60.0f;
+            if (BGM_STREAM != NULL)
+            {
+                BGM_STREAM->m_fade_mode = 1;
+                BGM_STREAM->m_fade_time_left = BGM_STREAM->m_fade_duration = frames;
+            }
+            goto pop;
+        }
+        case 6:
+            if (g_Supervisor.config.bgm_mode == 1)
+            {
+                if (BGM_STREAM->m_refilling)
+                {
+                    goto done;
+                }
+                BGM_STREAM->Pause();
+            }
+            goto pop;
+        case 7:
+            if (g_Supervisor.config.bgm_mode == 1)
+            {
+                if (BGM_STREAM->m_refilling)
+                {
+                    goto done;
+                }
+                BGM_STREAM->Unpause();
+            }
+            goto pop;
+        case 9:
+            BGM_STREAM->switch_track(&g_SoundManager.bgm_format[g_SoundManager.find_bgm(cmd->name)]);
+            goto pop;
+        default:
+            goto done;
+        }
+    pop:
+        // Drops the command; cmd moves along with the copy.
+        for (i32 i = 0; cmd->command != 0;)
+        {
+            i++;
+            *cmd = cmd[1];
+            cmd++;
+            if (i >= 0x1f)
+            {
+                break;
+            }
+        }
+    } while (again);
+    goto done;
+step:
+    cmd->unk_8++;
+done:
+    if (g_Supervisor.config.unk_22)
+    {
+        for (i32 i = 0; i < SOUND_QUEUE_SIZE; i++)
+        {
+            i32 id = g_SoundManager.queued_ids[i];
+            if (id < 0)
+            {
+                break;
+            }
+            g_SoundManager.queued_ids[i] = -1;
+            i32 count = g_SoundManager.queued_counts[i];
+            if (count < 0)
+            {
+                SoundBufferEntry *entry = &g_SoundManager.sound_buffers[id];
+                entry->was_playing = 0;
+                if (entry->buffer != NULL)
+                {
+                    DWORD status;
+                    entry->buffer->GetStatus(&status);
+                    entry->was_playing = status & DSBSTATUS_PLAYING;
+                    entry->buffer->Stop();
+                }
+                g_SoundManager.queued_counts[i] = 0;
+            }
+            else
+            {
+                i32 pan = 0;
+                for (i32 j = 0; j < count; j++)
+                {
+                    pan += g_SoundManager.queued_pans[i][j];
+                }
+                if (count > 0)
+                {
+                    pan /= count;
+                }
+                g_SoundManager.queued_counts[i] = 0;
+                g_SoundManager.sound_buffers[id].play(pan);
+            }
+        }
+    }
+    LEAVE_CS(CS_SOUND);
+    return g_SoundManager.bgm_commands[0].command;
 }

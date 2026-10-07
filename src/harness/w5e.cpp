@@ -31,3 +31,4 @@ f32 harness_w5e_transformed_pos(AnmVm *vm)
     vm->get_own_transformed_pos(&pos);
     return pos.x;
 }
+
