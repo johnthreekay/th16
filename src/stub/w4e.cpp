@@ -3,22 +3,3 @@
 // calls with standard conventions.
 #include "../MainMenu.h"
 
-// STUB: TH16 0x44ec60
-void TitleInf::update_key_config_sprites()
-{
-}
-
-// STUB: TH16 0x44f810
-void TitleInf::update_key_config_cursor()
-{
-}
-
-// STUB: TH16 0x44dc70
-void TitleInf::update_options_sprites()
-{
-}
-
-// STUB: TH16 0x44c8c0
-void TitleInf::update_options_cursor()
-{
-}

@@ -396,6 +396,204 @@ i32 TitleInf::do_options()
     return 1;
 }
 
+// AnmVm::search_children with its first level inlined, as LTCG did for
+// some constant scripts.
+static __forceinline AnmVm *search_children_inline(AnmVm *vm, i32 script, i32 n)
+{
+    for (ZunList<AnmVm> *node = &vm->list_of_children; node != NULL; node = node->next)
+    {
+        AnmVm *child = node->entry;
+        if (child == NULL || child == vm)
+        {
+            continue;
+        }
+        if (child->unk_49c == script || script == -1)
+        {
+            if (n == 0)
+            {
+                return child;
+            }
+            n--;
+        }
+        if (child->list_of_children.next != NULL)
+        {
+            AnmVm *found = child->search_children(script, n);
+            if (found != NULL)
+            {
+                return found;
+            }
+        }
+        if (vm->unk_49c == -2 && node->next == NULL)
+        {
+            return node->entry;
+        }
+    }
+    return NULL;
+}
+
+// TitleInf::interrupt_child_and_run with search_children inlined.
+static __forceinline void interrupt_child_and_run_inline(AnmId &id, i32 script, i32 interrupt)
+{
+    AnmVm *vm;
+    if (get_vm_or_clear(id) == NULL)
+    {
+        vm = NULL;
+    }
+    else
+    {
+        vm = search_children_inline(get_vm_or_clear(id), script, 0);
+    }
+    vm->interrupt(interrupt);
+    vm->run();
+}
+
+// Rows above the cursor get interrupt 30, rows below it 31; the digits of
+// the two volumes follow their rows.
+// TODO: the original keeps g_AnmManager in esi/ebx across the lookups (get_vm_with_id is an opaque stub here), which changes the inlined searches' registers.
+// FUNCTION: TH16 0x44c8c0
+void TitleInf::update_options_cursor()
+{
+    i32 i;
+    for (i = 0; i < menu.next_selection; i++)
+    {
+        interrupt_child_and_run(1, i + 0x17, 0x1e);
+        interrupt_child_and_run(1, i + 0x1c, 0x1e);
+    }
+    for (i++; i < 5; i++)
+    {
+        interrupt_child_and_run(1, i + 0x17, 0x1f);
+        interrupt_child_and_run(1, i + 0x1c, 0x1f);
+    }
+    if (menu.next_selection > 0)
+    {
+        interrupt_child_and_run_inline(anm_ids[1], 0x21, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x22, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x23, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x24, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x25, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x26, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x27, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x28, 0x1e);
+    }
+    if (menu.next_selection > 1)
+    {
+        interrupt_child_and_run_inline(anm_ids[1], 0x29, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2a, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2b, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2c, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2d, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2e, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2f, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x30, 0x1e);
+    }
+    else if (menu.next_selection < 1)
+    {
+        interrupt_child_and_run(1, 0x29, 0x1f);
+        interrupt_child_and_run(1, 0x2a, 0x1f);
+        interrupt_child_and_run(1, 0x2b, 0x1f);
+        interrupt_child_and_run(1, 0x2c, 0x1f);
+        interrupt_child_and_run(1, 0x2d, 0x1f);
+        interrupt_child_and_run(1, 0x2e, 0x1f);
+        interrupt_child_and_run(1, 0x2f, 0x1f);
+        interrupt_child_and_run(1, 0x30, 0x1f);
+    }
+}
+
+// The VM of the first descendant of anm_ids[index] running the script,
+// looked up again through its id.
+static __forceinline AnmVm *get_child_vm(AnmId &parent, i32 script)
+{
+    AnmVm *child = find_child_of(parent, script);
+    AnmId id;
+    id.id = child != NULL ? child->id.id : 0;
+    return g_AnmManager->get_vm_with_id(id);
+}
+
+// Points the VM at a sprite through the file it came from.
+static __forceinline void set_child_sprite(AnmVm *vm, i32 sprite)
+{
+    if (vm != NULL)
+    {
+        g_AnmManager->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, sprite);
+    }
+}
+
+// Applies the volumes and shows them: three digits each, in two layers of
+// sprites, with leading zeros hidden.
+// TODO: the original keeps g_AnmManager in edi across the lookups (get_vm_with_id is an opaque stub here).
+// FUNCTION: TH16 0x44dc70
+void TitleInf::update_options_sprites()
+{
+    g_SoundManager.bgm_volume = g_Supervisor.config.bgm_volume;
+    g_SoundManager.modify_bgm(8, 0, "SetVol");
+    g_SoundManager.se_volume = g_Supervisor.config.se_volume;
+    if (g_SoundManager.se_volume != 0)
+    {
+        f32 x = g_SoundManager.bgm_volume / 100.0f;
+        f32 t = (1.0f - x) * (1.0f - x);
+        f32 u = 1.0f - t * t;
+        g_SoundManager.bgm_db = -5000 - (i32)(u * -5000.0f);
+    }
+    else
+    {
+        g_SoundManager.bgm_db = -10000;
+    }
+    set_child_sprite(get_child_vm(anm_ids[1], 0x21), g_Supervisor.config.bgm_volume / 100 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x22), g_Supervisor.config.bgm_volume / 10 % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x23), g_Supervisor.config.bgm_volume % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x25), g_Supervisor.config.bgm_volume / 100 + 0x35);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x26), g_Supervisor.config.bgm_volume / 10 % 10 + 0x35);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x27), g_Supervisor.config.bgm_volume % 10 + 0x35);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x29), g_Supervisor.config.se_volume / 100 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x2a), g_Supervisor.config.se_volume / 10 % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x2b), g_Supervisor.config.se_volume % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x2d), g_Supervisor.config.se_volume / 100 + 0x35);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x2e), g_Supervisor.config.se_volume / 10 % 10 + 0x35);
+    set_child_sprite(get_child_vm(anm_ids[1], 0x2f), g_Supervisor.config.se_volume % 10 + 0x35);
+    if (g_Supervisor.config.bgm_volume < 10)
+    {
+        get_child_vm(anm_ids[1], 0x21)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x22)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x25)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x26)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+    }
+    else if (g_Supervisor.config.bgm_volume < 100)
+    {
+        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_FLAG_LO_2;
+    }
+    else
+    {
+        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_FLAG_LO_2;
+    }
+    if (g_Supervisor.config.se_volume < 10)
+    {
+        get_child_vm(anm_ids[1], 0x29)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x2a)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x2d)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x2e)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+    }
+    else if (g_Supervisor.config.se_volume < 100)
+    {
+        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_FLAG_LO_2;
+    }
+    else
+    {
+        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_FLAG_LO_2;
+    }
+}
+
 // TODO: the original realigns its frame to 8 bytes, and does not merge the two input tests into (pressed | repeat) & mask.
 // FUNCTION: TH16 0x44e930
 i32 TitleInf::do_key_config()
@@ -507,6 +705,33 @@ i32 TitleInf::do_key_config()
     return 1;
 }
 
+// Two digits per action, in two layers of sprites.
+// TODO: the original keeps g_AnmManager in edi across the lookups (get_vm_with_id is an opaque stub here).
+// FUNCTION: TH16 0x44ec60
+void TitleInf::update_key_config_sprites()
+{
+    set_child_sprite(get_child_vm(anm_ids[2], 0x3f), key_config[0] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x40), key_config[0] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x49), key_config[0] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4a), key_config[0] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x41), key_config[1] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x42), key_config[1] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4b), key_config[1] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4c), key_config[1] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x43), key_config[2] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x44), key_config[2] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4d), key_config[2] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4e), key_config[2] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x45), key_config[3] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x46), key_config[3] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4f), key_config[3] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x50), key_config[3] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x47), key_config[4] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x48), key_config[4] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x51), key_config[4] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x52), key_config[4] % 10 + 0x2a);
+}
+
 // FUNCTION: TH16 0x44f710
 void TitleInf::set_key(i32 action, i32 key)
 {
@@ -524,6 +749,39 @@ void TitleInf::set_key(i32 action, i32 key)
     key_config[action] = key;
     update_key_config_sprites();
     g_SoundManager.play_sound_centered(7, 0);
+}
+
+// Rows above the cursor get interrupt 30, rows below it 31; the five
+// remappable actions have two more pairs of sprites each.
+// TODO: the original keeps g_AnmManager in edi across the lookups (get_vm_with_id is an opaque stub here) and reserves a 12-byte frame.
+// FUNCTION: TH16 0x44f810
+void TitleInf::update_key_config_cursor()
+{
+    i32 i;
+    for (i = 0; i < menu.next_selection; i++)
+    {
+        interrupt_child_and_run(2, i + 0x31, 0x1e);
+        interrupt_child_and_run(2, i + 0x38, 0x1e);
+        if (i < 5)
+        {
+            interrupt_child_and_run(2, i * 2 + 0x3f, 0x1e);
+            interrupt_child_and_run(2, i * 2 + 0x40, 0x1e);
+            interrupt_child_and_run(2, i * 2 + 0x49, 0x1e);
+            interrupt_child_and_run(2, i * 2 + 0x4a, 0x1e);
+        }
+    }
+    for (i++; i < 7; i++)
+    {
+        interrupt_child_and_run(2, i + 0x31, 0x1f);
+        interrupt_child_and_run(2, i + 0x38, 0x1f);
+    }
+    for (i = menu.next_selection + 1; i < 5; i++)
+    {
+        interrupt_child_and_run(2, i * 2 + 0x3f, 0x1f);
+        interrupt_child_and_run(2, i * 2 + 0x40, 0x1f);
+        interrupt_child_and_run(2, i * 2 + 0x49, 0x1f);
+        interrupt_child_and_run(2, i * 2 + 0x4a, 0x1f);
+    }
 }
 
 // FUNCTION: TH16 0x44a800
