@@ -49,8 +49,8 @@ EnemyData::EnemyData()
 {
 }
 
-// TODO: the memset arguments for drops are pushed a few stores later in the original, and
-// next_enemy_id is read twice. The latter changed once set_boss_id got its harness caller.
+// TODO: drops.reset()'s memset arguments (push 0, lea esi, push esi) are scheduled a few
+// stores later in the original; ours pushes them right after push 0x50.
 // FUNCTION: TH16 0x41b580
 EnemyInf::EnemyInf(const char *sub_name)
 {
@@ -194,8 +194,6 @@ EnemyInf *EnemyManager::find_enemy_by_id(int id)
     return enemy;
 }
 
-// TODO: create_func/register_on_* still get this in ecx here (LTCG drops it in the original),
-// and the inlined UpdateFunc constructor keeps its stores in the original.
 // FUNCTION: TH16 0x41ae70
 int EnemyManager::initialize(const char *ecl_filename)
 {
@@ -216,8 +214,8 @@ int EnemyManager::initialize(const char *ecl_filename)
     f->function = (UpdateFuncCallback)on_draw_callback;
     f->on_registration = NULL;
     f->on_cleanup = NULL;
-    f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
+    f->flags &= ~UPDATE_FUNC_ACTIVE;
     g_UpdateFuncRegistry->register_on_draw(f, 0x17);
     on_draw = f;
 
@@ -292,7 +290,8 @@ HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
     }
 }
 
-// TODO: register allocation differs in the inlined ZunTimer::tick (the original keeps 1.0f in xmm2).
+// TODO: register allocation differs in the inlined ZunTimer::tick: the original loads 1.0f into
+// xmm2 at the damage_multiplier store and keeps 1.01f in xmm1 (tick_mixed does not change it).
 // FUNCTION: TH16 0x41b3d0
 int EnemyManager::update()
 {
@@ -518,7 +517,8 @@ int __fastcall ecl_ext_damage_stored(EnemyData *enemy, int damage)
 // The third damage hook: the damage the player deals to the hurtboxes
 // around the VM in anm_ids[1] (a rotated bar and a circle below it), on top
 // of the damage the enemy took itself.
-// TODO: the original loads vm->rotation.z into xmm3 after pushing enemy_id; ours before the size.x store.
+// TODO: the original loads vm->rotation.z into xmm3 after pushing enemy_id; ours before the size.x store
+// (separate size.x/size.y stores and get_vm_or_clear do not change it).
 // FUNCTION: TH16 0x425410
 int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage)
 {
@@ -831,7 +831,6 @@ int EnemyData::step_logic()
 // GLOBAL: TH16 0x4a6dc0
 EnemyManager *g_EnemyManager;
 
-// TODO: inlined delete_vm loads the child list before storing the flags.
 // FUNCTION: TH16 0x41ba10
 EnemyInf::~EnemyInf()
 {
@@ -883,7 +882,8 @@ void EnemyDrop::eject_all_drops(D3DXVECTOR3 *pos)
     main_type = 0;
 }
 
-// TODO: the original multiplies x as dist * x with dist loaded into a register; ours loads x.
+// TODO: the original multiplies x as dist * x with dist loaded into a register; ours loads x
+// (the operand order in the source does not change it).
 // FUNCTION: TH16 0x41d700
 void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
 {
@@ -987,8 +987,10 @@ int EnemyInf::on_tick()
     return result;
 }
 
-// TODO: the original keeps the summed position in xmm1-3 across find_or_clear (LTCG knows the
-// stubbed get_vm_with_id leaves them alone) and saves ebx/edi up front.
+// TODO: ours realigns the frame (and esp, -8) because of the direct zun_atan2f call; the
+// original calls it without realigning (a harness for thread_start's aligned
+// EnemyManager::create and HARNESS_CALLED update/on_tick do not change it). Separate float
+// locals for the summed position keep it in registers and avoid a /GS cookie.
 // FUNCTION: TH16 0x41d2e0
 int EnemyData::on_tick()
 {
@@ -1023,16 +1025,22 @@ int EnemyData::on_tick()
             {
                 continue;
             }
-            Float3 pos = anm_pos_array[i] + final_pos.pos;
+            f32 x = anm_pos_array[i].x + final_pos.pos.x;
+            f32 y = anm_pos_array[i].y + final_pos.pos.y;
+            f32 z = anm_pos_array[i].z + final_pos.pos.z;
             if (unk_224[i] >= 0)
             {
                 AnmVm *base = anm_ids[unk_224[i]].find_or_clear();
                 if (base != NULL)
                 {
-                    pos += base->pos;
+                    x += base->pos.x;
+                    y += base->pos.y;
+                    z += base->pos.z;
                 }
             }
-            vm->entity_pos = pos;
+            vm->entity_pos.x = x;
+            vm->entity_pos.y = y;
+            vm->entity_pos.z = z;
             if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
             {
                 vm->rotation.z = zun_atan2f(final_pos.velocity.y, final_pos.velocity.x);
@@ -1153,7 +1161,7 @@ int EnemyInf::die()
     return 1;
 }
 
-// TODO: the inlined tick adds speed and current_f the other way round (register choice).
+// TODO: the inlined tick (tick_mixed) adds speed and current_f the other way round (register choice).
 // FUNCTION: TH16 0x41d900
 void EnemyManager::kill_all()
 {
@@ -1173,7 +1181,7 @@ void EnemyManager::kill_all()
             enemy->enemy.flags_low |= 0x2000000;
         }
     }
-    mgr->inner.time_in_stage.tick();
+    mgr->inner.time_in_stage.tick_mixed();
 }
 
 // TODO: register allocation: the original keeps value in ebx and spills next to the argument slot.
@@ -1200,7 +1208,8 @@ void __stdcall EnemyManager::kill_all_with_unk_278(i32 value)
     mgr->inner.time_in_stage.tick();
 }
 
-// TODO: the inlined tick adds speed and current_f the other way round (register choice).
+// TODO: in the inlined tick the original adds current_f into the speed's xmm1; ours loads
+// current_f into xmm0 and adds the speed, the opposite of kill_all (tick or tick_mixed alike).
 // FUNCTION: TH16 0x41db70
 void EnemyManager::kill_all_no_set_death()
 {
@@ -1317,8 +1326,6 @@ const char *EnemyInf::check_time_interrupts()
     return NULL;
 }
 
-// TODO: the original loads g_AnmManager after pushing the id (LTCG knows the stubbed
-// get_vm_with_id leaves it alone, so it is loaded once).
 // FUNCTION: TH16 0x423260
 int EnemyData::ecl_anm_set_sprite()
 {
@@ -1337,12 +1344,7 @@ int EnemyData::ecl_anm_set_sprite()
         anm_slot_0_script = full->context.current_context->get_int_arg(1);
         anm_slot_0_anm_index = selected_anm_index;
     }
-    AnmManager *anm;
-    AnmVm *vm = (anm = g_AnmManager)->get_vm_with_id(anm_ids[slot]);
-    if (vm == NULL)
-    {
-        anm_ids[slot].id = 0;
-    }
+    AnmVm *vm = get_vm_or_clear(anm_ids[slot]);
     if (slot == 0)
     {
         final_sprite_size.x = vm->scale.y * vm->sprite_size.y;
@@ -1350,7 +1352,7 @@ int EnemyData::ecl_anm_set_sprite()
     }
     if (flags_low & 0x20)
     {
-        vm = anm->get_vm_with_id(anm_ids[slot]);
+        vm = get_vm(anm_ids[slot]);
         if (vm != NULL)
         {
             vm->clear_flag_lo_2_tree_inline();
@@ -1442,8 +1444,8 @@ EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, EnemyCreatePara
     return enemy;
 }
 
-// TODO: the original reloads the current context after the memset and the opcode after the
-// position stores (as if params had escaped); ours keeps both in registers.
+// TODO: in the inlined current_instr the original loads the offset into ecx and the
+// subroutine index into edx; ours swaps them. The rest matches.
 // FUNCTION: TH16 0x423050
 int EnemyData::ecl_enm_create()
 {
@@ -1476,14 +1478,7 @@ int EnemyData::ecl_enm_create()
     params.life = this->full->context.current_context->get_int_arg_given_value(3, instr->args[n + 2].i);
     params.score_reward = this->full->context.current_context->get_int_arg_given_value(4, instr->args[n + 3].i);
     params.item_drop = this->full->context.current_context->get_int_arg_given_value(5, instr->args[n + 4].i);
-    for (i32 i = 0; i < 4; i++)
-    {
-        params.ecl_int_vars[i] = ecl_int_vars[i];
-    }
-    for (i32 i = 0; i < 8; i++)
-    {
-        params.ecl_float_vars[i] = ecl_float_vars[i];
-    }
+    memcpy(params.ecl_int_vars, ecl_int_vars, sizeof(ecl_int_vars) + sizeof(ecl_float_vars));
     params.parent_enemy_id = this->full->enemy_id;
     g_EnemyManager->allocate_new_enemy((const char *)&instr->args[1], &params, 0);
     return 0;

@@ -221,7 +221,7 @@ i32 __fastcall ScreenEffect::on_tick_pulse(ScreenEffect *self)
         }
         self->timer.set_value(0);
     }
-    self->timer.tick();
+    self->timer.tick_mixed();
     return UPDATE_FUNC_CONTINUE;
 }
 

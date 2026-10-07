@@ -180,7 +180,10 @@ i32 __fastcall BulletManager::on_tick_callback(BulletManager *self)
     return self->on_tick_body();
 }
 
-// TODO: the original wraps a plain call in push ecx/pop ecx; ours tail-calls.
+// TODO: the original wraps a plain call in push ecx/pop ecx; ours tail-calls. A harness
+// standing in for thread_start's aligned create() call (create and initialize HARNESS_CALLED)
+// matches this and lifts initialize to 96%, but on_tick_callback then pads its call too,
+// because our on_tick_body does not realign itself like the original's.
 // FUNCTION: TH16 0x412c80
 i32 __fastcall BulletManager::on_draw_callback(BulletManager *self)
 {
@@ -311,30 +314,27 @@ static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
     {
         if (bullet->cancel_script >= 0)
         {
-            g_BulletManager->anm_ids[bullet->index] =
-                g_BulletManager->bullet_anm->create_vm(bullet->cancel_script, &bullet->pos, 0.0f, -1, 0);
+            AnmLoaded *anm = g_BulletManager->bullet_anm;
+            g_BulletManager->anm_ids[bullet->index] = anm->create_vm(bullet->cancel_script, &bullet->pos, 0.0f, -1, 0);
         }
         g_SoundManager.play_sound_at_position(0x47, bullet->pos.x);
         gen_items_from_cancel(&bullet->pos, mode);
     }
     D3DXVECTOR3 delta = bullet->velocity * g_game_speed * 0.5f;
-    bullet->pos.x = bullet->pos.x + delta.x;
-    bullet->pos.y = bullet->pos.y + delta.y;
-    bullet->pos.z = bullet->pos.z + delta.z;
+    bullet->pos += delta;
     bullet->state = 4;
     bullet->timer_144c.reset();
     return 0;
 }
 
-// TODO: the original loads the ANM file before pushing create_vm's
-// arguments and adds pos.x + delta.x with the operands swapped.
 // FUNCTION: TH16 0x416840
 i32 Bullet::cancel(i32 mode)
 {
     return cancel_bullet(this, mode);
 }
 
-// TODO: as Bullet::cancel (create_vm argument order, vector add operands).
+// TODO: the inlined cancel_bullet's velocity scaling and pos += delta differ in register
+// allocation and scheduling (the out-of-line Bullet::cancel matches).
 // FUNCTION: TH16 0x416f40
 HARNESS_CALLED void BulletManager::clear_all(i32 unused)
 {
@@ -352,14 +352,13 @@ HARNESS_CALLED void BulletManager::clear_all(i32 unused)
 static inline i32 bullet_in_circle(Bullet *bullet, D3DXVECTOR3 *pos, f32 radius)
 {
     f32 r = bullet->hitbox_diameter * 0.5f + radius;
-    f32 dy = bullet->pos.y - pos->y;
     f32 dx = bullet->pos.x - pos->x;
+    f32 dy = bullet->pos.y - pos->y;
     return dy * dy + dx * dx <= r * r;
 }
 
-// TODO: the original does not thread the jump after the iterator's NULL
-// entry, computes the y distance first and keeps 4 more frame bytes in the
-// bomb version.
+// TODO: only the iterator differs: the original does not thread the jump after the
+// iterator's NULL entry (if/else, or iter_* defined out of line, do not change it).
 // FUNCTION: TH16 0x416c20
 HARNESS_CALLED i32 BulletManager::cancel_radius(D3DXVECTOR3 *pos, f32 radius, i32 mode)
 {
@@ -378,7 +377,7 @@ HARNESS_CALLED i32 BulletManager::cancel_radius(D3DXVECTOR3 *pos, f32 radius, i3
     return 0;
 }
 
-// TODO: as cancel_radius.
+// TODO: as cancel_radius (only the iterator's jump threading differs).
 // FUNCTION: TH16 0x416d20
 HARNESS_CALLED i32 BulletManager::cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode)
 {
@@ -417,8 +416,6 @@ HARNESS_CALLED i32 BulletManager::cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3D
     return 0;
 }
 
-// TODO: the original frame has 4 more (unused) bytes and saves edi up
-// front instead of around the mode 5 branch.
 // FUNCTION: TH16 0x416a00
 HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
 {
@@ -444,7 +441,7 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
         }
         if (!(g_Spellcard->flags & 1))
         {
-            g_ItemManager->spawn_item(10, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f,
+            g_ItemManager->spawn_item(10, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f,
                                       2.2f, 0, 0);
         }
     }
@@ -452,19 +449,19 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
     {
         if (mgr->bomb_cancel_count_multiple_of(3))
         {
-            g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f,
+            g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f,
                                       2.2f, 0, 1);
         }
         g_BulletManager->bullet_count_canceled_by_bombs++;
     }
     else if (mode == 4)
     {
-        g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f, 2.2f,
+        g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f, 2.2f,
                                   0, 1);
         if (g_SubseasonBomb->in_use == 1)
         {
             g_ItemManager->spawn_item(g_SubseasonBomb->season_level + 8, pos, 0,
-                                      g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f, 2.2f, 0, 0);
+                                      g_replay_safe_rng.randf_neg_to(ZUN_PI / 180.0f * 10.0f) - ZUN_PI / 2.0f, 2.2f, 0, 0);
         }
     }
 }
@@ -1266,15 +1263,15 @@ done:
 
 static_assert(offsetof(Bullet, ex_state) == 0xfa0, "Bullet layout");
 
-// TODO: in the inlined timer tick the original adds the speed to
-// current_f in xmm0 (ours adds current_f to the speed in xmm1).
+// TODO: in the inlined timer tick the original adds the speed to current_f in xmm0 and
+// jumps to shared stores (ours adds current_f to the speed in xmm1; tick_mixed gets closer).
 // FUNCTION: TH16 0x414ec0
 i32 Bullet::step_ex_00()
 {
     if (ex_state[0].timer.current <= 16)
     {
         bullet_sincosmul(&velocity, angle, 5.0f - ex_state[0].timer.current_f * 5.0f / 16.0f + speed);
-        ex_state[0].timer.tick();
+        ex_state[0].timer.tick_mixed();
         return 0;
     }
     active_ex_flags ^= 1;
@@ -1460,8 +1457,6 @@ static void add_angle_twice(ZunAngle *a, f32 delta)
     a->value = wrap_angle(wrap_angle(a->value + delta));
 }
 
-// TODO: in the inlined timer tick the original keeps the frame in xmm0 on
-// the unscaled path (ours shares xmm1 with the scaled path).
 // FUNCTION: TH16 0x4153e0
 i32 Bullet::step_ex_03()
 {
@@ -1473,11 +1468,11 @@ i32 Bullet::step_ex_03()
     add_angle_twice(&angle_ref(), ex_state[2].floats[1] * g_game_speed);
     speed += ex_state[2].floats[0] * g_game_speed;
     bullet_sincosmul(&velocity, angle, speed);
-    ex_state[2].timer.tick();
+    ex_state[2].timer.tick_mixed();
     return 0;
 }
 
-// TODO: in the inlined timer tick the original loads current_f into xmm0
+// TODO: in the inlined timer tick (tick_mixed) the original loads current_f into xmm0
 // and adds the speed (ours adds current_f into the speed's xmm1).
 // FUNCTION: TH16 0x415570
 i32 Bullet::step_ex_04()
@@ -1521,7 +1516,7 @@ i32 Bullet::step_ex_04()
         new_speed = speed - ex_state[3].timer.current_f * speed / ex_state[3].ints[0];
     }
     bullet_sincosmul(&velocity, angle, new_speed);
-    ex_state[3].timer.tick();
+    ex_state[3].timer.tick_mixed();
     return 0;
 }
 
@@ -1644,7 +1639,7 @@ i32 Bullet::step_ex_17()
         angle = wrap_angle(atan2(velocity.y, velocity.x));
     }
     velocity.z = 0.0f;
-    ex_state[8].timer.tick();
+    ex_state[8].timer.tick_mixed();
     return 0;
 }
 

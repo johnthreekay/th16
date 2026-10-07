@@ -7,7 +7,8 @@
 #include "ZunMath.h"
 
 // TODO: the original compares uv.x with 0 only after storing uv.y; ours
-// compares it right after storing it.
+// compares it right after storing it (`uv.x < 0.0f` and a D3DXVECTOR2
+// assignment do not change it).
 // FUNCTION: TH16 0x41cbd0
 void EnemyData::update_fog()
 {

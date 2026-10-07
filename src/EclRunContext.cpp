@@ -266,7 +266,8 @@ HARNESS_CALLED i32 *EclRunContext::get_int_arg_ptr(int index)
     return NULL;
 }
 
-// TODO: register allocation differs.
+// TODO: ours hoists (i32)value above the sign test (both paths convert it); the original
+// converts in each path and adds the frame base before the stack address.
 // FUNCTION: TH16 0x4743a0
 f32 *EclRunContext::get_float_arg_ptr(int index)
 {
@@ -387,7 +388,8 @@ HARNESS_CALLED EclRawInstr *EclRunContext::get_subroutine_ptr()
     return current_instr();
 }
 
-// TODO: the original stores stack_offset before loading base_offset.
+// TODO: the original stores stack_offset before loading base_offset (not
+// changed by a new_offset local, an inline push helper or a union store).
 // FUNCTION: TH16 0x474810
 HARNESS_CALLED i32 EclStack::enter(i32 size)
 {
@@ -435,7 +437,6 @@ int SptInf::load_sub_by_name(const char *name)
     return 0;
 }
 
-// TODO: the original aligns its frame to 8 bytes; otherwise only block placement differs.
 // FUNCTION: TH16 0x473bc0
 HARNESS_CALLED i32 SptInf::run_ecl(f32 speed)
 {
@@ -479,7 +480,6 @@ HARNESS_CALLED void ecl_log(const char *fmt, ...)
 {
 }
 
-// TODO: the original walks the call arguments with a byte offset into args and spills differently.
 // This file's copy of ZunMath.h's sincosmul.
 // FUNCTION: TH16 0x474510
 static void __fastcall ecl_sincosmul(Float3 *dst, f32 angle, f32 radius)

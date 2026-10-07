@@ -10,7 +10,9 @@ static inline f32 ease_in_back(f32 x, f32 a)
            (1.0f - a * a / ((1.0f - a) * (1.0f - a)));
 }
 
-// TODO: register allocation differs in most curves; ours shares the 0.5f constant across branches.
+// TODO: (reccmp 83%) the two-branch curves assign x and return it once, which the original's
+// registers show; left: the in-out-2 else branch (original keeps 2.0f in xmm1 and moves the
+// result into xmm3) and out-in-sine (original result in xmm1, 0.5f loaded once in the else).
 // FUNCTION: TH16 0x4033f0
 HARNESS_CALLED f32 interp_common_methods(i32 mode, f32 time, f32 end_time)
 {
@@ -37,44 +39,68 @@ HARNESS_CALLED f32 interp_common_methods(i32 mode, f32 time, f32 end_time)
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return x * x * 0.5f;
+            x = x * x;
         }
-        return (2.0f - (2.0f - x) * (2.0f - x)) * 0.5f;
+        else
+        {
+            x = 2.0f - (2.0f - x) * (2.0f - x);
+        }
+        return x * 0.5f;
     case INTERP_EASE_OUT_IN_2:
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return 0.5f - (1.0f - x) * (1.0f - x) * 0.5f;
+            x = 0.5f - (1.0f - x) * (1.0f - x) * 0.5f;
         }
-        return (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        else
+        {
+            x = (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        }
+        return x;
     case INTERP_EASE_IN_OUT_3:
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return x * x * x * 0.5f;
+            x = x * x * x;
         }
-        return (2.0f - (2.0f - x) * (2.0f - x) * (2.0f - x)) * 0.5f;
+        else
+        {
+            x = 2.0f - (2.0f - x) * (2.0f - x) * (2.0f - x);
+        }
+        return x * 0.5f;
     case INTERP_EASE_OUT_IN_3:
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return 0.5f - (1.0f - x) * (1.0f - x) * (1.0f - x) * 0.5f;
+            x = 0.5f - (1.0f - x) * (1.0f - x) * (1.0f - x) * 0.5f;
         }
-        return (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        else
+        {
+            x = (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        }
+        return x;
     case INTERP_EASE_IN_OUT_4:
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return x * x * x * x * 0.5f;
+            x = x * x * x * x;
         }
-        return (2.0f - (2.0f - x) * (2.0f - x) * (2.0f - x) * (2.0f - x)) * 0.5f;
+        else
+        {
+            x = 2.0f - (2.0f - x) * (2.0f - x) * (2.0f - x) * (2.0f - x);
+        }
+        return x * 0.5f;
     case INTERP_EASE_OUT_IN_4:
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return 0.5f - (1.0f - x) * (1.0f - x) * (1.0f - x) * (1.0f - x) * 0.5f;
+            x = 0.5f - (1.0f - x) * (1.0f - x) * (1.0f - x) * (1.0f - x) * 0.5f;
         }
-        return (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        else
+        {
+            x = (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * (x - 1.0f) * 0.5f + 0.5f;
+        }
+        return x;
     case INTERP_FORCE_INITIAL:
         return 0.0f;
     case INTERP_FORCE_FINAL:
@@ -94,9 +120,13 @@ HARNESS_CALLED f32 interp_common_methods(i32 mode, f32 time, f32 end_time)
         x *= 2.0f;
         if (x < 1.0f)
         {
-            return (1.0f - sinf(x * ZUN_PI * 0.5f + ZUN_PI / 2)) * 0.5f;
+            x = (1.0f - sinf(x * ZUN_PI * 0.5f + ZUN_PI / 2)) * 0.5f;
         }
-        return sinf((x - 1.0f) * ZUN_PI * 0.5f) * 0.5f + 0.5f;
+        else
+        {
+            x = sinf((x - 1.0f) * ZUN_PI * 0.5f) * 0.5f + 0.5f;
+        }
+        return x;
     case INTERP_EASE_IN_BACK_A:
         return ease_in_back(x, 0.25f);
     case INTERP_EASE_IN_BACK_B:
@@ -127,14 +157,15 @@ void InterpFloat::reset()
     time.reset();
 }
 
-// TODO: case 17 copies initial to current as an integer and returns current
-// reloaded.
+// TODO: method 17 computes the new bezier_2, then copies initial to current as an integer
+// before storing it, and returns current reloaded; ours stores current from xmm0 (a temp for
+// the new bezier_2 or other statement orders do not change it).
 // FUNCTION: TH16 0x4171c0
 HARNESS_CALLED f32 InterpFloat::step()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -165,8 +196,8 @@ HARNESS_CALLED f32 InterpFloat::step()
     {
         // Constant acceleration: goal is added to the step.
         initial += bezier_2;
-        bezier_2 = bezier_2 + goal;
         current = initial;
+        bezier_2 = bezier_2 + goal;
         return current;
     }
     else if (method == 8)
@@ -254,7 +285,7 @@ D3DXVECTOR2 InterpFloat2::step()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -311,7 +342,7 @@ D3DXVECTOR3 InterpFloat3::step()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -367,7 +398,7 @@ D3DXVECTOR2 InterpFloat2::step_radial_dist()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -424,7 +455,7 @@ D3DXVECTOR3 InterpStrange1::step()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -506,13 +537,14 @@ D3DXVECTOR3 InterpStrange1::step()
     return current;
 }
 
-// TODO: the timer tick adds current_f and the speed the other way round, and one lea swaps its operands.
+// TODO: the timer tick (tick_mixed) adds current_f and the speed the other way round and stores
+// current_f before current on the unscaled path, and one lea swaps its operands.
 // FUNCTION: TH16 0x464590
 Int3 InterpInt3::step()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_mixed();
         if (time.current >= end_time)
         {
             time.set(end_time);
