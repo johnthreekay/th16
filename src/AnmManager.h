@@ -554,7 +554,7 @@ struct AnmManager
     // 0x46d990. Renders printf-style text into the VM's texture (the
     // ending and dialogue lines). Variadic, so __cdecl with this pushed
     // first.
-    void draw_text(AnmVm *vm, D3DCOLOR color, i32 unk_10, i32 font, i32 x, i32 y, const char *fmt, ...);
+    void draw_text(AnmVm *vm, D3DCOLOR color, i32 shadow_color, i32 font, i32 x, i32 spacing, const char *fmt, ...);
     // 0x46dab0 and 0x46dc20. The same right-aligned (ExpHP: draw_rtext) and
     // centered in the sprite; spacing as in draw_text's last argument.
     void draw_text_right(AnmVm *vm, D3DCOLOR color, D3DCOLOR shadow_color, i32 font, i32 spacing,

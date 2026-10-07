@@ -106,10 +106,10 @@ int __fastcall anm_gather_effect_on_tick(AnmVm *vm)
     if (data->timer.current != data->timer.previous && data->timer.current < 50)
     {
         i32 n = data->timer.current * 4;
-        data->vm_ids[n] = g_EffectManager->effect_anm->create_effect(0x99, -1, NULL);
-        data->vm_ids[n + 1] = g_EffectManager->effect_anm->create_effect(0x99, -1, NULL);
-        data->vm_ids[n + 2] = g_EffectManager->effect_anm->create_effect(0x99, -1, NULL);
-        data->vm_ids[n + 3] = g_EffectManager->effect_anm->create_effect(0x9a, -1, NULL);
+        data->vm_ids[n] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
+        data->vm_ids[n + 1] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
+        data->vm_ids[n + 2] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
+        data->vm_ids[n + 3] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE_2, -1, NULL);
         ZunColor color = vm->color_1;
         gather_setup_child(&data->vm_ids[n], color, vm);
         gather_setup_child(&data->vm_ids[n + 1], color, vm);
@@ -460,14 +460,14 @@ int __fastcall anm_masked_effect_init(AnmVm *vm, D3DXVECTOR3 *pos)
     D3DXVECTOR3 center(320.0f, 240.0f, 0.0f);
     for (i32 i = 0; i < 4; i++)
     {
-        g_EffectManager->effect_anm->copy_vm_and_run(&data->vms[i], i + 3);
+        g_EffectManager->effect_anm->copy_vm_and_run(&data->vms[i], i + EFFECT_SCRIPT_MASK_FIRST);
         data->vms[i].entity_pos = center;
     }
     data->mask_mode = 0;
     vm->set_layer(40);
     data->vms[3].entity_pos = data->vms[2].entity_pos = data->vms[1].entity_pos = data->vms[0].entity_pos =
         D3DXVECTOR3(320.0f, 240.0f, 0.0f);
-    g_EffectManager->effect_anm->copy_vm_and_run(&data->vms[4], 0xc5);
+    g_EffectManager->effect_anm->copy_vm_and_run(&data->vms[4], EFFECT_SCRIPT_MASK_OVERLAY);
     return 0;
 }
 
@@ -504,7 +504,7 @@ int __fastcall anm_masked_effect_on_switch(AnmVm *vm, i32 n)
     case 1:
         for (i32 i = 0; i < 4; i++)
         {
-            g_EffectManager->effect_anm->copy_vm_and_run(&data->vms[i], i + 7);
+            g_EffectManager->effect_anm->copy_vm_and_run(&data->vms[i], i + EFFECT_SCRIPT_MASK_SECOND_FIRST);
         }
         return 0;
     case 7:

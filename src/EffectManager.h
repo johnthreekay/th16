@@ -24,6 +24,20 @@ enum EffectId
     EFFECT_JAGGED_LINE_GRAY = 3,
 };
 
+// Scripts of effect.anm the effect callbacks start.
+enum EffectAnmScript
+{
+    // The masked effect's four mask VMs (3-6), what interrupt 1 replaces
+    // them with (7-10) and the VM drawn through the mask.
+    EFFECT_SCRIPT_MASK_FIRST = 3,
+    EFFECT_SCRIPT_MASK_SECOND_FIRST = 7,
+    EFFECT_SCRIPT_MASK_OVERLAY = 0xc5,
+    // The gather effect's children: three of the first per frame, one of
+    // the second in the complementary color.
+    EFFECT_SCRIPT_GATHER_PARTICLE = 0x99,
+    EFFECT_SCRIPT_GATHER_PARTICLE_2 = 0x9a,
+};
+
 // A row of the table EffectManager::create_effect reads (ExpHP:
 // zTableAnm508Data): which script to start and the callbacks the VM gets.
 struct EffectData

@@ -452,6 +452,15 @@ void AnmVm::update_special_vertices()
 #define ANM_FLAGS_LO ((AnmVmFlagsLoFields *)&flags_lo)
 #define ANM_FLAGS_HI ((AnmVmFlagsHiFields *)&flags_hi)
 
+// Bytes of extra data per segment of the special render modes: an outer and
+// an inner vertex, in screen space (texCircle, texArc) or in 3D
+// (texCylinder3D, texRing3D).
+enum
+{
+    ANM_SCREEN_SEGMENT_SIZE = 2 * sizeof(RenderVertex144),
+    ANM_3D_SEGMENT_SIZE = 2 * sizeof(RenderVertexXyzDiffuseTex),
+};
+
 // Stores to float argument n (a variable or the argument itself), with the
 // value computed first.
 static __forceinline void anm_store_float(AnmVm *vm, AnmRawInstr *ins, i32 n, f32 value)
@@ -1218,23 +1227,23 @@ __forceinline i32 AnmVm::run_script()
             break;
         case ANM_OP_TEX_CIRCLE:
             ANM_FLAGS_LO->render_mode = ANM_RENDER_TEX_CIRCLE;
-            alloc_extra_data(ANM_INT(0) * 56);
+            alloc_extra_data(ANM_INT(0) * ANM_SCREEN_SEGMENT_SIZE);
             break;
         case ANM_OP_TEX_ARC_EVEN:
             ANM_FLAGS_LO->render_mode = ANM_RENDER_TEX_ARC_EVEN;
-            alloc_extra_data(ANM_INT(0) * 56);
+            alloc_extra_data(ANM_INT(0) * ANM_SCREEN_SEGMENT_SIZE);
             break;
         case ANM_OP_TEX_ARC:
             ANM_FLAGS_LO->render_mode = ANM_RENDER_TEX_ARC;
-            alloc_extra_data(ANM_INT(0) * 56);
+            alloc_extra_data(ANM_INT(0) * ANM_SCREEN_SEGMENT_SIZE);
             break;
         case ANM_OP_TEX_CYLINDER_3D:
             ANM_FLAGS_LO->render_mode = ANM_RENDER_TEX_CYLINDER_3D;
-            alloc_extra_data(ANM_INT(0) * 48);
+            alloc_extra_data(ANM_INT(0) * ANM_3D_SEGMENT_SIZE);
             break;
         case ANM_OP_TEX_RING_3D:
             ANM_FLAGS_LO->render_mode = ANM_RENDER_TEX_RING_3D;
-            alloc_extra_data(ANM_INT(0) * 48);
+            alloc_extra_data(ANM_INT(0) * ANM_3D_SEGMENT_SIZE);
             break;
         case ANM_OP_UV_FROM_CORNERS:
         {
