@@ -834,6 +834,11 @@ decompiled code the surroundings it had in the original:
   - A store through D3DXVECTOR2's operator FLOAT* (`uv[1] = ...`) may alias
     uv.x, so the following `uv.x < 0` test stays after it
     (EnemyData::update_fog).
+  - InterpFloat::step matches with the plain ZunTimer::tick (current stored
+    before current_f) and method 17 copying initial to current as an
+    integer (`*(i32 *)&current = *(i32 *)&initial`) after the bezier_2
+    update: the original copies it with mov eax/mov and reloads current
+    for the return, where a float assignment forwards xmm0.
   - A class without its `// VTABLE:` annotation shows the vftable store in
     its constructor and destructor as a raw address in reccmp (AsciiInf).
   - The frames of create_vm and create_vm_front (4 unused bytes) are padded
