@@ -1004,7 +1004,7 @@ u8 g_cheat_prev_keys[0x100];
 // The player data screen: difficulty (menu_fc) and character (menu)
 // records, and pages of spell cards (menu_1d4, 0 for none). On Extra with
 // the fourth character selected it also reads the unlock cheat.
-// TODO: the original realigns its frame (and esp, -8), tests the up input after the three selection copies, and ORs the first 16 key bytes into the second.
+// TODO: the ascii create_effect call loads g_AsciiManager into ecx (the original eax, with the result slot in ecx), and the vectorized OR loads the second 16 key bytes first (the original the first; not the operand order, the accumulator type or a reversed loop).
 // FUNCTION: TH16 0x452330
 i32 TitleInf::do_player_data()
 {

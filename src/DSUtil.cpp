@@ -58,8 +58,10 @@ extern "C" const GUID IID_IDirectSoundNotify = {0xb0210783, 0x89cd, 0x11d0, {0xa
 #define CS_BGM_STREAM 12
 
 // Debug output, empty in the release build (TH06: utils::DebugPrint2).
+// Declared with no named parameter: as `(const char *fmt, ...)`, LTCG drops
+// the one-argument call in CWaveFile::open_file, which the original keeps.
 // FUNCTION: TH16 0x471d90
-void dsutil_debug_log(const char *fmt, ...)
+void dsutil_debug_log(...)
 {
 }
 
@@ -1056,7 +1058,6 @@ HARNESS_CALLED void CStreamingSound::seek(double seconds)
     LEAVE_CS(CS_BGM_STREAM);
 }
 
-// TODO: our build drops the log call with the error message; the original keeps it.
 // FUNCTION: TH16 0x4717e0
 HRESULT CWaveFile::open_file(const char *filename, ThBgmFormat *track)
 {

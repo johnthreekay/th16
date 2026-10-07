@@ -533,7 +533,7 @@ void TitleInf::update_options_sprites()
     }
 }
 
-// TODO: the original realigns its frame to 8 bytes, and does not merge the two input tests into (pressed | repeat) & mask.
+// TODO: for the up/down tests the original loads the pressed and repeat words as bytes (mov cl/al); ours loads dwords (byte casts only narrow the repeat load).
 // FUNCTION: TH16 0x44e930
 i32 TitleInf::do_key_config()
 {
