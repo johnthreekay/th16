@@ -56,11 +56,6 @@ int PopupManager::on_draw()
 
 #include "../LoadingThread.h"
 
-// STUB: TH16 0x43d970
-void Supervisor::setup_special_anms()
-{
-}
-
 // STUB: TH16 0x447760
 int ReplayManager::initialize(i32 mode, const char *filename)
 {

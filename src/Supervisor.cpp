@@ -727,6 +727,100 @@ HARNESS_CALLED AnmId Supervisor::create_fog_vm(i32 count, i32 script)
     return id;
 }
 
+// Points the arcade surfaces at text.anm's render target textures and
+// starts the VMs that draw them, picked by window width.
+// FUNCTION: TH16 0x43d970
+void Supervisor::setup_special_anms()
+{
+    if (arcade_surface_0 == NULL)
+    {
+        if (back_buffer == NULL)
+        {
+            d3d_device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back_buffer);
+        }
+        text_anm->d3d[2].texture->GetSurfaceLevel(0, &arcade_surface_0);
+        text_anm->d3d[3].texture->GetSurfaceLevel(0, &arcade_surface_1);
+        AnmVm *vm = vm_1bc;
+        if (!(vm->flags_lo & ANM_VM_VISIBLE))
+        {
+            if (g_resolution_x == 640)
+            {
+                text_anm->copy_vm(vm, 0x3b);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+                vm = vm_1c0;
+                text_anm->copy_vm(vm, 0x41);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+                vm = vm_1c4;
+                text_anm->copy_vm(vm, 0x3e);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+                vm = vm_1c8;
+                text_anm->copy_vm(vm, 0x44);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+            }
+            else if (g_resolution_x == 960)
+            {
+                text_anm->copy_vm(vm, 0x3c);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+                vm = vm_1c0;
+                text_anm->copy_vm(vm, 0x42);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+                vm = vm_1c4;
+                text_anm->copy_vm(vm, 0x3f);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+                vm = vm_1c8;
+                text_anm->copy_vm(vm, 0x45);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+            }
+            else if (g_resolution_x == 1280)
+            {
+                text_anm->copy_vm(vm, 0x3d);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+                vm = vm_1c0;
+                text_anm->copy_vm(vm, 0x43);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+                vm = vm_1c4;
+                text_anm->copy_vm(vm, 0x40);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+                vm = vm_1c8;
+                text_anm->copy_vm(vm, 0x46);
+                vm->unk_5b0 = NULL;
+                vm->parent = NULL;
+                vm->run();
+            }
+        }
+        if (g_screen_coord_scale == 1.5f)
+        {
+            vm_1c4->flags_hi &= ~0x800;
+        }
+    }
+    else
+    {
+        cameras[3] = cameras[0];
+    }
+}
+
 // FUNCTION: TH16 0x43dc30
 void Supervisor::release_surfaces()
 {
