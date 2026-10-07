@@ -426,46 +426,46 @@ void TitleInf::update_options_cursor()
     i32 i;
     for (i = 0; i < menu.next_selection; i++)
     {
-        interrupt_child_and_run(1, i + 0x17, 0x1e);
-        interrupt_child_and_run(1, i + 0x1c, 0x1e);
+        interrupt_child_and_run(1, i + 0x17, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run(1, i + 0x1c, TITLE_INTERRUPT_ABOVE_CURSOR);
     }
     for (i++; i < 5; i++)
     {
-        interrupt_child_and_run(1, i + 0x17, 0x1f);
-        interrupt_child_and_run(1, i + 0x1c, 0x1f);
+        interrupt_child_and_run(1, i + 0x17, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, i + 0x1c, TITLE_INTERRUPT_BELOW_CURSOR);
     }
     if (menu.next_selection > 0)
     {
-        interrupt_child_and_run_inline(anm_ids[1], 0x21, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x22, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x23, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x24, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x25, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x26, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x27, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x28, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x21, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x22, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x23, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x24, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x25, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x26, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x27, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x28, TITLE_INTERRUPT_ABOVE_CURSOR);
     }
     if (menu.next_selection > 1)
     {
-        interrupt_child_and_run_inline(anm_ids[1], 0x29, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2a, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2b, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2c, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2d, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2e, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2f, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x30, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x29, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2a, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2b, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2c, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2d, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2e, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2f, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x30, TITLE_INTERRUPT_ABOVE_CURSOR);
     }
     else if (menu.next_selection < 1)
     {
-        interrupt_child_and_run(1, 0x29, 0x1f);
-        interrupt_child_and_run(1, 0x2a, 0x1f);
-        interrupt_child_and_run(1, 0x2b, 0x1f);
-        interrupt_child_and_run(1, 0x2c, 0x1f);
-        interrupt_child_and_run(1, 0x2d, 0x1f);
-        interrupt_child_and_run(1, 0x2e, 0x1f);
-        interrupt_child_and_run(1, 0x2f, 0x1f);
-        interrupt_child_and_run(1, 0x30, 0x1f);
+        interrupt_child_and_run(1, 0x29, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2a, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2b, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2c, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2d, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2e, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2f, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x30, TITLE_INTERRUPT_BELOW_CURSOR);
     }
 }
 
@@ -709,27 +709,27 @@ void TitleInf::update_key_config_cursor()
     i32 i;
     for (i = 0; i < menu.next_selection; i++)
     {
-        interrupt_child_and_run(2, i + 0x31, 0x1e);
-        interrupt_child_and_run(2, i + 0x38, 0x1e);
+        interrupt_child_and_run(2, i + 0x31, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run(2, i + 0x38, TITLE_INTERRUPT_ABOVE_CURSOR);
         if (i < 5)
         {
-            interrupt_child_and_run(2, i * 2 + 0x3f, 0x1e);
-            interrupt_child_and_run(2, i * 2 + 0x40, 0x1e);
-            interrupt_child_and_run(2, i * 2 + 0x49, 0x1e);
-            interrupt_child_and_run(2, i * 2 + 0x4a, 0x1e);
+            interrupt_child_and_run(2, i * 2 + 0x3f, TITLE_INTERRUPT_ABOVE_CURSOR);
+            interrupt_child_and_run(2, i * 2 + 0x40, TITLE_INTERRUPT_ABOVE_CURSOR);
+            interrupt_child_and_run(2, i * 2 + 0x49, TITLE_INTERRUPT_ABOVE_CURSOR);
+            interrupt_child_and_run(2, i * 2 + 0x4a, TITLE_INTERRUPT_ABOVE_CURSOR);
         }
     }
     for (i++; i < 7; i++)
     {
-        interrupt_child_and_run(2, i + 0x31, 0x1f);
-        interrupt_child_and_run(2, i + 0x38, 0x1f);
+        interrupt_child_and_run(2, i + 0x31, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(2, i + 0x38, TITLE_INTERRUPT_BELOW_CURSOR);
     }
     for (i = menu.next_selection + 1; i < 5; i++)
     {
-        interrupt_child_and_run(2, i * 2 + 0x3f, 0x1f);
-        interrupt_child_and_run(2, i * 2 + 0x40, 0x1f);
-        interrupt_child_and_run(2, i * 2 + 0x49, 0x1f);
-        interrupt_child_and_run(2, i * 2 + 0x4a, 0x1f);
+        interrupt_child_and_run(2, i * 2 + 0x3f, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(2, i * 2 + 0x40, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(2, i * 2 + 0x49, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(2, i * 2 + 0x4a, TITLE_INTERRUPT_BELOW_CURSOR);
     }
 }
 
@@ -1199,13 +1199,13 @@ static __forceinline void title_highlight_inline(TitleInf *menu)
     i32 i;
     for (i = 0; i < menu->menu.next_selection; i++)
     {
-        title_interrupt_child_and_run(menu, i + 3, 30);
-        title_interrupt_child_and_run(menu, i + 13, 30);
+        title_interrupt_child_and_run(menu, i + 3, TITLE_INTERRUPT_ABOVE_CURSOR);
+        title_interrupt_child_and_run(menu, i + 13, TITLE_INTERRUPT_ABOVE_CURSOR);
     }
     for (i++; i < 10; i++)
     {
-        title_interrupt_child_and_run(menu, i + 3, 31);
-        title_interrupt_child_and_run(menu, i + 13, 31);
+        title_interrupt_child_and_run(menu, i + 3, TITLE_INTERRUPT_BELOW_CURSOR);
+        title_interrupt_child_and_run(menu, i + 13, TITLE_INTERRUPT_BELOW_CURSOR);
     }
 }
 
@@ -1268,18 +1268,18 @@ i32 TitleInf::do_title_screen()
             i32 i;
             for (i = 0; i < menu.next_selection; i++)
             {
-                interrupt_child_and_run(0, i + 3, 30);
-                interrupt_child_and_run(0, i + 13, 30);
+                interrupt_child_and_run(0, i + 3, TITLE_INTERRUPT_ABOVE_CURSOR);
+                interrupt_child_and_run(0, i + 13, TITLE_INTERRUPT_ABOVE_CURSOR);
             }
             for (i++; i < 10; i++)
             {
-                title_interrupt_child_and_run(this, i + 3, 31);
-                title_interrupt_child_and_run(this, i + 13, 31);
+                title_interrupt_child_and_run(this, i + 3, TITLE_INTERRUPT_BELOW_CURSOR);
+                title_interrupt_child_and_run(this, i + 13, TITLE_INTERRUPT_BELOW_CURSOR);
             }
             if (!g_Scorefile->any_cleared())
             {
-                interrupt_child(0, 4, 29);
-                interrupt_child(0, 14, 29);
+                interrupt_child(0, 4, TITLE_INTERRUPT_DISABLED);
+                interrupt_child(0, 14, TITLE_INTERRUPT_DISABLED);
             }
         }
         if (time_in_state.current > 130)
@@ -1291,8 +1291,8 @@ i32 TitleInf::do_title_screen()
             title_highlight_inline(this);
             if (!g_Scorefile->any_cleared())
             {
-                title_interrupt_child(this, 4, 29);
-                title_interrupt_child(this, 14, 29);
+                title_interrupt_child(this, 4, TITLE_INTERRUPT_DISABLED);
+                title_interrupt_child(this, 14, TITLE_INTERRUPT_DISABLED);
             }
         }
         break;
@@ -1314,18 +1314,18 @@ i32 TitleInf::do_title_screen()
             i32 i;
             for (i = 0; i < menu.next_selection; i++)
             {
-                interrupt_child_and_run(0, i + 3, 30);
-                interrupt_child_and_run(0, i + 13, 30);
+                interrupt_child_and_run(0, i + 3, TITLE_INTERRUPT_ABOVE_CURSOR);
+                interrupt_child_and_run(0, i + 13, TITLE_INTERRUPT_ABOVE_CURSOR);
             }
             for (i++; i < 10; i++)
             {
-                interrupt_child_and_run(0, i + 3, 31);
-                interrupt_child_and_run(0, i + 13, 31);
+                interrupt_child_and_run(0, i + 3, TITLE_INTERRUPT_BELOW_CURSOR);
+                interrupt_child_and_run(0, i + 13, TITLE_INTERRUPT_BELOW_CURSOR);
             }
             if (!g_Scorefile->any_cleared())
             {
-                interrupt_child(0, 4, 29);
-                interrupt_child(0, 14, 29);
+                interrupt_child(0, 4, TITLE_INTERRUPT_DISABLED);
+                interrupt_child(0, 14, TITLE_INTERRUPT_DISABLED);
             }
         }
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
@@ -1343,8 +1343,8 @@ i32 TitleInf::do_title_screen()
             title_highlight_inline(this);
             if (!g_Scorefile->any_cleared())
             {
-                title_interrupt_child(this, 4, 29);
-                title_interrupt_child(this, 14, 29);
+                title_interrupt_child(this, 4, TITLE_INTERRUPT_DISABLED);
+                title_interrupt_child(this, 14, TITLE_INTERRUPT_DISABLED);
             }
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))

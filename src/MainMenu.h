@@ -48,6 +48,17 @@ enum TitleState
     TITLE_STATE_SPELL_PRACTICE_SUBSEASON_SELECT = 20,
 };
 
+// The interrupts the title menus send to the sprites of their rows (the
+// row under the cursor gets a script-specific one instead).
+enum TitleRowInterrupt
+{
+    // Greyed out: a choice that is not available yet.
+    TITLE_INTERRUPT_DISABLED = 29,
+    // Rows above the cursor, and below it.
+    TITLE_INTERRUPT_ABOVE_CURSOR = 30,
+    TITLE_INTERRUPT_BELOW_CURSOR = 31,
+};
+
 // The title screen's menu items, top to bottom.
 enum TitleMenuItem
 {
