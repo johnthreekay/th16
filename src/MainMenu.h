@@ -10,6 +10,84 @@
 
 struct ReplayManager;
 
+// TitleInf::state: the screen of the title menu that runs. on_tick calls
+// the screen's do_* function (on_draw a draw function for some); set_state
+// switches screens and resets substate, the step within the screen. Most
+// screens use substate 0 to set up, 1 while their sprites appear, 2 for
+// input and 4 (or 3) while they leave.
+enum TitleState
+{
+    // Picks the first screen from g_title_return_point.
+    TITLE_STATE_INIT = 0,
+    // The title screen and its main menu.
+    TITLE_STATE_MAIN = 1,
+    // Leaving the title menu: unless a game mode switch was requested at
+    // the same time (which deletes the menu first), the game quits.
+    TITLE_STATE_EXIT = 2,
+    TITLE_STATE_OPTIONS = 3,
+    TITLE_STATE_KEY_CONFIG = 4,
+    TITLE_STATE_DIFFICULTY_SELECT = 5,
+    TITLE_STATE_CHARACTER_SELECT = 6,
+    TITLE_STATE_SUBSEASON_SELECT = 7,
+    TITLE_STATE_PRACTICE_STAGE_SELECT = 8,
+    // Never entered; only stops the BGM.
+    TITLE_STATE_UNUSED_9 = 9,
+    TITLE_STATE_PLAYER_DATA = 10,
+    TITLE_STATE_REPLAY_MENU = 11,
+    // Never entered; only stops the BGM.
+    TITLE_STATE_UNUSED_12 = 12,
+    TITLE_STATE_MUSIC_ROOM = 13,
+    // The high score name entry after a game.
+    TITLE_STATE_SCORE_NAME_ENTRY = 14,
+    // Saving the replay of the game just played.
+    TITLE_STATE_REPLAY_SAVE = 15,
+    TITLE_STATE_MANUAL = 16,
+    TITLE_STATE_SPELL_PRACTICE_STAGE_SELECT = 17,
+    TITLE_STATE_SPELL_PRACTICE_ROW_SELECT = 18,
+    TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT = 19,
+    TITLE_STATE_SPELL_PRACTICE_SUBSEASON_SELECT = 20,
+};
+
+// The title screen's menu items, top to bottom.
+enum TitleMenuItem
+{
+    TITLE_ITEM_START = 0,
+    TITLE_ITEM_EXTRA_START = 1,
+    TITLE_ITEM_PRACTICE_START = 2,
+    TITLE_ITEM_SPELL_PRACTICE = 3,
+    TITLE_ITEM_REPLAY = 4,
+    TITLE_ITEM_PLAYER_DATA = 5,
+    TITLE_ITEM_MUSIC_ROOM = 6,
+    TITLE_ITEM_OPTION = 7,
+    TITLE_ITEM_MANUAL = 8,
+    TITLE_ITEM_QUIT = 9,
+    TITLE_ITEM_COUNT = 10,
+};
+
+// The options screen's rows.
+enum OptionsItem
+{
+    OPTIONS_ITEM_BGM_VOLUME = 0,
+    OPTIONS_ITEM_SE_VOLUME = 1,
+    OPTIONS_ITEM_KEY_CONFIG = 2,
+    OPTIONS_ITEM_DEFAULT = 3,
+    OPTIONS_ITEM_QUIT = 4,
+    OPTIONS_ITEM_COUNT = 5,
+};
+
+// TitleInf::menu_flags.
+enum TitleMenuFlags
+{
+    // Start the title BGM once bgm_start_delay reaches 10 frames.
+    TITLE_START_BGM = 1 << 0,
+    // The title screen is shown for the first time since startup.
+    TITLE_FIRST_SHOW = 1 << 1,
+    // Tells load_replay_list to stop.
+    TITLE_STOP_REPLAY_LOADING = 1 << 2,
+    // load_replay_list is done.
+    TITLE_REPLAYS_LOADED = 1 << 3,
+};
+
 // The title screen and its menus. ExpHP calls it MainMenu; the name is
 // ZUN's, from RTTI. Layout from ExpHP's th-re-data (zMainMenu) and the
 // constructor; only what decompiled code needs.
@@ -22,17 +100,29 @@ class TitleInf : public TaskInf
     UpdateFunc *on_draw_func;
     AnmLoaded *title_anm;
     AnmLoaded *title_v_anm;
+    // TitleState values, and the step within the state.
     i32 state;
     i32 prev_state;
     i32 substate;
+    // The cursor of the screen that runs.
     MenuHelper menu;
-    MenuHelper menu_fc;
-    MenuHelper menu_1d4;
+    // The player data's difficulty.
+    MenuHelper player_data_difficulty_menu;
+    // The page shown by the player data's spell card list and the replay
+    // menu.
+    MenuHelper page_menu;
     ZunTimer time_in_state;
+    // anm_ids[i] runs title.anm script i, mostly (create_effect).
     AnmId anm_ids[0x11f];
-    AnmId anm_id_73c;
-    AnmId anm_ids_740[0x24];
-    AnmId anm_ids_7d0[9];
+    // ascii.anm script 0x13, which the submenus start when they open and
+    // remove when they go back to the title screen.
+    AnmId submenu_ascii_id;
+    // The text rows (text.anm scripts 3 and up) of the player data, the
+    // replay list and the spell practice list.
+    AnmId text_row_ids[0x24];
+    // 0 to 7: the music room's comment lines; 8: the title_v.anm effect
+    // of the title screen.
+    AnmId comment_line_ids[9];
     // The music room: the number of tracks, the comment line being
     // written (one every other frame) and its track, and whether the
     // warning about a track not heard yet is shown.
@@ -50,8 +140,10 @@ class TitleInf : public TaskInf
     // The replay name being entered, and the cursor in it.
     char replay_name[0xc];
     i32 replay_name_cursor;
-    i32 unk_5a58;
-    MenuHelper menu_5a5c;
+    // Set when the score did not make the top ten: no name entry.
+    i32 score_not_ranked;
+    // The name entry's character grid (91 characters, 13 to a row).
+    MenuHelper name_entry_menu;
     // The key config being edited: the button for each action.
     i16 key_config[6];
     u8 unk_5b40[0x5b44 - 0x5b40];
@@ -61,12 +153,14 @@ class TitleInf : public TaskInf
     // The stage picked to start a replay from (minus one).
     i32 replay_stage;
     ReplayManager *replays[100];
-    // Allocated with malloc (musiccmt.txt, while the music room is open).
-    void *unk_5ce0;
-    i32 unk_5ce4;
-    // Bit 2 stops the replay list loading; bit 3 is set once it is done.
-    u32 flags_5ce8;
-    MenuHelper menu_5cec;
+    // musiccmt.txt, read while the music room is open.
+    void *music_comment_file;
+    // Frames since the title screen appeared, until its BGM starts.
+    i32 bgm_start_delay;
+    // TitleMenuFlags.
+    u32 menu_flags;
+    // Spell practice: the character.
+    MenuHelper spell_character_menu;
     // Spell practice: the stage and boss attack whose spell cards are
     // listed, and the spell card ids of the listed rows.
     i32 spell_stage;
@@ -137,8 +231,8 @@ class TitleInf : public TaskInf
     HARNESS_CALLED i32 on_draw__practice_stage_select();
     HARNESS_CALLED i32 on_draw__replay();
     HARNESS_CALLED i32 on_draw__player_data();
-    HARNESS_CALLED i32 on_draw__4538b0();
-    HARNESS_CALLED i32 on_draw__4541b0();
+    HARNESS_CALLED i32 on_draw__score_name_entry();
+    HARNESS_CALLED i32 on_draw__replay_save();
     HARNESS_CALLED i32 on_draw__spell_practice_histories();
 
     // States of on_tick (ExpHP: do_*).

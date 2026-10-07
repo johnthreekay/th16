@@ -20,14 +20,14 @@ static_assert(offsetof(TitleInf, state) == 0x18, "TitleInf::state");
 static_assert(offsetof(TitleInf, menu) == 0x24, "TitleInf::menu");
 static_assert(offsetof(TitleInf, time_in_state) == 0x2ac, "TitleInf::time_in_state");
 static_assert(offsetof(TitleInf, anm_ids) == 0x2c0, "TitleInf::anm_ids");
-static_assert(offsetof(TitleInf, anm_id_73c) == 0x73c, "TitleInf::anm_id_73c");
+static_assert(offsetof(TitleInf, submenu_ascii_id) == 0x73c, "TitleInf::submenu_ascii_id");
 static_assert(offsetof(TitleInf, music_track_count) == 0x7f4, "TitleInf::music_track_count");
 static_assert(offsetof(TitleInf, music_filenames) == 0x804, "TitleInf::music_filenames");
 static_assert(offsetof(TitleInf, music_titles) == 0x1004, "TitleInf::music_titles");
 static_assert(offsetof(TitleInf, music_comments) == 0x1844, "TitleInf::music_comments");
 static_assert(offsetof(TitleInf, music_scroll) == 0x5a44, "TitleInf::music_scroll");
 static_assert(offsetof(TitleInf, replay_name) == 0x5a48, "TitleInf::replay_name");
-static_assert(offsetof(TitleInf, menu_5a5c) == 0x5a5c, "TitleInf::menu_5a5c");
+static_assert(offsetof(TitleInf, name_entry_menu) == 0x5a5c, "TitleInf::name_entry_menu");
 static_assert(offsetof(TitleInf, key_config) == 0x5b34, "TitleInf::key_config");
 static_assert(offsetof(TitleInf, unk_5b44) == 0x5b44, "TitleInf::unk_5b44");
 static_assert(offsetof(TitleInf, replay_slot) == 0x5b48, "TitleInf::replay_slot");
@@ -182,11 +182,11 @@ TitleInf::~TitleInf()
     {
         delete replays[i];
     }
-    AnmManager::interrupt_tree(anm_id_73c, 1);
-    if (unk_5ce0 != NULL)
+    AnmManager::interrupt_tree(submenu_ascii_id, 1);
+    if (music_comment_file != NULL)
     {
-        free(unk_5ce0);
-        unk_5ce0 = NULL;
+        free(music_comment_file);
+        music_comment_file = NULL;
     }
     g_MainMenu = NULL;
 }
@@ -216,23 +216,23 @@ i32 TitleInf::on_draw()
 {
     switch (state)
     {
-    case 11:
+    case TITLE_STATE_REPLAY_MENU:
         on_draw__replay();
         break;
-    case 10:
+    case TITLE_STATE_PLAYER_DATA:
         on_draw__player_data();
         break;
-    case 14:
-        on_draw__4538b0();
+    case TITLE_STATE_SCORE_NAME_ENTRY:
+        on_draw__score_name_entry();
         break;
-    case 15:
-        on_draw__4541b0();
+    case TITLE_STATE_REPLAY_SAVE:
+        on_draw__replay_save();
         break;
-    case 8:
+    case TITLE_STATE_PRACTICE_STAGE_SELECT:
         on_draw__practice_stage_select();
         break;
-    case 18:
-    case 19:
+    case TITLE_STATE_SPELL_PRACTICE_ROW_SELECT:
+    case TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT:
         on_draw__spell_practice_histories();
         break;
     }
@@ -264,7 +264,7 @@ i32 TitleInf::do_options()
     switch (substate)
     {
     case 0:
-        menu.num_choices = 5;
+        menu.num_choices = OPTIONS_ITEM_COUNT;
         menu.set_cursor(0);
         anm_ids[1] = title_anm->create_effect(1, -1, NULL);
         update_options_sprites();
@@ -298,10 +298,10 @@ i32 TitleInf::do_options()
         }
         if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
         {
-            if (menu.next_selection != 4)
+            if (menu.next_selection != OPTIONS_ITEM_QUIT)
             {
                 g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
-                menu.set_cursor(4);
+                menu.set_cursor(OPTIONS_ITEM_QUIT);
                 AnmManager::interrupt_tree_and_run(anm_ids[1], 3);
                 AnmManager::interrupt_tree(anm_ids[1], (i16)(menu.next_selection + 7));
                 update_options_cursor();
@@ -309,7 +309,7 @@ i32 TitleInf::do_options()
             }
             goto leave;
         }
-        if (menu.next_selection == 1 && time_in_state.ticked_on_multiple_of(60))
+        if (menu.next_selection == OPTIONS_ITEM_SE_VOLUME && time_in_state.ticked_on_multiple_of(60))
         {
             g_SoundManager.play_sound_centered(SE_PLDEAD00, 0);
         }
@@ -317,7 +317,7 @@ i32 TitleInf::do_options()
         {
             switch (menu.next_selection)
             {
-            case 0:
+            case OPTIONS_ITEM_BGM_VOLUME:
                 if (g_Supervisor.config.bgm_volume < 5)
                 {
                     g_Supervisor.config.bgm_volume = 0;
@@ -328,7 +328,7 @@ i32 TitleInf::do_options()
                 }
                 update_options_sprites();
                 break;
-            case 1:
+            case OPTIONS_ITEM_SE_VOLUME:
                 if (g_Supervisor.config.se_volume < 5)
                 {
                     g_Supervisor.config.se_volume = 0;
@@ -345,14 +345,14 @@ i32 TitleInf::do_options()
         {
             switch (menu.next_selection)
             {
-            case 0:
+            case OPTIONS_ITEM_BGM_VOLUME:
             {
                 i8 volume = g_Supervisor.config.bgm_volume + 5;
                 g_Supervisor.config.bgm_volume = volume > 100 ? 100 : volume;
                 update_options_sprites();
                 break;
             }
-            case 1:
+            case OPTIONS_ITEM_SE_VOLUME:
             {
                 i8 volume = g_Supervisor.config.se_volume + 5;
                 g_Supervisor.config.se_volume = volume > 100 ? 100 : volume;
@@ -365,19 +365,19 @@ i32 TitleInf::do_options()
         {
             switch (menu.next_selection)
             {
-            case 2:
+            case OPTIONS_ITEM_KEY_CONFIG:
                 AnmManager::interrupt_tree(anm_ids[1], 6);
                 g_SoundManager.play_sound_centered(SE_OK00, 0);
                 set_substate(4);
                 return 1;
-            case 3:
+            case OPTIONS_ITEM_DEFAULT:
                 g_Supervisor.config.bgm_volume = 100;
                 g_Supervisor.config.se_volume = 80;
                 g_Supervisor.config.unk_28 = 0;
                 update_options_sprites();
                 g_SoundManager.play_sound_centered(SE_OK00, 0);
                 return 1;
-            case 4:
+            case OPTIONS_ITEM_QUIT:
             leave:
                 AnmManager::interrupt_tree(anm_ids[1], 6);
                 g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
@@ -391,12 +391,12 @@ i32 TitleInf::do_options()
         {
             switch (menu.next_selection)
             {
-            case 2:
-                set_state(4);
+            case OPTIONS_ITEM_KEY_CONFIG:
+                set_state(TITLE_STATE_KEY_CONFIG);
                 menu.push();
                 break;
-            case 4:
-                set_state(1);
+            case OPTIONS_ITEM_QUIT:
+                set_state(TITLE_STATE_MAIN);
                 menu.pop();
                 return 1;
             }
@@ -636,7 +636,7 @@ i32 TitleInf::do_key_config()
     case 4:
         if (time_in_state.current >= 10)
         {
-            set_state(3);
+            set_state(TITLE_STATE_OPTIONS);
             menu.pop();
         }
         break;
@@ -938,7 +938,7 @@ const char *const g_demo_replay_names[3] = {"demo/demo1.rpy", "demo/demo2.rpy", 
 // FUNCTION: TH16 0x44af80
 i32 TitleInf::on_tick()
 {
-    if (state == 1)
+    if (state == TITLE_STATE_MAIN)
     {
         g_title_idle_frames++;
         if ((u16)g_hardware_input != 0)
@@ -976,10 +976,10 @@ i32 TitleInf::on_tick()
             g_title_idle_frames = 0;
         }
     }
-    if (flags_5ce8 & 1)
+    if (menu_flags & TITLE_START_BGM)
     {
-        unk_5ce4++;
-        if (unk_5ce4 >= 10)
+        bgm_start_delay++;
+        if (bgm_start_delay >= 10)
         {
             if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
             {
@@ -997,13 +997,13 @@ i32 TitleInf::on_tick()
             }
             g_SoundManager.modify_bgm(BGM_PLAY, 0, "dummy");
             g_Scorefile->bgm_unlocked[0] = 1;
-            flags_5ce8 &= ~1;
-            unk_5ce4 = 0;
+            menu_flags &= ~TITLE_START_BGM;
+            bgm_start_delay = 0;
         }
     }
     switch (state)
     {
-    case 0:
+    case TITLE_STATE_INIT:
     {
         AnmManager *anm = g_AnmManager;
         anm->disable_vms_from_anm_file(anm->loaded_anms[5]);
@@ -1016,7 +1016,7 @@ i32 TitleInf::on_tick()
             menu.num_choices = 10;
             menu.set_cursor(0);
             menu.push();
-            set_state(14);
+            set_state(TITLE_STATE_SCORE_NAME_ENTRY);
             g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_score_name_entry();
@@ -1024,32 +1024,32 @@ i32 TitleInf::on_tick()
         }
         if (!(g_Globals.flags_hi_45c & 1))
         {
-            flags_5ce8 |= 1;
-            unk_5ce4 = 0;
+            menu_flags |= TITLE_START_BGM;
+            bgm_start_delay = 0;
         }
         else
         {
-            flags_5ce8 &= ~1;
+            menu_flags &= ~TITLE_START_BGM;
             g_Globals.difficulty = g_Globals.difficulty_before_demo;
         }
         g_Globals.flags_hi_45c &= ~1;
         if (g_title_return_point == TITLE_RETURN_FIRST)
         {
-            flags_5ce8 |= 2;
-            set_state(1);
+            menu_flags |= TITLE_FIRST_SHOW;
+            set_state(TITLE_STATE_MAIN);
             g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_title_screen();
             break;
         }
-        flags_5ce8 &= ~2;
+        menu_flags &= ~TITLE_FIRST_SHOW;
         if (g_title_return_point == TITLE_RETURN_MAIN)
         {
-            if (g_Globals.difficulty == 4)
+            if (g_Globals.difficulty == DIFFICULTY_EXTRA)
             {
-                menu.set_cursor(1);
+                menu.set_cursor(TITLE_ITEM_EXTRA_START);
             }
-            set_state(1);
+            set_state(TITLE_STATE_MAIN);
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_title_screen();
         }
@@ -1058,10 +1058,10 @@ i32 TitleInf::on_tick()
             g_Supervisor.play_bgm_wav(0, "th16_01");
             g_Supervisor.play_bgm(0, 0);
             g_Globals.set_game_mode(0);
-            menu.num_choices = 10;
-            menu.set_cursor(4);
+            menu.num_choices = TITLE_ITEM_COUNT;
+            menu.set_cursor(TITLE_ITEM_REPLAY);
             menu.push();
-            set_state(11);
+            set_state(TITLE_STATE_REPLAY_MENU);
             g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_replay_menu();
@@ -1071,7 +1071,7 @@ i32 TitleInf::on_tick()
             ScreenEffect::create(9, 30, 0, 0, 0, 0x54);
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(17);
+            set_state(TITLE_STATE_SPELL_PRACTICE_STAGE_SELECT);
             g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_spell_practice_stage_select();
@@ -1081,7 +1081,7 @@ i32 TitleInf::on_tick()
             ScreenEffect::create(9, 30, 0, 0, 0, 0x54);
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(5);
+            set_state(TITLE_STATE_DIFFICULTY_SELECT);
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_difficulty_select();
         }
@@ -1092,66 +1092,66 @@ i32 TitleInf::on_tick()
         }
         break;
     }
-    case 1:
+    case TITLE_STATE_MAIN:
         on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
         do_title_screen();
         break;
-    case 5:
+    case TITLE_STATE_DIFFICULTY_SELECT:
         do_difficulty_select();
         break;
-    case 11:
+    case TITLE_STATE_REPLAY_MENU:
         do_replay_menu();
         break;
-    case 14:
+    case TITLE_STATE_SCORE_NAME_ENTRY:
         do_score_name_entry();
         break;
-    case 17:
+    case TITLE_STATE_SPELL_PRACTICE_STAGE_SELECT:
         do_spell_practice_stage_select();
         break;
-    case 3:
+    case TITLE_STATE_OPTIONS:
         do_options();
         break;
-    case 4:
+    case TITLE_STATE_KEY_CONFIG:
         do_key_config();
         break;
-    case 2:
+    case TITLE_STATE_EXIT:
         g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_QUIT;
         g_Supervisor.stop_bgm();
         break;
-    case 9:
+    case TITLE_STATE_UNUSED_9:
         g_Supervisor.stop_bgm();
         break;
-    case 12:
+    case TITLE_STATE_UNUSED_12:
         g_Supervisor.stop_bgm();
         break;
-    case 6:
+    case TITLE_STATE_CHARACTER_SELECT:
         do_character_select();
         break;
-    case 7:
+    case TITLE_STATE_SUBSEASON_SELECT:
         do_subseason_select();
         break;
-    case 8:
+    case TITLE_STATE_PRACTICE_STAGE_SELECT:
         do_practice_stage_select();
         break;
-    case 13:
+    case TITLE_STATE_MUSIC_ROOM:
         do_music_room();
         break;
-    case 18:
+    case TITLE_STATE_SPELL_PRACTICE_ROW_SELECT:
         do_spell_practice_row();
         break;
-    case 19:
+    case TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT:
         do_spell_practice_difficulty();
         break;
-    case 20:
+    case TITLE_STATE_SPELL_PRACTICE_SUBSEASON_SELECT:
         do_spell_practice_subseason();
         break;
-    case 10:
+    case TITLE_STATE_PLAYER_DATA:
         do_player_data();
         break;
-    case 16:
+    case TITLE_STATE_MANUAL:
         do_manual();
         break;
-    case 15:
+    case TITLE_STATE_REPLAY_SAVE:
         do_replay_save();
         break;
     }
@@ -1202,28 +1202,28 @@ i32 TitleInf::do_title_screen()
     switch (substate)
     {
     case 0:
-        menu.num_choices = 10;
+        menu.num_choices = TITLE_ITEM_COUNT;
         menu.wraps = 1;
         if (!g_Scorefile->any_cleared())
         {
-            menu.disable(1);
+            menu.disable(TITLE_ITEM_EXTRA_START);
         }
         if (g_Globals.game_mode == 2)
         {
-            menu.set_cursor(3);
+            menu.set_cursor(TITLE_ITEM_SPELL_PRACTICE);
             g_Globals.set_game_mode(0);
         }
         else if (g_Globals.game_mode != 0)
         {
-            menu.set_cursor(2);
+            menu.set_cursor(TITLE_ITEM_PRACTICE_START);
             g_Globals.set_game_mode(0);
         }
         set_substate(1);
-        if (flags_5ce8 & 2)
+        if (menu_flags & TITLE_FIRST_SHOW)
         {
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             anm_ids[0x65] = title_anm->create_effect(0x65, -1, NULL);
-            flags_5ce8 &= ~2;
+            menu_flags &= ~TITLE_FIRST_SHOW;
         }
         else
         {
@@ -1237,7 +1237,7 @@ i32 TitleInf::do_title_screen()
                 anm_ids[0x65] = title_anm->create_effect(0x65, -1, NULL);
                 AnmManager::interrupt_tree_and_run(anm_ids[0x65], 2);
             }
-            if (prev_state != 3)
+            if (prev_state != TITLE_STATE_OPTIONS)
             {
                 AnmManager::interrupt_tree_and_run(anm_ids[0x61], 2);
             }
@@ -1247,9 +1247,9 @@ i32 TitleInf::do_title_screen()
         if (time_in_state.current == 120)
         {
             anm_ids[0] = title_anm->create_effect(0, -1, NULL);
-            if (get_vm_or_clear(anm_ids_7d0[8]) == NULL)
+            if (get_vm_or_clear(comment_line_ids[8]) == NULL)
             {
-                anm_ids_7d0[8] = title_v_anm->create_effect(0, -1, NULL);
+                comment_line_ids[8] = title_v_anm->create_effect(0, -1, NULL);
             }
             i32 i;
             for (i = 0; i < menu.next_selection; i++)
@@ -1316,14 +1316,14 @@ i32 TitleInf::do_title_screen()
         }
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
-            if (menu.next_selection == 9)
+            if (menu.next_selection == TITLE_ITEM_QUIT)
             {
                 g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 set_substate(4);
                 return 1;
             }
             g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
-            menu.set_cursor(9);
+            menu.set_cursor(TITLE_ITEM_QUIT);
             AnmManager::interrupt_tree_and_run(anm_ids[0], 3);
             AnmManager::interrupt_tree(anm_ids[0], (i16)(menu.next_selection + 7));
             title_highlight_inline(this);
@@ -1338,25 +1338,25 @@ i32 TitleInf::do_title_screen()
             AnmManager::interrupt_tree(anm_ids[0], 6);
             switch (menu.next_selection)
             {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-            case 4:
-            case 5:
-            case 6:
-            case 8:
+            case TITLE_ITEM_START:
+            case TITLE_ITEM_EXTRA_START:
+            case TITLE_ITEM_PRACTICE_START:
+            case TITLE_ITEM_SPELL_PRACTICE:
+            case TITLE_ITEM_REPLAY:
+            case TITLE_ITEM_PLAYER_DATA:
+            case TITLE_ITEM_MUSIC_ROOM:
+            case TITLE_ITEM_MANUAL:
                 g_SoundManager.play_sound_centered(SE_OK00, 0);
                 AnmManager::interrupt_tree(anm_ids[0x65], 1);
                 anm_ids[0x65].id = 0;
-                AnmManager::interrupt_tree(anm_ids_7d0[8], 1);
+                AnmManager::interrupt_tree(comment_line_ids[8], 1);
                 set_substate(4);
                 return 1;
-            case 7:
+            case TITLE_ITEM_OPTION:
                 g_SoundManager.play_sound_centered(SE_OK00, 0);
                 set_substate(4);
                 return 1;
-            case 9:
+            case TITLE_ITEM_QUIT:
                 g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 set_substate(4);
                 return 1;
@@ -1370,66 +1370,66 @@ i32 TitleInf::do_title_screen()
         }
         switch (menu.next_selection)
         {
-        case 0:
+        case TITLE_ITEM_START:
             g_Globals.set_game_mode(0);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(5);
+            set_state(TITLE_STATE_DIFFICULTY_SELECT);
             menu.push();
             menu.set_cursor(g_last_difficulty);
             g_Globals.difficulty = g_last_difficulty;
             return 1;
-        case 1:
+        case TITLE_ITEM_EXTRA_START:
             g_Globals.set_game_mode(0);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(5);
+            set_state(TITLE_STATE_DIFFICULTY_SELECT);
             menu.push();
-            g_Globals.difficulty = 4;
+            g_Globals.difficulty = DIFFICULTY_EXTRA;
             menu.set_cursor(0);
             return 1;
-        case 2:
+        case TITLE_ITEM_PRACTICE_START:
             g_Globals.set_game_mode(1);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             menu.push();
             menu.set_cursor(g_last_difficulty);
-            set_state(5);
+            set_state(TITLE_STATE_DIFFICULTY_SELECT);
             g_Globals.difficulty = g_last_difficulty;
             return 1;
-        case 3:
+        case TITLE_ITEM_SPELL_PRACTICE:
             g_Globals.set_game_mode(2);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(17);
+            set_state(TITLE_STATE_SPELL_PRACTICE_STAGE_SELECT);
             menu.push();
-            menu_5cec.wraps = 1;
-            menu_5cec.num_choices = 4;
-            menu_5cec.set_cursor(g_last_character);
+            spell_character_menu.wraps = 1;
+            spell_character_menu.num_choices = 4;
+            spell_character_menu.set_cursor(g_last_character);
             menu.set_cursor(0);
             return 1;
-        case 4:
+        case TITLE_ITEM_REPLAY:
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(11);
+            set_state(TITLE_STATE_REPLAY_MENU);
             menu.push();
             return 1;
-        case 5:
+        case TITLE_ITEM_PLAYER_DATA:
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(10);
+            set_state(TITLE_STATE_PLAYER_DATA);
             menu.push();
             return 1;
-        case 6:
+        case TITLE_ITEM_MUSIC_ROOM:
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(13);
+            set_state(TITLE_STATE_MUSIC_ROOM);
             menu.push();
             return 1;
-        case 7:
-            set_state(3);
+        case TITLE_ITEM_OPTION:
+            set_state(TITLE_STATE_OPTIONS);
             menu.push();
             return 1;
-        case 8:
+        case TITLE_ITEM_MANUAL:
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(16);
+            set_state(TITLE_STATE_MANUAL);
             menu.push();
             return 1;
-        case 9:
-            set_state(2);
+        case TITLE_ITEM_QUIT:
+            set_state(TITLE_STATE_EXIT);
             break;
         }
         break;

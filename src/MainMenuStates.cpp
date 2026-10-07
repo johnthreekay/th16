@@ -56,7 +56,7 @@ static __forceinline i32 menu_selection_moved(MenuHelper *m)
     return m->current_selection != m->next_selection;
 }
 
-static_assert(offsetof(TitleInf, menu_5cec) == 0x5cec, "TitleInf::menu_5cec");
+static_assert(offsetof(TitleInf, spell_character_menu) == 0x5cec, "TitleInf::spell_character_menu");
 static_assert(offsetof(TitleInf, spell_stage) == 0x5dc4, "TitleInf::spell_stage");
 static_assert(offsetof(TitleInf, spell_ids) == 0x5dd0, "TitleInf::spell_ids");
 
@@ -75,8 +75,8 @@ static inline ReplayManager *create_replay_inline(const char *filename)
 }
 
 // Loads the numbered replays (th16_01.rpy to th16_25.rpy) and then the
-// user replays from the replay directory, until stopped through bit 2 of
-// flags_5ce8.
+// user replays from the replay directory, until stopped through
+// TITLE_STOP_REPLAY_LOADING.
 // FUNCTION: TH16 0x451560
 void TitleInf::load_replay_list()
 {
@@ -88,7 +88,7 @@ void TitleInf::load_replay_list()
     {
         sprintf(filename, "th16_%.2d.rpy", i);
         menu->replays[i - 1] = create_replay_inline(filename);
-        if (menu->flags_5ce8 & 4)
+        if (menu->menu_flags & TITLE_STOP_REPLAY_LOADING)
         {
             break;
         }
@@ -104,7 +104,7 @@ void TitleInf::load_replay_list()
             menu->replays[i] = ReplayManager::create_from_file(find_data.cFileName);
             _chdir(g_GameWindow.save_dir);
             _chdir("replay");
-            if (menu->flags_5ce8 & 4)
+            if (menu->menu_flags & TITLE_STOP_REPLAY_LOADING)
             {
                 break;
             }
@@ -116,7 +116,7 @@ void TitleInf::load_replay_list()
     }
     FindClose(find);
     _chdir(g_GameWindow.exe_dir);
-    menu->flags_5ce8 = (menu->flags_5ce8 & ~4) | 8;
+    menu->menu_flags = (menu->menu_flags & ~TITLE_STOP_REPLAY_LOADING) | 8;
 }
 
 // Saving the replay after a game: picking a slot, then entering the name.
@@ -174,15 +174,15 @@ i32 TitleInf::do_replay_save()
         else if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
             replay_slot = menu.next_selection;
-            menu_5a5c.set_cursor(0);
-            menu_5a5c.num_choices = 0x5b;
-            menu_5a5c.wraps = 1;
+            name_entry_menu.set_cursor(0);
+            name_entry_menu.num_choices = 0x5b;
+            name_entry_menu.wraps = 1;
             g_ReplayManager->set_end_stage(1);
             strcpy(replay_name, g_Scorefile->last_replay_name);
             replay_name_cursor = 0;
             if (strcmp(replay_name, "        ") != 0)
             {
-                menu_5a5c.move_cursor(-1);
+                name_entry_menu.move_cursor(-1);
             }
             i32 len;
             for (len = 8; len > 0 && replay_name[len - 1] == ' '; len--)
@@ -194,46 +194,46 @@ i32 TitleInf::do_replay_save()
         }
         break;
     case 3:
-        menu_save_selection(&menu_5a5c);
+        menu_save_selection(&name_entry_menu);
         if (pressed_or_repeating_inline(INPUT_UP))
         {
-            menu_5a5c.move_cursor(-13);
+            name_entry_menu.move_cursor(-13);
         }
         if (pressed_or_repeating_inline(INPUT_DOWN))
         {
-            menu_5a5c.move_cursor(13);
+            name_entry_menu.move_cursor(13);
         }
         if (pressed_or_repeating_inline(INPUT_LEFT))
         {
-            i32 selection = menu_5a5c.next_selection;
+            i32 selection = name_entry_menu.next_selection;
             if (selection % 13 != 0)
             {
-                menu_5a5c.move_cursor(-1);
+                name_entry_menu.move_cursor(-1);
             }
             else
             {
-                menu_5a5c.move_cursor(12);
+                name_entry_menu.move_cursor(12);
             }
         }
         if (pressed_or_repeating_inline(INPUT_RIGHT))
         {
-            i32 selection = menu_5a5c.next_selection;
+            i32 selection = name_entry_menu.next_selection;
             if (selection % 13 != 12)
             {
-                menu_5a5c.move_cursor(1);
+                name_entry_menu.move_cursor(1);
             }
             else
             {
-                menu_5a5c.move_cursor(-12);
+                name_entry_menu.move_cursor(-12);
             }
         }
-        if (menu_selection_moved(&menu_5a5c))
+        if (menu_selection_moved(&name_entry_menu))
         {
             g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
-            i32 choice = menu_5a5c.next_selection;
+            i32 choice = name_entry_menu.next_selection;
             if (choice < 88)
             {
                 if (replay_name_cursor < 8)
@@ -242,7 +242,7 @@ i32 TitleInf::do_replay_save()
                     replay_name_cursor++;
                     if (replay_name_cursor >= 8)
                     {
-                        menu_5a5c.set_cursor(90);
+                        name_entry_menu.set_cursor(90);
                     }
                 }
                 else
@@ -258,7 +258,7 @@ i32 TitleInf::do_replay_save()
                     replay_name_cursor++;
                     if (replay_name_cursor >= 8)
                     {
-                        menu_5a5c.set_cursor(90);
+                        name_entry_menu.set_cursor(90);
                     }
                 }
                 else
@@ -304,9 +304,9 @@ i32 TitleInf::do_replay_save()
         {
             AnmManager::interrupt_tree(anm_ids[0x70], 1);
             anm_ids[0x70].id = 0;
-            AnmManager::interrupt_tree(anm_id_73c, 1);
-            anm_id_73c.id = 0;
-            set_state(1);
+            AnmManager::interrupt_tree(submenu_ascii_id, 1);
+            submenu_ascii_id.id = 0;
+            set_state(TITLE_STATE_MAIN);
             menu.pop();
             ReplayManager::destroy(g_ReplayManager);
             g_Supervisor.play_bgm_wav(0, "th16_01");
@@ -338,9 +338,9 @@ i32 TitleInf::do_difficulty_select()
     switch (substate)
     {
     case 0:
-        if (anm_id_73c.id == 0)
+        if (submenu_ascii_id.id == 0)
         {
-            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
         }
         menu.wraps = 0;
         menu.num_choices = g_Globals.difficulty < DIFFICULTY_EXTRA ? 4 : 1;
@@ -438,7 +438,7 @@ i32 TitleInf::do_difficulty_select()
             AnmManager::interrupt_tree(anm_ids[0x68], 1);
             anm_ids[0x68].id = 0;
         confirm:
-            set_state(6);
+            set_state(TITLE_STATE_CHARACTER_SELECT);
             if (g_Globals.difficulty < DIFFICULTY_EXTRA)
             {
                 g_Globals.difficulty = menu.next_selection;
@@ -464,7 +464,7 @@ i32 TitleInf::do_difficulty_select()
             }
             else if (g_Globals.difficulty < DIFFICULTY_EXTRA)
             {
-                set_state(1);
+                set_state(TITLE_STATE_MAIN);
                 g_Globals.difficulty = menu.next_selection;
                 g_last_difficulty = menu.next_selection;
                 menu.pop();
@@ -474,10 +474,10 @@ i32 TitleInf::do_difficulty_select()
             {
                 g_Globals.difficulty = g_last_difficulty;
             }
-            set_state(1);
-            AnmManager::interrupt_tree(anm_id_73c, 1);
-            anm_id_73c.id = 0;
-            set_state(1);
+            set_state(TITLE_STATE_MAIN);
+            AnmManager::interrupt_tree(submenu_ascii_id, 1);
+            submenu_ascii_id.id = 0;
+            set_state(TITLE_STATE_MAIN);
             menu.pop();
         }
         break;
@@ -620,7 +620,7 @@ i32 TitleInf::do_character_select()
         if (time_in_state.current >= 14)
         {
         confirm:
-            set_state(7);
+            set_state(TITLE_STATE_SUBSEASON_SELECT);
             g_Globals.character = menu.next_selection;
             g_last_character = g_Globals.character;
             // MenuHelper::push, clearing num_disabled last.
@@ -647,7 +647,7 @@ i32 TitleInf::do_character_select()
             interrupt_and_clear(script);
             AnmManager::interrupt_tree(anm_ids[0x69], 1);
             anm_ids[0x69].id = 0;
-            set_state(5);
+            set_state(TITLE_STATE_DIFFICULTY_SELECT);
             g_Globals.character = menu.next_selection;
             menu.pop();
             g_last_character = g_Globals.character;
@@ -667,12 +667,12 @@ extern const char *g_stage_names[10];
 // FUNCTION: TH16 0x450af0
 i32 TitleInf::do_subseason_select()
 {
-    i32 script = (g_Globals.difficulty == 4) * 2 + 0x97;
+    i32 script = (g_Globals.difficulty == DIFFICULTY_EXTRA) * 2 + 0x97;
     switch (substate)
     {
     case 0:
         menu.num_choices = 4;
-        if (g_Globals.difficulty == 4)
+        if (g_Globals.difficulty == DIFFICULTY_EXTRA)
         {
             menu.set_cursor(0);
             menu.num_choices = 1;
@@ -699,7 +699,7 @@ i32 TitleInf::do_subseason_select()
         break;
     case 2:
         menu.current_selection = menu.next_selection;
-        if (g_Globals.difficulty != 4)
+        if (g_Globals.difficulty != DIFFICULTY_EXTRA)
         {
             if (input_pressed_or_repeating(INPUT_LEFT))
             {
@@ -755,11 +755,11 @@ i32 TitleInf::do_subseason_select()
         anm_ids[script].id = 0;
         AnmManager::interrupt_tree(anm_ids[0x6a], 1);
         anm_ids[0x6a].id = 0;
-        set_state(8);
+        set_state(TITLE_STATE_PRACTICE_STAGE_SELECT);
     start:
         if (time_in_state.current >= 40)
         {
-            if (g_Globals.difficulty != 4)
+            if (g_Globals.difficulty != DIFFICULTY_EXTRA)
             {
                 g_Globals.subseason = menu.next_selection;
             }
@@ -769,8 +769,8 @@ i32 TitleInf::do_subseason_select()
             }
             menu.push();
             g_Globals.spell_id = -1;
-            set_state(2);
-            if (g_Globals.difficulty < 4)
+            set_state(TITLE_STATE_EXIT);
+            if (g_Globals.difficulty < DIFFICULTY_EXTRA)
             {
                 g_stage_data = &g_stage_table[1];
                 g_Globals.stage_num = 1;
@@ -792,7 +792,7 @@ i32 TitleInf::do_subseason_select()
             interrupt_and_clear(script);
             AnmManager::interrupt_tree(anm_ids[0x6a], 1);
             anm_ids[0x6a].id = 0;
-            set_state(6);
+            set_state(TITLE_STATE_CHARACTER_SELECT);
             menu.pop();
         }
         break;
@@ -960,7 +960,7 @@ i32 TitleInf::do_practice_stage_select()
         if (time_in_state.current >= 40)
         {
             menu.push();
-            set_state(2);
+            set_state(TITLE_STATE_EXIT);
             i32 stage = menu.next_selection + 1;
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
             g_Globals.stage_num = stage;
@@ -976,7 +976,7 @@ i32 TitleInf::do_practice_stage_select()
         {
             AnmManager::interrupt_tree(anm_ids[0x71], 1);
             anm_ids[0x71].id = 0;
-            set_state(7);
+            set_state(TITLE_STATE_SUBSEASON_SELECT);
             menu.pop();
         }
         break;
@@ -1003,8 +1003,8 @@ u8 g_cheat_keys[0x100];
 // GLOBAL: TH16 0x4dfe60
 u8 g_cheat_prev_keys[0x100];
 
-// The player data screen: difficulty (menu_fc) and character (menu)
-// records, and pages of spell cards (menu_1d4, 0 for none). On Extra with
+// The player data screen: difficulty (player_data_difficulty_menu) and character (menu)
+// records, and pages of spell cards (page_menu, 0 for none). On Extra with
 // the fourth character selected it also reads the unlock cheat.
 // TODO: the ascii create_effect call loads g_AsciiManager into ecx (the original eax, with the result slot in ecx), and the vectorized OR loads the second 16 key bytes first (the original the first; not the operand order, the accumulator type or a reversed loop).
 // FUNCTION: TH16 0x452330
@@ -1015,20 +1015,20 @@ i32 TitleInf::do_player_data()
     case 0:
         menu.num_choices = 4;
         menu.set_cursor(0);
-        menu_fc.num_choices = 5;
-        menu_fc.set_cursor(1);
-        menu_fc.wraps = 1;
-        menu_1d4.num_choices = (count_spells_of_difficulty(menu_fc.next_selection) + 9) / 10 + 1;
-        menu_1d4.set_cursor(0);
-        menu_1d4.wraps = 1;
-        if (anm_id_73c.id == 0)
+        player_data_difficulty_menu.num_choices = 5;
+        player_data_difficulty_menu.set_cursor(1);
+        player_data_difficulty_menu.wraps = 1;
+        page_menu.num_choices = (count_spells_of_difficulty(player_data_difficulty_menu.next_selection) + 9) / 10 + 1;
+        page_menu.set_cursor(0);
+        page_menu.wraps = 1;
+        if (submenu_ascii_id.id == 0)
         {
-            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
         }
         anm_ids[0x6d] = title_anm->create_effect(0x6d, -1, NULL);
         set_substate(1);
         create_effect(menu.next_selection + 0xa7);
-        create_effect(menu_fc.next_selection + 0xaf);
+        create_effect(player_data_difficulty_menu.next_selection + 0xaf);
         anm_ids[0xb7] = title_anm->create_effect(0xb7, -1, NULL);
         anm_ids[0xb8] = title_anm->create_effect(0xb8, -1, NULL);
         anm_ids[0xb9] = title_anm->create_effect(0xb9, -1, NULL);
@@ -1046,29 +1046,29 @@ i32 TitleInf::do_player_data()
         break;
     case 2:
         menu_save_selection(&menu);
-        menu_save_selection(&menu_fc);
-        menu_save_selection(&menu_1d4);
+        menu_save_selection(&player_data_difficulty_menu);
+        menu_save_selection(&page_menu);
         if (pressed_or_repeating_inline(INPUT_UP))
         {
-            menu_fc.move_cursor(-1);
+            player_data_difficulty_menu.move_cursor(-1);
             AnmManager::interrupt_tree_and_run(anm_ids[0xb9], 2);
         }
         if (pressed_or_repeating_inline(INPUT_DOWN))
         {
-            menu_fc.move_cursor(1);
+            player_data_difficulty_menu.move_cursor(1);
             AnmManager::interrupt_tree_and_run(anm_ids[0xba], 2);
         }
-        if (menu_selection_moved(&menu_fc))
+        if (menu_selection_moved(&player_data_difficulty_menu))
         {
             g_SoundManager.play_sound_centered(SE_SELECT00, 0);
-            interrupt_and_clear(menu_fc.current_selection + 0xaf);
-            create_effect(menu_fc.next_selection + 0xaf);
-            if (menu_1d4.next_selection > 0)
+            interrupt_and_clear(player_data_difficulty_menu.current_selection + 0xaf);
+            create_effect(player_data_difficulty_menu.next_selection + 0xaf);
+            if (page_menu.next_selection > 0)
             {
-                menu_1d4.set_cursor(1);
+                page_menu.set_cursor(1);
                 draw_spell_card_page();
             }
-            menu_1d4.num_choices = (count_spells_of_difficulty(menu_fc.next_selection) + 9) / 10 + 1;
+            page_menu.num_choices = (count_spells_of_difficulty(player_data_difficulty_menu.next_selection) + 9) / 10 + 1;
         }
         if (pressed_or_repeating_inline(INPUT_LEFT))
         {
@@ -1085,26 +1085,26 @@ i32 TitleInf::do_player_data()
             g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             interrupt_and_clear(menu.current_selection + 0xa7);
             create_effect(menu.next_selection + 0xa7);
-            if (menu_1d4.next_selection > 0)
+            if (page_menu.next_selection > 0)
             {
                 draw_spell_card_page();
             }
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
-            if (menu_1d4.next_selection == 0)
+            if (page_menu.next_selection == 0)
             {
                 for (i32 i = 0; i < 10; i++)
                 {
-                    anm_ids_740[i] = g_Supervisor.text_anm->create_effect(i + 3, -1, NULL);
+                    text_row_ids[i] = g_Supervisor.text_anm->create_effect(i + 3, -1, NULL);
                 }
             }
-            menu_1d4.move_cursor(1);
-            if (menu_1d4.next_selection == 0)
+            page_menu.move_cursor(1);
+            if (page_menu.next_selection == 0)
             {
                 for (i32 i = 0; i < 10; i++)
                 {
-                    AnmManager::interrupt_tree(anm_ids_740[i], 1);
+                    AnmManager::interrupt_tree(text_row_ids[i], 1);
                 }
             }
             else
@@ -1113,7 +1113,7 @@ i32 TitleInf::do_player_data()
             }
             g_SoundManager.play_sound_centered(SE_OK00, 0);
         }
-        if (menu_fc.next_selection == 4 && menu.next_selection == 3)
+        if (player_data_difficulty_menu.next_selection == 4 && menu.next_selection == 3)
         {
             if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_BOMB | INPUT_MENU | INPUT_ENTER))
             {
@@ -1199,7 +1199,7 @@ i32 TitleInf::do_player_data()
         {
             set_substate(3);
             g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
-            interrupt_and_clear(menu_fc.next_selection + 0xaf);
+            interrupt_and_clear(player_data_difficulty_menu.next_selection + 0xaf);
             interrupt_and_clear(menu.next_selection + 0xa7);
             interrupt_and_clear(0xb7);
             interrupt_and_clear(0xb8);
@@ -1211,7 +1211,7 @@ i32 TitleInf::do_player_data()
             interrupt_and_clear(0xbb);
             for (i32 i = 0; i < 10; i++)
             {
-                AnmManager::interrupt_tree(anm_ids_740[i], 1);
+                AnmManager::interrupt_tree(text_row_ids[i], 1);
             }
             return 1;
         }
@@ -1220,9 +1220,9 @@ i32 TitleInf::do_player_data()
         if (time_in_state.current >= 6)
         {
             interrupt_and_clear(0x6d);
-            AnmManager::interrupt_tree(anm_id_73c, 1);
-            anm_id_73c.id = 0;
-            set_state(1);
+            AnmManager::interrupt_tree(submenu_ascii_id, 1);
+            submenu_ascii_id.id = 0;
+            set_state(TITLE_STATE_MAIN);
             menu.pop();
         }
         break;
@@ -1231,17 +1231,17 @@ i32 TitleInf::do_player_data()
 }
 
 // Player data, spell card page: ten spell cards of the chosen difficulty
-// (page menu_1d4 - 1), numbered with full-width digits, with their names
+// (page page_menu - 1), numbered with full-width digits, with their names
 // once seen and the chosen character's captures.
 // TODO: ours realigns the frame (and esp, -8) and divides by 10 with a multiply; the original uses idiv by a register.
 // FUNCTION: TH16 0x452c30
 i32 TitleInf::draw_spell_card_page()
 {
-    i32 skip = menu_1d4.next_selection * 10 - 10;
+    i32 skip = page_menu.next_selection * 10 - 10;
     i32 id = 0;
     for (i32 seen = 0; seen < skip; id++)
     {
-        if (g_spell_difficulty[id] == menu_fc.next_selection)
+        if (g_spell_difficulty[id] == player_data_difficulty_menu.next_selection)
         {
             seen++;
         }
@@ -1249,12 +1249,12 @@ i32 TitleInf::draw_spell_card_page()
     const char *digits[10] = {"\x82\x4f", "\x82\x50", "\x82\x51", "\x82\x52", "\x82\x53",
                               "\x82\x54", "\x82\x55", "\x82\x56", "\x82\x57", "\x82\x58"};
     char name[0xa5];
-    AnmId *row_id = anm_ids_740;
+    AnmId *row_id = text_row_ids;
     for (i32 row = 0; row < 10; row++, row_id++)
     {
         for (; id < 0x77; id++)
         {
-            if (g_spell_difficulty[id] == menu_fc.next_selection)
+            if (g_spell_difficulty[id] == player_data_difficulty_menu.next_selection)
             {
                 break;
             }
@@ -1263,7 +1263,7 @@ i32 TitleInf::draw_spell_card_page()
         {
             for (; row < 10; row++)
             {
-                g_AnmManager->draw_text_centered(get_vm_or_clear(anm_ids_740[row]), 0xffffffff, 0, 0, 0, " ");
+                g_AnmManager->draw_text_centered(get_vm_or_clear(text_row_ids[row]), 0xffffffff, 0, 0, 0, " ");
             }
             return 0;
         }
@@ -1371,7 +1371,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__practice_stage_select()
 // FUNCTION: TH16 0x456d50
 HARNESS_CALLED i32 TitleInf::on_draw__spell_practice_histories()
 {
-    if (substate > 0 && (substate <= 2 || (substate == 3 && state != 19)))
+    if (substate > 0 && (substate <= 2 || (substate == 3 && state != TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT)))
     {
         Float3 pos;
         pos.x = 330.0f;
@@ -1384,16 +1384,16 @@ HARNESS_CALLED i32 TitleInf::on_draw__spell_practice_histories()
             i32 id = spell_ids[i];
             if (id >= -1)
             {
-                if (state == 19 && i == menu.next_selection)
+                if (state == TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT && i == menu.next_selection)
                 {
                     g_AsciiManager->color.d3d =
-                        g_Scorefile->characters[menu_5cec.next_selection].spells[id].captures[1] != 0 ? 0xff90d0ff
+                        g_Scorefile->characters[spell_character_menu.next_selection].spells[id].captures[1] != 0 ? 0xff90d0ff
                                                                                                       : 0xffb0b0b0;
                 }
                 else
                 {
                     g_AsciiManager->color.d3d =
-                        g_Scorefile->characters[menu_5cec.next_selection].spells[id].captures[1] != 0 ? 0xff60a0c0
+                        g_Scorefile->characters[spell_character_menu.next_selection].spells[id].captures[1] != 0 ? 0xff60a0c0
                                                                                                       : 0xff404040;
                 }
                 if (g_Scorefile->characters[4].spells[id].attempts[0] == 0 &&
@@ -1403,16 +1403,16 @@ HARNESS_CALLED i32 TitleInf::on_draw__spell_practice_histories()
                 }
                 else
                 {
-                    ScorefileSpell *spell = &g_Scorefile->characters[menu_5cec.next_selection].spells[id];
+                    ScorefileSpell *spell = &g_Scorefile->characters[spell_character_menu.next_selection].spells[id];
                     g_AsciiManager->create_stringf(&pos, "SCORE %8d0  %4d/%4d", spell->practice_score,
                                                    spell->captures[1], spell->attempts[1]);
                     pos.y += 10.0f;
                     g_AsciiManager->color.d3d =
-                        g_Scorefile->characters[menu_5cec.next_selection].spells[id].captures[0] != 0 ? 0xff206060
+                        g_Scorefile->characters[spell_character_menu.next_selection].spells[id].captures[0] != 0 ? 0xff206060
                                                                                                       : 0xff404040;
                     if (g_spell_difficulty[id] <= 4)
                     {
-                        spell = &g_Scorefile->characters[menu_5cec.next_selection].spells[id];
+                        spell = &g_Scorefile->characters[spell_character_menu.next_selection].spells[id];
                         g_AsciiManager->create_stringf(&pos, "GAME MODE        %4d/%4d", spell->captures[0],
                                                        spell->attempts[0]);
                     }
@@ -1458,18 +1458,18 @@ i32 TitleInf::do_replay_menu()
         i32 last = g_last_replay_slot;
         menu.num_choices = 25;
         menu.set_cursor(last % 25);
-        menu_1d4.num_choices = 3;
-        menu_1d4.set_cursor(last / 25);
-        menu_1d4.wraps = 1;
+        page_menu.num_choices = 3;
+        page_menu.set_cursor(last / 25);
+        page_menu.wraps = 1;
         g_last_replay_slot = 0;
-        if (anm_id_73c.id == 0)
+        if (submenu_ascii_id.id == 0)
         {
-            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
         }
         anm_ids[0x6c] = title_anm->create_effect(0x6c, -1, NULL);
         set_substate(1);
         memset(replays, 0, sizeof(replays));
-        flags_5ce8 &= ~0xc;
+        menu_flags &= ~(TITLE_STOP_REPLAY_LOADING | TITLE_REPLAYS_LOADED);
         unk_5b44 = 0;
         thread.restart((ThreadStart)replay_list_thread, this);
         if (g_AnmManager->get_vm_with_id(anm_ids[0x61]) == NULL)
@@ -1487,7 +1487,7 @@ i32 TitleInf::do_replay_menu()
         break;
     case 2:
         menu_save_selection(&menu);
-        menu_1d4.current_selection = menu_1d4.next_selection;
+        page_menu.current_selection = page_menu.next_selection;
         if (pressed_or_repeating_inline(INPUT_UP))
         {
             menu.move_cursor(-1);
@@ -1498,13 +1498,13 @@ i32 TitleInf::do_replay_menu()
         }
         if (pressed_or_repeating_inline(INPUT_LEFT))
         {
-            menu_1d4.move_cursor(-1);
+            page_menu.move_cursor(-1);
         }
         if (pressed_or_repeating_inline(INPUT_RIGHT))
         {
-            menu_1d4.move_cursor(1);
+            page_menu.move_cursor(1);
         }
-        if (menu_selection_moved(&menu_1d4))
+        if (menu_selection_moved(&page_menu))
         {
             g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
@@ -1516,17 +1516,17 @@ i32 TitleInf::do_replay_menu()
         {
             set_substate(5);
             g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
-            flags_5ce8 |= 4;
+            menu_flags |= TITLE_STOP_REPLAY_LOADING;
             return 1;
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
-            if (replays[menu_1d4.next_selection * 25 + menu.next_selection] == NULL)
+            if (replays[page_menu.next_selection * 25 + menu.next_selection] == NULL)
             {
                 break;
             }
             set_substate(4);
-            replay_slot = menu_1d4.next_selection * 25 + menu.next_selection;
+            replay_slot = page_menu.next_selection * 25 + menu.next_selection;
             menu.push();
             g_SoundManager.play_sound_centered(SE_OK00, 0);
             menu.num_choices = 7;
@@ -1577,7 +1577,7 @@ i32 TitleInf::do_replay_menu()
             start:
                 replay_stage = menu.next_selection;
                 set_substate(3);
-                flags_5ce8 |= 4;
+                menu_flags |= TITLE_STOP_REPLAY_LOADING;
                 g_SoundManager.play_sound_centered(SE_BOON00, 0);
                 g_Supervisor.fade_out_bgm(0.05f);
                 return 1;
@@ -1593,9 +1593,9 @@ i32 TitleInf::do_replay_menu()
             AnmManager::interrupt_tree(id, 7);
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
         }
-        if (time_in_state.current >= 32 && (flags_5ce8 & 8))
+        if (time_in_state.current >= 32 && (menu_flags & TITLE_REPLAYS_LOADED))
         {
-            set_state(2);
+            set_state(TITLE_STATE_EXIT);
             i32 stage = replay_stage + 1;
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_START_REPLAY;
             g_Globals.stage_num = stage;
@@ -1623,7 +1623,7 @@ i32 TitleInf::do_replay_menu()
         }
         break;
     case 5:
-        if (time_in_state.current >= 6 && (flags_5ce8 & 8))
+        if (time_in_state.current >= 6 && (menu_flags & TITLE_REPLAYS_LOADED))
         {
             for (i32 i = 0; i < 100; i++)
             {
@@ -1632,9 +1632,9 @@ i32 TitleInf::do_replay_menu()
             memset(replays, 0, sizeof(replays));
             AnmManager::interrupt_tree(anm_ids[0x6c], 1);
             anm_ids[0x6c].id = 0;
-            AnmManager::interrupt_tree(anm_id_73c, 1);
-            anm_id_73c.id = 0;
-            set_state(1);
+            AnmManager::interrupt_tree(submenu_ascii_id, 1);
+            submenu_ascii_id.id = 0;
+            set_state(TITLE_STATE_MAIN);
             menu.pop();
         }
         break;
@@ -1673,7 +1673,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__replay()
         pos.y = 80.0f;
         pos.z = 0.0f;
         g_AsciiManager->draw_shadows = 1;
-        for (i32 i = menu_1d4.next_selection * 25; i < (menu_1d4.next_selection + 1) * 25; i++)
+        for (i32 i = page_menu.next_selection * 25; i < (page_menu.next_selection + 1) * 25; i++)
         {
             ReplayManager **replay = &replays[i];
             g_AsciiManager->color.d3d = menu.next_selection == i % 25 ? 0xffffff00 : 0xff808080;
@@ -1681,7 +1681,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__replay()
             {
                 RpyInfo *info = (*replay)->info;
                 struct tm *time = localtime(&info->timestamp);
-                if (menu_1d4.next_selection == 0)
+                if (page_menu.next_selection == 0)
                 {
                     if (!(info->flags_a & 2))
                     {
@@ -1714,7 +1714,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__replay()
             }
             else
             {
-                g_AsciiManager->create_stringf(&pos, g_replay_list_formats[menu_1d4.next_selection != 0][1], i + 1);
+                g_AsciiManager->create_stringf(&pos, g_replay_list_formats[page_menu.next_selection != 0][1], i + 1);
             }
             pos.y += 15.0f;
         }
@@ -1734,7 +1734,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__replay()
         }
         g_AsciiManager->draw_shadows = 1;
         struct tm *time = localtime(&info->timestamp);
-        if (menu_1d4.next_selection == 0)
+        if (page_menu.next_selection == 0)
         {
             if (!(info->flags_a & 2))
             {
@@ -1815,9 +1815,9 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
     pos.x = 22.0f;
     pos.y = 160.0f;
     pos.z = 0.0f;
-    i32 difficulty = menu_fc.next_selection;
+    i32 difficulty = player_data_difficulty_menu.next_selection;
     g_AsciiManager->draw_shadows = 1;
-    if (menu_1d4.next_selection == 0)
+    if (page_menu.next_selection == 0)
     {
         for (i32 i = 0; i < 10; i++)
         {
@@ -1858,7 +1858,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
     return 1;
 }
 
-// The high score name entry after a game (unk_5a58 is set when the score
+// The high score name entry after a game (score_not_ranked is set when the score
 // did not make the top ten), then on to saving the replay unless the game
 // was continued.
 // TODO: the original saves ebx (push ecx; push ebx) and keeps &replay_name in it for the score copy, tests the pressed word in memory before the name entry, and has the ascii create_effect pattern (see README).
@@ -1872,9 +1872,9 @@ i32 TitleInf::do_score_name_entry()
         menu.num_choices = 30;
         g_Supervisor.play_bgm_wav(0, "th128_08");
         g_Supervisor.play_bgm(0, 0x11);
-        if (anm_id_73c.id == 0)
+        if (submenu_ascii_id.id == 0)
         {
-            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
         }
         create_effect(0x6f);
         set_substate(1);
@@ -1895,25 +1895,25 @@ i32 TitleInf::do_score_name_entry()
             time_in_state.set_value(0);
             menu.wraps = 1;
             menu.set_cursor(rank);
-            menu_5a5c.set_cursor(0);
-            menu_5a5c.num_choices = 0x5b;
-            menu_5a5c.wraps = 1;
+            name_entry_menu.set_cursor(0);
+            name_entry_menu.num_choices = 0x5b;
+            name_entry_menu.wraps = 1;
             strcpy(replay_name, g_Scorefile->last_replay_name);
             if (strcmp(replay_name, "        ") != 0)
             {
-                menu_5a5c.move_cursor(-1);
+                name_entry_menu.move_cursor(-1);
             }
             i32 len;
             for (len = 8; len > 0 && replay_name[len - 1] == ' '; len--)
             {
             }
             replay_name_cursor = len;
-            unk_5a58 = 0;
+            score_not_ranked = 0;
         }
         else
         {
             menu.set_cursor(-1);
-            unk_5a58 = 1;
+            score_not_ranked = 1;
         }
     }
     case 1:
@@ -1924,51 +1924,51 @@ i32 TitleInf::do_score_name_entry()
         }
         break;
     case 2:
-        if (unk_5a58 == 0)
+        if (score_not_ranked == 0)
         {
-            menu_save_selection(&menu_5a5c);
+            menu_save_selection(&name_entry_menu);
             if (input_pressed_or_repeating(INPUT_UP))
             {
-                menu_5a5c.move_cursor(-13);
+                name_entry_menu.move_cursor(-13);
             }
             if (input_pressed_or_repeating(INPUT_DOWN))
             {
-                menu_5a5c.move_cursor(13);
+                name_entry_menu.move_cursor(13);
             }
             if (input_pressed_or_repeating(INPUT_LEFT))
             {
-                i32 selection = menu_5a5c.next_selection;
+                i32 selection = name_entry_menu.next_selection;
                 if (selection % 13 != 0)
                 {
-                    menu_5a5c.move_cursor(-1);
+                    name_entry_menu.move_cursor(-1);
                 }
                 else
                 {
-                    menu_5a5c.move_cursor(12);
+                    name_entry_menu.move_cursor(12);
                 }
             }
             if (input_pressed_or_repeating(INPUT_RIGHT))
             {
-                i32 selection = menu_5a5c.next_selection;
+                i32 selection = name_entry_menu.next_selection;
                 if (selection % 13 != 12)
                 {
-                    menu_5a5c.move_cursor(1);
+                    name_entry_menu.move_cursor(1);
                 }
                 else
                 {
-                    menu_5a5c.move_cursor(-12);
+                    name_entry_menu.move_cursor(-12);
                 }
             }
-            if (menu_selection_moved(&menu_5a5c))
+            if (menu_selection_moved(&name_entry_menu))
             {
                 g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             }
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
-            if (unk_5a58 == 0)
+            if (score_not_ranked == 0)
             {
-                i32 choice = menu_5a5c.next_selection;
+                i32 choice = name_entry_menu.next_selection;
                 if (choice < 88)
                 {
                     if (replay_name_cursor < 8)
@@ -1977,7 +1977,7 @@ i32 TitleInf::do_score_name_entry()
                         replay_name_cursor++;
                         if (replay_name_cursor >= 8)
                         {
-                            menu_5a5c.set_cursor(90);
+                            name_entry_menu.set_cursor(90);
                         }
                     }
                     else
@@ -1993,7 +1993,7 @@ i32 TitleInf::do_score_name_entry()
                         replay_name_cursor++;
                         if (replay_name_cursor >= 8)
                         {
-                            menu_5a5c.set_cursor(90);
+                            name_entry_menu.set_cursor(90);
                         }
                     }
                     else
@@ -2029,7 +2029,7 @@ i32 TitleInf::do_score_name_entry()
         }
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
-            if (unk_5a58 == 0)
+            if (score_not_ranked == 0)
             {
                 if (replay_name_cursor == 0)
                 {
@@ -2053,14 +2053,14 @@ i32 TitleInf::do_score_name_entry()
             interrupt_and_clear(g_Globals.difficulty + 0xaf);
             if (g_Globals.continues_used == 0)
             {
-                set_state(15);
+                set_state(TITLE_STATE_REPLAY_SAVE);
                 return 1;
             }
             ReplayManager::destroy(g_ReplayManager);
-            AnmManager::interrupt_tree(anm_id_73c, 1);
-            anm_id_73c.id = 0;
+            AnmManager::interrupt_tree(submenu_ascii_id, 1);
+            submenu_ascii_id.id = 0;
             menu.pop();
-            set_state(1);
+            set_state(TITLE_STATE_MAIN);
             g_Supervisor.play_bgm_wav(0, "th16_01");
             g_Supervisor.play_bgm(0, 0);
         }
@@ -2074,7 +2074,7 @@ i32 TitleInf::do_score_name_entry()
 // character grid.
 // TODO: register allocation: the original keeps the index in esi and g_AsciiManager in edx (swapped).
 // FUNCTION: TH16 0x4538b0
-HARNESS_CALLED i32 TitleInf::on_draw__4538b0()
+HARNESS_CALLED i32 TitleInf::on_draw__score_name_entry()
 {
     switch (substate)
     {
@@ -2092,7 +2092,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__4538b0()
     for (i32 i = 0; i < 10; i++)
     {
         g_AsciiManager->color.d3d =
-            unk_5a58 != 0 ? ~(i * 16) | 0xffffff00 : (menu.next_selection != i ? 0xff808040 : 0xffffffff);
+            score_not_ranked != 0 ? ~(i * 16) | 0xffffff00 : (menu.next_selection != i ? 0xff808040 : 0xffffffff);
         ScorefileScore *score =
             &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].scores[difficulty][i];
         if (score->date != 0)
@@ -2111,7 +2111,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__4538b0()
         }
         pos.y += 18.0f;
     }
-    if (unk_5a58 != 0)
+    if (score_not_ranked != 0)
     {
         return 1;
     }
@@ -2133,7 +2133,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__4538b0()
     pos.z = 0.0f;
     for (i32 i = 0; i < 91; i++)
     {
-        g_AsciiManager->color.d3d = menu_5a5c.next_selection == i ? 0xffffff00 : 0xff808080;
+        g_AsciiManager->color.d3d = name_entry_menu.next_selection == i ? 0xffffff00 : 0xff808080;
         i32 c;
         if (i < 88)
         {
@@ -2165,7 +2165,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__4538b0()
 // The replay save screen: the 25 slots, then the chosen slot with the name
 // being entered and the character grid.
 // FUNCTION: TH16 0x4541b0
-HARNESS_CALLED i32 TitleInf::on_draw__4541b0()
+HARNESS_CALLED i32 TitleInf::on_draw__replay_save()
 {
     Float3 pos;
     switch (substate)
@@ -2240,7 +2240,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__4541b0()
             pos.z = 0.0f;
             for (i32 i = 0; i < 91; i++)
             {
-                g_AsciiManager->color.d3d = menu_5a5c.next_selection == i ? 0xffffff00 : 0xff808080;
+                g_AsciiManager->color.d3d = name_entry_menu.next_selection == i ? 0xffffff00 : 0xff808080;
                 i32 c;
                 if (i < 88)
                 {
@@ -2285,9 +2285,9 @@ i32 TitleInf::do_manual()
     switch (substate)
     {
     case 0:
-        if (anm_id_73c.id == 0)
+        if (submenu_ascii_id.id == 0)
         {
-            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
         }
         anm_ids[0x72] = title_anm->create_effect(0x72, -1, NULL);
         HelpManual::create();
@@ -2298,10 +2298,10 @@ i32 TitleInf::do_manual()
     case 1:
         if (g_HelpManual->unk_124 != 0)
         {
-            AnmManager::interrupt_tree(anm_id_73c, 1);
-            anm_id_73c.id = 0;
+            AnmManager::interrupt_tree(submenu_ascii_id, 1);
+            submenu_ascii_id.id = 0;
             interrupt_and_clear(0x72);
-            set_state(1);
+            set_state(TITLE_STATE_MAIN);
             if (g_HelpManual != NULL)
             {
                 delete g_HelpManual;
@@ -2344,7 +2344,7 @@ static __forceinline void music_room_comment_step(TitleInf *menu)
 {
     if (!(menu->time_in_state.current & 1) && menu->music_comment_line < 8)
     {
-        AnmVm *vm = menu->anm_ids_7d0[menu->music_comment_line].find_or_clear();
+        AnmVm *vm = menu->comment_line_ids[menu->music_comment_line].find_or_clear();
         if (!g_Scorefile->bgm_unlocked[menu->music_comment_track] && menu->music_warning != 0)
         {
             g_AnmManager->draw_text(vm, 0x8080ff, 0, 0, 0, 0, g_music_room_warning[menu->music_comment_line]);
@@ -2374,15 +2374,15 @@ i32 TitleInf::do_music_room()
         {
             menu.num_choices = 6;
             menu.set_cursor(0);
-            if (anm_id_73c.id == 0)
+            if (submenu_ascii_id.id == 0)
             {
-                anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+                submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
             }
             create_effect(0x6e);
             i32 count = 0;
             i32 size;
             char *p = (char *)file_read_all("musiccmt.txt", &size, 0);
-            unk_5ce0 = p;
+            music_comment_file = p;
             if (p == NULL)
             {
                 goto leave;
@@ -2417,7 +2417,7 @@ i32 TitleInf::do_music_room()
             pos.z = 0.0f;
             for (i32 i = 0; i < 8; i++)
             {
-                anm_ids_7d0[i] = g_Supervisor.text_anm->create_vm_inline(i + 0x13, &pos, 0.0f, -1);
+                comment_line_ids[i] = g_Supervisor.text_anm->create_vm_inline(i + 0x13, &pos, 0.0f, -1);
             }
             music_comment_line = 0;
             music_comment_track = 0;
@@ -2434,8 +2434,8 @@ i32 TitleInf::do_music_room()
                 {
                     break;
                 }
-                anm_ids_740[0x10 + i] = title_anm->create_vm_inline(i + 0xbc, NULL, 0.0f, -1);
-                AnmVm *vm = get_vm_or_clear(anm_ids_740[0x10 + i]);
+                text_row_ids[0x10 + i] = title_anm->create_vm_inline(i + 0xbc, NULL, 0.0f, -1);
+                AnmVm *vm = get_vm_or_clear(text_row_ids[0x10 + i]);
                 if (g_Scorefile->bgm_unlocked[i])
                 {
                     g_AnmManager->draw_text(vm, 0xffffff, 0, 0, 0, 0, music_titles[i]);
@@ -2508,7 +2508,7 @@ i32 TitleInf::do_music_room()
             pos.z = 0.0f;
             for (i32 i = 0; i < music_track_count; i++)
             {
-                AnmVm *vm = get_vm_or_clear(anm_ids_740[0x10 + i]);
+                AnmVm *vm = get_vm_or_clear(text_row_ids[0x10 + i]);
                 if (i >= music_scroll && i < music_scroll + 10)
                 {
                     vm->set_flag_lo_2_tree();
@@ -2545,7 +2545,7 @@ i32 TitleInf::do_music_room()
         {
             for (i32 i = 0; i < 8; i++)
             {
-                AnmManager::interrupt_tree(anm_ids_7d0[i], 3);
+                AnmManager::interrupt_tree(comment_line_ids[i], 3);
             }
             music_comment_track = menu.next_selection;
             music_comment_line = 0;
@@ -2576,19 +2576,19 @@ i32 TitleInf::do_music_room()
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
         leave:
-            if (unk_5ce0 != NULL)
+            if (music_comment_file != NULL)
             {
-                free(unk_5ce0);
-                unk_5ce0 = NULL;
+                free(music_comment_file);
+                music_comment_file = NULL;
             }
-            unk_5ce0 = NULL;
+            music_comment_file = NULL;
             for (i32 i = 0; i < music_track_count; i++)
             {
-                AnmManager::interrupt_tree(anm_ids_740[0x10 + i], 1);
+                AnmManager::interrupt_tree(text_row_ids[0x10 + i], 1);
             }
             for (i32 i = 0; i < 8; i++)
             {
-                AnmManager::interrupt_tree(anm_ids_7d0[i], 1);
+                AnmManager::interrupt_tree(comment_line_ids[i], 1);
             }
             g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             substate = 3;
@@ -2600,9 +2600,9 @@ i32 TitleInf::do_music_room()
         if (time_in_state.current >= 10)
         {
             interrupt_and_clear(0x6e);
-            AnmManager::interrupt_tree(anm_id_73c, 1);
-            anm_id_73c.id = 0;
-            set_state(1);
+            AnmManager::interrupt_tree(submenu_ascii_id, 1);
+            submenu_ascii_id.id = 0;
+            set_state(TITLE_STATE_MAIN);
             g_Supervisor.play_bgm_wav(0, "th16_01");
             g_Supervisor.play_bgm(0, 0);
             menu.pop();
@@ -2621,9 +2621,9 @@ i32 TitleInf::do_spell_practice_stage_select()
     switch (substate)
     {
     case 0:
-        if (anm_id_73c.id == 0)
+        if (submenu_ascii_id.id == 0)
         {
-            anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
         }
         menu.num_choices = 7;
         if (g_AnmManager->get_vm_with_id(anm_ids[0x11c]) == NULL)
@@ -2639,17 +2639,17 @@ i32 TitleInf::do_spell_practice_stage_select()
         {
             menu.set_cursor(g_spell_practice_last_stage);
             g_spell_practice_last_stage = -1;
-            menu_5cec.wraps = 1;
-            menu_5cec.num_choices = 4;
-            menu_5cec.set_cursor(g_Globals.character + g_Globals.subshot);
+            spell_character_menu.wraps = 1;
+            spell_character_menu.num_choices = 4;
+            spell_character_menu.set_cursor(g_Globals.character + g_Globals.subshot);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 3);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd7], (i16)(menu.next_selection + 7));
             AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 6);
             AnmManager::interrupt_tree_and_run(anm_ids[0x11c], 3);
-            AnmManager::interrupt_tree(anm_ids[0x11c], (i16)(menu_5cec.next_selection + 7));
+            AnmManager::interrupt_tree(anm_ids[0x11c], (i16)(spell_character_menu.next_selection + 7));
             AnmManager::interrupt_tree(anm_ids[0x71], 1);
             anm_ids[0x71].id = 0;
-            set_state(18);
+            set_state(TITLE_STATE_SPELL_PRACTICE_ROW_SELECT);
             spell_stage = menu.next_selection;
             menu.push();
             menu.set_cursor(0);
@@ -2663,7 +2663,7 @@ i32 TitleInf::do_spell_practice_stage_select()
             AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 3);
             AnmManager::interrupt_tree(anm_ids[0xd7], (i16)(menu.next_selection + 7));
             AnmManager::interrupt_tree_and_run(anm_ids[0x11c], 3);
-            AnmManager::interrupt_tree(anm_ids[0x11c], (i16)(menu_5cec.next_selection + 7));
+            AnmManager::interrupt_tree(anm_ids[0x11c], (i16)(spell_character_menu.next_selection + 7));
             return 1;
         }
         break;
@@ -2705,7 +2705,7 @@ i32 TitleInf::do_spell_practice_stage_select()
         {
             AnmManager::interrupt_tree(anm_ids[0x71], 1);
             anm_ids[0x71].id = 0;
-            set_state(18);
+            set_state(TITLE_STATE_SPELL_PRACTICE_ROW_SELECT);
             spell_stage = menu.next_selection;
             menu.push();
             menu.set_cursor(0);
@@ -2721,10 +2721,10 @@ i32 TitleInf::do_spell_practice_stage_select()
             anm_ids[0xd7].id = 0;
             AnmManager::interrupt_tree(anm_ids[0x11c], 1);
             anm_ids[0x11c].id = 0;
-            set_state(1);
+            set_state(TITLE_STATE_MAIN);
             menu.pop();
-            AnmManager::interrupt_tree(anm_id_73c, 1);
-            anm_id_73c.id = 0;
+            AnmManager::interrupt_tree(submenu_ascii_id, 1);
+            submenu_ascii_id.id = 0;
         }
         break;
     }
@@ -2735,7 +2735,7 @@ i32 TitleInf::do_spell_practice_stage_select()
 // FUNCTION: TH16 0x455790
 i32 TitleInf::do_spell_practice_character()
 {
-    MenuHelper *character_menu = &menu_5cec;
+    MenuHelper *character_menu = &spell_character_menu;
     character_menu->current_selection = character_menu->next_selection;
     if (input_pressed_or_repeating(INPUT_LEFT))
     {
@@ -2744,11 +2744,11 @@ i32 TitleInf::do_spell_practice_character()
         character_menu->move_cursor(-1);
         AnmManager::interrupt_tree_and_run(anm_ids[0x11c], (i16)(character_menu->next_selection + 13));
         g_Globals.character = character_menu->next_selection;
-        if (state == 18)
+        if (state == TITLE_STATE_SPELL_PRACTICE_ROW_SELECT)
         {
             load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
         }
-        else if (state == 19)
+        else if (state == TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT)
         {
             load_spell_list(spell_stage, spell_row, spell_ids, -1);
             highlight_spell_row(menu.next_selection);
@@ -2761,11 +2761,11 @@ i32 TitleInf::do_spell_practice_character()
         character_menu->move_cursor(1);
         AnmManager::interrupt_tree_and_run(anm_ids[0x11c], (i16)(character_menu->next_selection + 7));
         g_Globals.character = character_menu->next_selection;
-        if (state == 18)
+        if (state == TITLE_STATE_SPELL_PRACTICE_ROW_SELECT)
         {
             load_spell_list(spell_stage, menu.next_selection, spell_ids, -1);
         }
-        else if (state == 19)
+        else if (state == TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT)
         {
             load_spell_list(spell_stage, spell_row, spell_ids, -1);
             highlight_spell_row(menu.next_selection);
@@ -2858,7 +2858,7 @@ i32 TitleInf::do_spell_practice_row()
         if (time_in_state.current >= 14)
         {
         start_list:
-            set_state(19);
+            set_state(TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT);
             spell_row = menu.next_selection;
             menu.push_inline();
             AnmManager::interrupt_tree(anm_ids[0x6b], 1);
@@ -2871,7 +2871,7 @@ i32 TitleInf::do_spell_practice_row()
         {
             for (i32 i = 0; i < 5; i++)
             {
-                AnmManager::interrupt_tree(anm_ids_740[i], 1);
+                AnmManager::interrupt_tree(text_row_ids[i], 1);
             }
             for (i32 i = 0; i < 7; i++)
             {
@@ -2883,7 +2883,7 @@ i32 TitleInf::do_spell_practice_row()
             anm_ids[0xd8].id = 0;
             AnmManager::interrupt_tree(anm_ids[0xd7], 1);
             anm_ids[0xd7].id = 0;
-            set_state(17);
+            set_state(TITLE_STATE_SPELL_PRACTICE_STAGE_SELECT);
             menu.pop_inline();
         }
         break;
@@ -2971,14 +2971,14 @@ i32 TitleInf::do_spell_practice_subseason()
         if (time_in_state.current >= 40)
         {
             menu.push();
-            set_state(2);
+            set_state(TITLE_STATE_EXIT);
             g_title_return_point = TITLE_RETURN_SPELL_PRACTICE;
             i32 stage = spell_stage + 1;
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
             g_stage_data = &g_stage_table[stage];
             g_Globals.spell_id = spell_ids[spell_index];
-            g_Globals.character = menu_5cec.next_selection;
+            g_Globals.character = spell_character_menu.next_selection;
             g_Globals.subshot = 0;
             g_Globals.subseason = menu.next_selection;
             g_Globals.difficulty = g_spell_difficulty[spell_ids[spell_index]];
@@ -2996,7 +2996,7 @@ i32 TitleInf::do_spell_practice_subseason()
             anm_ids[0x6a].id = 0;
             AnmManager::interrupt_tree(anm_ids[0xd9], 1);
             anm_ids[0xd9].id = 0;
-            set_state(19);
+            set_state(TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT);
             menu.pop();
         }
         break;
@@ -3060,7 +3060,7 @@ i32 TitleInf::do_spell_practice_difficulty()
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
-            AnmManager::interrupt_tree(anm_ids_740[menu.next_selection], 6);
+            AnmManager::interrupt_tree(text_row_ids[menu.next_selection], 6);
             set_substate(3);
             g_SoundManager.play_sound_centered(SE_OK00, 0);
             if (spell_stage == 6)
@@ -3085,14 +3085,14 @@ i32 TitleInf::do_spell_practice_difficulty()
             if (time_in_state.current >= 40)
             {
                 menu.push();
-                set_state(2);
+                set_state(TITLE_STATE_EXIT);
                 g_title_return_point = TITLE_RETURN_SPELL_PRACTICE;
                 i32 stage = spell_stage + 1;
                 g_Globals.stage_num = stage;
                 g_Globals.weird_stage_num = stage;
                 g_stage_data = &g_stage_table[stage];
                 g_Globals.spell_id = spell_ids[menu.next_selection];
-                g_Globals.character = menu_5cec.next_selection;
+                g_Globals.character = spell_character_menu.next_selection;
                 g_Globals.subshot = 0;
                 g_Globals.difficulty = g_spell_difficulty[spell_ids[menu.next_selection]];
                 g_Globals.subseason = 4;
@@ -3106,7 +3106,7 @@ i32 TitleInf::do_spell_practice_difficulty()
         else if (time_in_state.current >= 14)
         {
             spell_index = menu.next_selection;
-            set_state(20);
+            set_state(TITLE_STATE_SPELL_PRACTICE_SUBSEASON_SELECT);
             menu.push();
             interrupt_and_clear(0x6b);
             menu.set_cursor(0);
@@ -3118,7 +3118,7 @@ i32 TitleInf::do_spell_practice_difficulty()
         {
             AnmManager::interrupt_tree(anm_ids[0xd8], 1);
             anm_ids[0xd8].id = 0;
-            set_state(18);
+            set_state(TITLE_STATE_SPELL_PRACTICE_ROW_SELECT);
             menu.pop();
         }
         break;
@@ -3177,12 +3177,12 @@ HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 s
     }
     for (i32 i = 0; i < 5; i++)
     {
-        if (get_vm_or_clear(anm_ids_740[i]) == NULL)
+        if (get_vm_or_clear(text_row_ids[i]) == NULL)
         {
-            anm_ids_740[i] = title_anm->create_vm_inline(i + 0xd2, NULL, 0.0f, -1);
+            text_row_ids[i] = title_anm->create_vm_inline(i + 0xd2, NULL, 0.0f, -1);
         }
-        interrupt_tree_inline(anm_ids_740[i], 2);
-        g_AnmManager->draw_text(get_vm_or_clear(anm_ids_740[i]), 0x808080, 0, 0, 0, 0, " Nothing ... ");
+        interrupt_tree_inline(text_row_ids[i], 2);
+        g_AnmManager->draw_text(get_vm_or_clear(text_row_ids[i]), 0x808080, 0, 0, 0, 0, " Nothing ... ");
     }
     if (stage != 6)
     {
@@ -3215,7 +3215,7 @@ HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 s
                 anm_ids[0x113] = title_anm->create_effect(0x113, -1, NULL);
             }
             difficulty = g_spell_difficulty[id];
-            slot = difficulty != 4;
+            slot = difficulty != DIFFICULTY_EXTRA;
         }
         else
         {
@@ -3235,7 +3235,7 @@ HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 s
         if (g_Scorefile->characters[4].spells[id].attempts[0] == 0 && !overdrive_open)
         {
             ids[slot] = -1;
-            g_AnmManager->draw_text(get_vm_or_clear(anm_ids_740[slot]), 0xb0b0b0, 0, 0, 0, 0,
+            g_AnmManager->draw_text(get_vm_or_clear(text_row_ids[slot]), 0xb0b0b0, 0, 0, 0, 0,
                                     " No.%3d  \x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H", id + 1);
         }
         else
@@ -3266,12 +3266,12 @@ HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 s
                 name[len] = ' ';
             }
             name[len] = '\0';
-            ScorefileCharacter *character = &g_Scorefile->characters[menu_5cec.next_selection];
-            AnmVm *vm = get_vm_or_clear(anm_ids_740[slot]);
+            ScorefileCharacter *character = &g_Scorefile->characters[spell_character_menu.next_selection];
+            AnmVm *vm = get_vm_or_clear(text_row_ids[slot]);
             g_AnmManager->draw_text(vm, character->spells[id].captures[1] != 0 ? 0xffff80 : 0xefefef, 0, 0, 0, 0,
                                     " No.%3d  %s", id + 1, name);
         }
-        interrupt_tree_inline(anm_ids_740[slot], 2);
+        interrupt_tree_inline(text_row_ids[slot], 2);
         if (last_slot < slot)
         {
             last_slot = slot;
@@ -3283,11 +3283,11 @@ HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 s
         {
             if (i == selected)
             {
-                interrupt_tree_inline(anm_ids_740[i], 2);
+                interrupt_tree_inline(text_row_ids[i], 2);
             }
             else
             {
-                interrupt_tree_inline(anm_ids_740[i], 3);
+                interrupt_tree_inline(text_row_ids[i], 3);
             }
         }
     }
@@ -3297,17 +3297,17 @@ HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 s
         {
             if (i == selected)
             {
-                interrupt_tree_inline(anm_ids_740[i], 2);
+                interrupt_tree_inline(text_row_ids[i], 2);
             }
             else
             {
-                interrupt_tree_inline(anm_ids_740[i], 3);
+                interrupt_tree_inline(text_row_ids[i], 3);
             }
         }
     }
     for (i32 i = last_slot + 1; i < 5; i++)
     {
-        delete_vm_inline_and_clear(anm_ids_740[i]);
+        delete_vm_inline_and_clear(text_row_ids[i]);
     }
     return 0;
 }
@@ -3321,17 +3321,17 @@ i32 TitleInf::highlight_spell_row(i32 selected)
     {
         if (i == selected)
         {
-            if (get_vm_or_clear(anm_ids_740[i]) != NULL)
+            if (get_vm_or_clear(text_row_ids[i]) != NULL)
             {
-                AnmManager::interrupt_tree(anm_ids_740[i], 2);
+                AnmManager::interrupt_tree(text_row_ids[i], 2);
             }
             AnmManager::interrupt_tree_and_run(anm_ids[0x10d + g_spell_difficulty[spell_ids[i]]], 2);
         }
         else
         {
-            if (get_vm_or_clear(anm_ids_740[i]) != NULL)
+            if (get_vm_or_clear(text_row_ids[i]) != NULL)
             {
-                AnmManager::interrupt_tree(anm_ids_740[i], 3);
+                AnmManager::interrupt_tree(text_row_ids[i], 3);
             }
             AnmManager::interrupt_tree_and_run(anm_ids[0x10d + g_spell_difficulty[spell_ids[i]]], 3);
         }

@@ -180,7 +180,7 @@ struct Supervisor
     Camera cameras[4];
     Camera *current_camera;
     i32 current_camera_index;
-    // GameMode values. Code asks for a switch by writing
+    // SupervisorGameMode values. Code asks for a switch by writing
     // gamemode_to_switch_to; switch_gamemodes performs it on the next tick.
     i32 gamemode_current;
     i32 gamemode_to_switch_to;
@@ -389,7 +389,7 @@ enum SupervisorFlags
 
 // Supervisor's game modes (gamemode_current, gamemode_to_switch_to). The
 // switches themselves are in Supervisor::switch_gamemodes.
-enum GameMode
+enum SupervisorGameMode
 {
     // gamemode_current until the first switch.
     GAMEMODE_NONE = -2,
