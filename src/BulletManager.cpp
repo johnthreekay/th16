@@ -466,6 +466,242 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
     }
 }
 
+// Cancel scripts of bullet.anm for types of cancel kind 1, by color.
+// GLOBAL: TH16 0x490ec0
+extern const i32 g_bullet_cancel_scripts[8] = {4, 8, 12, 16, 20, 24, 28, 34};
+
+// FUNCTION: TH16 0x412cb0
+i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 angle_to_player)
+{
+    Bullet *bullet = (Bullet *)freelist_head.next;
+    if (bullet == NULL)
+    {
+        return 1;
+    }
+    bullet->freelist_node.unlink_inline();
+    g_BulletManager->tick_list_head.insert_after(&bullet->tick_list_node);
+
+    f32 angle = 0.0f;
+    f32 speed;
+    if (props->layers > 1)
+    {
+        speed = props->spd1 - (props->spd1 - props->spd2) * (f32)layer / (f32)(props->layers - 1);
+    }
+    else
+    {
+        speed = props->spd1;
+    }
+    f32 x;
+    switch ((u16)props->aim_type)
+    {
+    case 0:
+    case 1:
+        if (props->count & 1)
+        {
+            angle += (f32)((i + 1) / 2) * props->ang_bullet_dist;
+        }
+        else
+        {
+            angle += (f32)(i / 2) * props->ang_bullet_dist + props->ang_bullet_dist * 0.5f;
+        }
+        if (i & 1)
+        {
+            angle *= -1.0f;
+        }
+        if ((u16)props->aim_type == 0)
+        {
+            angle += angle_to_player;
+        }
+        angle += props->ang_aim;
+        break;
+    case 2:
+        angle += angle_to_player;
+    case 3:
+        angle += (f32)i * ZUN_2PI / (f32)props->count;
+        angle += (f32)layer * props->ang_bullet_dist + props->ang_aim;
+        break;
+    case 4:
+        angle += angle_to_player;
+    case 5:
+        angle += ZUN_PI / (f32)props->count;
+        angle += (f32)i * ZUN_2PI / (f32)props->count;
+        angle += (f32)layer * props->ang_bullet_dist + props->ang_aim;
+        break;
+    case 6:
+        angle = props->ang_aim + g_replay_safe_rng.randf_neg_to(props->ang_bullet_dist);
+        break;
+    case 7:
+        speed = g_replay_safe_rng.randf_0_to(props->spd2) + props->spd1;
+        angle += (f32)i * ZUN_2PI / (f32)props->count;
+        angle += (f32)layer * props->ang_bullet_dist + props->ang_aim;
+        break;
+    case 8:
+        angle = props->ang_aim + g_replay_safe_rng.randf_neg_to(props->ang_bullet_dist);
+        speed = g_replay_safe_rng.randf_0_to(props->spd2) + props->spd1;
+        break;
+    case 9:
+    case 10:
+        x = (f32)i * ZUN_2PI / (f32)props->count;
+        if (props->layers & 1)
+        {
+            angle = (f32)((layer + 1) / 2) * props->ang_bullet_dist + x;
+            if (props->layers > 1)
+            {
+                speed = (props->spd2 - props->spd1) * (f32)((layer + 1) & 0xfffe) / (f32)(props->layers - 1) +
+                        props->spd1;
+            }
+        }
+        else
+        {
+            angle = (f32)(layer / 2) * props->ang_bullet_dist + props->ang_bullet_dist * 0.5f + x;
+            if (props->layers > 1)
+            {
+                speed = (props->spd2 - props->spd1) * (f32)(layer & 0xfffe) / (f32)(props->layers - 1) + props->spd1;
+            }
+        }
+        if (layer & 1)
+        {
+            angle *= -1.0f;
+        }
+        if ((u16)props->aim_type == 9)
+        {
+            angle += angle_to_player;
+        }
+        angle += props->ang_aim;
+        break;
+    case 11:
+        x = (f32)i * ZUN_2PI / (f32)props->count;
+        angle += props->ang_aim + x;
+        speed *= 1.0f - (f32)fabs(sinf(x)) * props->spd2;
+        break;
+    case 12:
+        x = (f32)i * ZUN_2PI / (f32)props->count + ZUN_PI / (f32)props->count;
+        angle += props->ang_aim + x;
+        speed *= 1.0f - (f32)fabs(sinf(x)) * props->spd2;
+        break;
+    }
+    bullet->speed = speed;
+    bullet->angle = wrap_angle(wrap_angle(angle + 0.0f));
+    bullet->pos = props->pos;
+    if (props->distance != 0.0f)
+    {
+        D3DXVECTOR3 offset;
+        bullet_sincosmul(&offset, bullet->angle, props->distance);
+        bullet->pos.x += offset.x;
+        bullet->pos.y += offset.y;
+    }
+    bullet->pos.z = 0.1f;
+    bullet->flags |= 1;
+    bullet->state = 1;
+    bullet->timer_144c.reset();
+    bullet->timer_1460.reset();
+    bullet->ex_invuln_remaining_frames = 0;
+    bullet->scale = 1.0f;
+    bullet->scale_i.end_time = 0;
+    if (et_protect_range > 0.0f)
+    {
+        if (et_protect_range > (bullet->pos.x - g_Player->inner.pos.x) * (bullet->pos.x - g_Player->inner.pos.x) +
+                                   (bullet->pos.y - g_Player->inner.pos.y) * (bullet->pos.y - g_Player->inner.pos.y))
+        {
+            bullet->sub_412670();
+            return -1;
+        }
+    }
+    bullet_sincosmul(&bullet->velocity, angle, speed);
+    bullet->active_ex_flags = props->sfx_flags;
+    bullet->color = props->color;
+    bullet->sprite = props->type;
+    bullet->unk_c7c = 0;
+    bullet->flags = (bullet->flags & ~0xc) | 2;
+    bullet->unk_1448 = 60;
+    bullet->timer_1420.reset();
+    bullet->timer_1434.reset();
+    AnmVm *vm = &bullet->vm0;
+    vm->wipe();
+    bullet->vm0.index_of_sprite_mapping_func = 1;
+    bullet->vm0.associated_game_entity = bullet;
+    bullet_anm->set_vm_script(&bullet->vm0, g_bullet_types[props->type].script);
+    bullet->flags |= 0x10;
+    bullet->vm0.flags_hi = (bullet->vm0.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+    bullet->vm1.wipe();
+    bullet->vm1.flags_lo &= ~1;
+    if (g_bullet_types[props->type].unk_110 != 0)
+    {
+        bullet->vm1.flags_lo |= 1;
+        g_BulletManager->bullet_anm->set_vm_script(&bullet->vm1, g_bullet_types[props->type].unk_110);
+        bullet->vm1.flags_hi = (bullet->vm1.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+    }
+    switch (g_bullet_types[props->type].unk_10c)
+    {
+    case 0:
+        bullet->cancel_script = props->color * 2 + 4;
+        break;
+    case 1:
+        bullet->cancel_script = g_bullet_cancel_scripts[props->color];
+        break;
+    case 2:
+        bullet->cancel_script = -1;
+        bullet->flags |= 0x10;
+        break;
+    case 3:
+        bullet->cancel_script = 0x10;
+        break;
+    case 4:
+        bullet->cancel_script = 6;
+        break;
+    case 6:
+        bullet->cancel_script = g_bullet_types[bullet->sprite].sprites[props->color][3];
+        bullet->flags |= 0x10;
+        break;
+    case 7:
+        bullet->cancel_script = 0x104;
+        bullet->flags |= 0x10;
+        break;
+    case 8:
+        bullet->cancel_script = 0x107;
+        bullet->flags |= 0x10;
+        break;
+    case 9:
+        bullet->cancel_script = 0x10a;
+        bullet->flags |= 0x10;
+        break;
+    case 10:
+        bullet->cancel_script = 0x113;
+        bullet->flags |= 0x10;
+        break;
+    }
+    bullet->layer = g_bullet_types[props->type].unk_108;
+    bullet->bounce_sound = props->shot_transform_sfx;
+    bullet->unk_c58 = 5;
+    bullet->hitbox_diameter = bullet->hitbox_height = g_bullet_types[props->type].hitbox_radius;
+    bullet->unk_c6c = props->sfx_flags;
+    bullet->active_ex_flags = 0;
+    bullet->unk_c64 = 0;
+    bullet->unk_c60 = props->start_transform;
+    memcpy(bullet->et_ex, props->ex, sizeof(bullet->et_ex));
+    if (props->ex[props->start_transform].type == 2)
+    {
+        if ((i16)props->ex[bullet->unk_c60].a != 1)
+        {
+            bullet->vm0.interrupt_out_of_line((i16)props->ex[bullet->unk_c60].a + 7);
+        }
+        bullet->state = 2;
+        bullet->pos -= bullet->velocity * 4.0f;
+        bullet->unk_c60++;
+    }
+    else
+    {
+        vm->interrupt(2);
+    }
+    bullet->run_ex();
+    vm->run();
+    if (bullet->vm1.flags_lo & 1)
+    {
+        bullet->vm1.run();
+    }
+    return 0;
+}
+
 // FUNCTION: TH16 0x414da0
 HARNESS_CALLED i32 BulletManager::shoot_bullets(EnemyBulletShooter *props)
 {

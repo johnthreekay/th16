@@ -17,8 +17,3 @@ Float3 g_zero_vec;
 // GLOBAL: TH16 0x4a2250
 EffectData g_effect_table[4];
 
-// STUB: TH16 0x412cb0
-i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 angle_to_player)
-{
-    return i + layer;
-}
