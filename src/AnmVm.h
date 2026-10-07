@@ -276,7 +276,7 @@ struct AnmVm
     HARNESS_CALLED f32 get_slowdown_factor();
     void alloc_extra_data(u32 size);
     void set_layer(i32 layer);
-    void set_alpha1_time(i32 end_time, i32 method, u8 initial, u8 goal);
+    DECOMP_NOINLINE void set_alpha1_time(i32 end_time, i32 method, u8 initial, u8 goal);
     // Clears the suffix except for the fields that identify the VM.
     void wipe_suffix();
     // Switches to another sprite of the same file, changing only the UVs.
@@ -322,6 +322,8 @@ struct AnmVm
         }
     }
 
+    // 0x406240. Starts moving pos_i along a bezier curve.
+    void set_pos_bezier(i32 end_time, Float3 *initial, Float3 *bezier_1, Float3 *goal, Float3 *bezier_2);
     // 0x447550. Starts interpolating the scale from initial to goal.
     void set_scale_interp(i32 end_time, i32 method, D3DXVECTOR2 *initial, D3DXVECTOR2 *goal);
     // Script argument lookups: a variable number (AnmVar) gives the

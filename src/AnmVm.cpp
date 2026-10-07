@@ -180,3 +180,15 @@ void AnmVm::set_scale_interp(i32 end_time, i32 method, D3DXVECTOR2 *initial, D3D
     scale_i.goal = *goal;
     scale_i.time.reset();
 }
+
+// FUNCTION: TH16 0x406240
+void AnmVm::set_pos_bezier(i32 end_time, Float3 *initial, Float3 *bezier_1, Float3 *goal, Float3 *bezier_2)
+{
+    pos_i.end_time = end_time;
+    pos_i.method = INTERP_BEZIER;
+    pos_i.initial = *initial;
+    pos_i.goal = *goal;
+    pos_i.bezier_1 = *bezier_1;
+    pos_i.bezier_2 = *bezier_2;
+    pos_i.time.reset();
+}

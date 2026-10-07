@@ -320,6 +320,10 @@ struct AnmManager
     HARNESS_CALLED AnmId insert_in_ui_list_front(AnmVm *vm);
     // get_vm_with_id for snapshots.
     HARNESS_CALLED AnmVm *get_snapshot_vm_with_id(AnmId id);
+    // 0x469890. Draws a triangle fan of count points around center, each
+    // offset by offsets[i] and colored colors[i]. Every caller goes through
+    // g_AnmManager, so LTCG dropped this.
+    HARNESS_CALLED void draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors);
     // 0x46fac0. Writes a snapshot VM and its children into a buffer, adding
     // the bytes written to *size (replay and pause snapshots).
     void serialize_vm_tree(void *buffer, AnmVm *vm, i32 *size);

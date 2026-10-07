@@ -5,6 +5,8 @@
 
 #include "AnmManager.h"
 #include "AnmVm.h"
+#include "Rng.h"
+#include "ZunMath.h"
 
 // ins_508 data of effect kind 2.
 struct AnmEffect2Data
@@ -151,6 +153,125 @@ int __fastcall anm_effect_2_on_copy_1(AnmVm *vm, u8 *buffer, i32 *size, i32 mode
             }
         }
     }
+    return 0;
+}
+
+// ins_508 data of effect kind 3: a fan of colored points that grows by
+// one each frame.
+struct AnmEffect3Data
+{
+    Float2 offsets[64];
+    ZunColor colors[64];
+    f32 angle;
+    ZunTimer timer;
+};
+
+// FUNCTION: TH16 0x406510
+int __fastcall anm_effect_3_init(AnmVm *vm, D3DXVECTOR3 *pos)
+{
+    vm->alloc_extra_data(sizeof(AnmEffect3Data));
+    AnmEffect3Data *data = (AnmEffect3Data *)vm->ins_508_extra_data;
+    memset(data, 0, sizeof(AnmEffect3Data));
+    data->offsets[0].x = pos->x;
+    data->offsets[0].y = pos->y;
+    data->offsets[0].x += 320.0f;
+    data->offsets[0].y += 16.0f;
+    data->angle = g_replay_unsafe_rng.randf_neg_1_to_1() * ZUN_PI;
+    data->timer = 1;
+    i32 j = 0;
+    for (i32 i = 0; i < 64; i++)
+    {
+        data->colors[i].d3d = 0xff0080ff;
+        if (i < 8)
+        {
+            data->colors[i].r = ~(i << 5);
+        }
+        if (i >= 32)
+        {
+            data->colors[i].a = ~(j++ << 4);
+        }
+    }
+    vm->entity_pos = *pos;
+    vm->set_layer(15);
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    vm->set_alpha1_time(0x40, 0, 0xff, 0);
+    return 0;
+}
+
+// TODO: in the timer tick the original loads the speed pointer before
+// storing previous (ours stores first, so registers differ).
+// FUNCTION: TH16 0x406690
+int __fastcall anm_effect_3_on_tick(AnmVm *vm)
+{
+    AnmEffect3Data *data = (AnmEffect3Data *)vm->ins_508_extra_data;
+    i32 n = data->timer.current;
+    if (n < 64)
+    {
+        if (n != data->timer.previous)
+        {
+            for (i32 i = 0; i < n; i++)
+            {
+                if (data->colors[i].a >= 0x10)
+                {
+                    data->colors[i].a -= 0x10;
+                }
+                else
+                {
+                    data->colors[i].a = 0;
+                }
+            }
+            Float2 *point = &data->offsets[n];
+            sincosmul((Float3 *)point, data->angle, g_replay_unsafe_rng.randf_0_to_1() * 5.0f + 4.0f);
+            point->x += point[-1].x;
+            point->y += point[-1].y;
+            data->angle = wrap_angle(g_replay_unsafe_rng.randf_neg_to(ZUN_PI) / 5.0f + data->angle);
+        }
+        data->timer.tick_in_place();
+        return 0;
+    }
+    return 1;
+}
+
+// TODO: the original aligns the frame to 8 bytes (and esp, -8) and adds
+// entity_pos.x + pos.x in the other order.
+// FUNCTION: TH16 0x406860
+int __fastcall anm_effect_3_on_draw(AnmVm *vm)
+{
+    AnmEffect3Data *data = (AnmEffect3Data *)vm->ins_508_extra_data;
+    g_AnmManager->setup_render_state_for_vm(vm);
+    Float3 pos;
+    pos = vm->entity_pos + vm->pos + vm->pos_2;
+    vm->transform_coords(&pos);
+    g_AnmManager->draw_triangle_fan(data->timer.current, &pos, data->offsets, data->colors);
+    return 0;
+}
+
+// FUNCTION: TH16 0x406930
+int __fastcall anm_effect_3b_init(AnmVm *vm, D3DXVECTOR3 *pos)
+{
+    vm->alloc_extra_data(sizeof(AnmEffect3Data));
+    AnmEffect3Data *data = (AnmEffect3Data *)vm->ins_508_extra_data;
+    memset(data, 0, sizeof(AnmEffect3Data));
+    data->offsets[0].x = 0.0f;
+    data->offsets[0].y = 0.0f;
+    data->angle = g_replay_unsafe_rng.randf_neg_1_to_1() * ZUN_PI;
+    data->timer = 1;
+    i32 j = 0;
+    for (i32 i = 0; i < 64; i++)
+    {
+        data->colors[i].d3d = 0xff505050;
+        if (i < 8)
+        {
+            data->colors[i].b = ~(i << 5);
+        }
+        if (i >= 32)
+        {
+            data->colors[i].a = ~(j++ << 4);
+        }
+    }
+    vm->entity_pos = *pos;
+    vm->flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
+    vm->set_layer(19);
     return 0;
 }
 

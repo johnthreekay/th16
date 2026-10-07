@@ -52,3 +52,10 @@ i32 *harness_screen_metric_ptr(i32 which)
         return &g_game_2d_origin_y;
     }
 }
+
+// Like the other fan drawers (0x469890 has one caller in the original, but
+// LTCG must see it called through g_AnmManager).
+void harness_draw_triangle_fan(i32 n, Float3 *center, Float2 *offsets, ZunColor *colors)
+{
+    g_AnmManager->draw_triangle_fan(n, center, offsets, colors);
+}
