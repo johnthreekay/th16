@@ -14,8 +14,4 @@ D3DXVECTOR2 g_zero_vec2;
 // The hooks ECL 634 installs; only entry 0, never set.
 void *g_ecl_unknown_634_funcs[1];
 
-// STUB: TH16 0x417f00
-void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
-{
-}
 

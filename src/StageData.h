@@ -5,7 +5,15 @@
 // ExpHP: zTableStageDataArrayItem.
 struct StageBoss
 {
-    u8 unk_0[0x14];
+    // The anm slot and script of the spell card background, and whether
+    // the card sets Spellcard flag 0x200.
+    i32 spell_bg_anm_slot;
+    i32 spell_bg_script;
+    i32 spell_flag_200;
+    // Another effect the card starts with, by the card's last ECL
+    // argument (slot -1 for none).
+    i32 spell_anm_slot;
+    i32 spell_script;
     // The ECL anm slot and script of the boss's intro (dialogue
     // instruction 20) and of its face (instruction 2).
     i32 intro_anm_slot;

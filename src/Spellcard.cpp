@@ -15,6 +15,9 @@
 #include "Scorefile.h"
 #include "SoundManager.h"
 #include "Spellcard.h"
+#include "EffectManager.h"
+#include "StageData.h"
+#include "Supervisor.h"
 #include "Stage.h"
 #include "UpdateFunc.h"
 
@@ -176,6 +179,81 @@ HARNESS_CALLED void Spellcard::decode_time_code(i32 *seconds, i32 *hundredths)
     {
         *seconds = (time_code / 100 % 1000 + 934) % 1000;
         *hundredths = (time_code % 100 + 67) % 100;
+    }
+}
+
+// TODO: this and name trade esi/edi, and later code differs in register allocation.
+// FUNCTION: TH16 0x417f00
+void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
+{
+    __asm finit;
+    time = 0;
+    this->spell_id = spell_id;
+    strcpy(this->name, name);
+    flags |= 3;
+    flags &= ~0x98;
+    if (g_ReplayManager->mode != 1)
+    {
+        strcpy(g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id].name, name);
+        i32 practice = g_Globals.game_mode == 2;
+        ScorefileSpell *spell = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id];
+        if (spell->attempts[practice] < 99999)
+        {
+            spell->attempts[practice]++;
+        }
+        strcpy(g_Scorefile->characters[4].spells[spell_id].name, name);
+        spell = &g_Scorefile->characters[4].spells[spell_id];
+        if (spell->attempts[practice] < 99999)
+        {
+            spell->attempts[practice]++;
+        }
+    }
+    g_Gui->interrupt_spell_vms_2();
+    flags &= ~0x20;
+    ticks = 1;
+    flags &= ~0x40;
+    text_anm_ids[0] = g_AsciiManager->ascii_anm->create_effect(0, -1, NULL);
+    text_anm_ids[1] = g_Supervisor.text_anm->create_effect(2, -1, NULL);
+    text_anm_ids[2] = g_AsciiManager->ascii_anm->create_effect(1, -1, NULL);
+    AnmManager *anm = g_AnmManager;
+    g_AnmManager->draw_text_right(get_vm_or_clear(text_anm_ids[1]), 0xffffff, 0, 0, 0, name);
+    g_SoundManager.play_sound_centered(0x21, 0);
+    boss_anm_id = g_EffectManager->effect_anm->create_effect(0xd, -1, NULL);
+    EnemyInf *boss = NULL;
+    i32 boss_id = g_EnemyManager->inner.boss_ids[0];
+    if (boss_id != 0)
+    {
+        for (EnemyList *node = g_EnemyManager->active_enemy_list_head; node != NULL; node = node->next)
+        {
+            boss = node->entry;
+            if (boss->enemy_id == boss_id)
+            {
+                break;
+            }
+        }
+    }
+    boss_pos = boss->enemy.final_pos.pos;
+    AnmVm *vm = g_AnmManager->get_vm_with_id(boss_anm_id);
+    if (vm != NULL)
+    {
+        vm->entity_pos = boss->enemy.final_pos.pos;
+    }
+    find_child_of(boss_anm_id, 0xb)->int_vars[2] = arg_2;
+    find_child_of(boss_anm_id, 0xc)->int_vars[2] = arg_2;
+    timeout = arg_2;
+    i32 bonuses[5] = {500000, 1000000, 1500000, 2000000, 1000000};
+    bonus = bonuses[g_Globals.difficulty] * g_Globals.stage_num;
+    bonus_max = bonus >= 1000000000 ? 999999999 : bonus;
+    g_EffectManager->effect_anm->create_effect(0x14, -1, NULL);
+    StageBoss *stage_boss = &g_stage_data->bosses[g_Globals.chapter < 43 && g_stage_data->bosses[1].spell_bg_anm_slot != -1];
+    background_anm_id = g_EnemyManager->anim_statement_anms[stage_boss->spell_bg_anm_slot]->create_effect(
+        stage_boss->spell_bg_script, -1, NULL);
+    flags = (flags & ~0x200) | ((stage_boss->spell_flag_200 << 9) & 0x200);
+    stage_boss = &g_stage_data->bosses[arg_3];
+    if (stage_boss->spell_anm_slot != -1)
+    {
+        g_EnemyManager->anim_statement_anms[stage_boss->spell_anm_slot]->create_effect(stage_boss->spell_script, -1,
+                                                                                       NULL);
     }
 }
 
