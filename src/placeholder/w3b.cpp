@@ -22,3 +22,15 @@ void AnmManager::draw_text(AnmVm *vm, D3DCOLOR color, i32 unk_10, i32 font, i32 
     w3b_placeholder_sink(vm, w3b_placeholder_sink(buf, color + unk_10 + font + (i32)d + y));
 }
 
+
+// Starts pos_i (unit 3's range). A visible body keeps callers that pass a
+// local's address free of a /GS cookie.
+// STUB: TH16 0x4173f0
+void AnmVm::set_pos_time(i32 end_time, i32 method, Float3 *initial, Float3 *goal)
+{
+    pos_i.end_time = end_time;
+    pos_i.method = method;
+    pos_i.initial = *initial;
+    pos_i.goal = *goal;
+    pos_i.time = 0;
+}

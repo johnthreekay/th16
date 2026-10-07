@@ -1801,3 +1801,102 @@ int EnemyInf::run_over_300()
 {
     return enemy.ecl_run_over_300();
 }
+
+static inline void anm_set_rgb1(AnmVm *vm, i32 r, i32 g, i32 b)
+{
+    vm->color_1.r = r;
+    vm->color_1.g = g;
+    vm->color_1.b = b;
+}
+
+static inline void anm_set_scale(AnmVm *vm, f32 x, f32 y)
+{
+    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm->scale.x = x;
+    vm->scale.y = y;
+}
+
+static inline void anm_set_scale_2(AnmVm *vm, f32 x, f32 y)
+{
+    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm->scale_2.x = x;
+    vm->scale_2.y = y;
+}
+
+// TODO: register allocation: the original keeps full in ecx (reloading the context from it) and
+// spills vm, with this in edi and vm in ebx.
+// FUNCTION: TH16 0x4233a0
+void EnemyData::ecl_anm_vm_instr()
+{
+    EclRawInstr *instr = full->context.current_context->current_instr();
+    i32 slot = full->context.current_context->get_int_arg(0);
+    if ((u32)slot > 15)
+    {
+        return;
+    }
+    AnmVm *vm = get_vm_or_clear(anm_ids[slot]);
+    if (vm == NULL)
+    {
+        return;
+    }
+    switch ((i16)instr->opcode)
+    {
+    case 319:
+        vm->rotation.z = full->context.current_context->get_float_arg(1);
+        vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
+        break;
+    case 329:
+        anm_set_scale(vm, full->context.current_context->get_float_arg(1), full->context.current_context->get_float_arg(2));
+        break;
+    case 335:
+        anm_set_scale_2(vm, full->context.current_context->get_float_arg(1),
+                        full->context.current_context->get_float_arg(2));
+        break;
+    case 330:
+        vm->scale_to(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
+                     full->context.current_context->get_float_arg(3), full->context.current_context->get_float_arg(4));
+        break;
+    case 325:
+        anm_set_rgb1(vm, full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
+                     full->context.current_context->get_int_arg(3));
+        break;
+    case 326:
+    {
+        ZunColor color;
+        color.r = full->context.current_context->get_int_arg(3);
+        color.g = full->context.current_context->get_int_arg(4);
+        color.b = full->context.current_context->get_int_arg(5);
+        vm->fade_rgb1(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
+                      &color);
+        break;
+    }
+    case 327:
+        vm->color_1.a = full->context.current_context->get_int_arg(1);
+        break;
+    case 328:
+        vm->fade_alpha1(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
+                        full->context.current_context->get_int_arg(3));
+        break;
+    case 331:
+        vm->color_2.a = full->context.current_context->get_int_arg(1);
+        break;
+    case 332:
+        vm->fade_alpha2(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
+                        full->context.current_context->get_int_arg(3));
+        break;
+    case 333:
+    {
+        Float3 goal(full->context.current_context->get_float_arg(3), full->context.current_context->get_float_arg(4),
+                    0.0f);
+        vm->set_pos_time(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
+                         &anm_ids[full->context.current_context->get_int_arg(0)].find_or_clear()->entity_pos, &goal);
+        break;
+    }
+    case 336:
+        vm->set_layer(full->context.current_context->get_int_arg(1));
+        break;
+    case 337:
+        ((AnmVmFlagsLoBits *)&vm->flags_lo)->blend_mode = (u8)full->context.current_context->get_int_arg(1);
+        break;
+    }
+}

@@ -214,6 +214,9 @@ struct EnemyData
     int ecl_anm_set_sprite();
     // 0x423050. The enmCreate family.
     int ecl_enm_create();
+    // 0x4233a0. The anm instructions that change a VM of the enemy
+    // (rotation, scale, colors, alpha, position, layer, blend mode).
+    void ecl_anm_vm_instr();
     // 0x41dcb0. The enemy-specific ECL instructions (300 and up).
     int ecl_run_over_300();
     i32 get_int_arg(int index);
