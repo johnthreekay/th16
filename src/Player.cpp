@@ -1,3 +1,6 @@
+// The player: setup from the shot type's files, movement, options,
+// shooting, damage sources, getting hit and respawning. The shot type
+// callbacks and PlayerBullet are in PlayerShot.cpp.
 #include <stdlib.h>
 #include <stddef.h>
 #include <math.h>
@@ -195,6 +198,7 @@ HARNESS_CALLED i32 Player::check_hit_rect(Float3 *pos, Float3 *size, i32 graze_o
     if (hurtbox.min_pos.x > hi.x || hurtbox.min_pos.y > hi.y || lo.x > hurtbox.max_pos.x ||
         lo.y > hurtbox.max_pos.y)
     {
+        // A miss grazes within 24 pixels.
         half = D3DXVECTOR3(24.0f, 24.0f, 24.0f);
         hi = *pos + half;
         lo = *pos - half;
@@ -239,6 +243,7 @@ HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_o
     }
     if (dist_sq >= hitbox * hitbox + radius * radius)
     {
+        // A miss grazes within 40 pixels (more for big bullets).
         f32 graze = radius / 2.5f;
         graze = 40.0f > graze ? 40.0f : graze;
         if (dist_sq >= (graze + hitbox) * (graze + hitbox) + radius * radius)
@@ -266,8 +271,8 @@ HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_o
     return 1;
 }
 
-// The spell card's bonus is lost when the player is hit after its first
-// second (and lose_life and die repeat this).
+// Also fails the spell card (once it has run a second) and counts the
+// miss; die does the same to the spell card.
 // FUNCTION: TH16 0x443cd0
 void Player::lose_life()
 {
@@ -278,6 +283,7 @@ void Player::lose_life()
         effects->anm_ids[index] = effects->effect_anm->create_vm(0x1c, &inner.pos, 0.0f, -1, 0);
     }
     g_Globals.lives--;
+    // Every life starts with three bombs.
     g_Globals.bombs = 3;
     if (g_Gui != NULL)
     {
@@ -954,7 +960,9 @@ i32 Player::tick_bullets()
         {
             Float3 corners[4];
             vm->write_sprite_corners(corners);
-            if (bullet->age.current >= 15 && !is_on_screen(&corners[0]) && !is_on_screen(&corners[1]) &&
+            // Bullets (other than lasers) older than 15 frames go away once
+        // their sprite is entirely off screen.
+        if (bullet->age.current >= 15 && !is_on_screen(&corners[0]) && !is_on_screen(&corners[1]) &&
                 !is_on_screen(&corners[2]) && !is_on_screen(&corners[3]))
             {
                 {
@@ -988,6 +996,9 @@ i32 Player::tick_bullets()
     return 0;
 }
 
+// Per character (the .sht file's own values are ignored): the sizes of the
+// focused item attraction box, the graze box, the unfocused attraction box
+// (also the item box) and the hitbox.
 // GLOBAL: TH16 0x492c68
 const f32 g_player_attract_radii[4] = {100.0f, 100.0f, 100.0f, 100.0f};
 // GLOBAL: TH16 0x492c78
@@ -996,6 +1007,7 @@ const f32 g_player_graze_radii[4] = {5.0f, 5.0f, 5.0f, 5.0f};
 const f32 g_player_item_radii[4] = {60.0f, 60.0f, 60.0f, 60.0f};
 // GLOBAL: TH16 0x492c98
 const f32 g_player_hitbox_radii[4] = {3.0f, 3.0f, 3.0f, 3.0f};
+// The shot type files: per character (pl01 is Marisa's) and per subseason.
 // GLOBAL: TH16 0x492ca8
 const char *const g_player_sht_names[4] = {"pl00.sht", "pl02.sht", "pl03.sht", "pl01.sht"};
 // GLOBAL: TH16 0x492cb8
@@ -1015,6 +1027,7 @@ const char *const g_subseason_anm_names[5] = {"pl00sub.anm", "pl02sub.anm", "pl0
 i32 Player::initialize()
 {
     anm_file = AnmManager::preload_anm(PLAYER_ANM_SLOT, g_player_anm_names[g_Globals.character + g_Globals.subshot]);
+    // "Player data not found. The data is corrupted."
     if (anm_file == NULL)
     {
         g_GameErrorContext.log("\x8e\xa9\x8b@\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81"
@@ -1144,7 +1157,8 @@ static __forceinline void player_set_script(Player *player, i32 script)
     player->vm.run();
 }
 
-// TODO: the original realigns its frame (and esp, -8) and keeps 1.0f in xmm2; register allocation differs.
+// TODO: the original realigns its frame (and esp, -8) and keeps 1.0f in
+// xmm2; register allocation differs.
 // FUNCTION: TH16 0x441cf0
 i32 Player::move()
 {
@@ -1370,7 +1384,9 @@ static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
     }
 }
 
-// TODO: ours gets a /GS cookie for the zero position passed to create_vm_inline; the original zeroes one local before the loops and aligns its frame.
+// TODO: ours gets a /GS cookie for the zero position passed to
+// create_vm_inline; the original zeroes one local before the loops and
+// aligns its frame.
 // FUNCTION: TH16 0x4440e0
 void PlayerInner::repopulate_options()
 {
@@ -1691,9 +1707,11 @@ i32 Player::on_tick_body()
                 vm.color_2.d3d = 0xffff0000;
                 vm.flags_lo = (vm.flags_lo & ~ANM_VM_COLOR_MODE_MASK) | ANM_VM_COLOR_MODE_1;
             }
+            // An afterimage with the player's current sprite.
             i32 scripts[4] = {4, 4, 4, 4};
             AnmId id = anm_file->create_vm(scripts[g_Globals.character], &inner.pos, 0.0f, -1, 0);
             anm_file->set_sprite(get_vm_or_clear(id), vm.sprite_id);
+
             g_AnmManager->get_vm_with_id(id)->color_1.d3d = 0xffff0000;
         }
         else if (inner.speed_multiplier > 1.01f)
@@ -1773,6 +1791,7 @@ i32 Player::on_tick_body()
         inner.shoot_key_long_timer = -1;
         unk_2c790 = 0;
         unk_2c794 = 0;
+        // The looping shot sounds.
         stop_sound_inline(0x1e);
         stop_sound_inline(0x37);
     }
