@@ -126,6 +126,7 @@ struct PauseMenu
     i32 replay_ended;
     // g_frame_pacing.mode while the menu is open.
     i32 saved_pacing_mode;
+    // The numbered replay slots, read while the replay save list is open.
     ReplayManager *replays[25];
     u8 unk_270[0x2d4 - 0x270];
     // The replay or score name being entered.

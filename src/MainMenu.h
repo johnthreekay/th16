@@ -175,11 +175,14 @@ class TitleInf : public TaskInf
     // KeyConfigItem action.
     i16 key_config[6];
     u8 unk_5b40[0x5b44 - 0x5b40];
+    // Cleared when the replay menu opens; never read.
     i32 unk_5b44;
     // The replay slot being saved to or played.
     i32 replay_slot;
     // The stage picked to start a replay from (minus one).
     i32 replay_stage;
+    // The replay menu's list: the numbered slots, then the th16_ud????.rpy
+    // files (load_replay_list).
     ReplayManager *replays[100];
     // musiccmt.txt, read while the music room is open.
     void *music_comment_file;
