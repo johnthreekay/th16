@@ -2064,6 +2064,92 @@ i32 LaserCurveInf::initialize(void *params)
     return 0;
 }
 
+static_assert(offsetof(AnmVm, pos) == 0x2c, "AnmVm::pos");
+static_assert(offsetof(AnmVm, uv_quad_of_sprite) == 0x3a8, "AnmVm::uv_quad_of_sprite");
+
+// The angle halfway from cur to prev, going the short way round.
+static __forceinline f32 laser_mid_angle(f32 cur, f32 prev)
+{
+    f32 d;
+    if (prev - cur > ZUN_PI)
+    {
+        d = prev - (cur + ZUN_2PI);
+    }
+    else if (cur - prev > ZUN_PI)
+    {
+        d = prev - (cur - ZUN_2PI);
+    }
+    else
+    {
+        d = prev - cur;
+    }
+    d = wrap_angle(d);
+    d = wrap_angle(d * 0.5f);
+    return wrap_angle(d + cur);
+}
+
+// Draws the body as a triangle strip: two vertices per segment, half the
+// laser's width to each side across the segment's direction (averaged with
+// the previous segment's), with u running from 0 to 1 along the laser. The
+// origin VM sits on the last segment until the whole laser is out.
+// TODO: the original adds the vertex y to the loaded segment y (operand order) and stores pos.z = 0 after loading the y offset.
+// FUNCTION: TH16 0x438750
+i32 LaserCurveInf::on_draw()
+{
+    f32 u = 0.0f;
+    RenderVertex144 *vertex = (RenderVertex144 *)unk_1528;
+    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    for (i32 i = 0; i < inner.segment_count; i++, segment++, vertex++)
+    {
+        vertex->pos.w = 1.0f;
+        vertex->diffuse = 0xffffffff;
+        vertex->uv.x = u;
+        vertex->uv.y = vm_92c.uv_quad_of_sprite[0].y;
+        f32 a;
+        if (i == 0)
+        {
+            a = wrap_angle(segment->angle + ZUN_PI / 2);
+        }
+        else
+        {
+            f32 cur = wrap_angle(segment->angle + ZUN_PI / 2);
+            a = laser_mid_angle(cur, wrap_angle(segment[-1].angle + ZUN_PI / 2));
+        }
+        laser_sincosmul((Float3 *)&vertex->pos, a, inner.laser_new_arg_4 * 0.5f);
+        *(Float3 *)&vertex->pos += segment->pos;
+        vertex->pos.x += (f32)g_game_2d_origin_x;
+        vertex->pos.y += (f32)g_early_arcade_offset_y;
+        vertex->pos.z = 0.0f;
+        vertex++;
+        vertex->pos.w = 1.0f;
+        vertex->diffuse = 0xffffffff;
+        vertex->uv.x = u;
+        vertex->uv.y = vm_92c.uv_quad_of_sprite[2].y;
+        if (i == 0)
+        {
+            a = wrap_angle(segment->angle - ZUN_PI / 2);
+        }
+        else
+        {
+            f32 cur = wrap_angle(segment->angle - ZUN_PI / 2);
+            a = laser_mid_angle(cur, wrap_angle(segment[-1].angle - ZUN_PI / 2));
+        }
+        laser_sincosmul((Float3 *)&vertex->pos, a, inner.laser_new_arg_4 * 0.5f);
+        *(Float3 *)&vertex->pos += segment->pos;
+        vertex->pos.x += (f32)g_game_2d_origin_x;
+        vertex->pos.y += (f32)g_early_arcade_offset_y;
+        vertex->pos.z = 0.0f;
+        u += 1.0f / (f32)(inner.segment_count - 1);
+    }
+    g_AnmManager->draw_vm__mode_9(&vm_92c, (RenderVertex144 *)unk_1528, inner.segment_count * 2);
+    if (inner.segment_count >= timer_40.current)
+    {
+        vm_f28.pos = ((LaserCurveSegment *)unk_1524)[inner.segment_count - 1].pos;
+        g_AnmManager->draw_vm(&vm_f28);
+    }
+    return 0;
+}
+
 // TODO: register allocation and the order of the vector temporaries differ (the original builds them with unpcklps).
 // FUNCTION: TH16 0x438370
 void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle,

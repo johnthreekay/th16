@@ -14,13 +14,6 @@ void LaserCurveInf::run_ex()
     unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x438750
-i32 LaserCurveInf::on_draw()
-{
-    return unit5_placeholder(this);
-}
-
 // FUNCTION: TH16 0x437760
 i32 LaserCurveInf::on_destroy()
 {
