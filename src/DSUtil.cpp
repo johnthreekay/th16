@@ -615,7 +615,6 @@ LPDIRECTSOUNDBUFFER CSound::GetFreeBuffer()
     }
 }
 
-// TODO: the original has 8 more bytes of frame and saves esi/edi up front.
 // FUNCTION: TH16 0x471120
 HRESULT CSound::Play(DWORD dwPriority, DWORD dwFlags, DWORD offset)
 {

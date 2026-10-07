@@ -20,7 +20,6 @@ FpsCounter::~FpsCounter()
     g_FpsCounter = NULL;
 }
 
-// TODO: our build realigns the stack (and esp, -8) on entry; the original does not.
 // FUNCTION: TH16 0x4262f0
 HARNESS_CALLED int FpsCounter::update()
 {

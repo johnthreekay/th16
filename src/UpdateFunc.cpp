@@ -174,7 +174,7 @@ done:
 }
 
 // FUNCTION: TH16 0x4015a0
-int UpdateFuncRegistry::run_all_on_draw()
+HARNESS_CALLED int UpdateFuncRegistry::run_all_on_draw()
 {
     UpdateFuncRegistry *registry = g_UpdateFuncRegistry;
     UpdateFuncList *node;

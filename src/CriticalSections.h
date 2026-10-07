@@ -10,6 +10,7 @@ enum
     CS_FILE = 2,
     CS_GAME_ERROR_CONTEXT = 3,
     // Held while Supervisor::switch_gamemodes switches.
+    // GameWindow::get_runtime also takes it around its timer state.
     CS_SUPERVISOR_GAMEMODE = 5,
     // Guards restarting g_Supervisor.thread.
     CS_SUPERVISOR_THREAD = 6,

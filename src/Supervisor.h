@@ -22,7 +22,11 @@ struct Config
     // Analog stick dead zones (DirectInput axis units).
     i16 deadzone_x;
     i16 deadzone_y;
-    u8 unk_20[0x23 - 0x20];
+    // 0xff: not chosen yet (the device setup then picks 32-bit color).
+    u8 color_mode;
+    // 0 turns the BGM off.
+    u8 bgm_mode;
+    u8 unk_22;
     // Window size option; 0, 1, 2 pick ascii.anm, ascii_960.anm,
     // ascii_1280.anm.
     u8 window_size;
@@ -32,7 +36,10 @@ struct Config
     // Percentages from the options menu.
     i8 bgm_volume;
     i8 se_volume;
-    u8 unk_28[0x2c - 0x28];
+    u8 unk_28;
+    // 1: sleep before presenting so frames come at 60 Hz.
+    u8 unk_29;
+    u8 unk_2a[0x2c - 0x2a];
     // 0x8 skips DirectInput setup.
     u32 flags_2c;
     u8 unk_30[0x68 - 0x30];
@@ -55,7 +62,9 @@ struct Screenshot
 };
 
 // Owns the Direct3D/DirectInput objects and global game state. ZUN's name
-// for it in older games was MotherInf (per ExpHP).
+// for it in older games was MotherInf (per ExpHP). Packed to 4 bytes:
+// frame_time is a double at an offset that is not a multiple of 8.
+#pragma pack(push, 4)
 struct Supervisor
 {
     // ExpHP's layout puts d3d, d3d_device and dinput 4 bytes later, but
@@ -68,11 +77,19 @@ struct Supervisor
     u8 unk_10[0x10];
     IDirectInputDevice8A *keyboard;
     IDirectInputDevice8A *joystick;
-    u8 unk_28[0xdc - 0x28];
+    u8 unk_28[0x2c - 0x28];
+    DIDEVCAPS joystick_caps;
+    // Passed to the BGM streaming thread, which ignores it.
+    void *unk_58;
+    u8 unk_5c[0xdc - 0x5c];
     // The full-window viewport, set by screen effects before they draw.
     D3DVIEWPORT9 viewport_dc;
+    // What the device was created with (BackBufferFormat picks the
+    // texture formats).
     D3DPRESENT_PARAMETERS present_params;
-    u8 unk_12c[0x1ac - 0x12c];
+    u8 unk_12c[0x19c - 0x12c];
+    // The adapter's display mode at startup.
+    D3DDISPLAYMODE display_mode;
     // Render targets for the arcade region while it is drawn at the
     // default resolution (the "@R" surfaces), and the back buffer.
     IDirect3DSurface9 *arcade_surface_0;
@@ -98,7 +115,10 @@ struct Supervisor
     // a game (0 for a replay restart).
     i32 unk_700;
     i32 unk_704;
-    u8 unk_708[0x71c - 0x708];
+    u8 unk_708[0x714 - 0x708];
+    // Set to 2 after the device is reset (3 by WinMain).
+    i32 unk_714;
+    u8 unk_718[0x71c - 0x718];
     // Set by load_game_config for config flag 0x20.
     i32 unk_71c;
     u8 unk_720[0x728 - 0x720];
@@ -116,28 +136,37 @@ struct Supervisor
     u8 unk_9bc[0xa0c - 0x9bc];
     i32 fog_enabled;
     i32 zwrite_enabled;
-    u8 unk_a14[0xa1c - 0xa14];
+    // Sum of the executable's dwords and its size, from compute_exe_checksum.
+    i32 exe_checksum;
+    i32 exe_size;
     // th16_<version>.ver, read in on_registration.
     i32 ver_file_size;
     void *ver_file_data;
     struct LoadingThread *loading_thread;
-    u8 unk_a28[0xa3c - 0xa28];
+    u8 unk_a28[0xa34 - 0xa28];
+    // Seconds the last frame's update and draw took.
+    double frame_time;
     D3DCOLOR background_color;
 
     u32 read_joypad(u32 input);
 
     HRESULT enable_d3d_fog();
-    HRESULT disable_d3d_fog();
+    // Called by the frame loop and draw_vm; LTCG inlined it into the layer
+    // draw callbacks, which use disable_d3d_fog_inline.
+    DECOMP_NOINLINE HRESULT disable_d3d_fog();
+    HRESULT disable_d3d_fog_inline();
     HRESULT enable_zwrite();
     HRESULT disable_zwrite();
     void swap_transform_matrices(Camera *camera);
-    void release_surfaces();
+    // Reaches the object through g_Supervisor; LTCG dropped this.
+    HARNESS_CALLED void release_surfaces();
     void sub_43c630();
     void sub_43c6a0();
     // 0x43bbd0. Copies the back buffer and starts write_screenshot to save
     // it to path. Works on g_Supervisor; returns 1 for an unsupported
-    // back buffer format.
-    int take_screenshot(const char *path);
+    // back buffer format. Its one caller is GameWindow::take_screenshot;
+    // LTCG dropped this.
+    HARNESS_CALLED int take_screenshot(const char *path);
     // 0x43be40. The screenshot thread: converts and saves g_Supervisor's
     // screenshot.
     static void __cdecl write_screenshot(void *arg);
@@ -155,7 +184,16 @@ struct Supervisor
     // 0x401d50. Reads keyboard and pad into g_hardware_input and returns
     // the buttons held.
     static u32 read_keyboard_input();
+    // 0x45ba80. Sets every render state the game relies on (after a
+    // device reset, too).
+    static void reset_render_state();
     int initialize();
+    // Creates the DirectInput keyboard and the first game controller.
+    i32 dx_direct_input_initialize();
+    // Sets up DirectInput and picks the input paths it made available.
+    static void init_input();
+    // Checksums th16.exe into exe_checksum; -1 if it cannot be read.
+    static i32 compute_exe_checksum();
     // Runs a loader function on `thread`. Every caller passes NULL for arg,
     // which LTCG folds; the loaders themselves are plain void functions.
     HARNESS_CALLED i32 start_thread(ThreadStart start, void *arg);
@@ -191,6 +229,8 @@ struct Supervisor
     DECOMP_NOINLINE void release_dinput();
 };
 
+#pragma pack(pop)
+
 enum SupervisorFlags
 {
     // Read the pad through DirectInput rather than joyGetPosEx.
@@ -202,6 +242,17 @@ enum SupervisorFlags
 };
 
 extern Supervisor g_Supervisor;
+
+inline HRESULT Supervisor::disable_d3d_fog_inline()
+{
+    if (fog_enabled != 0)
+    {
+        g_AnmManager->flush_sprites();
+        fog_enabled = 0;
+        return d3d_device->SetRenderState(D3DRS_FOGENABLE, FALSE);
+    }
+    return 0;
+}
 
 // Pad button numbers for each game button, -1 if unassigned. Index meaning
 // (from read_joypad): 0 shot, 1 bomb, 2 -> 0x8, 3 -> 0x100, 9 -> 0x800.
@@ -220,8 +271,10 @@ extern i32 g_arcade_width;
 // elements drawn at full resolution (ExpHP: ARCADE_HUD_ORIGIN_X/Y).
 extern i32 g_arcade_hud_origin_x;
 extern i32 g_arcade_hud_origin_y;
-// Unknown flags; setup_cameras makes camera 2 960 pixels high when the
-// bits 0x3c are 8.
+// GameWindow::flags (0x2: device lost; 0x3c: window size; 0x40: frame
+// pacing by sleeping), which code outside the window methods addresses as a
+// global. setup_cameras makes camera 2 960 pixels high when the bits 0x3c
+// are 8.
 extern u32 g_unk_4d9d1c;
 // Where game coordinate (0, 0) is on the arcade surface.
 extern i32 g_game_2d_origin_x;

@@ -76,7 +76,7 @@ struct Spellcard
     // 0x417bc0. Measures the card's real duration: starts the clock while
     // the card runs, then turns the time into the tamper-checked
     // time_code and records it in (or, during playback, reads it from) the
-    // replay.
+    // replay. Called once per presented frame.
     static void measure_real_time();
 };
 #pragma pack(pop)

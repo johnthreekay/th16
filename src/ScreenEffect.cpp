@@ -380,3 +380,10 @@ ScreenEffect::~ScreenEffect()
     g_UpdateFuncRegistry->unregister_locked(on_tick);
     g_UpdateFuncRegistry->unregister_locked(on_draw);
 }
+
+// Debug logging, compiled out of the release build. The static constructor
+// at 0x401170 logs "initialize ScreenInf" through it.
+// FUNCTION: TH16 0x45d410
+void screen_debug_log(const char *fmt, ...)
+{
+}

@@ -138,6 +138,17 @@ struct CSoundManager
 {
     struct IDirectSound8 *m_pDS;
 
+    CSoundManager()
+    {
+        m_pDS = NULL;
+    }
+    // Releases the device; inlined into SoundManager::initialize and
+    // release (SoundManager.cpp).
+    ~CSoundManager();
+    // The sample's Initialize, inlined into SoundManager::initialize.
+    HRESULT Initialize(HWND hWnd, DWORD dwCoopLevel, DWORD dwPrimaryChannels, DWORD dwPrimaryFreq,
+                       DWORD dwPrimaryBitRate);
+
     // 0x470250. Every caller asks for 44.1 kHz 16-bit stereo; LTCG folded
     // the arguments.
     HARNESS_CALLED HRESULT SetPrimaryBufferFormat(DWORD dwPrimaryChannels, DWORD dwPrimaryFreq,
@@ -354,7 +365,13 @@ struct SoundManager
     i32 queued_ids[SOUND_QUEUE_SIZE];
     i32 queued_counts[SOUND_QUEUE_SIZE];
     i32 queued_pans[SOUND_QUEUE_SIZE][0x80];
-    u8 unk_187c[0x1980 - 0x187c];
+    // BGM tracks read ahead into memory (thbgm.fmt entry, file data, read
+    // position and size), and the slot playing.
+    ThBgmFormat *preload_format[0x10];
+    u8 *preload_data[0x10];
+    u8 *preload_cursor[0x10];
+    i32 preload_size[0x10];
+    i32 preload_current;
     // thbgm.fmt.
     ThBgmFormat *bgm_format;
     // File name of the BGM that select_bgm last switched to.
@@ -365,7 +382,9 @@ struct SoundManager
     // File name of the BGM playing.
     char bgm_name[0x100];
     BgmCommandEntry bgm_commands[0x1f];
-    u8 unk_4454[0x5560 - 0x4454];
+    u8 unk_4454[0x4560 - 0x4454];
+    // File names of the preloaded tracks.
+    char preload_names[0x10][0x100];
     // The BGM archive's file name (thbgm.dat).
     char bgm_dat_name[0x100];
     BgmStream *bgm_stream;
@@ -387,6 +406,17 @@ struct SoundManager
 
     // Queues a command for the sound thread.
     void modify_bgm(i32 command, i32 arg, const char *name);
+    // Frees everything initialize created. Reaches the manager through
+    // g_SoundManager; LTCG dropped this.
+    HARNESS_CALLED i32 release();
+    // 0x45db10. Opens the BGM archive and creates the BGM stream on it.
+    // The path is "thbgm.dat" at the only call site; LTCG folded it.
+    HARNESS_CALLED i32 open_bgm(const char *path);
+    // Reads a track into one of the preload slots (only with the preload
+    // option, flags_2c & 0x10), and starts streaming from such a slot.
+    // Reach the manager through g_SoundManager; LTCG dropped this.
+    HARNESS_CALLED i32 preload_bgm(i32 slot, const char *name);
+    HARNESS_CALLED i32 play_preloaded_bgm(i32 slot);
 
     // 0x45d510
     i32 initialize(HWND window);
@@ -409,12 +439,9 @@ struct SoundManager
     // Stops one sound, or every sound when id is negative (remembering
     // which were playing).
     void stop_sound(i32 id);
-    // 0x45db10. Opens the BGM archive (thbgm.dat at the only call site,
-    // which LTCG folds).
-    DECOMP_NOINLINE i32 open_bgm_dat(const char *name);
     // Points the BGM stream at another track. Reaches the manager through
     // g_SoundManager; LTCG dropped this.
-    i32 select_bgm(const char *path);
+    HARNESS_CALLED i32 select_bgm(const char *path);
 
     // Members that do not use this; LTCG dropped it.
     static i32 update_sound_thread();

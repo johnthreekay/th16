@@ -41,6 +41,10 @@ struct AnmLoadedD3D
 
     // 0x46f490. Fills the top level of the texture with zeroes.
     void clear_texture();
+    // Creates the texture as a render target of the given size. The inlined
+    // copy of AnmManager::create_render_target (0x46cd80), which LTCG
+    // inlined into create_d3d_textures_for_loaded_anms.
+    void create_render_target(i32 width, i32 height);
 };
 
 // The header of one entry of an .anm file (ExpHP: zAnmRawEntry); the
@@ -216,8 +220,8 @@ struct RenderVertex044
 };
 
 // A request to copy part of the back buffer into the texture of a loaded
-// .anm entry (the pause menu's snapshot of the game screen). anm_slot < 0
-// marks a free entry.
+// .anm entry (the pause menu's snapshot of the game screen; TH06:
+// AnmManager::RequestScreenshot). anm_slot < 0 marks a free entry.
 struct AnmScreenCopy
 {
     i32 anm_slot;
@@ -237,6 +241,8 @@ struct AnmManager
 {
     ThreadInf thread;
     u8 unk_1c[0x20 - 0x1c];
+    // Requests to copy part of the back buffer into a texture, served by
+    // take_screenshots.
     AnmScreenCopy screen_copies[4];
     // Cleared every frame by GameThread's on_draw.
     i32 unk_c0;
@@ -357,6 +363,12 @@ struct AnmManager
     // 0x440cd0. The same into the sprite a VM shows. Every caller goes
     // through g_AnmManager.
     HARNESS_CALLED i32 copy_screen_to_sprite(AnmId id, i32 src_x, i32 src_y, i32 src_width, i32 src_height);
+    // Release the render target textures before the device is reset, and
+    // create them again afterwards. Every caller goes through g_AnmManager.
+    HARNESS_CALLED void release_textures();
+    HARNESS_CALLED void create_d3d_textures_for_loaded_anms();
+    // 0x459700. Serves the queued screen copies, once per frame.
+    HARNESS_CALLED void take_screenshots();
 
     // 0x46f270 (ExpHP: AnmBehemoth::disable_vms_from_anm_file).
     void disable_vms_from_anm_file(AnmLoaded *anm);

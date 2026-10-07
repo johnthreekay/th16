@@ -8,19 +8,8 @@ void w3c_stub_sink(void *p)
 {
 }
 
-// Opaque work for the stand-ins in src/placeholder/w3c.cpp.
-int w3c_placeholder_sink(void *a, const void *b)
-{
-    return 0;
-}
-
 // STUB: TH16 0x46b900
 void anm_manager_46b900()
-{
-}
-
-// STUB: TH16 0x458db0
-void supervisor_458db0()
 {
 }
 
@@ -33,18 +22,6 @@ Scorefile::Scorefile()
 void scorefile_save_449a00()
 {
 }
-
-// STUB: TH16 0x458520
-bool supervisor_458520()
-{
-    return false;
-}
-
-#include <windows.h>
-
-// Fonts 0x458db0 creates (only 1 is never deleted).
-// GLOBAL: TH16 0x4df904
-HFONT g_fonts_4df904[10];
 
 #include "../StageData.h"
 

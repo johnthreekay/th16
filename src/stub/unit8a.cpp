@@ -3,12 +3,6 @@
 #include "../Interp.h"
 #include "../SoundManager.h"
 
-// STUB: TH16 0x45d510
-i32 SoundManager::initialize(HWND window)
-{
-    return 0;
-}
-
 // STUB: TH16 0x406e10
 D3DXVECTOR3 InterpFloat3::step()
 {

@@ -55,6 +55,12 @@ class TitleInf : public TaskInf
     // Members that reach the menu through g_MainMenu; LTCG dropped this.
     HARNESS_CALLED i32 initialize();
     static unsigned __stdcall thread_start();
+    // 0x451560. Loads the replay list for the replay menu, on the menu's
+    // thread; reaches the menu through g_MainMenu.
+    static void load_replay_list();
+    // 0x451740. The replay menu's loading thread. Passed to
+    // ThreadInf::restart as a ThreadStart, though ZUN declared it cdecl.
+    static unsigned replay_list_thread(void *arg);
 
     void set_state(i32 state);
     void set_substate(i32 substate);
