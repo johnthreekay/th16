@@ -124,12 +124,14 @@ unsigned __stdcall TitleInf::thread_start()
 {
     if (g_MainMenu->initialize() != 0)
     {
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_QUIT;
+        g_Supervisor.gamemode_to_switch_to =
+            (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_QUIT;
         return 0;
     }
     if (g_LoadingThread != NULL)
     {
-        while (g_LoadingThread->count_638 < 180 && !(g_Supervisor.flags & (SUPERVISOR_QUIT_REQUESTED | SUPERVISOR_FLAG_100)))
+        while (g_LoadingThread->count_638 < 180 &&
+               !(g_Supervisor.flags & (SUPERVISOR_QUIT_REQUESTED | SUPERVISOR_FLAG_100)))
         {
             Sleep(16);
         }
@@ -1126,7 +1128,8 @@ i32 TitleInf::on_tick()
         do_key_config();
         break;
     case TITLE_STATE_EXIT:
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_QUIT;
+        g_Supervisor.gamemode_to_switch_to =
+            (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_QUIT;
         g_Supervisor.stop_bgm();
         break;
     case TITLE_STATE_UNUSED_9:

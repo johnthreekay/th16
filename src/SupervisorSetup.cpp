@@ -247,17 +247,23 @@ void read_resolution_dialog()
     }
     if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_640) == BST_CHECKED)
     {
-        g_Supervisor.config.window_size = IsDlgButtonChecked(g_GameWindow.dialog, IDC_FULL_SCREEN) == BST_CHECKED ? WINDOW_SIZE_FULLSCREEN_640 : WINDOW_SIZE_WINDOWED_640;
+        g_Supervisor.config.window_size = IsDlgButtonChecked(g_GameWindow.dialog, IDC_FULL_SCREEN) == BST_CHECKED
+                                              ? WINDOW_SIZE_FULLSCREEN_640
+                                              : WINDOW_SIZE_WINDOWED_640;
     }
     else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_960) == BST_CHECKED)
     {
         g_Supervisor.config.window_size =
-            (IsDlgButtonChecked(g_GameWindow.dialog, IDC_FULL_SCREEN) == BST_CHECKED ? WINDOW_SIZE_FULLSCREEN_640 : WINDOW_SIZE_WINDOWED_640) + 1;
+            (IsDlgButtonChecked(g_GameWindow.dialog, IDC_FULL_SCREEN) == BST_CHECKED ? WINDOW_SIZE_FULLSCREEN_640
+                                                                                       : WINDOW_SIZE_WINDOWED_640) +
+            1;
     }
     else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_1280) == BST_CHECKED)
     {
         g_Supervisor.config.window_size =
-            (IsDlgButtonChecked(g_GameWindow.dialog, IDC_FULL_SCREEN) == BST_CHECKED ? WINDOW_SIZE_FULLSCREEN_640 : WINDOW_SIZE_WINDOWED_640) + 2;
+            (IsDlgButtonChecked(g_GameWindow.dialog, IDC_FULL_SCREEN) == BST_CHECKED ? WINDOW_SIZE_FULLSCREEN_640
+                                                                                       : WINDOW_SIZE_WINDOWED_640) +
+            2;
     }
 }
 

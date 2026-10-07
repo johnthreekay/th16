@@ -145,7 +145,8 @@ int PauseMenu::on_tick()
     {
     case PAUSE_CLOSED:
         if (!(g_Globals.flags_hi_45c & 1) && !g_GameThread->flags.flag_16 &&
-            ((g_hardware_input_pressed & INPUT_MENU) || (g_Supervisor.flags & SUPERVISOR_DEVICE_WAS_RESET)) && g_GameThread->on_tick != NULL &&
+            ((g_hardware_input_pressed & INPUT_MENU) || (g_Supervisor.flags & SUPERVISOR_DEVICE_WAS_RESET)) &&
+            g_GameThread->on_tick != NULL &&
             (g_GameThread->on_tick->flags & UPDATE_FUNC_ACTIVE) && g_GameThread->time_in_stage.current >= 30)
         {
             open();
@@ -488,7 +489,8 @@ void open_stage_end_menu()
     GameThread::update_play_time();
     if (g_GameThread->replay_mode == 1)
     {
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
+        g_Supervisor.gamemode_to_switch_to =
+            (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         return;
     }
     g_GameThread->flags.flag_4 = 1;
@@ -606,7 +608,8 @@ void open_game_over_menu()
     GameThread::update_play_time();
     if (g_GameThread->replay_mode == 1)
     {
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
+        g_Supervisor.gamemode_to_switch_to =
+            (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         return;
     }
     menu->set_state(PAUSE_GAME_OVER);
@@ -1391,12 +1394,14 @@ void PauseMenu::tick_open()
         case PAUSE_ITEM_QUIT:
             AnmManager::interrupt_tree(snapshot_id, 1);
             AnmManager::interrupt_tree(menu_anm_id, 1);
-            g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
+            g_Supervisor.gamemode_to_switch_to =
+                (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
             break;
         case PAUSE_ITEM_RESTART:
             delete_vm_and_clear(snapshot_id);
             delete_vm_and_clear(menu_anm_id);
-            g_Supervisor.gamemode_to_switch_to = g_GameThread->replay_mode != 0 ? GAMEMODE_RESTART_REPLAY : GAMEMODE_RESTART;
+            g_Supervisor.gamemode_to_switch_to =
+                g_GameThread->replay_mode != 0 ? GAMEMODE_RESTART_REPLAY : GAMEMODE_RESTART;
             break;
         }
         set_state(PAUSE_CLOSED);

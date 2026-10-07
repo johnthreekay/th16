@@ -1621,7 +1621,8 @@ void Gui::sub_426d70()
     }
     gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
     gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
-    if (g_Supervisor.gamemode_to_switch_to != GAMEMODE_UNUSED_8 && !(g_Globals.flags_hi_45c & 1) && g_Globals.game_mode != 2)
+    if (g_Supervisor.gamemode_to_switch_to != GAMEMODE_UNUSED_8 && !(g_Globals.flags_hi_45c & 1) &&
+        g_Globals.game_mode != 2)
     {
         create_effect_inline(gui->stage_logo_anm, 1, -1, NULL);
     }

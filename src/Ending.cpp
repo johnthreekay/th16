@@ -99,7 +99,8 @@ i32 Ending::on_tick_body()
     }
     else
     {
-        g_Supervisor.gamemode_to_switch_to = g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT ? GAMEMODE_IDLE : GAMEMODE_TITLE_SCORE_ENTRY;
+        g_Supervisor.gamemode_to_switch_to =
+            g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT ? GAMEMODE_IDLE : GAMEMODE_TITLE_SCORE_ENTRY;
     }
     return 1;
 }

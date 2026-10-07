@@ -98,7 +98,8 @@ i32 Scorefile::load_sections()
                 ScorefileSection *section = (ScorefileSection *)p;
                 if (section->magic == SCOREFILE_SECTION_CHARA)
                 {
-                    if (section->version == SCOREFILE_SECTION_VERSION && section->compute_checksum(sizeof(ScorefileChara)) == section->checksum &&
+                    if (section->version == SCOREFILE_SECTION_VERSION &&
+                        section->compute_checksum(sizeof(ScorefileChara)) == section->checksum &&
                         section->size == sizeof(ScorefileChara))
                     {
                         memcpy(&sf->charas[((ScorefileChara *)section)->character], section, sizeof(ScorefileChara));
@@ -106,7 +107,8 @@ i32 Scorefile::load_sections()
                 }
                 else if (section->magic == SCOREFILE_SECTION_STATUS)
                 {
-                    if (section->version == SCOREFILE_SECTION_VERSION && section->compute_checksum(sizeof(ScorefileStatus)) == section->checksum &&
+                    if (section->version == SCOREFILE_SECTION_VERSION &&
+                        section->compute_checksum(sizeof(ScorefileStatus)) == section->checksum &&
                         section->size == sizeof(ScorefileStatus))
                     {
                         sf->status = *(ScorefileStatus *)section;

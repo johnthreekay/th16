@@ -1069,7 +1069,8 @@ i32 TitleInf::do_player_data()
                 page_menu.set_cursor(1);
                 draw_spell_card_page();
             }
-            page_menu.num_choices = (count_spells_of_difficulty(player_data_difficulty_menu.next_selection) + 9) / 10 + 1;
+            page_menu.num_choices =
+                (count_spells_of_difficulty(player_data_difficulty_menu.next_selection) + 9) / 10 + 1;
         }
         if (pressed_or_repeating_inline(INPUT_LEFT))
         {
@@ -1388,14 +1389,16 @@ HARNESS_CALLED i32 TitleInf::on_draw__spell_practice_histories()
                 if (state == TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT && i == menu.next_selection)
                 {
                     g_AsciiManager->color.d3d =
-                        g_Scorefile->characters[spell_character_menu.next_selection].spells[id].captures[1] != 0 ? 0xff90d0ff
-                                                                                                      : 0xffb0b0b0;
+                        g_Scorefile->characters[spell_character_menu.next_selection].spells[id].captures[1] != 0
+                            ? 0xff90d0ff
+                            : 0xffb0b0b0;
                 }
                 else
                 {
                     g_AsciiManager->color.d3d =
-                        g_Scorefile->characters[spell_character_menu.next_selection].spells[id].captures[1] != 0 ? 0xff60a0c0
-                                                                                                      : 0xff404040;
+                        g_Scorefile->characters[spell_character_menu.next_selection].spells[id].captures[1] != 0
+                            ? 0xff60a0c0
+                            : 0xff404040;
                 }
                 if (g_Scorefile->characters[4].spells[id].attempts[0] == 0 &&
                     g_Scorefile->characters[4].spells[id].attempts[1] == 0)
@@ -1409,8 +1412,9 @@ HARNESS_CALLED i32 TitleInf::on_draw__spell_practice_histories()
                                                    spell->captures[1], spell->attempts[1]);
                     pos.y += 10.0f;
                     g_AsciiManager->color.d3d =
-                        g_Scorefile->characters[spell_character_menu.next_selection].spells[id].captures[0] != 0 ? 0xff206060
-                                                                                                      : 0xff404040;
+                        g_Scorefile->characters[spell_character_menu.next_selection].spells[id].captures[0] != 0
+                            ? 0xff206060
+                            : 0xff404040;
                     if (g_spell_difficulty[id] <= 4)
                     {
                         spell = &g_Scorefile->characters[spell_character_menu.next_selection].spells[id];

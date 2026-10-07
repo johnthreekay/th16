@@ -931,7 +931,8 @@ int __fastcall Supervisor::on_tick(void *arg)
 {
     Supervisor *s = (Supervisor *)arg;
 
-    if ((s->flags & (SUPERVISOR_QUIT_REQUESTED | SUPERVISOR_FLAG_100)) == SUPERVISOR_QUIT_REQUESTED && !s->thread.should_run)
+    if ((s->flags & (SUPERVISOR_QUIT_REQUESTED | SUPERVISOR_FLAG_100)) == SUPERVISOR_QUIT_REQUESTED &&
+        !s->thread.should_run)
     {
         g_Supervisor.gamemode_to_switch_to = GAMEMODE_QUIT;
     }
