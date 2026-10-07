@@ -426,7 +426,6 @@ void PauseMenu::take_snapshot()
     }
 }
 
-// TODO: ours realigns its frame to 8 bytes (caused by the call to update_play_time; the original does not).
 // FUNCTION: TH16 0x43f0f0
 void PauseMenu::open()
 {
@@ -472,7 +471,6 @@ void PauseMenu::open()
     flags_3ec &= ~4;
 }
 
-// TODO: the original realigns its frame to 8 bytes (ebx-based form); the body matches.
 // FUNCTION: TH16 0x43f500
 void game_over_43f500()
 {

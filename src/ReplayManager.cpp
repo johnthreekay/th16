@@ -294,7 +294,6 @@ static_assert(offsetof(RpyInfo, num_stages) == 0x80, "RpyInfo::num_stages");
 static_assert(offsetof(RpyInfo, character) == 0x84, "RpyInfo::character");
 static_assert(sizeof(RpyInfo) == 0xa0, "RpyInfo");
 
-// TODO: the original's frame is 4 bytes smaller (size shares its stack slot with data).
 // FUNCTION: TH16 0x448c10
 int ReplayManager::read_replay_file(const char *filename)
 {

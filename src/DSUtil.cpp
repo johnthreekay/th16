@@ -1034,7 +1034,6 @@ HARNESS_CALLED double CStreamingSound::get_play_time()
     return play_time(this);
 }
 
-// TODO: the original restores esi and edi after the critical section, ours before.
 // FUNCTION: TH16 0x471c90
 HARNESS_CALLED void CStreamingSound::seek(double seconds)
 {
