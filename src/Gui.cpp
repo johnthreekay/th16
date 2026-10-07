@@ -148,7 +148,6 @@ i32 Gui::load_stage_files()
     return 0;
 }
 
-// TODO: inlined delete_vm loads the child list before storing the flags.
 // FUNCTION: TH16 0x427730
 void Gui::release_stage_files()
 {

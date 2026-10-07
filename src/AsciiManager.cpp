@@ -159,7 +159,6 @@ void AsciiInf::create_stringf(Float3 *pos, const char *fmt, ...)
     va_end(args);
 }
 
-// TODO: ours passes fmt to _vsprintf_l in edx; the original pushes it.
 // FUNCTION: TH16 0x4084f0
 void AsciiInf::create_debug_stringf(Float3 *pos, const char *fmt, ...)
 {

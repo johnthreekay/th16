@@ -261,7 +261,6 @@ HARNESS_CALLED void AsciiInf::hide_now_loading()
     now_loading_id.id = 0;
 }
 
-// TODO: the original frame has an unused 4-byte slot that ours lacks.
 // FUNCTION: TH16 0x41a390
 HARNESS_CALLED void AsciiInf::show_now_loading(f32 x, f32 y)
 {
@@ -270,8 +269,6 @@ HARNESS_CALLED void AsciiInf::show_now_loading(f32 x, f32 y)
 
 #define ENDING_NEXT_INSTR(instr) ((EndingInstr *)((u8 *)(instr) + (instr)->size + 4))
 
-// TODO: register allocation: the original never uses ebx (spills this instead), and play_bgm*
-// get this in ecx here (LTCG dropped it in the original).
 // FUNCTION: TH16 0x4199f0
 i32 EndingChildF0::run()
 {
@@ -438,12 +435,9 @@ i32 EndingChildF0::run()
         case 11:
         {
             // Supervisor::fade_out_bgm(3.0f), inlined.
-            f32 seconds = 3.0f;
-            if (g_game_speed != 0.0f && !(g_game_speed > 1.0f))
-            {
-                seconds /= g_game_speed;
-            }
-            g_SoundManager.modify_bgm(BGM_FADE_OUT, seconds, "");
+            g_SoundManager.modify_bgm(BGM_FADE_OUT,
+                                      g_game_speed != 0.0f && !(g_game_speed > 1.0f) ? 3.0f / g_game_speed : 3.0f,
+                                      "");
             flags &= ~1;
             break;
         }
@@ -491,6 +485,6 @@ i32 EndingChildF0::run()
         }
         instr = ENDING_NEXT_INSTR(instr);
     }
-    timer_18.tick();
+    timer_18.tick_split();
     return 0;
 }
