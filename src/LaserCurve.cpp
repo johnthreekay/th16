@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "AnmManager.h"
 #include "CriticalSections.h"
@@ -69,11 +70,95 @@ i32 LaserCurveInf::cancel_as_bomb_rectangle(Float3 *a, Float3 *b, f32 angle, i32
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x43a2f0
-i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d)
+// Cancels the segments inside a bomb's circle (an effect and items on every
+// tenth), then cuts them off the laser: all hit deletes it, a hit head is
+// dropped, and otherwise everything before the end of the first hit run.
+// Returns the number of segments hit.
+// FUNCTION: TH16 0x43a2f0
+i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 mode, i32 d)
 {
-    return unit5_placeholder(this);
+    if (d != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    i32 count = 0;
+    u8 hit[0x100];
+    memset(hit, 0, sizeof(hit));
+    radius = radius * radius;
+    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    i32 i;
+    for (i = 0; i < inner.segment_count; i++, segment++)
+    {
+        Float3 seg_pos = segment->pos;
+        if ((pos->x - seg_pos.x) * (pos->x - seg_pos.x) + (pos->y - seg_pos.y) * (pos->y - seg_pos.y) > radius)
+        {
+            continue;
+        }
+        count++;
+        hit[i] = 1;
+        if (i % 10 == 0)
+        {
+            gen_items_from_cancel(&seg_pos, mode);
+            g_BulletManager->bullet_anm->create_vm(inner.color * 2 + 0xd1, &seg_pos, 0.0f, -1, 0);
+        }
+    }
+    if (count != 0)
+    {
+        if (count >= i)
+        {
+            pending_delete = 1;
+            return count;
+        }
+        i32 j;
+        for (j = 0; j < i; j++)
+        {
+            if (!hit[j])
+            {
+                break;
+            }
+        }
+        if (j != 0)
+        {
+            for (i32 k = 0; k < inner.segment_count - j; k++)
+            {
+                ((LaserCurveSegment *)unk_1524)[k] = ((LaserCurveSegment *)unk_1524)[k + j];
+            }
+            timer_40 += (f32)-j;
+            inner.segment_count -= j;
+            return count;
+        }
+        i32 head = 0;
+        for (; j < i; j++, head++)
+        {
+            if (hit[j])
+            {
+                break;
+            }
+        }
+        if (j < i && head != 0)
+        {
+            for (; j < i; j++)
+            {
+                if (!hit[j])
+                {
+                    break;
+                }
+            }
+            if (j >= i)
+            {
+                inner.segment_count = head;
+            }
+            else
+            {
+                for (i32 k = 0; k < inner.segment_count - j; k++)
+                {
+                    ((LaserCurveSegment *)unk_1524)[k] = ((LaserCurveSegment *)unk_1524)[k + j];
+                }
+                inner.segment_count -= j;
+            }
+        }
+    }
+    return count;
 }
 
 // AnmLoaded::create_vm as LTCG inlined it into some callers.
