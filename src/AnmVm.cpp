@@ -212,7 +212,7 @@ void AnmVm::interrupt_out_of_line(i32 n)
 }
 
 // FUNCTION: TH16 0x4173f0
-void AnmVm::set_pos_time(i32 end_time, i32 method, Float3 *initial, Float3 *goal)
+HARNESS_CALLED void AnmVm::set_pos_time(i32 end_time, i32 method, Float3 *initial, Float3 *goal)
 {
     pos_i.end_time = end_time;
     pos_i.bezier_1 = g_zero_vec;

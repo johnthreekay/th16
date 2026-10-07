@@ -469,7 +469,7 @@ struct AnmVm
     }
 
     // 0x4173f0. Starts moving pos_i from initial to goal.
-    void set_pos_time(i32 end_time, i32 method, Float3 *initial, Float3 *goal);
+    HARNESS_CALLED void set_pos_time(i32 end_time, i32 method, Float3 *initial, Float3 *goal);
     // 0x406240. Starts moving pos_i along a bezier curve.
     void set_pos_bezier(i32 end_time, Float3 *initial, Float3 *bezier_1, Float3 *goal, Float3 *bezier_2);
     // 0x447550. Starts interpolating the scale from initial to goal.
