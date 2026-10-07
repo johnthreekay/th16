@@ -466,9 +466,17 @@ void BombReimuAOrb::update()
     timer.tick();
 }
 
+// Not ZUN's: calling update through this keeps LTCG from realigning
+// on_tick's frame for it, which the original does not do (and which would
+// pad BombReimuAOrb::finish's frame).
+static DECOMP_NOINLINE void orb_update(BombReimuAOrb *orb)
+{
+    orb->update();
+}
+
 // Starts the orbs at frame 0, steps them, and bursts those whose damage
 // source has dealt 300 damage.
-// TODO: same shape, different register allocation and block order (orb loop, the damage source lookups).
+// TODO: same shape, different register allocation and block order (orb loop, the damage source lookups); calls update through the orb_update stand-in (see there).
 // FUNCTION: TH16 0x410de0
 i32 BombReimuAInf::on_tick()
 {
@@ -532,7 +540,7 @@ i32 BombReimuAInf::on_tick()
         {
             continue;
         }
-        orb->update();
+        orb_update(orb);
         if (g_Player->get_damage_source(orb->damage_source)->total_damage_dealt >= 300)
         {
             orb->finish();
