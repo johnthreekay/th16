@@ -151,8 +151,6 @@ i32 BombCirnoAInf::begin()
 
 // Sparkles inside the growing circle for most of the bomb, then all over
 // the screen.
-// TODO: the first sparkle's x adds pos.x to the offset where the original
-// adds the offset to pos.x (operand order of one addss).
 // FUNCTION: TH16 0x40f240
 i32 BombCirnoAInf::on_tick()
 {
@@ -179,7 +177,8 @@ i32 BombCirnoAInf::on_tick()
         D3DXVECTOR3 effect_pos;
         cirno_sincosmul(&effect_pos, angle, g_replay_safe_rng.randf_0_to_1() * scale);
         effect_pos.z = 0.0f;
-        effect_pos += pos;
+        Float3 *center = &pos;
+        effect_pos += *center;
         AnmVm *effect = g_EffectManager->get_tracked_vm(g_EffectManager->create_tracked(3, &effect_pos, 0));
         effect->flags_lo &= ~0x1c0;
         effect->flags_lo |= 0x20;

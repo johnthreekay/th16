@@ -672,8 +672,6 @@ i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x
 // A shooter's on_init callback also gets the shot key timer.
 typedef i32(__fastcall *ShtInitFunc)(PlayerBullet *bullet, i32 time);
 
-// TODO: the original loads the script number after choosing the file and
-// shares one push and call; ours has a call per branch.
 // FUNCTION: TH16 0x444e10
 i32 PlayerBullet::create(i32 shooter_ref, i32 time, PlayerInner *inner)
 {
@@ -735,17 +733,19 @@ i32 PlayerBullet::create(i32 shooter_ref, i32 time, PlayerInner *inner)
     pos.pos.y += shooter->offset_from_option.y - pos.velocity.y;
     if (!(shooter_ref & 0xf0000))
     {
-        anm_id = g_Player->anm_file->create_effect(shooter->anm_script + 5, -1, NULL);
+        AnmLoaded *anm = g_Player->anm_file;
+        anm_id = anm->create_effect(shooter->anm_script + 5, -1, NULL);
     }
     else
     {
-        anm_id = g_Player->subseason_anm_file->create_effect(shooter->anm_script, -1, NULL);
+        AnmLoaded *anm = g_Player->subseason_anm_file;
+        anm_id = anm->create_effect(shooter->anm_script, -1, NULL);
     }
     AnmVm *vm = get_vm_or_clear(anm_id);
     if (vm->flags_hi & 0x80)
     {
-        vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         vm->rotation.z = shooter->angle;
+        vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
     }
     damage_source_index =
         g_Player->create_rect_damage_source(&pos.pos, laser_length, unk_a4_f, pos.angle.value, 9999999, unk_9c);
