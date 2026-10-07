@@ -34,6 +34,21 @@ static void __fastcall cirno_sincosmul(Float3 *dst, f32 angle, f32 radius)
     }
 }
 
+// The same for Marisa's bomb.
+// FUNCTION: TH16 0x410130
+static void __fastcall marisa_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
+
 // A bomb ends a spell card's bonus once the card has run a second.
 static inline void spellcard_on_bomb()
 {
@@ -198,6 +213,83 @@ i32 BombMarisaAInf::begin()
     AnmLoaded *anm = g_Player->anm_file;
     anm_id_64 = anm->create_vm(25, &pos, 0.0f, -1, 0);
     g_Player->inner.flags |= 4;
+    return 0;
+}
+
+// Marisa's master spark: turns with the player's movement and keeps three
+// stretches of damage along the beam.
+// TODO: ours gets a /GS cookie for beam_pos and swaps edi/ebx (the ANM
+// manager and the VM).
+// FUNCTION: TH16 0x40fb00
+i32 BombMarisaAInf::on_tick()
+{
+    AnmManager *anm = g_AnmManager;
+    AnmVm *vm = anm->get_vm_with_id(anm_id);
+    if (vm == NULL)
+    {
+        anm_id.id = 0;
+    }
+    g_Player->inner.iframes = 40;
+    if (vm == NULL)
+    {
+        AnmManager::interrupt_tree(anm_id_64, 1);
+        return -1;
+    }
+    if (timer.current > 300)
+    {
+        return 0;
+    }
+    if (timer.current == 300)
+    {
+        AnmManager::interrupt_tree(anm_id, 1);
+        AnmManager::interrupt_tree(anm_id_64, 1);
+        g_Player->inner.flags &= ~4;
+        g_Player->inner.speed_multiplier = 1.0f;
+    }
+    vm->flags_lo |= 4;
+    vm->rotation.z = angle;
+    Player *player = g_Player;
+    if (0.0f > player->inner.unk_16050)
+    {
+        angle -= 0.0026179939f;
+    }
+    else if (player->inner.unk_16050 > 0.0f)
+    {
+        angle += 0.0026179939f;
+    }
+    pos = player->inner.pos;
+    player->inner.speed_multiplier = 0.2f;
+    if (timer.current != timer.previous && timer.current % 3 == 0)
+    {
+        D3DXVECTOR3 beam_pos;
+        beam_pos.z = 0.0f;
+        marisa_sincosmul(&beam_pos, angle, 208.0f);
+        beam_pos.x = pos.x + beam_pos.x;
+        beam_pos.y = pos.y + beam_pos.y;
+        beam_pos.z = pos.z + beam_pos.z;
+        g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 32.0f, angle, 0, 60))->flags |= 4;
+        marisa_sincosmul(&beam_pos, angle, 240.0f);
+        beam_pos.x = pos.x + beam_pos.x;
+        beam_pos.y = pos.y + beam_pos.y;
+        beam_pos.z = pos.z + beam_pos.z;
+        g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 128.0f, angle, 0, 20))->flags |= 4;
+        marisa_sincosmul(&beam_pos, angle, 304.0f);
+        beam_pos.x = pos.x + beam_pos.x;
+        beam_pos.y = pos.y + beam_pos.y;
+        beam_pos.z = pos.z + beam_pos.z;
+        g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 256.0f, angle, 0, 20))->flags |= 4;
+    }
+    vm = anm->get_vm_with_id(anm_id);
+    if (vm != NULL)
+    {
+        vm->entity_pos = pos;
+    }
+    vm = anm->get_vm_with_id(anm_id_64);
+    if (vm != NULL)
+    {
+        vm->entity_pos = pos;
+    }
+    method_10();
     return 0;
 }
 
