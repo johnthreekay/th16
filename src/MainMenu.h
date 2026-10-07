@@ -33,7 +33,20 @@ class TitleInf : public TaskInf
     AnmId anm_id_73c;
     AnmId anm_ids_740[0x24];
     AnmId anm_ids_7d0[9];
-    u8 unk_7f4[0x5a48 - 0x7f4];
+    // The music room: the number of tracks, the comment line being
+    // written (one every other frame) and its track, and whether the
+    // warning about a track not heard yet is shown.
+    i32 music_track_count;
+    i32 music_comment_line;
+    i32 music_comment_track;
+    i32 music_warning;
+    // From musiccmt.txt: file name, title and eight comment lines per
+    // track.
+    char music_filenames[0x20][0x40];
+    char music_titles[0x20][0x42];
+    char music_comments[0x20][8][0x42];
+    // The first track row shown.
+    i32 music_scroll;
     // The replay name being entered, and the cursor in it.
     char replay_name[0xc];
     i32 replay_name_cursor;
@@ -48,7 +61,7 @@ class TitleInf : public TaskInf
     // The stage picked to start a replay from (minus one).
     i32 replay_stage;
     ReplayManager *replays[100];
-    // Allocated with malloc.
+    // Allocated with malloc (musiccmt.txt, while the music room is open).
     void *unk_5ce0;
     i32 unk_5ce4;
     // Bit 2 stops the replay list loading; bit 3 is set once it is done.
@@ -152,6 +165,8 @@ class TitleInf : public TaskInf
     i32 do_player_data();
     // 0x4532f0 (ExpHP: do_menu_sub_4532f0). The high score name entry.
     i32 do_score_name_entry();
+    // 0x4546f0 (ExpHP: do_music_room).
+    i32 do_music_room();
     // 0x452c30. The spell card page of the player data.
     i32 draw_spell_card_page();
     // The row of replay_slot on its page of 25.

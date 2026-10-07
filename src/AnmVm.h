@@ -27,7 +27,7 @@ struct AnmId
 
     // 0x46f2e0 (ExpHP: anm_find_existing_or_clear_id). Looks the VM up and
     // forgets the id if it is gone.
-    AnmVm *find_or_clear();
+    DECOMP_NOINLINE AnmVm *find_or_clear();
     // 0x46f300 and 0x46f340. AnmVm::set/clear_flag_lo_2_tree.
     void set_flag_lo_2_tree();
     void clear_flag_lo_2_tree();

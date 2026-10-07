@@ -1,14 +1,17 @@
 // States of the title screen's menus (TitleInf::on_tick dispatches on
 // state).
 #include <direct.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <time.h>
 
 #include "MainMenu.h"
 
 #include "EffectManager.h"
+#include "FileSystem.h"
 #include "GameWindow.h"
 #include "Globals.h"
 #include "HelpManual.h"
@@ -2281,6 +2284,305 @@ i32 TitleInf::do_manual()
                 delete g_HelpManual;
             }
             return 0;
+        }
+        break;
+    }
+    return 0;
+}
+
+char *__fastcall skip_line(char *p, i32 *remaining);
+char *__fastcall read_line(char *dst, char *src, i32 *remaining);
+
+// The comment shown for a track not heard in the game yet, with the first
+// press of the shot button.
+// GLOBAL: TH16 0x4936b8
+const char *g_music_room_warning[8] = {
+    "\x81@",
+    "\x81@\x81@\x81\x96\x81\x96\x91I\x91\xf0\x82\xb5\x82\xbd\x8b\xc8\x82\xcd\x82\xdc\x82\xbe\x83Q\x81[\x83\x80\x92\x86\x82"
+    "\xc5\x8d\xc4\x90\xb6\x82\xb3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb9\x82\xf1\x81\x96\x81\x96",
+    " ",
+    "\x81@\x81@\x81@\x81@\x8b\xc8\x82\xcc\x83R\x83\x81\x83\x93\x83g\x82\xaa\x83l\x83^\x83o\x83\x8c\x82\xc9\x82\xc8\x82"
+    "\xe9\x8b\xb0\x82\xea\x82\xaa\x82\xa0\x82\xe8\x82\xdc\x82\xb7\x81"
+    "B",
+    "\x81@\x81@\x81@\x81@\x81@\x81@\x81@\x81@\x81@\x82\xbb\x82\xea\x82\xc5\x82\xe0\x8d\xc4\x90\xb6\x82\xb5\x82\xdc\x82"
+    "\xb7\x82\xa9\x81H",
+    "\x81@",
+    "\x81@\x81@\x81@\x8d\xc4\x90\xb6\x82\xb5\x82\xbd\x82\xa2\x95\xfb\x82\xcd\x81"
+    "A\x82\xe0\x82\xa4\x88\xea\x93x\x8c\x88\x92\xe8\x83{\x83^\x83\x93\x82\xf0\x89\x9f\x82\xb5\x82\xc4\x82\xad\x82\xbe"
+    "\x82\xb3\x82\xa2\x81"
+    "B",
+    "\x81@\x81@\x81@\x8d\xc4\x90\xb6\x82\xb5\x82\xbd\x82\xad\x82\xc8\x82\xa2\x95\xfb\x82\xcd\x81"
+    "A\x83J\x81[\x83\\\x83\x8b\x82\xf0\x88\xda\x93\xae\x82\xb5\x82\xc4\x82\xad\x82\xbe\x82\xb3\x82\xa2\x81"
+    "B",
+};
+
+// Writes the next line of the chosen track's comment (or of the warning).
+static __forceinline void music_room_comment_step(TitleInf *menu)
+{
+    if (!(menu->time_in_state.current & 1) && menu->music_comment_line < 8)
+    {
+        AnmVm *vm = menu->anm_ids_7d0[menu->music_comment_line].find_or_clear();
+        if (!g_Scorefile->bgm_unlocked[menu->music_comment_track] && menu->music_warning != 0)
+        {
+            g_AnmManager->draw_text(vm, 0x8080ff, 0, 0, 0, 0, g_music_room_warning[menu->music_comment_line]);
+        }
+        else
+        {
+            g_AnmManager->draw_text(vm, 0xffffff, 0, 0, 0, 0,
+                                    menu->music_comments[menu->music_comment_track][menu->music_comment_line]);
+        }
+        vm->interrupt_out_of_line(2);
+        menu->music_comment_line++;
+    }
+}
+
+// The music room: the track list (ten rows shown, sliding in two at a time
+// at first) and the comment of the track last picked. Tracks not heard in
+// the game yet show as numbers, and playing one asks for a second press.
+// TODO: ours adds a /GS cookie for pos (a D3DXVECTOR3 in memory, see README) and keeps pos.x in memory in the scroll loop where the original uses xmm2.
+// FUNCTION: TH16 0x4546f0
+i32 TitleInf::do_music_room()
+{
+    Float3 pos;
+    switch (substate)
+    {
+    case 0:
+        if (time_in_state.current == 1)
+        {
+            menu.num_choices = 6;
+            menu.set_cursor(0);
+            if (anm_id_73c.id == 0)
+            {
+                anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            }
+            create_effect(0x6e);
+            i32 count = 0;
+            i32 size;
+            char *p = (char *)file_read_all("musiccmt.txt", &size, 0);
+            unk_5ce0 = p;
+            if (p == NULL)
+            {
+                goto leave;
+            }
+            while (size > 0)
+            {
+                if (*p == '#')
+                {
+                    p = skip_line(p, &size);
+                }
+                else if (*p == '@')
+                {
+                    p = read_line(music_filenames[count], p + 1, &size);
+                    p = read_line(music_titles[count], p, &size);
+                    for (i32 i = 0; i < 8; i++)
+                    {
+                        p = read_line(music_comments[count][i], p, &size);
+                    }
+                    count++;
+                }
+                else
+                {
+                    p = skip_line(p, &size);
+                }
+            }
+            menu.num_choices = count;
+            menu.set_cursor(0);
+            music_scroll = 0;
+            music_track_count = count;
+            pos.x = 0.0f;
+            pos.y = 0.0f;
+            pos.z = 0.0f;
+            for (i32 i = 0; i < 8; i++)
+            {
+                anm_ids_7d0[i] = g_Supervisor.text_anm->create_vm_inline(i + 0x13, &pos, 0.0f, -1);
+            }
+            music_comment_line = 0;
+            music_comment_track = 0;
+            music_warning = 0;
+        }
+        if (time_in_state.current < 10)
+        {
+            pos.x = 128.0f;
+            pos.y = (96.0f - music_scroll * 20.0f + (time_in_state.current * 40 - 40)) * 2.0f;
+            pos.z = 0.0f;
+            for (i32 i = time_in_state.current * 2 - 2; i < time_in_state.current * 2; i++)
+            {
+                if (i >= music_track_count)
+                {
+                    break;
+                }
+                anm_ids_740[0x10 + i] = title_anm->create_vm_inline(i + 0xbc, NULL, 0.0f, -1);
+                AnmVm *vm = get_vm_or_clear(anm_ids_740[0x10 + i]);
+                if (g_Scorefile->bgm_unlocked[i])
+                {
+                    g_AnmManager->draw_text(vm, 0xffffff, 0, 0, 0, 0, music_titles[i]);
+                }
+                else
+                {
+                    g_AnmManager->draw_text(vm, 0xffffff, 0, 0, 0, 0,
+                                            "No.%2d  \x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H", i + 1);
+                }
+                if (i >= music_scroll && i < music_scroll + 10)
+                {
+                    vm->set_flag_lo_2_tree_inline();
+                }
+                else
+                {
+                    vm->clear_flag_lo_2_tree_inline();
+                }
+                if (i == menu.next_selection)
+                {
+                    pos.x -= 8.0;
+                }
+                vm->set_pos_time(4, 0, &vm->pos, &pos);
+                if (i == menu.next_selection)
+                {
+                    pos.x += 8.0;
+                }
+                pos.y += 40.0f;
+                vm->interrupt(i != menu.next_selection ? 3 : 2);
+            }
+        }
+        if (time_in_state.current >= 10)
+        {
+            substate = 1;
+            time_in_state.reset();
+            return 0;
+        }
+        break;
+    case 1:
+        music_room_comment_step(this);
+        if (time_in_state.current > 4)
+        {
+            set_substate(2);
+            return 0;
+        }
+        break;
+    case 2:
+        music_room_comment_step(this);
+        menu.current_selection = menu.next_selection;
+        if (pressed_or_repeating_inline(INPUT_UP))
+        {
+            menu.move_cursor(-1);
+        }
+        if (pressed_or_repeating_inline(INPUT_DOWN))
+        {
+            menu.move_cursor(1);
+        }
+        if (menu.current_selection != menu.next_selection)
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            if (menu.next_selection < music_scroll)
+            {
+                music_scroll = menu.next_selection;
+            }
+            else if (menu.next_selection >= music_scroll + 10)
+            {
+                music_scroll = menu.next_selection - 9;
+            }
+            pos.x = 128.0f;
+            pos.y = (96.0f - music_scroll * 20.0f) * 2.0f;
+            pos.z = 0.0f;
+            for (i32 i = 0; i < music_track_count; i++)
+            {
+                AnmVm *vm = get_vm_or_clear(anm_ids_740[0x10 + i]);
+                if (i >= music_scroll && i < music_scroll + 10)
+                {
+                    vm->set_flag_lo_2_tree();
+                }
+                else
+                {
+                    vm->clear_flag_lo_2_tree_inline();
+                }
+                if (i == menu.next_selection)
+                {
+                    pos.x -= 8.0;
+                }
+                if ((f32)fabs(vm->pos.y - pos.y) < 80.0f)
+                {
+                    vm->set_pos_time(4, 0, &vm->pos, &pos);
+                }
+                else
+                {
+                    vm->pos = pos;
+                }
+                if (i == menu.next_selection)
+                {
+                    pos.x += 8.0;
+                }
+                pos.y += 40.0f;
+                vm->interrupt(i != menu.next_selection ? 3 : 2);
+            }
+            if (music_comment_line >= 8)
+            {
+                music_warning = 0;
+            }
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            for (i32 i = 0; i < 8; i++)
+            {
+                AnmManager::interrupt_tree(anm_ids_7d0[i], 3);
+            }
+            music_comment_track = menu.next_selection;
+            music_comment_line = 0;
+            time_in_state.reset();
+            if (!g_Scorefile->bgm_unlocked[music_comment_track] && music_warning == 0)
+            {
+                if (g_Supervisor.config.flags_2c & 0x10)
+                {
+                    g_SoundManager.modify_bgm(4, 0, "dummy");
+                }
+                else
+                {
+                    g_SoundManager.modify_bgm(3, 0, "dummy");
+                }
+                music_warning = 1;
+                return 0;
+            }
+            g_Supervisor.play_bgm_wav(0, music_filenames[menu.next_selection]);
+            if (g_Supervisor.config.flags_2c & 0x10)
+            {
+                g_SoundManager.modify_bgm(4, 0, "dummy");
+            }
+            g_SoundManager.modify_bgm(2, 0, "dummy");
+            g_Scorefile->bgm_unlocked[0] = 1;
+            music_warning = 0;
+            return 0;
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+        leave:
+            if (unk_5ce0 != NULL)
+            {
+                free(unk_5ce0);
+                unk_5ce0 = NULL;
+            }
+            unk_5ce0 = NULL;
+            for (i32 i = 0; i < music_track_count; i++)
+            {
+                AnmManager::interrupt_tree(anm_ids_740[0x10 + i], 1);
+            }
+            for (i32 i = 0; i < 8; i++)
+            {
+                AnmManager::interrupt_tree(anm_ids_7d0[i], 1);
+            }
+            g_SoundManager.play_sound_centered(9, 0);
+            substate = 3;
+            time_in_state.reset();
+            return 0;
+        }
+        break;
+    case 3:
+        if (time_in_state.current >= 10)
+        {
+            interrupt_and_clear(0x6e);
+            AnmManager::interrupt_tree(anm_id_73c, 1);
+            anm_id_73c.id = 0;
+            set_state(1);
+            g_Supervisor.play_bgm_wav(0, "th16_01");
+            g_Supervisor.play_bgm(0, 0);
+            menu.pop();
         }
         break;
     }
