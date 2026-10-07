@@ -4,6 +4,7 @@
 // the real code.
 #include "../AnmManager.h"
 #include "../BulletManager.h"
+#include "../Enemy.h"
 #include "../EffectManager.h"
 
 // Written by window setup code that is not decompiled yet.
@@ -36,4 +37,10 @@ AnmId AnmManager::deserialize_vm_tree(void *buffer, AnmVm *parent, i32 *size)
 {
     *size = 0;
     return AnmId();
+}
+
+// STUB: TH16 0x412cb0
+i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 angle_to_player)
+{
+    return i + layer;
 }

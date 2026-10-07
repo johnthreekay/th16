@@ -210,6 +210,11 @@ struct BulletManager
     // 0x416e20. The same for a rectangle of the given size, rotated by
     // angle (xmm3).
     HARNESS_CALLED i32 cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3DXVECTOR3 *size, f32 angle, i32 mode);
+    // 0x414da0. Fires every bullet of a shot (layers x count), aimed from
+    // the angle to the player. Only called through g_BulletManager.
+    HARNESS_CALLED i32 shoot_bullets(struct EnemyBulletShooter *props);
+    // 0x412cb0. Fires bullet i of the given layer; 1 stops the shot.
+    i32 shoot_one(struct EnemyBulletShooter *props, i32 i, i32 layer, f32 angle_to_player);
     // 0x416c20. cancel_radius_as_bomb for every bullet (ECL).
     HARNESS_CALLED i32 cancel_radius(D3DXVECTOR3 *pos, f32 radius, i32 mode);
 };

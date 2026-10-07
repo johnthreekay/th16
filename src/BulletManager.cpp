@@ -1,10 +1,13 @@
+#include <math.h>
 #include <string.h>
 
 #include "AnmManager.h"
 #include "BulletManager.h"
 #include "Bomb.h"
 #include "Collision.h"
+#include "Enemy.h"
 #include "Item.h"
+#include "Player.h"
 #include "Rng.h"
 #include "SoundManager.h"
 #include "Spellcard.h"
@@ -408,4 +411,37 @@ HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
                                       g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f, 2.2f, 0, 0);
         }
     }
+}
+
+// FUNCTION: TH16 0x414da0
+HARNESS_CALLED i32 BulletManager::shoot_bullets(EnemyBulletShooter *props)
+{
+    f32 dy = g_Player->inner.pos.y - props->pos.y;
+    f32 dx = g_Player->inner.pos.x - props->pos.x;
+    f32 angle;
+    if (dy == 0.0f && dx == 0.0f)
+    {
+        angle = ZUN_PI / 2;
+    }
+    else
+    {
+        angle = atan2f(dy, dx);
+    }
+    for (i32 layer = 0; layer < props->layers; layer++)
+    {
+        for (i32 i = 0; i < props->count; i++)
+        {
+            i32 result = shoot_one(props, i, layer, angle);
+            if (result != 0 && result == 1)
+            {
+                goto done;
+            }
+        }
+    }
+done:
+    if (props->sfx_flags & 0x20)
+    {
+        g_SoundManager.play_sound_at_position(props->shot_sfx, props->pos.x);
+    }
+    return 0;
 }

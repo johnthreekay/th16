@@ -22,7 +22,16 @@ struct EnemyBulletShooter
 {
     i32 type;
     u32 color;
-    u8 unk_8[0x374 - 0x8];
+    // Where the bullets come from.
+    D3DXVECTOR3 pos;
+    u8 unk_14[0x364 - 0x14];
+    // Bullets per layer and layers per shot.
+    i16 count;
+    i16 layers;
+    i32 aim_type;
+    // 0x20: play shot_sfx.
+    u32 sfx_flags;
+    u32 shot_sfx;
     u32 shot_transform_sfx;
     u32 start_transform;
     u32 unk_37c;

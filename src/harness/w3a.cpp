@@ -2,6 +2,7 @@
 #include "../AnmManager.h"
 #include "../BulletManager.h"
 #include "../EffectManager.h"
+#include "../Enemy.h"
 #include "../Fog.h"
 #include "../Gui.h"
 #include "../PosVel.h"
@@ -121,4 +122,12 @@ void harness_spellcard_end()
 f32 harness_fabsf(f32 x, f32 y)
 {
     return zun_fabsf(x) + zun_fabsf(y - x);
+}
+
+// Like ECL's shoot instructions (0x420aa0) and the lasers' transforms
+// (0x432465, 0x4391b0).
+void harness_shoot_bullets(EnemyBulletShooter *props)
+{
+    g_BulletManager->shoot_bullets(props);
+    g_BulletManager->shoot_bullets(props + 1);
 }
