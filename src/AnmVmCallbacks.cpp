@@ -5,6 +5,7 @@
 
 #include "AnmManager.h"
 #include "AnmVm.h"
+#include "EffectManager.h"
 #include "Rng.h"
 #include "ZunMath.h"
 
@@ -316,6 +317,44 @@ int __fastcall anm_effect_1_on_tick(AnmVm *vm)
     }
     data->vms[4].run();
     data->frame_count++;
+    return 0;
+}
+
+// TODO: scheduling: the original loads 240.0f before 320.0f and the zero z
+// only after the four x/y stores.
+// FUNCTION: TH16 0x407900
+int __fastcall anm_effect_1_on_switch(AnmVm *vm, i32 n)
+{
+    AnmEffect1Data *data = (AnmEffect1Data *)vm->ins_508_extra_data;
+    switch (n)
+    {
+    case 1:
+        for (i32 i = 0; i < 4; i++)
+        {
+            g_EffectManager->effect_anm->copy_vm_and_run(&data->vms[i], i + 7);
+        }
+        return 0;
+    case 7:
+        data->unk_1dec = 0;
+        vm->set_layer(30);
+        break;
+    case 8:
+        data->unk_1dec = 1;
+        vm->set_layer(23);
+        break;
+    case 9:
+        data->unk_1dec = 0;
+        vm->set_layer(36);
+        break;
+    case 10:
+        data->unk_1dec = 3;
+        vm->set_layer(30);
+        break;
+    default:
+        return 0;
+    }
+    data->vms[0].entity_pos = data->vms[1].entity_pos = data->vms[2].entity_pos = data->vms[3].entity_pos =
+        D3DXVECTOR3(320.0f, 240.0f, 0.0f);
     return 0;
 }
 
