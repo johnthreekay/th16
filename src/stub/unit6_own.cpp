@@ -23,10 +23,9 @@ void play_sound_centered_stub(i32 id, i32 unused)
 #include "../PauseMenu.h"
 #include "../ReplayManager.h"
 
-// STUB: TH16 0x43e5f0
-int PauseMenu::on_tick()
+// STUB: TH16 0x43f980
+void PauseMenu::tick_open()
 {
-    return 1;
 }
 
 #include "../AsciiManager.h"

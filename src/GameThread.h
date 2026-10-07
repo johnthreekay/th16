@@ -79,7 +79,10 @@ struct GameThreadFlags
     u32 flag_7 : 1;
     u32 flag_8 : 2;
     u32 flag_10 : 1;
-    u32 flag_11 : 21;
+    u32 flag_11 : 5;
+    // Keeps the pause key from opening the pause menu.
+    u32 flag_16 : 1;
+    u32 flag_17 : 15;
 };
 
 // Runs a game in progress. Layout from ExpHP's th-re-data (zGameThread),

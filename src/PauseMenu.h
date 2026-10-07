@@ -62,6 +62,9 @@ struct PauseMenu
     void leave_state_3();
 
     int on_tick();
+    // 0x43f980 (ExpHP: on_tick_in_pause_menu). The menu's tick while it is
+    // open (states 1 to 3).
+    void tick_open();
     int on_draw();
     // 0x43e730. The name entry keyboard; the name is drawn at pos.
     void draw_keyboard(Float3 pos);
@@ -81,6 +84,9 @@ struct PauseMenu
     // 0x43f0f0 (ExpHP: do_open_pause_menu). Pauses the game and opens the
     // menu.
     void open();
+    // 0x43f7e0. At the end of a game: records a practice score, or puts
+    // the score into the high score table and sets up the name entry.
+    void begin_score_entry();
     static int __fastcall on_tick_thunk(void *arg);
     static int __fastcall on_draw_thunk(void *arg);
 };

@@ -124,6 +124,33 @@ PauseMenu *PauseMenu::create()
     return menu;
 }
 
+extern u32 g_hardware_input_pressed;
+
+// TODO: the inlined timer ticks use other xmm registers for 1.0, 1.01 and the speed.
+// FUNCTION: TH16 0x43e5f0
+int PauseMenu::on_tick()
+{
+    switch (state)
+    {
+    case 0:
+        if (!(g_Globals.flags_hi_45c & 1) && !g_GameThread->flags.flag_16 &&
+            ((g_hardware_input_pressed & 0x100) || (g_Supervisor.flags & 0x10)) && g_GameThread->on_tick != NULL &&
+            (g_GameThread->on_tick->flags & UPDATE_FUNC_ACTIVE) && g_GameThread->time_in_stage.current >= 30)
+        {
+            open();
+        }
+        break;
+    case 1:
+    case 2:
+    case 3:
+        tick_open();
+        break;
+    }
+    time_in_current_menu.tick();
+    time_since_pause_or_unpause.tick();
+    return 1;
+}
+
 // The original's callback is a jmp to the member function, most likely the
 // fastcall invoker of a capture-less lambda; a static thunk compiles the same.
 // FUNCTION: TH16 0x43e720
@@ -457,6 +484,63 @@ void PauseMenu::open()
         vm->clear_flag_lo_2_tree_inline();
     }
     flags_3ec &= ~4;
+}
+
+// TODO: ours folds the character offset into the practice index (one imul by 0xa63, scaled by 8); the original adds it to the pointer.
+// FUNCTION: TH16 0x43f7e0
+void PauseMenu::begin_score_entry()
+{
+    if (g_Globals.game_mode != 2)
+    {
+        if (g_Globals.game_mode != 0)
+        {
+            ScorefilePractice *practice = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
+                                               .practices[g_Globals.difficulty][g_Globals.stage_num - 1];
+            if (practice->score < g_Globals.score)
+            {
+                practice->score = g_Globals.score;
+            }
+        }
+        else
+        {
+            if (g_Globals.stage_num == 7 && unk_1fc != 0)
+            {
+                g_Globals.stage_num = 9;
+            }
+            i32 rank = ((ScorefileData *)g_Scorefile)->charas[g_Globals.subshot + g_Globals.character].insert_score();
+            if (g_Globals.stage_num == 9 && unk_1fc != 0)
+            {
+                g_Globals.stage_num = 7;
+            }
+            if (rank >= 0)
+            {
+                menu_34.num_choices = 25;
+                menu_34.wraps = 1;
+                menu_34.set_cursor(rank);
+                menu.set_cursor(0);
+                menu.num_choices = 0x5b;
+                menu.wraps = 1;
+                strcpy(name, ((ScorefileData *)g_Scorefile)->status.name);
+                name_cursor = 0;
+                if (strcmp(name, "        ") != 0)
+                {
+                    menu.move_cursor(-1);
+                }
+                i32 i;
+                for (i = 8; i > 0; i--)
+                {
+                    if (name[i - 1] != ' ')
+                    {
+                        break;
+                    }
+                }
+                name_cursor = i;
+                unk_200 = 0;
+                return;
+            }
+        }
+    }
+    unk_200 = 1;
 }
 
 // FUNCTION: TH16 0x43f240
