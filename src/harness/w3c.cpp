@@ -52,7 +52,7 @@ void harness_w3c_gui_spell_bonus(i32 captured, i32 bonus)
     }
 }
 
-// Like the game start code at 0x42e171.
+// Like stage_clear at 0x42e171.
 void harness_w3c_player_resume_options()
 {
     g_Player->resume_options();
