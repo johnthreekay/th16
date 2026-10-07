@@ -268,6 +268,20 @@ static void __fastcall anm_sincosmul(Float3 *dst, f32 angle, f32 radius)
 #define ANM_FLAGS_LO ((AnmVmFlagsLoFields *)&flags_lo)
 #define ANM_FLAGS_HI ((AnmVmFlagsHiFields *)&flags_hi)
 
+// Vector stores that take their components as separate values.
+static inline void anm_set_float3(Float3 *v, f32 x, f32 y, f32 z)
+{
+    v->x = x;
+    v->y = y;
+    v->z = z;
+}
+
+static inline void anm_set_float2(Float2 *v, f32 x, f32 y)
+{
+    v->x = x;
+    v->y = y;
+}
+
 // The color arguments of instructions 408 and 413 (and the current color),
 // as set_rgb1_time and set_rgb2_time take them. Alpha is left unset.
 static inline ZunColor anm_rgb(i32 r, i32 g, i32 b)
@@ -777,11 +791,11 @@ __forceinline i32 AnmVm::run_script()
             break;
         // angleVel, scaleGrowth
         case 415:
-            angular_velocity = Float3(ANM_FLOAT(0), ANM_FLOAT(1), ANM_FLOAT(2));
+            anm_set_float3(&angular_velocity, ANM_FLOAT(0), ANM_FLOAT(1), ANM_FLOAT(2));
             flags_hi |= ANM_VM_HAS_VELOCITY;
             break;
         case 416:
-            scale_growth = Float2(ANM_FLOAT(0), ANM_FLOAT(1));
+            anm_set_float2(&scale_growth, ANM_FLOAT(0), ANM_FLOAT(1));
             flags_hi |= ANM_VM_HAS_VELOCITY;
             break;
         // alphaTimeLinear
