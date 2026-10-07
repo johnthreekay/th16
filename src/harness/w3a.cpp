@@ -5,6 +5,7 @@
 #include "../Fog.h"
 #include "../Gui.h"
 #include "../PosVel.h"
+#include "../Spellcard.h"
 #include "../Supervisor.h"
 
 // Like the main menu (0x450d75, 0x4512f2, ...), which starts its cursor
@@ -107,4 +108,10 @@ void harness_gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
 {
     gen_items_from_cancel(pos, mode);
     gen_items_from_cancel(pos + 1, mode + 1);
+}
+
+// Like ECL's spell card end instruction (0x421891).
+void harness_spellcard_end()
+{
+    g_Spellcard->end();
 }

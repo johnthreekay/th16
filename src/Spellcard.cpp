@@ -3,8 +3,12 @@
 #include "AnmManager.h"
 #include "AsciiManager.h"
 #include "Globals.h"
+#include "Gui.h"
+#include "ReplayManager.h"
 #include "Scorefile.h"
+#include "SoundManager.h"
 #include "Spellcard.h"
+#include "Stage.h"
 #include "UpdateFunc.h"
 
 // GLOBAL: TH16 0x4a6db0
@@ -165,5 +169,51 @@ HARNESS_CALLED void Spellcard::decode_time_code(i32 *seconds, i32 *hundredths)
     {
         *seconds = (time_code / 100 % 1000 + 934) % 1000;
         *hundredths = (time_code % 100 + 67) % 100;
+    }
+}
+
+// FUNCTION: TH16 0x4182f0
+HARNESS_CALLED void Spellcard::end()
+{
+    if (!(flags & 1))
+    {
+        return;
+    }
+    g_Stage->stage_flags |= STAGE_FLAG_1;
+    AnmManager::interrupt_tree(text_anm_ids[0], 1);
+    AnmManager::interrupt_tree(text_anm_ids[1], 1);
+    AnmManager::interrupt_tree(text_anm_ids[2], 1);
+    flags &= ~1;
+    delete_vm_and_clear(background_anm_id);
+    flags &= ~0x20;
+    g_Gui->interrupt_spell_vms_3();
+    delete_vm_and_clear(boss_anm_id);
+    if (flags & 2)
+    {
+        g_Globals.add_to_score(bonus);
+        g_Gui->sub_42bcf0(bonus, 0);
+        if (g_ReplayManager->mode != 1)
+        {
+            i32 practice = g_Globals.game_mode == 2;
+            ScorefileSpell *spell = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id];
+            if (spell->captures[practice] < 99999)
+            {
+                spell->captures[practice]++;
+            }
+            spell = &g_Scorefile->characters[4].spells[spell_id];
+            if (spell->captures[practice] < 99999)
+            {
+                spell->captures[practice]++;
+            }
+        }
+        g_SoundManager.play_sound_centered(0x2e, 0);
+    }
+    else
+    {
+        g_Gui->sub_42bcf0(0, 1);
+    }
+    if (flags & 0x80)
+    {
+        g_SoundManager.play_sound_centered(0x45, 0);
     }
 }

@@ -65,6 +65,10 @@ struct Spellcard
     // it was tampered with). Only called through g_Spellcard, which LTCG
     // put in place of this.
     HARNESS_CALLED void decode_time_code(i32 *seconds, i32 *hundredths);
+    // 0x4182f0. Ends the spell card: removes its name and background, pays
+    // out the bonus if it was captured and counts the capture. Only called
+    // through g_Spellcard.
+    HARNESS_CALLED void end();
 };
 
 // Difficulty (0-3, 4 for Extra) of each spell card.
