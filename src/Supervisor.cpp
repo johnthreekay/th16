@@ -29,6 +29,7 @@
 #include "Scorefile.h"
 #include "StageData.h"
 #include "SoundManager.h"
+#include "TextHelper.h"
 #include "UpdateFunc.h"
 
 static_assert(offsetof(Supervisor, d3d_device) == 0x8, "Supervisor::d3d_device");
@@ -43,7 +44,16 @@ static_assert(offsetof(Supervisor, start_time) == 0x734, "Supervisor::start_time
 static_assert(offsetof(Supervisor, screenshot) == 0x870, "Supervisor::screenshot");
 static_assert(offsetof(Supervisor, thread) == 0x998, "Supervisor::thread");
 static_assert(offsetof(Supervisor, loading_thread) == 0xa24, "Supervisor::loading_thread");
+static_assert(offsetof(Supervisor, unk_58) == 0x58, "Supervisor::unk_58");
+static_assert(offsetof(Supervisor, display_mode) == 0x19c, "Supervisor::display_mode");
+static_assert(offsetof(Supervisor, unk_714) == 0x714, "Supervisor::unk_714");
+static_assert(offsetof(Supervisor, exe_size) == 0xa18, "Supervisor::exe_size");
+static_assert(offsetof(Supervisor, ver_file_size) == 0xa1c, "Supervisor::ver_file_size");
+static_assert(offsetof(Supervisor, frame_time) == 0xa34, "Supervisor::frame_time");
 static_assert(offsetof(Supervisor, background_color) == 0xa3c, "Supervisor::background_color");
+static_assert(offsetof(Config, color_mode) == 0x20, "Config::color_mode");
+static_assert(offsetof(Config, unk_29) == 0x29, "Config::unk_29");
+static_assert(offsetof(Config, flags_2c) == 0x2c, "Config::flags_2c");
 static_assert(offsetof(GameWindow, save_dir) == 0x2d, "GameWindow::save_dir");
 static_assert(offsetof(SoundManager, bgm_dat_name) == 0x5560, "SoundManager::bgm_dat_name");
 
@@ -268,12 +278,8 @@ HARNESS_CALLED void Supervisor::swap_transform_matrices(Camera *camera)
 }
 
 // Not decompiled yet (src/stub/w3c.cpp). 0x46b900 sets up AnmManager
-// vertex data through g_AnmManager, 0x458db0 creates a font.
+// vertex data through g_AnmManager.
 void anm_manager_46b900();
-void supervisor_458db0();
-// 0x458520 releases the text rendering DC; the fonts come from 0x458db0.
-bool supervisor_458520();
-extern HFONT g_fonts_4df904[10];
 
 // The tanf from the CRT headers stays out of line (0x43dc90).
 DECOMP_NOINLINE float __CRTDECL tanf(float);
@@ -842,7 +848,7 @@ void Supervisor::setup_special_anms()
 }
 
 // FUNCTION: TH16 0x43dc30
-void Supervisor::release_surfaces()
+HARNESS_CALLED void Supervisor::release_surfaces()
 {
     if (g_Supervisor.arcade_surface_0 != NULL)
     {
@@ -958,7 +964,7 @@ int __fastcall Supervisor::on_registration(void *arg)
     g_UpdateFuncRegistry->register_on_draw(f, 0x4b);
     fps->on_draw = f;
     anm_manager_46b900();
-    supervisor_458db0();
+    create_fonts();
     g_Supervisor.vm_1bc = new AnmVm;
     g_Supervisor.vm_1c0 = new AnmVm;
     g_Supervisor.vm_1c4 = new AnmVm;
@@ -993,16 +999,16 @@ int Supervisor::teardown_everything()
         anm->vertex_buffer = NULL;
     }
     g_SoundManager.modify_bgm(4, 0, "dummy");
-    supervisor_458520();
-    DeleteObject(g_fonts_4df904[0]);
-    DeleteObject(g_fonts_4df904[2]);
-    DeleteObject(g_fonts_4df904[4]);
-    DeleteObject(g_fonts_4df904[6]);
-    DeleteObject(g_fonts_4df904[8]);
-    DeleteObject(g_fonts_4df904[3]);
-    DeleteObject(g_fonts_4df904[5]);
-    DeleteObject(g_fonts_4df904[7]);
-    DeleteObject(g_fonts_4df904[9]);
+    g_TextHelper.release_buffer();
+    DeleteObject(g_font_904);
+    DeleteObject(g_font_90c);
+    DeleteObject(g_font_914);
+    DeleteObject(g_font_91c);
+    DeleteObject(g_font_924);
+    DeleteObject(g_font_910);
+    DeleteObject(g_font_918);
+    DeleteObject(g_font_920);
+    DeleteObject(g_font_928);
     if (keyboard != NULL)
     {
         keyboard->Unacquire();
@@ -1055,9 +1061,8 @@ extern HANDLE g_file;
 
 void debug_log_43dce0(const char *fmt, ...);
 
-// TODO: the original realigns its frame to 8 bytes (ebx frame), so it also pops call arguments one call at a time.
 // FUNCTION: TH16 0x43bbd0
-int Supervisor::take_screenshot(const char *path)
+HARNESS_CALLED int Supervisor::take_screenshot(const char *path)
 {
     Screenshot *shot = &g_Supervisor.screenshot;
     while (shot->thread != 0)

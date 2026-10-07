@@ -58,7 +58,7 @@ int LoadingThread::thread_start(void *arg)
                 {
                     if (!(g_Supervisor.config.flags_2c & 0x10))
                     {
-                        g_SoundManager.open_bgm_dat("thbgm.dat");
+                        g_SoundManager.open_bgm("thbgm.dat");
                     }
                     else
                     {

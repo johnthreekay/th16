@@ -106,7 +106,7 @@ struct UpdateFuncRegistry
     // TH06 equivalent: Chain::RunCalcChain
     int run_all_on_tick();
     // TH06 equivalent: Chain::RunDrawChain
-    int run_all_on_draw();
+    HARNESS_CALLED int run_all_on_draw();
     void unregister_all_in_list(UpdateFunc *head);
     // TH06 equivalent: Chain::Cut
     DECOMP_NOINLINE void unregister(UpdateFunc *f);

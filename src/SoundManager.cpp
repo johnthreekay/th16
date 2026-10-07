@@ -41,6 +41,10 @@ static_assert(offsetof(SoundManager, bgm_name) == 0x22e0, "SoundManager layout")
 static_assert(offsetof(SoundManager, bgm_commands) == 0x23e0, "SoundManager layout");
 static_assert(offsetof(SoundManager, bgm_stream) == 0x5660, "SoundManager layout");
 static_assert(offsetof(SoundManager, init_thread) == 0x5674, "SoundManager layout");
+static_assert(offsetof(SoundManager, preload_format) == 0x187c, "SoundManager layout");
+static_assert(offsetof(SoundManager, preload_current) == 0x197c, "SoundManager layout");
+static_assert(offsetof(SoundManager, preload_names) == 0x4560, "SoundManager layout");
+static_assert(offsetof(SoundManager, bgm_dat_name) == 0x5560, "SoundManager layout");
 static_assert(sizeof(SoundManager) == 0x5698, "SoundManager layout");
 static_assert(offsetof(BgmStream, refilling) == 0x9c, "BgmStream layout");
 static_assert(sizeof(ThBgmFormat) == 0x34, "ThBgmFormat layout");
@@ -197,6 +201,121 @@ void SoundManager::thread_init(void *arg)
     g_SoundManager.init_done = 1;
 }
 
+inline HRESULT CSoundManager::Initialize(HWND hWnd, DWORD dwCoopLevel, DWORD dwPrimaryChannels, DWORD dwPrimaryFreq,
+                                         DWORD dwPrimaryBitRate)
+{
+    if (m_pDS != NULL)
+    {
+        m_pDS->Release();
+        m_pDS = NULL;
+    }
+    HRESULT hr;
+    if (FAILED(hr = DirectSoundCreate8(NULL, &m_pDS, NULL)))
+    {
+        return hr;
+    }
+    if (FAILED(hr = m_pDS->SetCooperativeLevel(hWnd, dwCoopLevel)))
+    {
+        return hr;
+    }
+    SetPrimaryBufferFormat(dwPrimaryChannels, dwPrimaryFreq, dwPrimaryBitRate);
+    return S_OK;
+}
+
+inline CSoundManager::~CSoundManager()
+{
+    if (m_pDS != NULL)
+    {
+        m_pDS->Release();
+        m_pDS = NULL;
+    }
+}
+
+// FUNCTION: TH16 0x45d510
+i32 SoundManager::initialize(HWND window)
+{
+    DSBUFFERDESC desc;
+    WAVEFORMATEX format;
+    void *p1;
+    DWORD n1;
+    void *p2;
+    DWORD n2;
+
+    for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
+    {
+        sound_buffers[i].unk_4 = -1;
+        SoundEffectData *data;
+        for (data = g_sound_effect_table; data != NULL; data++)
+        {
+            if (data->id == i)
+            {
+                break;
+            }
+        }
+        sound_buffers[i].id = i;
+        sound_buffers[i].data = data;
+    }
+    for (i32 i = 0; i < SOUND_QUEUE_SIZE; i++)
+    {
+        queued_ids[i] = -1;
+    }
+    manager = new CSoundManager;
+    if (manager->Initialize(window, DSSCL_PRIORITY, 2, 44100, 16) < 0)
+    {
+        g_GameErrorContext.log("DirectSound \x83I\x83u\x83W\x83" "F\x83N\x83g\x82\xcc\x8f\x89\x8a\xfa\x89\xbb\x82\xaa\x8e\xb8\x94s\x82\xb5\x82\xbd\x82\xe6\r\n");
+        if (manager != NULL)
+        {
+            delete manager;
+            manager = NULL;
+        }
+        return -1;
+    }
+    dsound = manager->m_pDS;
+    bgm_thread = NULL;
+    memset(&desc, 0, sizeof(DSBUFFERDESC));
+    desc.dwSize = sizeof(DSBUFFERDESC);
+    desc.dwFlags = DSBCAPS_LOCSOFTWARE | DSBCAPS_GLOBALFOCUS;
+    desc.dwBufferBytes = 0x8000;
+    memset(&format, 0, sizeof(WAVEFORMATEX));
+    format.cbSize = 0;
+    format.wFormatTag = WAVE_FORMAT_PCM;
+    format.nChannels = 2;
+    format.nSamplesPerSec = 44100;
+    format.nAvgBytesPerSec = 176400;
+    format.nBlockAlign = 4;
+    format.wBitsPerSample = 16;
+    desc.lpwfxFormat = &format;
+    if (dsound->CreateSoundBuffer(&desc, &init_sound_buffer, NULL) < 0)
+    {
+        return -1;
+    }
+    if (init_sound_buffer->Lock(0, 0x8000, &p1, &n1, &p2, &n2, 0) < 0)
+    {
+        return -1;
+    }
+    memset(p1, 0, 0x8000);
+    init_sound_buffer->Unlock(p1, n1, p2, n2);
+    init_sound_buffer->Play(0, 0, DSBPLAY_LOOPING);
+    bgm_volume = 100;
+    se_volume = 100;
+    SetTimer(window, 0, 250, NULL);
+    game_window = window;
+    for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
+    {
+        if (g_SoundManager.thread_state == SOUND_THREAD_QUIT)
+        {
+            return -1;
+        }
+        if (g_SoundManager.sound_buffers[i].load(g_sound_file_names[g_sound_effect_table[i].file_index]) != 0)
+        {
+            g_GameErrorContext.log("error : Sound \x83t\x83@\x83" "C\x83\x8b\x82\xaa\x93\xc7\x82\xdd\x8d\x9e\x82\xdf\x82\xc8\x82\xa2 \x83" "f\x81[\x83^\x82\xf0\x8am\x94" "F %s\r\n", g_sound_file_names[g_sound_effect_table[i].file_index]);
+            return -1;
+        }
+    }
+    g_GameErrorContext.log("DirectSound \x82\xcd\x90\xb3\x8f\xed\x82\xc9\x8f\x89\x8a\xfa\x89\xbb\x82\xb3\x82\xea\x82\xdc\x82\xb5\x82\xbd\r\n");
+    return 0;
+}
+
 // FUNCTION: TH16 0x45d7e0
 void SoundManager::thread_load_sound_files(void *arg)
 {
@@ -217,6 +336,64 @@ void SoundManager::thread_load_sound_files(void *arg)
     {
         Sleep(1);
     }
+}
+
+// FUNCTION: TH16 0x45d850
+HARNESS_CALLED i32 SoundManager::release()
+{
+    if (bgm_format != NULL)
+    {
+        free(bgm_format);
+        bgm_format = NULL;
+    }
+    for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
+    {
+        if (sound_buffers[i].buffer != NULL)
+        {
+            sound_buffers[i].buffer->Release();
+            sound_buffers[i].buffer = NULL;
+        }
+    }
+    for (i32 i = 0; i < SOUND_FILE_COUNT; i++)
+    {
+        if (sound_file_data[i] != NULL)
+        {
+            free(sound_file_data[i]);
+            sound_file_data[i] = NULL;
+        }
+    }
+    if (manager == NULL)
+    {
+        return 0;
+    }
+    KillTimer(game_window, 1);
+    stop_bgm();
+    dsound = NULL;
+    init_sound_buffer->Stop();
+    if (init_sound_buffer != NULL)
+    {
+        init_sound_buffer->Release();
+        init_sound_buffer = NULL;
+    }
+    if (bgm_stream != NULL)
+    {
+        bgm_stream->destroy();
+        bgm_stream = NULL;
+    }
+    if (manager != NULL)
+    {
+        delete manager;
+        manager = NULL;
+    }
+    for (i32 i = 0; i < 0x10; i++)
+    {
+        if (preload_data[i] != NULL)
+        {
+            free(preload_data[i]);
+            preload_data[i] = NULL;
+        }
+    }
+    return 0;
 }
 
 // FUNCTION: TH16 0x45d9d0
@@ -263,8 +440,36 @@ i32 SoundManager::find_bgm(const char *path)
     return bgm_format[i].name[0] != '\0' ? i : 0;
 }
 
+// FUNCTION: TH16 0x45db10
+HARNESS_CALLED i32 SoundManager::open_bgm(const char *path)
+{
+    strcpy(bgm_dat_name, path);
+    if (manager == NULL)
+    {
+        return -1;
+    }
+    if (dsound == NULL)
+    {
+        return -1;
+    }
+    stop_bgm();
+    ThBgmFormat *format = bgm_format;
+    DWORD block_align = format->format.nBlockAlign;
+    i32 samples_per_sec = format->format.nSamplesPerSec;
+    DWORD notify_size = samples_per_sec * block_align * 4 / 8;
+    bgm_event = CreateEventA(NULL, FALSE, FALSE, NULL);
+    bgm_thread = CreateThread(NULL, 0, bgm_thread_proc, g_Supervisor.unk_58, 0, &bgm_thread_id);
+    notify_size -= notify_size % block_align;
+    if (FAILED(manager->CreateStreaming((CStreamingSound **)&bgm_stream, "thbgm.dat", 0, GUID_NULL, 8, notify_size,
+                                        bgm_event, format)))
+    {
+        return -1;
+    }
+    return 0;
+}
+
 // FUNCTION: TH16 0x45dbf0
-i32 SoundManager::select_bgm(const char *path)
+HARNESS_CALLED i32 SoundManager::select_bgm(const char *path)
 {
     if (g_SoundManager.bgm_stream == NULL)
     {
@@ -273,6 +478,101 @@ i32 SoundManager::select_bgm(const char *path)
     i32 i = g_SoundManager.find_bgm(path);
     g_SoundManager.bgm_stream->wave_file->open_bgm(&g_SoundManager.bgm_format[i], 0);
     strcpy(g_SoundManager.selected_bgm_name, path);
+    return 0;
+}
+
+// TODO: ours keeps slot * 4 in edi (and shifts esi in place); the original indexes with [esi*4] throughout.
+// FUNCTION: TH16 0x45dc50
+HARNESS_CALLED i32 SoundManager::preload_bgm(i32 slot, const char *name)
+{
+    if (g_SoundManager.preload_data[slot] != NULL && strcmp(name, g_SoundManager.preload_names[slot]) == 0)
+    {
+        return 0;
+    }
+    strcpy(g_SoundManager.preload_names[slot], name);
+    if (!(g_Supervisor.config.flags_2c & 0x10))
+    {
+        return 0;
+    }
+    if (g_SoundManager.manager == NULL)
+    {
+        return 0;
+    }
+    if (g_SoundManager.preload_data[slot] != NULL)
+    {
+        free(g_SoundManager.preload_data[slot]);
+        g_SoundManager.preload_data[slot] = NULL;
+    }
+    ENTER_CS(CS_FILE);
+    HANDLE file = CreateFileA(g_SoundManager.bgm_dat_name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                              FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    if (file == INVALID_HANDLE_VALUE)
+    {
+        sound_debug_log("error : bgmfile is not find %s\r\n", g_SoundManager.bgm_dat_name);
+        LEAVE_CS(CS_FILE);
+        return -1;
+    }
+    i32 track = g_SoundManager.find_bgm(name);
+    SetFilePointer(file, g_SoundManager.bgm_format[track].start_offset, NULL, FILE_BEGIN);
+    u8 *data = (u8 *)malloc(g_SoundManager.bgm_format[track].unk_14);
+    if (data == NULL)
+    {
+        CloseHandle(file);
+        sound_debug_log("error : bgmfile is not find %s\r\n", g_SoundManager.bgm_dat_name);
+        g_CriticalSections.leave(CS_FILE);
+        return -1;
+    }
+    DWORD read;
+    ReadFile(file, data, g_SoundManager.bgm_format[track].unk_14, &read, NULL);
+    CloseHandle(file);
+    g_CriticalSections.leave(CS_FILE);
+    g_SoundManager.preload_format[slot] = &g_SoundManager.bgm_format[track];
+    g_SoundManager.preload_data[slot] = data;
+    g_SoundManager.preload_cursor[slot] = data;
+    g_SoundManager.preload_size[slot] = g_SoundManager.preload_format[slot]->unk_14;
+    return 0;
+}
+
+// FUNCTION: TH16 0x45de30
+HARNESS_CALLED i32 SoundManager::play_preloaded_bgm(i32 slot)
+{
+    if (g_SoundManager.manager == NULL)
+    {
+        return -1;
+    }
+    if (!g_Supervisor.config.bgm_mode)
+    {
+        return -1;
+    }
+    if (g_SoundManager.dsound == NULL)
+    {
+        return -1;
+    }
+    if (!(g_Supervisor.config.flags_2c & 0x10))
+    {
+        return g_SoundManager.select_bgm(g_SoundManager.preload_names[slot]);
+    }
+    if (g_SoundManager.preload_data[slot] == NULL)
+    {
+        return -1;
+    }
+    strcpy(g_SoundManager.selected_bgm_name, g_SoundManager.preload_names[slot]);
+    ThBgmFormat *format = g_SoundManager.preload_format[slot];
+    DWORD block_align = format->format.nBlockAlign;
+    i32 samples_per_sec = format->format.nSamplesPerSec;
+    DWORD notify_size = samples_per_sec * block_align * 4 / 8;
+    g_SoundManager.bgm_event = CreateEventA(NULL, FALSE, FALSE, NULL);
+    g_SoundManager.bgm_thread =
+        CreateThread(NULL, 0, bgm_thread_proc, g_Supervisor.unk_58, 0, &g_SoundManager.bgm_thread_id);
+    notify_size -= notify_size % block_align;
+    if (FAILED(g_SoundManager.manager->CreateStreamingFromMemory(
+            (CStreamingSound **)&g_SoundManager.bgm_stream, g_SoundManager.preload_cursor[slot],
+            g_SoundManager.preload_size[slot], g_SoundManager.preload_format[slot], 0, GUID_NULL, 8, notify_size,
+            g_SoundManager.bgm_event)))
+    {
+        return -1;
+    }
+    g_SoundManager.preload_current = slot;
     return 0;
 }
 

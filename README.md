@@ -287,6 +287,20 @@ decompiled code the surroundings it had in the original:
   the call at most sites; ours merges the pops (Fog::Fog, AnmLoaded::load).
 - Some matches depend on unrelated code existing: 0x43c940 stops matching
   as soon as write_screenshot is defined anywhere in the program.
+- dxguid.lib is a single object: one unresolved reference pulls in all of
+  it, which then clashes with any GUID defined in source for annotation.
+  So every GUID the game takes from it is defined in source (DSUtil.cpp,
+  SupervisorSetup.cpp), including the axis, POV and key ids that
+  dinput8.lib's `c_dfDIJoystick2` and `c_dfDIKeyboard` refer to.
+- Where a struct global overlaps globals that are annotated on their own
+  (g_GameWindow's flags is g_unk_4d9d1c, its resolution fields are
+  g_resolution_x and the rest), code that addresses the field as a global
+  must name the separate global; quickdiff and reccmp name the original's
+  address after the exact annotation, so `g_GameWindow.flags` shows up as a
+  difference even with identical code.
+- Supervisor::take_screenshot (0x43bbd0) lost its frame realignment and
+  matched once it became HARNESS_CALLED with its one real caller,
+  GameWindow::take_screenshot; LTCG then also dropped its unused `this`.
 
 ### Known tooling gaps
 

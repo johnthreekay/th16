@@ -3,7 +3,6 @@
 #include "../AsciiManager.h"
 #include "../Enemy.h"
 #include "../EnemyManager.h"
-#include "../FpsCounter.h"
 #include "../Input.h"
 
 // Every caller goes through g_EnemyManager, so LTCG replaces `this` with a
@@ -31,18 +30,6 @@ int harness_enemy_find_closest(D3DXVECTOR3 *pos, f32 max_dist)
 void harness_enemy_manager_create(const char *ecl_filename)
 {
     EnemyManager::create(ecl_filename);
-}
-
-// Like the main loop (0x45ac02, 0x45ae4e, 0x45b060).
-void harness_fps_counter_update()
-{
-    g_FpsCounter->update();
-}
-
-// Like the teardown at 0x43b6ad.
-void harness_fps_counter_delete()
-{
-    delete g_FpsCounter;
 }
 
 // Like the dialogue skip check at 0x42b043.

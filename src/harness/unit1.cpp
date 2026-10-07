@@ -14,7 +14,8 @@ void harness_set_game_speed(f32 speed)
     g_game_speed = speed;
 }
 
-// Like the file loader around 0x45ddbb, which leaves CS_FILE this way.
+// Like the file loader at 0x402440 (0x40250b), which leaves CS_FILE this
+// way; switch_gamemodes and SoundManager::preload_bgm are the other callers.
 void harness_leave_cs(int i)
 {
     g_CriticalSections.leave(CS_FILE);

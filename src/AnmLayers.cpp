@@ -243,7 +243,7 @@ int __fastcall AnmManager::on_draw_0a_layer_03(AnmManager *mgr)
 {
     camera_update_43c780(&g_Supervisor.cameras[3]);
     use_camera(3);
-    g_Supervisor.disable_d3d_fog();
+    g_Supervisor.disable_d3d_fog_inline();
     return mgr->render_layer(3);
 }
 
