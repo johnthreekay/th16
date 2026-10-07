@@ -2502,7 +2502,7 @@ void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
 // full length, moving and shrinking to laser_new_arg_3), leaving the screen
 // once the two delay timers ran out, then the graze check and the VMs.
 // Nonzero once the laser is done.
-// TODO: ours speculatively devirtualizes run_ex, method_3c and method_50 (the first and last still stubs); the original calls them through the vtable.
+// TODO: the original realigns the frame, keeps the * 1.0f of the inlined timer decrement, and loads g_game_speed once for the three position components.
 // FUNCTION: TH16 0x432f40
 i32 LaserLineInf::on_tick()
 {
@@ -2635,7 +2635,7 @@ i32 LaserLineInf::on_tick()
 // One frame: the et_ex steps, then each segment follows the node list to
 // its place at timer_40 minus its index (segments not out yet stay at the
 // start), leaving the screen once every segment is off it.
-// TODO: ours speculatively devirtualizes run_ex and the small et_ex steps; register allocation differs.
+// TODO: the original walks the segments with a pointer biased by -8 and keeps the constants 192 and 448 in swapped registers; it also keeps the * 1.0f of the inlined timer decrement.
 // FUNCTION: TH16 0x4377d0
 i32 LaserCurveInf::on_tick()
 {
@@ -2713,6 +2713,10 @@ i32 LaserCurveInf::on_tick()
             f32 t = timer_40.current_f - (f32)i;
             if (t >= 0.0f)
             {
+                f32 prev_length = segment[-1].length;
+                f32 prev_angle = segment[-1].angle;
+                f32 *out_length = &segment->length;
+                f32 *out_angle = &segment->angle;
                 LaserCurveNode *node;
                 for (node = &nodes; node != NULL; node = node->next)
                 {
@@ -2720,12 +2724,12 @@ i32 LaserCurveInf::on_tick()
                     {
                         if (!placed)
                         {
-                            node->get_state(&segment->pos, &segment->length, &segment->angle, t);
+                            node->get_state(&segment->pos, out_length, out_angle, t);
                         }
                         else
                         {
-                            node->step_back(&segment->pos, &segment->length, &segment->angle, &segment[-1].pos,
-                                            segment[-1].length, segment[-1].angle, t);
+                            node->step_back(&segment->pos, out_length, out_angle, &segment[-1].pos, prev_length,
+                                            prev_angle, t);
                         }
                         break;
                     }
@@ -2748,8 +2752,7 @@ i32 LaserCurveInf::on_tick()
     }
     else
     {
-        i32 i;
-        for (i = 0; i < inner.segment_count; i++, segment++)
+        for (i32 i = 0; i < inner.segment_count; i++, segment++)
         {
             Float3 head;
             laser_sincosmul(&head, angle, unk_70);
@@ -2757,14 +2760,12 @@ i32 LaserCurveInf::on_tick()
             if (!(segment->pos.x + width <= -192.0f || segment->pos.x - width >= 192.0f ||
                   segment->pos.y + width <= 0.0f || segment->pos.y - width >= 448.0f))
             {
-                break;
+                goto on_screen;
             }
         }
-        if (i >= inner.segment_count)
-        {
-            return 1;
-        }
+        return 1;
     }
+on_screen:
     check_graze_or_kill(0);
     vm_92c.run();
     vm_f28.run();

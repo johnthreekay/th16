@@ -356,7 +356,7 @@ class LaserCurveInf : public LaserDataInf
     virtual i32 method_3c();
     virtual i32 method_40();
     virtual i32 method_44();
-    virtual i32 method_60();
+    DECOMP_NOINLINE virtual i32 method_60();
 
     HARNESS_CALLED LaserCurveNode *append_node(f32 value);
 
