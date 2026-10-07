@@ -1947,7 +1947,7 @@ int EnemyData::ecl_run_over_300()
         break;
     // unknown544(on): ENEMY_FLAG_8000000.
     case ECL_OP_FLAG_8000000:
-        ((EnemyFlagsLow *)&flags_low)->unk_27 = get_int_arg(0);
+        ((EnemyFlagsLow *)&flags_low)->flag_8000000 = get_int_arg(0);
         break;
     // laserOn(et): a line laser from the shooter's settings.
     case ECL_OP_LASER_ON:

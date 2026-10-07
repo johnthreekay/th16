@@ -277,8 +277,7 @@ struct EnemyFlagsLow
     u32 timeout : 1;
     u32 unk_25 : 1;
     u32 flag_4000000 : 1;
-    // ENEMY_FLAG_8000000.
-    u32 unk_27 : 1;
+    u32 flag_8000000 : 1;
     u32 bombshield : 1;
     u32 unk_29 : 1;
     u32 big_life : 1;
