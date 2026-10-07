@@ -214,6 +214,49 @@ i32 AnmManager::draw_vm__mode_11(AnmVm *vm, RenderVertex144 *vertices, i32 verte
     return 0;
 }
 
+// Draws count points, each center + offsets[i] in colors[i], as a line
+// strip (despite the name) from the primitive buffer.
+// TODO: ours never uses ebx (the original keeps count * 20 and center in it) and spills the loop counter.
+// FUNCTION: TH16 0x469890
+HARNESS_CALLED void AnmManager::draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors)
+{
+    AnmManager *mgr = g_AnmManager;
+    RenderVertex044 *vertices = mgr->primitive_write_cursor;
+    if (vertices + 1 + count >= mgr->primitive_vertex_data + 0x8000)
+    {
+        return;
+    }
+    mgr->flush_sprites();
+    for (i32 i = 0; i < count; i++)
+    {
+        vertices->pos.x = center->x + offsets->x;
+        vertices->pos.y = offsets->y + center->y;
+        vertices->pos.z = 0.0f;
+        vertices->pos.w = 1.0f;
+        vertices->diffuse = colors->d3d;
+        vertices++;
+        offsets++;
+        colors++;
+    }
+    if (g_AnmManager->last_color_op != 0)
+    {
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
+        g_AnmManager->last_color_op = 0;
+    }
+    if (mgr->render_cache_184fbb6 != 1)
+    {
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        mgr->render_cache_184fbb6 = 1;
+    }
+    g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_LINESTRIP, count - 1, mgr->primitive_write_cursor,
+                                             sizeof(RenderVertex044));
+    mgr->primitive_write_cursor += count;
+    mgr->unk_cc++;
+}
+
 // The on_draw callback of VMs that carry their own vertices: a fan of 33
 // vertices in the extra data of instruction 508 (ExpHP: AnmVm::on_draw__6).
 // FUNCTION: TH16 0x46a330

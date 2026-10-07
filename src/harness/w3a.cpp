@@ -59,13 +59,6 @@ i32 *harness_screen_metric_ptr(i32 which)
     }
 }
 
-// Like the other fan drawers (0x469890 has one caller in the original, but
-// LTCG must see it called through g_AnmManager).
-void harness_draw_triangle_fan(i32 n, Float3 *center, Float2 *offsets, ZunColor *colors)
-{
-    g_AnmManager->draw_triangle_fan(n, center, offsets, colors);
-}
-
 // Like the bombs (0x4106e1) and ECL (0x41eff8), which point a PosVel at an
 // angle.
 void harness_posvel_set_angle(PosVel *pv, f32 angle)
