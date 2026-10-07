@@ -1,5 +1,8 @@
+#include <math.h>
+
 #include "AnmManager.h"
 #include "Laser.h"
+#include "Supervisor.h"
 
 // FUNCTION: TH16 0x431fa0
 i32 __fastcall LaserLineInf::on_sprite_set(AnmVm *vm, i32 sprite)
@@ -96,11 +99,25 @@ i32 LaserLineInf::check_graze_or_kill(i32 a)
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x432dc0
+// The same et_ex step as LaserCurveInf::method_3c.
+// TODO: the original adds and stores the velocity one component at a time and reloads unk_60.x for the fabsf test.
+// FUNCTION: TH16 0x432dc0
 i32 LaserLineInf::method_3c()
 {
-    return unit5_placeholder(this);
+    BulletExState *st = &ex_state[1];
+    if (st->timer.current >= st->ints[0])
+    {
+        ex_flags &= ~4;
+        return 1;
+    }
+    length += st->floats[0] * g_game_speed;
+    unk_60 += *(Float3 *)&st->floats[5] * g_game_speed;
+    if (fabsf(unk_60.x) > 0.0001f || fabsf(unk_60.y) > 0.0001f)
+    {
+        angle = atan2(unk_60.y, unk_60.x);
+    }
+    st->timer.tick();
+    return 0;
 }
 
 // Placeholder (not decompiled yet).
