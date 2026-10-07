@@ -2,6 +2,7 @@
 // shape depends on code that is not decompiled yet.
 #include "../AnmManager.h"
 #include "../MainMenu.h"
+#include "../ReplayManager.h"
 
 extern i32 g_spell_practice_last_stage;
 extern i32 g_spell_practice_last_row;
@@ -30,4 +31,10 @@ i32 harness_w4f_circle(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 radius)
 i32 harness_w4f_practice_key()
 {
     return g_unk_4a5bf8;
+}
+
+// The pause menu (0x4403f1) saves replays too, with 1 as the last argument.
+i32 harness_w4f_save_replay(const char *path, const char *name)
+{
+    return g_ReplayManager->save(path, name, 0, 1);
 }

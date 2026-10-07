@@ -183,6 +183,9 @@ struct ReplayManager
     // 0x4483b0. Dates the replay and records the stage it ends on (the
     // extra stage as 8 and up). Every caller goes through g_ReplayManager.
     HARNESS_CALLED i32 set_end_stage(i32 extra_stage);
+    // 0x448400. Saves g_ReplayManager's replay under the name. The third
+    // argument is the same at every call site; LTCG folded it.
+    HARNESS_CALLED i32 save(const char *path, const char *name, i32 unused, i32 unk_4);
 };
 
 // 0x449120. Clears the game's button state (not the hardware's).
