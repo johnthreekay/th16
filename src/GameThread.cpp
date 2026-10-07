@@ -102,14 +102,135 @@ DECOMP_NOINLINE void GameThread::thread_start()
     unit5_placeholder(g_GameThread);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x42d200
+extern i32 g_unk_4c0f40;
+
+// g_Globals' flag word at 0x45c as a whole (flags_lo_45c, game_mode, ...).
+#define GLOBALS_FLAGS_45C (*(u32 *)((u8 *)&g_Globals + 0x45c))
+
+// Ends a game: saves the score file, shows "now loading" for what comes
+// next, and deletes the game objects (keeping the stage, GUI and player
+// across a stage transition, flag 2) and the update functions.
+// TODO: the original's frame is 4 bytes larger and it lays out the mode 4/16 branch before mode 14.
+// FUNCTION: TH16 0x42d200
 DECOMP_NOINLINE GameThread::~GameThread()
 {
-    unit5_placeholder(this);
+    scorefile_save_449a00();
+    GLOBALS_FLAGS_45C &= ~3;
+    g_game_speed = 1.0f;
+    g_draw_hook_4a6eec = NULL;
+    g_draw_hook_4a6ee8 = NULL;
+    if (g_Supervisor.gamemode_to_switch_to == 10 || g_Supervisor.gamemode_to_switch_to == 11)
+    {
+        g_AsciiManager->show_now_loading_inline(480.0f, 392.0f);
+        if (g_Globals.weird_stage_num == g_Globals.stage_num)
+        {
+            GLOBALS_FLAGS_45C |= 1;
+        }
+    }
+    else if (g_Supervisor.gamemode_to_switch_to == 12)
+    {
+        g_AsciiManager->show_now_loading(480.0f, 392.0f);
+        GLOBALS_FLAGS_45C |= 2;
+    }
+    else if (g_Supervisor.gamemode_to_switch_to == 4 || g_Supervisor.gamemode_to_switch_to == 16)
+    {
+        g_AsciiManager->show_now_loading(480.0f, 392.0f);
+    }
+    else if (g_Supervisor.gamemode_to_switch_to == 14)
+    {
+        g_AsciiManager->show_now_loading(480.0f, 392.0f);
+        if (g_Globals.weird_stage_num != g_Globals.stage_num)
+        {
+            g_Globals.continues_used++;
+            if (g_Globals.continues_used >= 10)
+            {
+                g_Globals.continues_used = 9;
+            }
+            GLOBALS_FLAGS_45C |= 8;
+        }
+        GLOBALS_FLAGS_45C |= 1;
+    }
+    if (!(GLOBALS_FLAGS_45C & 2))
+    {
+        if (g_Supervisor.gamemode_to_switch_to != 15 && g_Supervisor.gamemode_to_switch_to != 16)
+        {
+            delete g_ReplayManager;
+        }
+        delete g_Stage;
+        delete g_Stage2;
+        delete g_PauseMenu;
+        delete g_Gui;
+        delete g_Player;
+        delete g_BulletManager;
+        delete g_ItemManager;
+        delete g_LaserManager;
+        delete g_PopupManager;
+    }
+    else
+    {
+        g_Gui->release_msg();
+        delete g_Stage2;
+        g_Stage2 = g_Stage;
+        PauseMenu *pause = g_PauseMenu;
+        if (pause->on_tick_func != NULL)
+        {
+            pause->on_tick_func->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        if (pause->on_draw_func != NULL)
+        {
+            pause->on_draw_func->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        BulletManager *bullets = g_BulletManager;
+        if (bullets->on_tick != NULL)
+        {
+            bullets->on_tick->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        if (bullets->on_draw != NULL)
+        {
+            bullets->on_draw->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        ReplayManager *replay = g_ReplayManager;
+        if (replay->on_tick_22_func != NULL)
+        {
+            replay->on_tick_22_func->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        if (replay->on_draw_func != NULL)
+        {
+            replay->on_draw_func->flags &= ~UPDATE_FUNC_ACTIVE;
+        }
+        g_ItemManager->destroy_all();
+    }
+    if (!(GLOBALS_FLAGS_45C & 9))
+    {
+        delete g_EnemyManager;
+    }
+    else
+    {
+        g_EnemyManager->destroy_all();
+    }
+    g_AnmManager->disable_vms_from_anm_file(g_EffectManager->effect_anm);
+    g_AnmManager->disable_vms_from_anm_file(g_EffectManager->bullet_anm);
+    BombInf::destroy_all();
+    delete g_Spellcard;
+    g_UpdateFuncRegistry->unregister_locked(on_tick);
+    g_UpdateFuncRegistry->unregister_locked(on_draw);
+    g_GameThread = NULL;
+    if (!(g_Globals.game_mode == 2 && (GLOBALS_FLAGS_45C & 1)) && !(GLOBALS_FLAGS_45C & 0x42))
+    {
+        if (g_Supervisor.config.flags_2c & 0x10)
+        {
+            g_SoundManager.modify_bgm(4, 0, "dummy");
+        }
+        else
+        {
+            g_SoundManager.modify_bgm(3, 0, "dummy");
+        }
+        g_SoundManager.bgm_name[0] = '\0';
+    }
+    SoundManager::pause_sounds();
+    g_unk_4c0f40 = 1;
+    g_Supervisor.background_color = (GLOBALS_FLAGS_45C & 1) ? 0 : 0xff000000;
 }
-
-extern i32 g_unk_4c0f40;
 
 // One frame of a game: the ending fade, the stage restart and intro
 // timing, the demo's end, the music restart after a pause and the timers.
