@@ -74,7 +74,11 @@ struct Bullet
     u8 unk_c44[4];
     // Position in BulletManager::bullets.
     i32 index;
-    u8 unk_c4c[0xc68 - 0xc4c];
+    u8 unk_c4c[0xc5c - 0xc4c];
+    // Script of bullet.anm played where the bullet is cancelled (none if
+    // negative).
+    i32 cancel_script;
+    u8 unk_c60[0xc68 - 0xc60];
     u32 active_ex_flags;
     u8 unk_c6c[0xc72 - 0xc6c];
     u16 state;

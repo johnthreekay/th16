@@ -6,6 +6,7 @@
 #include "Collision.h"
 #include "Item.h"
 #include "Rng.h"
+#include "SoundManager.h"
 #include "Spellcard.h"
 #include "GameErrorContext.h"
 #include "GameThread.h"
@@ -252,6 +253,40 @@ int __fastcall bullet_map_sprite(AnmVm *vm, i32 sprite)
         return g_bullet_types[bullet->sprite].sprites[sprite + bullet->color * 4];
     }
     return sprite;
+}
+
+static_assert(offsetof(Bullet, cancel_script) == 0xc5c, "Bullet layout");
+static_assert(offsetof(Bullet, timer_144c) == 0x144c, "Bullet layout");
+static_assert(offsetof(BulletManager, anm_ids) == 0x13ffc8c, "BulletManager layout");
+static_assert(offsetof(BulletManager, unk_cancel_counter) == 0x1403b14, "BulletManager layout");
+
+// TODO: the original loads the ANM file before pushing create_vm's
+// arguments and adds pos.x + delta.x with the operands swapped.
+// FUNCTION: TH16 0x416840
+i32 Bullet::cancel(i32 mode)
+{
+    vm0.interrupt(1);
+    vm0.run();
+    if (vm1.flags_lo & ANM_VM_VISIBLE)
+    {
+        vm1.interrupt(1);
+    }
+    if (!(flags & BULLET_FLAG_NO_DRAW))
+    {
+        if (cancel_script >= 0)
+        {
+            g_BulletManager->anm_ids[index] = g_BulletManager->bullet_anm->create_vm(cancel_script, &pos, 0.0f, -1, 0);
+        }
+        g_SoundManager.play_sound_at_position(0x47, pos.x);
+        gen_items_from_cancel(&pos, mode);
+    }
+    D3DXVECTOR3 delta = velocity * g_game_speed * 0.5f;
+    pos.x = pos.x + delta.x;
+    pos.y = pos.y + delta.y;
+    pos.z = pos.z + delta.z;
+    state = 4;
+    timer_144c.reset();
+    return 0;
 }
 
 // Whether a bullet's hitbox touches a circle.
