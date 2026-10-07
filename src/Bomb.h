@@ -4,6 +4,7 @@
 
 #include "AnmManager.h"
 #include "EnemyManager.h"
+#include "PosVel.h"
 #include "UpdateFunc.h"
 #include "ZunTimer.h"
 #include "decomp.h"
@@ -85,11 +86,20 @@ class BombInf
 struct BombReimuAOrb
 {
     AnmId anm_id;
-    D3DXVECTOR3 pos;
-    u8 unk_10[0x38 - 0x10];
-    // Where the orb was launched from.
-    D3DXVECTOR3 start_pos;
-    u8 unk_44[0xa0 - 0x44];
+    union
+    {
+        struct
+        {
+            D3DXVECTOR3 pos;
+            u8 unk_10[0x38 - 0x10];
+            // Where the orb was launched from.
+            D3DXVECTOR3 start_pos;
+            u8 unk_44[0x48 - 0x44];
+        };
+        // The orb's motion: pos is its first field.
+        PosVel motion;
+    };
+    u8 unk_48[0xa0 - 0x48];
     i32 active;
     ZunTimer timer;
     // How far the orb moved last frame.

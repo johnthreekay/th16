@@ -369,33 +369,34 @@ i32 BombCirnoAInf::method_10()
 // The orb's motion: its pos is the first field of a PosVel.
 static inline PosVel *orb_motion(BombReimuAOrb *orb)
 {
-    return (PosVel *)&orb->pos;
+    return &orb->motion;
 }
 
-// TODO: the original addresses the PosVel through this (a member at +4), ours through a second pointer register; the ifs after the timer check also differ in block order.
+// TODO: this is in esi where the original has edi (both save esi and edi and
+// leave the other unused), and the radial_dist update is scheduled into the
+// start_pos copy.
 // FUNCTION: TH16 0x410550
 void BombReimuAOrb::update()
 {
-    PosVel *motion = orb_motion(this);
     if (timer.current != timer.previous)
     {
         i32 time = timer.current;
         if (time < 90)
         {
             start_pos = g_Player->inner.pos;
-            motion->radial_dist += 1.5f;
-            motion->angle.value = wrap_angle(motion->angle.value + ZUN_PI / 30);
+            motion.radial_dist += 1.5f;
+            motion.angle.value = wrap_angle(motion.angle.value + ZUN_PI / 30);
         }
         else if (time < (index + 9) * 10)
         {
             start_pos = g_Player->inner.pos;
-            motion->angle.value = wrap_angle(motion->angle.value + ZUN_PI / 30);
+            motion.angle.value = wrap_angle(motion.angle.value + ZUN_PI / 30);
         }
         else if (time == (index + 9) * 10)
         {
-            motion->flags &= ~0xf;
-            motion->set_angle(atan2(move.y, move.x));
-            motion->speed = sqrtf(move.x * move.x + move.y * move.y);
+            motion.flags &= ~0xf;
+            motion.set_angle(atan2(move.y, move.x));
+            motion.speed = sqrtf(move.x * move.x + move.y * move.y);
         }
         else
         {
@@ -410,7 +411,7 @@ void BombReimuAOrb::update()
                 {
                     f32 goal = atan2(target_enemy->enemy.final_pos.pos.y - pos.y,
                                      target_enemy->enemy.final_pos.pos.x - pos.x);
-                    f32 angle = motion->angle.value;
+                    f32 angle = motion.angle.value;
                     f32 delta;
                     if (goal - angle > ZUN_PI)
                     {
@@ -424,7 +425,7 @@ void BombReimuAOrb::update()
                     {
                         delta = goal - angle;
                     }
-                    f32 speed = motion->speed;
+                    f32 speed = motion.speed;
                     f32 abs_delta = fabs(delta);
                     if (abs_delta >= ZUN_PI / 4)
                     {
@@ -434,20 +435,20 @@ void BombReimuAOrb::update()
                     {
                         speed = speed + 0.2f > 8.0f ? 8.0f : speed + 0.2f;
                     }
-                    motion->set_angle((motion->angle + delta * 0.1f).value);
-                    motion->speed = speed;
+                    motion.set_angle((motion.angle + delta * 0.1f).value);
+                    motion.speed = speed;
                 }
             }
             else if (pos.x < -160.0f || pos.x > 160.0f || pos.y < 32.0f || pos.y > 416.0f)
             {
-                motion->speed *= 0.9f;
+                motion.speed *= 0.9f;
             }
         }
     }
     D3DXVECTOR3 old_pos = pos;
-    motion->update_secondary_fields();
-    motion->step();
-    AnmVm *vm = g_AnmManager->get_vm_with_id(anm_id);
+    motion.update_secondary_fields();
+    motion.step();
+    AnmVm *vm = get_vm(anm_id);
     if (vm != NULL)
     {
         vm->entity_pos = pos;
