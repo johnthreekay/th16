@@ -414,7 +414,10 @@ struct LaserManager
     Float3 cancel_pos;
     Float3 cancel_pos_2;
     AnmLoaded *bullet_anm;
-    u8 unk_608[8];
+    // Summed by the method_1c variants: 18 to 22 for each point of a laser
+    // inside their rectangle, by laser width. Nothing reads it.
+    i32 unk_608;
+    u8 unk_60c[4];
 
     LaserManager();
     ~LaserManager();

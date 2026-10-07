@@ -6,6 +6,7 @@
 #include "Collision.h"
 #include "CriticalSections.h"
 #include "EffectManager.h"
+#include "EnemyManager.h"
 #include "Enemy.h"
 #include "GameErrorContext.h"
 #include "GameThread.h"
@@ -1024,6 +1025,142 @@ i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i3
                 } while (j < i);
             }
         }
+    }
+    return count;
+}
+
+// collision_test_circle_rect as LTCG inlined it into the method_1c
+// variants.
+static __forceinline i32 test_circle_rect_inline(f32 rect_x, f32 rect_y, f32 w, f32 h, f32 angle, f32 circle_x,
+                                                 f32 circle_y, f32 radius)
+{
+    circle_x -= rect_x;
+    circle_y -= rect_y;
+    angle = -angle;
+    f32 s = zun_sinf(angle);
+    f32 c = zun_cosf(angle);
+    f32 x = circle_x * c - circle_y * s;
+    f32 y = circle_x * s + circle_y * c;
+    f32 half_w = w * 0.5f;
+    f32 half_h = h * 0.5f;
+    f32 abs_x = fabsf(x);
+    if (half_w + radius >= abs_x && half_h >= fabsf(y))
+    {
+        return 1;
+    }
+    if (half_w >= abs_x && half_h + radius >= fabsf(y))
+    {
+        return 1;
+    }
+    f32 radius_sq = radius * radius;
+    if (radius_sq > (x - half_w) * (x - half_w) + (y - half_h) * (y - half_h))
+    {
+        return 1;
+    }
+    if (radius_sq > (x + half_w) * (x + half_w) + (y - half_h) * (y - half_h))
+    {
+        return 1;
+    }
+    if (radius_sq > (x - half_w) * (x - half_w) + (y + half_h) * (y + half_h))
+    {
+        return 1;
+    }
+    if (radius_sq > (x + half_w) * (x + half_w) + (y + half_h) * (y + half_h))
+    {
+        return 1;
+    }
+    return 0;
+}
+
+// The first boss, as the method_1c variants look it up (inlined
+// find_enemy_by_id).
+static __forceinline EnemyInf *laser_boss()
+{
+    return g_EnemyManager->find_enemy_by_id(g_EnemyManager->inner.boss_ids[0]);
+}
+
+// The size of the sprite of the boss's first VM.
+static __forceinline AnmLoadedSprite *laser_boss_sprite()
+{
+    AnmVm *vm = get_vm_or_clear(laser_boss()->enemy.anm_ids[0]);
+    return &g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id];
+}
+
+static_assert(offsetof(EnemyInf, enemy.anm_ids) == 0x1330, "EnemyInf::enemy.anm_ids");
+
+// Never called. Walks the laser in steps of 16 units: while *boss_hit is
+// clear, sets it once a point is within 8 units of the boss's sprite (at
+// three quarters size). Counts the points inside the rectangle at pos (size,
+// turned by rect_angle) and adds a damage value by laser width for each to
+// g_LaserManager->unk_608. Its own points move only 8 units per step in
+// the rectangle's frame. The parameters are pos, size, rect_angle, unused,
+// e (skip while countdown_5c8 runs) and boss_hit.
+// TODO: register allocation differs (the original keeps this in edi, size in esi); it multiplies the sprite sizes before zun_sinf and squares each corner distance again, as in collision_test_circle_rect.
+// FUNCTION: TH16 0x436010
+i32 LaserInfiniteInf::method_1c(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
+{
+    Float3 *pos = (Float3 *)a;
+    Float3 *size = (Float3 *)b;
+    f32 rect_angle = *(f32 *)&c;
+    i32 *boss_hit = (i32 *)f;
+    if (e != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    f32 dist = 8.0f;
+    i32 count = 0;
+    f32 dx = position.x - pos->x;
+    f32 dy = position.y - pos->y;
+    f32 s = zun_sinf(rect_angle);
+    f32 cs = zun_cosf(rect_angle);
+    f32 rx = dx * cs - dy * s;
+    f32 ry = dx * s + dy * cs;
+    Float3 local_step;
+    laser_sincosmul(&local_step, wrap_angle(angle + rect_angle), 8.0f);
+    f32 local_x = local_step.x + rx;
+    f32 local_y = local_step.y + ry;
+    local_step.z = 0.0f;
+    f32 half_w = size->x * 0.5f;
+    f32 half_h = size->y * 0.5f;
+    Float3 step;
+    laser_sincosmul(&step, angle, 8.0f);
+    f32 world_x = position.x + step.x;
+    f32 world_y = position.y + step.y;
+    step.x += step.x;
+    step.y += step.y;
+    step.z = 0.0f;
+    u8 hit[0x100];
+    u8 *h = hit;
+    for (; dist + 8.0f <= unk_70; dist += 16.0f, h++)
+    {
+        if (*boss_hit == 0)
+        {
+            if (test_circle_rect_inline(laser_boss()->enemy.final_pos.pos.x, laser_boss()->enemy.final_pos.pos.y,
+                                        laser_boss_sprite()->sprite_width * 0.75f,
+                                        laser_boss_sprite()->sprite_height * 0.75f, 0.0f, world_x, world_y, 8.0f))
+            {
+                *boss_hit = 1;
+            }
+        }
+        if (!(-half_w > local_x || local_x > half_w || -half_h > local_y || local_y > half_h))
+        {
+            count++;
+            *h = 1;
+            i32 damage = 18;
+            if (width >= 96.0f)
+            {
+                damage = 22;
+            }
+            else if (width >= 16.0f && 96.0f > width)
+            {
+                damage = (i32)((width - 16.0f) / 80.0f * 3.0f + 18.0f + 1.0f);
+            }
+            g_LaserManager->unk_608 += damage;
+        }
+        local_x += local_step.x;
+        world_x += step.x;
+        local_y += local_step.y;
+        world_y += step.y;
     }
     return count;
 }
