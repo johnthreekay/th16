@@ -1,3 +1,4 @@
+#include "AnmManager.h"
 #include "Laser.h"
 
 // FUNCTION: TH16 0x431fa0
@@ -38,12 +39,6 @@ i32 LaserLineInf::on_tick()
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x433720
-i32 LaserLineInf::on_draw()
-{
-    return unit5_placeholder(this);
-}
 
 // Placeholder (not decompiled yet).
 // STUB: TH16 0x434010

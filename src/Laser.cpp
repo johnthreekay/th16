@@ -14,7 +14,10 @@ LaserManager *g_LaserManager;
 BulletTypeInfo g_bullet_types[BULLET_TYPE_COUNT];
 
 // This file's copy of ZunMath.h's sincosmul, which TH16 keeps once per
-// object file. A static of its own so that it can be annotated.
+// object file. A static of its own so that it can be annotated. ZUN's laser
+// code was one file; the laser methods that call it are kept here so that
+// they call this copy (LTCG knows it leaves ecx and edx alone, which it
+// would not assume for an external function).
 // FUNCTION: TH16 0x43ad00
 static void __fastcall laser_sincosmul(Float3 *dst, f32 angle, f32 radius)
 {
@@ -522,4 +525,44 @@ LaserInfiniteInner::LaserInfiniteInner()
 {
     memset(this, 0, sizeof(LaserInfiniteInner));
     speed = 8.0f;
+}
+
+// FUNCTION: TH16 0x433720
+i32 LaserLineInf::on_draw()
+{
+    i32 i = 0;
+    vm_92c.pos = position;
+    f32 rotation = angle + ZUN_PI / 2;
+    while (rotation > ZUN_PI)
+    {
+        rotation -= ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    while (rotation < -ZUN_PI)
+    {
+        rotation += ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    AnmVm *vm = &vm_92c;
+    vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
+    vm->rotation.z = rotation;
+    g_AnmManager->draw_vm(vm);
+    Float3 *tip = &vm_1524.pos;
+    laser_sincosmul(tip, angle, unk_70);
+    tip->z = 0.0f;
+    tip->x += position.x;
+    tip->y += position.y;
+    g_AnmManager->draw_vm(&vm_1524);
+    if (unk_7c == 0.0f)
+    {
+        vm_f28.pos = position;
+        g_AnmManager->draw_vm(&vm_f28);
+    }
+    return 0;
 }
