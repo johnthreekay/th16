@@ -156,7 +156,8 @@ HARNESS_CALLED void *Ending::load_script(const char *filename)
     return data;
 }
 
-// TODO: the original frame has 4 more bytes (see show_now_loading).
+// TODO: the original frame has 4 more bytes: the spilled UpdateFunc pointer
+// keeps [ebp-0x10] to itself, where ours shares it with the AnmId result.
 // FUNCTION: TH16 0x4191f0
 i32 Ending::initialize()
 {

@@ -51,8 +51,6 @@ void help_manual_read_file()
     g_Supervisor.thread.stop_requested = TRUE;
 }
 
-// TODO: the original inlines the second create_func (only that one); ours
-// calls both, since create_func is HARNESS_CALLED and so never inlined.
 // FUNCTION: TH16 0x42e810
 i32 HelpManual::initialize()
 {
@@ -61,9 +59,14 @@ i32 HelpManual::initialize()
     f->arg = this;
     g_UpdateFuncRegistry->register_on_tick(f, 0xb);
     on_tick = f;
-    f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_draw_callback);
-    f->flags &= ~UPDATE_FUNC_ACTIVE;
+    // create_func, inlined here in the original (only this one).
+    f = new UpdateFunc;
+    f->flags |= UPDATE_FUNC_HEAP_ALLOCATED;
+    f->function = (UpdateFuncCallback)on_draw_callback;
+    f->on_registration = NULL;
+    f->on_cleanup = NULL;
     f->arg = this;
+    f->flags &= ~UPDATE_FUNC_ACTIVE;
     g_UpdateFuncRegistry->register_on_draw(f, 0x48);
     on_draw = f;
     g_Supervisor.start_thread((ThreadStart)help_manual_load_anm, NULL);

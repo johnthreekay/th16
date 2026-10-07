@@ -700,8 +700,6 @@ void GameThread::enable_update_funcs()
     }
 }
 
-// TODO: register allocation: the original keeps the converted time in
-// eax:edx and computes the index in ecx, saving only esi/edi.
 // FUNCTION: TH16 0x42dbc0
 void GameThread::update_play_time()
 {
@@ -716,9 +714,12 @@ void GameThread::update_play_time()
     double elapsed = get_runtime() - g_play_time_runtime;
     if (elapsed >= 0.0)
     {
+        // The total's address is taken before the conversion: the original
+        // loads g_Scorefile before the __dtol3 call and keeps it in edi.
         Scorefile *scorefile = g_Scorefile;
+        __int64 *total = &scorefile->play_time;
         __int64 time = (__int64)(elapsed * 100.0);
-        scorefile->play_time += time;
+        *total += time;
         scorefile->characters[g_Globals.subshot + g_Globals.character].play_time += time;
     }
     g_play_time_runtime = get_runtime();
