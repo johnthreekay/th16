@@ -107,7 +107,7 @@ HARNESS_CALLED f32 AnmVm::get_float_var(f32 value)
 }
 
 // FUNCTION: TH16 0x45f610
-i32 AnmVm::get_int_var(i32 value)
+HARNESS_CALLED i32 AnmVm::get_int_var(i32 value)
 {
     switch (value)
     {
@@ -150,7 +150,7 @@ i32 AnmVm::get_int_var(i32 value)
 }
 
 // FUNCTION: TH16 0x45f780
-f32 *AnmVm::get_float_var_ptr(f32 *value)
+HARNESS_CALLED f32 *AnmVm::get_float_var_ptr(f32 *value)
 {
     switch ((i32)*value)
     {
@@ -189,7 +189,7 @@ f32 *AnmVm::get_float_var_ptr(f32 *value)
 }
 
 // FUNCTION: TH16 0x45f890
-i32 *AnmVm::get_int_var_ptr(i32 *value)
+HARNESS_CALLED i32 *AnmVm::get_int_var_ptr(i32 *value)
 {
     switch (*value)
     {
@@ -466,8 +466,11 @@ run_script:
             break;
         // isetRand, fsetRand
         case 122:
-            *ANM_INT_PTR(0) = g_replay_unsafe_rng.rand_u32_in_range(ANM_INT(1));
+        {
+            u32 range = ANM_INT(1);
+            *ANM_INT_PTR(0) = range != 0 ? g_replay_unsafe_rng.rand_u32() % range : 0;
             break;
+        }
         case 123:
             *ANM_FLOAT_PTR(0) = g_replay_unsafe_rng.randf_0_to(ANM_FLOAT(1));
             break;

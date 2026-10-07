@@ -22,3 +22,9 @@ int __fastcall anm_effect_4_init(AnmVm *vm)
 void AnmVm::update_special_vertices()
 {
 }
+
+// Opaque use of a local double, for harness callers that must have 8-byte
+// aligned frames.
+void w4b_opaque_double(double *value)
+{
+}

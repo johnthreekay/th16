@@ -448,9 +448,9 @@ struct AnmVm
     // Script argument lookups: a variable number (AnmVar) gives the
     // variable, anything else is returned as is.
     HARNESS_CALLED f32 get_float_var(f32 value);
-    i32 get_int_var(i32 value);
-    f32 *get_float_var_ptr(f32 *value);
-    i32 *get_int_var_ptr(i32 *value);
+    HARNESS_CALLED i32 get_int_var(i32 value);
+    HARNESS_CALLED f32 *get_float_var_ptr(f32 *value);
+    HARNESS_CALLED i32 *get_int_var_ptr(i32 *value);
     // Rotation plus every parent's, in rotation_related. Wraps this VM's
     // own rotation into [-pi, pi] on the way.
     Float3 *get_total_rotation();
