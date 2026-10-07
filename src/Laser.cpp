@@ -1587,7 +1587,7 @@ i32 LaserInfiniteInf::initialize(void *params)
     ex_index = *(i32 *)inner.unk_50;
     width = 2.0f;
     id = inner.laser_st_on_arg_1;
-    timer.reset();
+    timer_2c.reset();
     unk_94c = 0;
     return 0;
 }
