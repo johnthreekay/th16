@@ -164,7 +164,7 @@ struct PauseMenu
 
     int on_tick();
     // 0x43f980 (ExpHP: on_tick_in_pause_menu). The menu's tick while it is
-    // open (states 1 to 3).
+    // open (any state but PAUSE_CLOSED).
     void tick_open();
     int on_draw();
     // 0x43e730. The name entry keyboard; the name is drawn at pos.

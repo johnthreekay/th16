@@ -1038,7 +1038,7 @@ void PauseMenu::tick_open()
         return;
     case PAUSE_SUB_REPLAY_NAME_ENTRY:
     case PAUSE_SUB_SCORE_NAME_ENTRY:
-        // Entering the replay name (12) or the score name (15).
+        // Entering the replay name or the score name.
         if (time_in_current_menu.current < 10)
         {
             break;
