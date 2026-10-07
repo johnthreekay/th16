@@ -53,16 +53,15 @@ GameThread::GameThread()
     memset(this, 0, sizeof(GameThread));
 }
 
-// TODO: esi and edi swapped (replay_mode and thread).
 // FUNCTION: TH16 0x42d700
 HARNESS_CALLED GameThread *GameThread::create(i32 replay_mode)
 {
     GameThread *thread = new GameThread();
     g_unk_4d9d90 = 0;
     g_Supervisor.d3d_device->EvictManagedResources();
-    thread->flags.paused = 1;
     g_GameThread = thread;
     thread->replay_mode = replay_mode;
+    thread->flags.paused = 1;
     g_Supervisor.start_thread((ThreadStart)thread_start_callback, NULL);
     return thread;
 }
@@ -427,7 +426,6 @@ fail:
 // Ends a game: saves the score file, shows "now loading" for what comes
 // next, and deletes the game objects (keeping the stage, GUI and player
 // across a stage transition, flag 2) and the update functions.
-// TODO: the original's frame is 4 bytes larger and it lays out the mode 4/16 branch before mode 14.
 // FUNCTION: TH16 0x42d200
 DECOMP_NOINLINE GameThread::~GameThread()
 {
@@ -449,7 +447,11 @@ DECOMP_NOINLINE GameThread::~GameThread()
         g_AsciiManager->show_now_loading(480.0f, 392.0f);
         GLOBALS_FLAGS_45C |= 2;
     }
-    else if (g_Supervisor.gamemode_to_switch_to == 4 || g_Supervisor.gamemode_to_switch_to == 16)
+    else if (g_Supervisor.gamemode_to_switch_to == 4)
+    {
+        g_AsciiManager->show_now_loading(480.0f, 392.0f);
+    }
+    else if (g_Supervisor.gamemode_to_switch_to == 16)
     {
         g_AsciiManager->show_now_loading(480.0f, 392.0f);
     }
