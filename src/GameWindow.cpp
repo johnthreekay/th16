@@ -403,7 +403,7 @@ HARNESS_CALLED void GameWindow::take_screenshot()
 {
     char path[0x100];
     g_AnmManager->take_screenshots();
-    if (!(g_hardware_input_pressed & 0x40000))
+    if (!(g_hardware_input_pressed & INPUT_SCREENSHOT))
     {
         return;
     }
@@ -430,11 +430,11 @@ void GameWindow::set_resolution_from_config()
 {
     f32 scale;
     u32 size = (g_window_flags >> WINDOW_SIZE_SHIFT) & 0xf;
-    if (size == 2 || size == 5)
+    if (size == WINDOW_SIZE_FULLSCREEN_1280 || size == WINDOW_SIZE_WINDOWED_1280)
     {
         scale = 2.0f;
     }
-    else if (size == 1 || size == 4)
+    else if (size == WINDOW_SIZE_FULLSCREEN_960 || size == WINDOW_SIZE_WINDOWED_960)
     {
         scale = 1.5f;
     }
@@ -475,14 +475,14 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
                 g_window_flags |= WINDOW_CHANGE_MODE;
                 switch ((g_window_flags >> WINDOW_SIZE_SHIFT) & 0xf)
                 {
-                case 3:
-                    SET_WINDOW_SIZE(0);
+                case WINDOW_SIZE_WINDOWED_640:
+                    SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_640);
                     break;
-                case 4:
-                    SET_WINDOW_SIZE(1);
+                case WINDOW_SIZE_WINDOWED_960:
+                    SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_960);
                     break;
-                case 5:
-                    SET_WINDOW_SIZE(2);
+                case WINDOW_SIZE_WINDOWED_1280:
+                    SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_1280);
                     break;
                 }
                 break;
@@ -533,23 +533,23 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             g_window_flags |= WINDOW_CHANGE_MODE;
             switch ((g_window_flags >> WINDOW_SIZE_SHIFT) & 0xf)
             {
-            case 3:
-                SET_WINDOW_SIZE(0);
+            case WINDOW_SIZE_WINDOWED_640:
+                SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_640);
                 break;
-            case 4:
-                SET_WINDOW_SIZE(1);
+            case WINDOW_SIZE_WINDOWED_960:
+                SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_960);
                 break;
-            case 5:
-                SET_WINDOW_SIZE(2);
+            case WINDOW_SIZE_WINDOWED_1280:
+                SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_1280);
                 break;
-            case 0:
-                SET_WINDOW_SIZE(3);
+            case WINDOW_SIZE_FULLSCREEN_640:
+                SET_WINDOW_SIZE(WINDOW_SIZE_WINDOWED_640);
                 break;
-            case 1:
-                SET_WINDOW_SIZE(4);
+            case WINDOW_SIZE_FULLSCREEN_960:
+                SET_WINDOW_SIZE(WINDOW_SIZE_WINDOWED_960);
                 break;
-            case 2:
-                SET_WINDOW_SIZE(5);
+            case WINDOW_SIZE_FULLSCREEN_1280:
+                SET_WINDOW_SIZE(WINDOW_SIZE_WINDOWED_1280);
                 break;
             }
         }

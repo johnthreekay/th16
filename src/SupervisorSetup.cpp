@@ -184,30 +184,30 @@ INT_PTR CALLBACK resolution_dialog_proc(HWND dialog, UINT message, WPARAM wparam
     case WM_INITDIALOG:
         if (g_Supervisor.config.flags & CONFIG_SHOW_STARTUP_DIALOG)
         {
-            SendMessageA(GetDlgItem(dialog, 0xca), BM_SETCHECK, BST_CHECKED, 0);
+            SendMessageA(GetDlgItem(dialog, IDC_SHOW_AT_STARTUP), BM_SETCHECK, BST_CHECKED, 0);
         }
         switch (g_Supervisor.config.window_size)
         {
-        case 0:
-            SendMessageA(GetDlgItem(dialog, 0xcb), BM_SETCHECK, BST_CHECKED, 0);
-        case 3:
-            SendMessageA(GetDlgItem(dialog, 0xcd), BM_SETCHECK, BST_CHECKED, 0);
+        case WINDOW_SIZE_FULLSCREEN_640:
+            SendMessageA(GetDlgItem(dialog, IDC_FULL_SCREEN), BM_SETCHECK, BST_CHECKED, 0);
+        case WINDOW_SIZE_WINDOWED_640:
+            SendMessageA(GetDlgItem(dialog, IDC_SIZE_640), BM_SETCHECK, BST_CHECKED, 0);
             break;
-        case 1:
-            SendMessageA(GetDlgItem(dialog, 0xcb), BM_SETCHECK, BST_CHECKED, 0);
-        case 4:
-            SendMessageA(GetDlgItem(dialog, 0xce), BM_SETCHECK, BST_CHECKED, 0);
+        case WINDOW_SIZE_FULLSCREEN_960:
+            SendMessageA(GetDlgItem(dialog, IDC_FULL_SCREEN), BM_SETCHECK, BST_CHECKED, 0);
+        case WINDOW_SIZE_WINDOWED_960:
+            SendMessageA(GetDlgItem(dialog, IDC_SIZE_960), BM_SETCHECK, BST_CHECKED, 0);
             break;
-        case 2:
-            SendMessageA(GetDlgItem(dialog, 0xcb), BM_SETCHECK, BST_CHECKED, 0);
-        case 5:
-            SendMessageA(GetDlgItem(dialog, 0xcf), BM_SETCHECK, BST_CHECKED, 0);
+        case WINDOW_SIZE_FULLSCREEN_1280:
+            SendMessageA(GetDlgItem(dialog, IDC_FULL_SCREEN), BM_SETCHECK, BST_CHECKED, 0);
+        case WINDOW_SIZE_WINDOWED_1280:
+            SendMessageA(GetDlgItem(dialog, IDC_SIZE_1280), BM_SETCHECK, BST_CHECKED, 0);
             break;
         }
         g_window_flags = (g_window_flags & ~WINDOW_DIALOG_CANCELLED) | WINDOW_DIALOG_OPEN;
         return FALSE;
     case WM_COMMAND:
-        if (LOWORD(wparam) != 0xd0)
+        if (LOWORD(wparam) != IDC_OK)
         {
             return FALSE;
         }
@@ -234,7 +234,7 @@ INT_PTR CALLBACK resolution_dialog_proc(HWND dialog, UINT message, WPARAM wparam
 // FUNCTION: TH16 0x45c2a0
 void read_resolution_dialog()
 {
-    if (IsDlgButtonChecked(g_GameWindow.dialog, 0xca) == BST_CHECKED)
+    if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SHOW_AT_STARTUP) == BST_CHECKED)
     {
         g_Supervisor.config.flags |= CONFIG_SHOW_STARTUP_DIALOG;
     }
@@ -242,19 +242,19 @@ void read_resolution_dialog()
     {
         g_Supervisor.config.flags &= ~CONFIG_SHOW_STARTUP_DIALOG;
     }
-    if (IsDlgButtonChecked(g_GameWindow.dialog, 0xcd) == BST_CHECKED)
+    if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_640) == BST_CHECKED)
     {
-        g_Supervisor.config.window_size = IsDlgButtonChecked(g_GameWindow.dialog, 0xcb) == BST_CHECKED ? 0 : 3;
+        g_Supervisor.config.window_size = IsDlgButtonChecked(g_GameWindow.dialog, IDC_FULL_SCREEN) == BST_CHECKED ? WINDOW_SIZE_FULLSCREEN_640 : WINDOW_SIZE_WINDOWED_640;
     }
-    else if (IsDlgButtonChecked(g_GameWindow.dialog, 0xce) == BST_CHECKED)
+    else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_960) == BST_CHECKED)
     {
         g_Supervisor.config.window_size =
-            (IsDlgButtonChecked(g_GameWindow.dialog, 0xcb) == BST_CHECKED ? 0 : 3) + 1;
+            (IsDlgButtonChecked(g_GameWindow.dialog, IDC_FULL_SCREEN) == BST_CHECKED ? WINDOW_SIZE_FULLSCREEN_640 : WINDOW_SIZE_WINDOWED_640) + 1;
     }
-    else if (IsDlgButtonChecked(g_GameWindow.dialog, 0xcf) == BST_CHECKED)
+    else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_1280) == BST_CHECKED)
     {
         g_Supervisor.config.window_size =
-            (IsDlgButtonChecked(g_GameWindow.dialog, 0xcb) == BST_CHECKED ? 0 : 3) + 2;
+            (IsDlgButtonChecked(g_GameWindow.dialog, IDC_FULL_SCREEN) == BST_CHECKED ? WINDOW_SIZE_FULLSCREEN_640 : WINDOW_SIZE_WINDOWED_640) + 2;
     }
 }
 

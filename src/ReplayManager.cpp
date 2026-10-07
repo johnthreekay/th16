@@ -65,7 +65,7 @@ int __fastcall ReplayManager::on_tick_22(void *arg)
 
     // Fast-forward: run the frame list again for 7 of every 8 frames.
     if (g_GameThread != NULL && !g_GameThread->flags.paused && replay->mode == REPLAY_PLAYBACK &&
-        (g_hardware_input & 0x201) && replay->current_tick_num_in_stage % 8 != 0)
+        (g_hardware_input & (INPUT_SKIP | INPUT_SHOT)) && replay->current_tick_num_in_stage % 8 != 0)
     {
         return UPDATE_FUNC_RESTART_FROM_FIRST;
     }
@@ -192,9 +192,9 @@ int ReplayManager::on_tick_record()
     if (g_Supervisor.config.flags & CONFIG_SHOT_HOLD_FOCUS)
     {
         input = g_InputState.input;
-        if ((input & 1) && (u32)g_InputState.hold_time[0] >= 10)
+        if ((input & INPUT_SHOT) && (u32)g_InputState.hold_time[0] >= 10)
         {
-            input |= 8;
+            input |= INPUT_FOCUS;
             g_InputState.input = input;
         }
     }

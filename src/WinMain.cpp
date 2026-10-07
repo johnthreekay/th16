@@ -111,7 +111,8 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
         i32 height = GetSystemMetrics(SM_CYDLGFRAME) * 2 + GetSystemMetrics(SM_CYCAPTION) + g_resolution_y;
         g_GameWindow.window =
             CreateWindowExA(0, "BASE", "\x93\x8c\x95\xfb\x93V\x8b\xf3\xe0\xf6\x81@\x81` Hidden Star in Four Seasons. ver 1.00a",
-                            0x100b0000, g_Supervisor.config.window_x, g_Supervisor.config.window_y,
+                            WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX, g_Supervisor.config.window_x,
+                            g_Supervisor.config.window_y,
                             width, height, NULL, NULL, instance, NULL);
     }
     GetWindowRect(g_GameWindow.window, &g_Supervisor.window_rect);
@@ -409,6 +410,15 @@ static inline void stop_sound_threads()
     SoundManager::stop_threads();
 }
 
+// The program: sets up the critical sections, the single instance mutex
+// and the save directories, loads th16.cfg and shows the resolution dialog
+// (when CONFIG_SHOW_STARTUP_DIALOG is set or Shift is held), then creates
+// Direct3D, the window, input and sound and hands over to the Supervisor.
+// The frame loop runs a frame whenever no window message is waiting; when
+// the device is lost or the display mode changes (WINDOW_CHANGE_MODE) it
+// resets the device. A frame result of 2 (options that need a restart
+// changed) starts over from creating Direct3D. On exit it saves th16.cfg
+// and log.txt and restores the screen saver settings.
 // WinMain has C linkage, so it is annotated by its linker symbol.
 // TODO: 80%; the critical section loops count differently and some blocks are laid out in another order.
 // SYNTHETIC: TH16 0x459830 SYMBOL
@@ -453,7 +463,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
     if ((g_Supervisor.config.flags & CONFIG_SHOW_STARTUP_DIALOG) || (GetKeyboardState(keys), keys[VK_SHIFT] & 0x80))
     {
         g_GameWindow.dialog =
-            CreateDialogParamA(instance_copy, MAKEINTRESOURCEA(0xcb), NULL, resolution_dialog_proc, 0);
+            CreateDialogParamA(instance_copy, MAKEINTRESOURCEA(IDD_RESOLUTION), NULL, resolution_dialog_proc, 0);
         ShowWindow(g_GameWindow.dialog, SW_SHOW);
         for (;;)
         {
@@ -471,7 +481,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
                 TranslateMessage(&msg);
                 DispatchMessageA(&msg);
             }
-            if (g_hardware_input_pressed & 0x80001)
+            if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
             {
                 read_resolution_dialog();
                 g_window_flags &= ~(WINDOW_DIALOG_CANCELLED | WINDOW_DIALOG_OPEN);
@@ -479,40 +489,40 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
                 g_GameWindow.dialog = NULL;
                 break;
             }
-            if (g_hardware_input_pressed & 0x20)
+            if (g_hardware_input_pressed & INPUT_DOWN)
             {
-                if (IsDlgButtonChecked(g_GameWindow.dialog, 0xcd) == BST_CHECKED)
+                if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_640) == BST_CHECKED)
                 {
-                    check_dialog_button(0xcd, FALSE);
-                    check_dialog_button(0xce, TRUE);
+                    check_dialog_button(IDC_SIZE_640, FALSE);
+                    check_dialog_button(IDC_SIZE_960, TRUE);
                 }
-                else if (IsDlgButtonChecked(g_GameWindow.dialog, 0xce) == BST_CHECKED)
+                else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_960) == BST_CHECKED)
                 {
-                    check_dialog_button(0xce, FALSE);
-                    check_dialog_button(0xcf, TRUE);
+                    check_dialog_button(IDC_SIZE_960, FALSE);
+                    check_dialog_button(IDC_SIZE_1280, TRUE);
                 }
-                else if (IsDlgButtonChecked(g_GameWindow.dialog, 0xcf) == BST_CHECKED)
+                else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_1280) == BST_CHECKED)
                 {
-                    check_dialog_button(0xcf, FALSE);
-                    check_dialog_button(0xcd, TRUE);
+                    check_dialog_button(IDC_SIZE_1280, FALSE);
+                    check_dialog_button(IDC_SIZE_640, TRUE);
                 }
             }
-            if (g_hardware_input_pressed & 0x10)
+            if (g_hardware_input_pressed & INPUT_UP)
             {
-                if (IsDlgButtonChecked(g_GameWindow.dialog, 0xcd) == BST_CHECKED)
+                if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_640) == BST_CHECKED)
                 {
-                    check_dialog_button(0xcd, FALSE);
-                    check_dialog_button(0xcf, TRUE);
+                    check_dialog_button(IDC_SIZE_640, FALSE);
+                    check_dialog_button(IDC_SIZE_1280, TRUE);
                 }
-                else if (IsDlgButtonChecked(g_GameWindow.dialog, 0xce) == BST_CHECKED)
+                else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_960) == BST_CHECKED)
                 {
-                    check_dialog_button(0xce, FALSE);
-                    check_dialog_button(0xcd, TRUE);
+                    check_dialog_button(IDC_SIZE_960, FALSE);
+                    check_dialog_button(IDC_SIZE_640, TRUE);
                 }
-                else if (IsDlgButtonChecked(g_GameWindow.dialog, 0xcf) == BST_CHECKED)
+                else if (IsDlgButtonChecked(g_GameWindow.dialog, IDC_SIZE_1280) == BST_CHECKED)
                 {
-                    check_dialog_button(0xcf, FALSE);
-                    check_dialog_button(0xce, TRUE);
+                    check_dialog_button(IDC_SIZE_1280, FALSE);
+                    check_dialog_button(IDC_SIZE_960, TRUE);
                 }
             }
             if (g_GameWindow.dialog == NULL)
@@ -649,7 +659,8 @@ create_d3d:
             {
                 i32 width = g_resolution_x + GetSystemMetrics(SM_CXDLGFRAME) * 2;
                 i32 height = GetSystemMetrics(SM_CYDLGFRAME) * 2 + GetSystemMetrics(SM_CYCAPTION) + g_resolution_y;
-                SetWindowLongA(g_GameWindow.window, GWL_STYLE, 0x10cb0000);
+                SetWindowLongA(g_GameWindow.window, GWL_STYLE,
+                               WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
                 SetWindowPos(g_GameWindow.window, NULL, g_Supervisor.window_rect.left, g_Supervisor.window_rect.top,
                              width, height, SWP_SHOWWINDOW | SWP_FRAMECHANGED);
                 ShowWindow(g_GameWindow.window, SW_SHOWNORMAL);
@@ -675,7 +686,7 @@ create_d3d:
     }
 teardown:
     g_Supervisor.config.window_size = (g_window_flags >> WINDOW_SIZE_SHIFT) & 0xf;
-    if (g_Supervisor.config.window_size >= 3)
+    if (g_Supervisor.config.window_size >= WINDOW_SIZE_WINDOWED_640)
     {
         GetWindowRect(g_GameWindow.window, &g_Supervisor.window_rect);
         g_Supervisor.config.window_x = g_Supervisor.window_rect.left;

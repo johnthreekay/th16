@@ -137,7 +137,7 @@ int PauseMenu::on_tick()
     {
     case 0:
         if (!(g_Globals.flags_hi_45c & 1) && !g_GameThread->flags.flag_16 &&
-            ((g_hardware_input_pressed & 0x100) || (g_Supervisor.flags & SUPERVISOR_DEVICE_WAS_RESET)) && g_GameThread->on_tick != NULL &&
+            ((g_hardware_input_pressed & INPUT_MENU) || (g_Supervisor.flags & SUPERVISOR_DEVICE_WAS_RESET)) && g_GameThread->on_tick != NULL &&
             (g_GameThread->on_tick->flags & UPDATE_FUNC_ACTIVE) && g_GameThread->time_in_stage.current >= 30)
         {
             open();

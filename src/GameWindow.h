@@ -36,6 +36,22 @@ enum WindowFlags
     WINDOW_DIALOG_OPEN = 1 << 8,
 };
 
+// The resolution dialog shown at startup (dialog resource IDD_RESOLUTION)
+// and its controls.
+enum ResolutionDialogIds
+{
+    IDD_RESOLUTION = 0xcb,
+    // Check box: show this dialog every time (CONFIG_SHOW_STARTUP_DIALOG).
+    IDC_SHOW_AT_STARTUP = 0xca,
+    // Check box: full screen rather than a window.
+    IDC_FULL_SCREEN = 0xcb,
+    // Radio buttons for the three sizes.
+    IDC_SIZE_640 = 0xcd,
+    IDC_SIZE_960 = 0xce,
+    IDC_SIZE_1280 = 0xcf,
+    IDC_OK = 0xd0,
+};
+
 // The main window (TH06's GameWindow) and the frame loop state. Window
 // methods reach the fields through this; other code addresses them as
 // globals. Several of those globals are defined on their own
