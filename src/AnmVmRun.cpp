@@ -1543,7 +1543,7 @@ void AnmVm::set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor 
 
 // TODO: /GS cookie from the stubbed InterpFloat3/InterpAngle steps, and the 8-byte frame alignment InterpFloat2::step has too.
 // FUNCTION: TH16 0x463b30
-void AnmVm::step_interpolators()
+HARNESS_CALLED void AnmVm::step_interpolators()
 {
     if (pos_i.end_time != 0)
     {
