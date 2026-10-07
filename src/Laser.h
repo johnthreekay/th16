@@ -395,6 +395,24 @@ struct LaserManager
     // second argument is the same at every call site; LTCG folded it.
     HARNESS_CALLED LaserDataInf *find_by_id(i32 id, i32 unused);
 
+    // cancel_in_rectangle as Marisa's bomb has it inlined, without the
+    // count.
+    __forceinline void cancel_in_rectangle_inline(Float3 *a, Float3 *b, f32 angle, i32 mode, i32 e)
+    {
+        LaserDataInf *laser = list_head.next;
+        cancel_pos = *a;
+        cancel_pos_2 = *b;
+        while (laser != NULL)
+        {
+            LaserDataInf *next = laser->next;
+            if (laser->state != 1 && laser->ticked)
+            {
+                laser->cancel_as_bomb_rectangle(a, b, angle, mode, e);
+            }
+            laser = next;
+        }
+    }
+
     // cancel_in_radius as the season releases have it inlined, without the
     // count. Our build needs the __forceinline to agree.
     __forceinline void cancel_in_radius_inline(Float3 *pos, f32 radius, i32 c, i32 d)

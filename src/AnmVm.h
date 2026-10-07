@@ -383,6 +383,29 @@ struct AnmVm
     void wipe();
     // 0x40e490. Position including entity_pos and every parent's.
     Float3 world_pos();
+    // world_pos as Marisa's bomb has it inline.
+    __forceinline Float3 world_pos_inline()
+    {
+        Float3 result;
+        result.x = pos.x + entity_pos.x + pos_2.x;
+        result.y = pos.y + entity_pos.y + pos_2.y;
+        result.z = pos.z + entity_pos.z + pos_2.z;
+        if (parent != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+        {
+            if (flags_hi & ANM_VM_ROTATE_WITH_PARENT)
+            {
+                f32 s = zun_sinf(parent->rotation.z);
+                f32 c = zun_cosf(parent->rotation.z);
+                f32 x = result.x;
+                f32 y = result.y;
+                result.x = x * c - y * s;
+                result.y = y * c + x * s;
+            }
+            Float3 parent_pos = parent->world_pos();
+            result += parent_pos;
+        }
+        return result;
+    }
     // 0x45f980. Nonzero once the script has ended (anm_effect_1_on_tick
     // counts on it).
     i32 run();

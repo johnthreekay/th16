@@ -324,6 +324,39 @@ i32 BombAyaAInf::method_10()
     return 0;
 }
 
+// Every beam VM (script 24) under the bomb's VM cancels bullets and lasers
+// in its rectangle.
+// TODO: the original realigns its frame (and esp, -8), reads the parent's world_pos from its stack slot and keeps the loop unrotated.
+// FUNCTION: TH16 0x40fe80
+i32 BombMarisaAInf::method_10()
+{
+    for (i32 i = 0;; i++)
+    {
+        AnmManager *anm = g_AnmManager;
+        if (anm->get_vm_with_id(anm_id) == NULL)
+        {
+            anm_id.id = 0;
+            return 0;
+        }
+        AnmVm *parent = anm->get_vm_with_id(anm_id);
+        if (parent == NULL)
+        {
+            anm_id.id = 0;
+        }
+        AnmVm *vm = parent->search_children(0x18, i);
+        if (vm == NULL)
+        {
+            return 0;
+        }
+        D3DXVECTOR3 size;
+        size.x = vm->scale.x * 48.0f;
+        size.y = vm->scale.y * 160.0f;
+        D3DXVECTOR3 p = vm->world_pos_inline();
+        g_BulletManager->cancel_rectangle_as_bomb(&p, &size, angle, 5);
+        g_LaserManager->cancel_in_rectangle_inline(&p, &size, angle, 5, 1);
+    }
+}
+
 // The radius grows from 16 to 176 over the first second, then to 208.
 // FUNCTION: TH16 0x40f4c0
 i32 BombCirnoAInf::method_10()
