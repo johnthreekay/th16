@@ -38,7 +38,9 @@ struct TexelA8R3G3B2
 
 // Gives every fully transparent texel the average color of its opaque
 // neighbors, so that filtering does not blend in black at sprite edges.
-#define BLEED_TRANSPARENT_TEXELS(T)                                                                                 \
+// ZERO_SUMS clears the sums; the order of the stores steers register
+// allocation (the 32-bit case only gets b into ebx with b cleared first).
+#define BLEED_TRANSPARENT_TEXELS(T, ZERO_SUMS)                                                                     \
     for (u32 y = 0; y < desc.Height; y++)                                                                           \
     {                                                                                                               \
         T *texel = (T *)((u8 *)locked.pBits + locked.Pitch * y);                                                    \
@@ -48,10 +50,8 @@ struct TexelA8R3G3B2
             {                                                                                                       \
                 continue;                                                                                           \
             }                                                                                                       \
-            u32 r = 0;                                                                                              \
-            u32 g = 0;                                                                                              \
-            u32 b = 0;                                                                                              \
-            u32 count = 0;                                                                                          \
+            u32 r, g, b, count;                                                                                     \
+            ZERO_SUMS;                                                                                              \
             if (x != 0 && texel[-1].a != 0)                                                                         \
             {                                                                                                       \
                 r = texel[-1].r;                                                                                    \
@@ -100,6 +100,7 @@ struct TexelA8R3G3B2
         }                                                                                                           \
     }
 
+// TODO: register allocation and spills differ; the original's 32-bit loop keeps a second pointer (texel - 2) beside the spilled texel pointer.
 // FUNCTION: TH16 0x46c0d0
 void __stdcall AnmManager::convert_texture(IDirect3DTexture9 *texture)
 {
@@ -113,16 +114,16 @@ void __stdcall AnmManager::convert_texture(IDirect3DTexture9 *texture)
     {
     case D3DFMT_UNKNOWN:
     case D3DFMT_A8R8G8B8:
-        BLEED_TRANSPARENT_TEXELS(TexelA8R8G8B8);
+        BLEED_TRANSPARENT_TEXELS(TexelA8R8G8B8, (b = 0, g = 0, r = 0, count = 0));
         break;
     case D3DFMT_A1R5G5B5:
-        BLEED_TRANSPARENT_TEXELS(TexelA1R5G5B5);
+        BLEED_TRANSPARENT_TEXELS(TexelA1R5G5B5, (r = 0, g = 0, b = 0, count = 0));
         break;
     case D3DFMT_A4R4G4B4:
-        BLEED_TRANSPARENT_TEXELS(TexelA4R4G4B4);
+        BLEED_TRANSPARENT_TEXELS(TexelA4R4G4B4, (r = 0, g = 0, b = 0, count = 0));
         break;
     case D3DFMT_A8R3G3B2:
-        BLEED_TRANSPARENT_TEXELS(TexelA8R3G3B2);
+        BLEED_TRANSPARENT_TEXELS(TexelA8R3G3B2, (r = 0, g = 0, b = 0, count = 0));
         break;
     }
     surface->UnlockRect();
