@@ -91,6 +91,23 @@ struct Arcfile
     // allocation if dest is NULL.
     u8 *read_file(const char *name, u8 *dest);
     ArcfileEntry *find_entry(const char *name);
+    // find_entry as file_read_all has it inline.
+    __forceinline ArcfileEntry *find_entry_inline(const char *name)
+    {
+        ArcfileEntry *entry = entries;
+        if (entry == NULL)
+        {
+            return NULL;
+        }
+        for (i32 i = entry_count; i > 0; i--, entry++)
+        {
+            if (_stricmp(name, entry->name) == 0)
+            {
+                return entry;
+            }
+        }
+        return NULL;
+    }
     // These reach the archive through g_Arcfile or not at all; LTCG drops
     // the unused this.
     HARNESS_CALLED bool read_directory(const char *path);
