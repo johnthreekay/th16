@@ -1,3 +1,4 @@
+#include <math.h>
 #include <string.h>
 
 #include "AnmManager.h"
@@ -564,5 +565,65 @@ i32 LaserLineInf::on_draw()
         vm_f28.pos = position;
         g_AnmManager->draw_vm(&vm_f28);
     }
+    return 0;
+}
+
+// An et_ex step: moves the curve's origin by ex_state[1]'s velocity (scaled
+// by the game speed) and turns it to face its direction of motion, until
+// the step's time runs out.
+// TODO: the original adds and stores the velocity one component at a time and reloads unk_60.x for the fabsf test.
+// FUNCTION: TH16 0x4395b0
+i32 LaserCurveInf::method_3c()
+{
+    BulletExState *st = &ex_state[1];
+    if (st->timer.current >= st->ints[0])
+    {
+        ex_flags &= ~4;
+        return 1;
+    }
+    length += st->floats[0] * g_game_speed;
+    unk_60 += *(Float3 *)&st->floats[5] * g_game_speed;
+    if (fabsf(unk_60.x) > 0.0001f || fabsf(unk_60.y) > 0.0001f)
+    {
+        angle = atan2(unk_60.y, unk_60.x);
+    }
+    st->timer.tick();
+    return 0;
+}
+
+// An et_ex step: turns the curve by ex_state[2]'s angular speed and grows
+// it, until the step's time runs out.
+// TODO: the original stores the new angle after loading floats[0] (scheduling).
+// FUNCTION: TH16 0x439460
+i32 LaserCurveInf::method_40()
+{
+    BulletExState *st = &ex_state[2];
+    if (st->timer.current >= st->ints[0])
+    {
+        ex_flags &= ~8;
+        return 1;
+    }
+    i32 i = 0;
+    f32 a = st->floats[1] * g_game_speed + angle;
+    while (a > ZUN_PI)
+    {
+        a -= ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    while (a < -ZUN_PI)
+    {
+        a += ZUN_2PI;
+        if (i++ > 32)
+        {
+            break;
+        }
+    }
+    angle = a;
+    length += st->floats[0] * g_game_speed;
+    laser_sincosmul(&unk_60, angle, length);
+    st->timer.tick();
     return 0;
 }

@@ -160,19 +160,6 @@ i32 LaserCurveInf::check_graze_or_kill(i32 a)
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x4395b0
-i32 LaserCurveInf::method_3c()
-{
-    return unit5_placeholder(this);
-}
-
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x439460
-i32 LaserCurveInf::method_40()
-{
-    return unit5_placeholder(this);
-}
 
 // Placeholder (not decompiled yet).
 // STUB: TH16 0x4392c0
