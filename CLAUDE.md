@@ -82,6 +82,9 @@ To keep branches mergeable:
   stays in (functionally correct, still annotated) with a one-line
   `// TODO:` comment saying what differs; move on.
 - Commit often. No em dashes in comments or commit messages.
+- Don't start shells that wait for other background work (background commands
+  already report when they finish). Never wait with `until ! pgrep -f <pattern>`:
+  the loop's own command line matches the pattern, so it never ends.
 
 ## Readability pass (rules for renaming and documenting)
 
