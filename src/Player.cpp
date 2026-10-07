@@ -1063,3 +1063,192 @@ i32 Player::initialize()
     }
     return 0;
 }
+
+// GLOBAL: TH16 0x492c20
+const Int2 g_player_directions[9] = {{0, 0}, {0, -1}, {0, 1}, {-1, 0}, {1, 0}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
+
+// copy_vm_and_run as LTCG inlined it here.
+static __forceinline void player_set_script(Player *player, i32 script)
+{
+    player->anm_file->copy_vm(&player->vm, script);
+    player->vm.unk_5b0 = NULL;
+    player->vm.parent = NULL;
+    player->vm.run();
+}
+
+// FUNCTION: TH16 0x441cf0
+i32 Player::move()
+{
+    u32 input = g_InputState.input;
+    if ((input & (INPUT_UP | INPUT_LEFT)) == (INPUT_UP | INPUT_LEFT))
+    {
+        attempted_direction = 5;
+    }
+    else if ((input & (INPUT_DOWN | INPUT_LEFT)) == (INPUT_DOWN | INPUT_LEFT))
+    {
+        attempted_direction = 7;
+    }
+    else if ((input & (INPUT_UP | INPUT_RIGHT)) == (INPUT_UP | INPUT_RIGHT))
+    {
+        attempted_direction = 6;
+    }
+    else if ((input & (INPUT_DOWN | INPUT_RIGHT)) == (INPUT_DOWN | INPUT_RIGHT))
+    {
+        attempted_direction = 8;
+    }
+    else if (input & INPUT_DOWN)
+    {
+        attempted_direction = 2;
+    }
+    else if (input & INPUT_UP)
+    {
+        attempted_direction = 1;
+    }
+    else if (input & INPUT_LEFT)
+    {
+        attempted_direction = 3;
+    }
+    else if (input & INPUT_RIGHT)
+    {
+        attempted_direction = 4;
+    }
+    else
+    {
+        attempted_direction = 0;
+    }
+    if (g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 && inner.time_in_stage.current >= 4)
+    {
+        inner.is_focused = (g_InputState.input >> 3) & 1;
+    }
+    else
+    {
+        inner.is_focused = 0;
+        inner.percent_moved_by_options = 30;
+    }
+    i32 dx = g_player_directions[attempted_direction].x;
+    i32 dy = g_player_directions[attempted_direction].y;
+    i32 speed_x;
+    i32 speed_y;
+    if (inner.is_focused)
+    {
+        if (inner.anm_id_focused_hitbox.id == 0)
+        {
+            inner.anm_id_focused_hitbox = g_EffectManager->effect_anm->create_effect(0x1a, 0xe, NULL);
+        }
+        AnmVm *vm = get_vm_or_clear(inner.anm_id_focused_hitbox);
+        if (vm != NULL)
+        {
+            if (inner.flags & 0x10)
+            {
+                f32 scale = (player_scale - 1.0f) * 2.0f;
+                vm->scale_2.y = scale + 1.0f;
+                vm->scale_2.x = scale + 1.0f;
+            }
+            else
+            {
+                vm->scale_2.x = 1.0f;
+                vm->scale_2.y = 1.0f;
+            }
+            vm->flags_lo |= ANM_VM_SCALE_CHANGED;
+        }
+        speed_x = attempted_direction >= 5 ? inner.speeds_subpixel[3] : inner.speeds_subpixel[1];
+        speed_y = attempted_direction >= 5 ? inner.speeds_subpixel[3] : inner.speeds_subpixel[1];
+    }
+    else
+    {
+        if (g_AnmManager->get_vm_with_id(inner.anm_id_focused_hitbox) != NULL)
+        {
+            AnmManager::interrupt_tree(inner.anm_id_focused_hitbox, 1);
+        }
+        inner.anm_id_focused_hitbox.id = 0;
+        speed_x = attempted_direction >= 5 ? inner.speeds_subpixel[2] : inner.speeds_subpixel[0];
+        speed_y = attempted_direction >= 5 ? inner.speeds_subpixel[2] : inner.speeds_subpixel[0];
+    }
+    i32 vx = (f32)(speed_x * dx - (i32)(inner.unk_1607c.x * -128.0f)) * inner.speed_multiplier;
+    i32 vy = (f32)(speed_y * dy - (i32)(inner.unk_1607c.y * -128.0f)) * inner.speed_multiplier;
+    if (vx < 0 && attempted_velocity.x >= 0)
+    {
+        player_set_script(this, 1);
+    }
+    if (vx > 0 && attempted_velocity.x <= 0)
+    {
+        player_set_script(this, 3);
+    }
+    if (vx == 0 && attempted_velocity.x < 0)
+    {
+        player_set_script(this, 2);
+    }
+    if (vx == 0 && attempted_velocity.x > 0)
+    {
+        player_set_script(this, 4);
+    }
+    attempted_velocity.x = vx;
+    attempted_velocity.y = vy;
+    inner.unk_16050 = vx * g_game_speed;
+    inner.unk_16054 = vy * g_game_speed;
+    if (attempted_direction != 0)
+    {
+        inner.last_nonzero_delta_pos_subpixel = *(Float3 *)&inner.unk_16050;
+    }
+    inner.velocity_subpixel.y = (i32)inner.unk_16054;
+    inner.velocity_subpixel.x = (i32)inner.unk_16050;
+    inner.pos_subpixel.x += inner.velocity_subpixel.x;
+    inner.pos_subpixel.y += inner.velocity_subpixel.y;
+    if (inner.pos_subpixel.x < -184 * 128)
+    {
+        inner.pos_subpixel.x = -184 * 128;
+    }
+    else if (inner.pos_subpixel.x > 184 * 128)
+    {
+        inner.pos_subpixel.x = 184 * 128;
+    }
+    if (inner.pos_subpixel.y < 32 * 128)
+    {
+        inner.pos_subpixel.y = 32 * 128;
+    }
+    else if (inner.pos_subpixel.y > 432 * 128)
+    {
+        inner.pos_subpixel.y = 432 * 128;
+    }
+    inner.pos.x = inner.pos_subpixel.x / 128.0f;
+    inner.pos.y = inner.pos_subpixel.y / 128.0f;
+    if (get_vm_or_clear(inner.anm_id_focused_hitbox) != NULL)
+    {
+        AnmVm *vm = g_AnmManager->get_vm_with_id(inner.anm_id_focused_hitbox);
+        if (vm != NULL)
+        {
+            vm->entity_pos = inner.pos;
+        }
+    }
+    if (inner.flags & 2)
+    {
+        inner.unk_16074++;
+    }
+    update_options(inner.main_options, 4);
+    update_options(inner.subseason_options, 8);
+    if (inner.unk_16074 >= 30)
+    {
+        inner.num_main_options = 0;
+        inner.num_season_options = 0;
+    }
+    if (inner.timer_15fa4.current > 0)
+    {
+        if (get_vm_or_clear(inner.anm_id_15fa0) == NULL)
+        {
+            inner.anm_id_15fa0 = g_EffectManager->effect_anm->create_effect(0x1b, 0xe, NULL);
+        }
+        AnmVm *vm = g_AnmManager->get_vm_with_id(inner.anm_id_15fa0);
+        if (vm != NULL)
+        {
+            vm->entity_pos = inner.pos;
+        }
+        inner.timer_15fa4.decrement(1.0f);
+        if (inner.timer_15fa4.current <= 0)
+        {
+            AnmManager::interrupt_tree(inner.anm_id_15fa0, 1);
+            inner.timer_15fa4.reset_inline();
+            inner.anm_id_15fa0.id = 0;
+        }
+    }
+    return 0;
+}

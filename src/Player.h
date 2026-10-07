@@ -164,9 +164,13 @@ struct PlayerInner
     // The .sht file's four move speeds (unfocused, focused, and both
     // diagonally) in 1/128 pixels.
     i32 speeds_subpixel[4];
-    // Scaled by 1/128; aims and sizes Aya's bomb.
+    // Scaled by 1/128; aims and sizes Aya's bomb. The movement this frame
+    // in 1/128 pixels (ExpHP: attempted_delta_pos__subpixel).
     f32 unk_16050;
-    u8 unk_16054[0x16070 - 0x16054];
+    f32 unk_16054;
+    f32 unk_16058;
+    Float3 last_nonzero_delta_pos_subpixel;
+    Int2 velocity_subpixel;
     // How far (in percent) options move toward their preferred position
     // each frame; below 30 they stay put.
     i32 percent_moved_by_options;
@@ -174,7 +178,9 @@ struct PlayerInner
     i32 unk_16074;
     // Set every frame by the autumn release.
     f32 speed_multiplier;
-    u8 unk_1607c[0x1608c - 0x1607c];
+    // Pushes the player along (subtracted from the movement, in pixels).
+    Float3 unk_1607c;
+    u8 unk_16088[0x1608c - 0x16088];
     i32 num_season_options;
 
     // 0x440ec0. Only the members' constructors; out of line, as the
@@ -375,6 +381,9 @@ struct Player
     i32 do_shooting(i32 short_time, i32 long_time);
     // 0x4455d0. Runs the shot key timers while the player is alive.
     i32 tick_shooting_state();
+    // 0x441cf0. Reads the arrows and the focus key, moves the player and
+    // the options, and keeps the hitbox and release VMs on the player.
+    i32 move();
     // 0x4456d0. Runs every live bullet: its shot type callback, movement,
     // the off-screen check and its damage source.
     i32 tick_bullets();
