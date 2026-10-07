@@ -10,7 +10,9 @@
 struct ReplayManager;
 
 // The in-game pause menu (also shown on game over and after a replay).
-// Layout partly from ExpHP's th-re-data (zPauseMenu).
+// Layout partly from ExpHP's th-re-data (zPauseMenu). Packed to 4 bytes for
+// saved_bgm_time.
+#pragma pack(push, 4)
 struct PauseMenu
 {
     u32 flags;
@@ -27,7 +29,7 @@ struct PauseMenu
     i32 unk_1f4;
     // Where the next character of the replay or score name goes.
     i32 name_cursor;
-    u8 unk_1fc[0x200 - 0x1fc];
+    i32 unk_1fc;
     // Nonzero once the score name is entered (the keyboard is hidden).
     i32 unk_200;
     u8 unk_204[0x208 - 0x204];
@@ -37,7 +39,9 @@ struct PauseMenu
     // The replay or score name being entered.
     char name[0xc];
     f32 saved_game_speed;
-    u8 unk_2e4[0x3ec - 0x2e4];
+    // The BGM playing when the game ended, to resume after the menu.
+    double saved_bgm_time;
+    char saved_bgm_name[0x100];
     i32 flags_3ec;
     AnmLoaded *front_anm;
 
@@ -45,7 +49,9 @@ struct PauseMenu
     ~PauseMenu();
     int initialize();
     static PauseMenu *create();
-    void set_state(i32 state);
+    // Kept alive by its callers rather than /INCLUDE, so that LTCG sees it
+    // leaves ecx alone (replay_ended_43f240 counts on that).
+    HARNESS_CALLED void set_state(i32 state);
     void set_unk_1f4(i32 value);
 
     // 0x43f6a0, 0x43f740 and 0x43f790: leaving states 1 (the pause menu),
@@ -69,8 +75,18 @@ struct PauseMenu
     // 0x43ec10. The high score table of the game that just ended, with the
     // keyboard for the name.
     void draw_high_scores();
+    // 0x43ef20 (ExpHP: take_snapshot_for_pause). Copies the game area of
+    // the screen into the sprite of a new text.anm VM behind the menu.
+    void take_snapshot();
     static int __fastcall on_tick_thunk(void *arg);
     static int __fastcall on_draw_thunk(void *arg);
 };
+#pragma pack(pop)
 
 extern PauseMenu *g_PauseMenu;
+
+// 0x43f240. Opens the menu shown when a replay ends.
+void replay_ended_43f240();
+// 0x43f350 (ExpHP: sub_43f350_pause). Opens the menu at the end of a
+// game (or ends spell practice's retry loop).
+void pause_menu_43f350();

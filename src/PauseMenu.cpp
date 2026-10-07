@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <string.h>
 #include <time.h>
 
@@ -9,13 +10,19 @@
 #include "Globals.h"
 #include "Gui.h"
 #include "Scorefile.h"
+#include "SoundManager.h"
 #include "Supervisor.h"
+
+static_assert(offsetof(PauseMenu, name) == 0x2d4, "PauseMenu::name");
+static_assert(offsetof(PauseMenu, saved_bgm_time) == 0x2e4, "PauseMenu::saved_bgm_time");
+static_assert(offsetof(PauseMenu, flags_3ec) == 0x3ec, "PauseMenu::flags_3ec");
+static_assert(offsetof(Gui, front_anm) == 0x2d8, "Gui::front_anm");
 
 // GLOBAL: TH16 0x4a6ef4
 PauseMenu *g_PauseMenu;
 
 // FUNCTION: TH16 0x43e150
-void PauseMenu::set_state(i32 state)
+HARNESS_CALLED void PauseMenu::set_state(i32 state)
 {
     prev_state = this->state;
     this->state = state;
@@ -362,6 +369,121 @@ int PauseMenu::on_draw()
     g_AsciiManager->draw_shadows = 0;
     return 1;
 }
+
+// TODO: the original realigns its frame to 8 bytes (whole-program, see README) and keeps vm in a stack slot, not ebx.
+// FUNCTION: TH16 0x43ef20
+void PauseMenu::take_snapshot()
+{
+    delete_vm_and_clear(anm_id_1e8);
+    anm_id_1e8 = g_Supervisor.text_anm->create_ui_vm_at_origin(0x34, 0);
+    // get_vm_or_clear with g_AnmManager read once (see on_draw).
+    AnmManager *anm_manager = g_AnmManager;
+    AnmVm *vm = anm_manager->get_vm_with_id(anm_id_1e8);
+    if (vm == NULL)
+    {
+        anm_id_1e8.id = 0;
+    }
+    AnmLoadedSprite *sprite = &anm_manager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id];
+    RECT dst;
+    dst.left = (i32)sprite->start_pixel_inclusive.x;
+    dst.top = (i32)sprite->start_pixel_inclusive.y;
+    dst.right = (i32)(sprite->sprite_width + sprite->start_pixel_inclusive.x);
+    dst.bottom = (i32)(sprite->sprite_height + sprite->start_pixel_inclusive.y);
+    RECT src;
+    src.left = (i32)(g_arcade_hud_origin_x - g_screen_coord_scale * 384.0f * 0.5f);
+    src.top = g_arcade_hud_origin_y;
+    src.right = (i32)(g_screen_coord_scale * 384.0f * 0.5f + g_arcade_hud_origin_x);
+    src.bottom = (i32)(g_screen_coord_scale * 448.0f + g_arcade_hud_origin_y);
+    AnmLoaded *loaded = anm_manager->loaded_anms[vm->anm_loaded_index];
+    i32 entry = loaded->sprites[vm->sprite_id].image_file_num_in_anm;
+    i32 slot = loaded->slot_num;
+    IDirect3DSurface9 *src_surface = g_Supervisor.arcade_surface_1;
+    if (anm_manager->loaded_anms[slot]->d3d[entry].texture != NULL)
+    {
+        anm_manager->flush_sprites();
+        IDirect3DSurface9 *surface;
+        if (anm_manager->loaded_anms[slot]->d3d[entry].texture->GetSurfaceLevel(0, &surface) == D3D_OK)
+        {
+            if (D3DXLoadSurfaceFromSurface(surface, NULL, &dst, src_surface, NULL, &src, D3DX_FILTER_POINT, 0) ==
+                D3D_OK)
+            {
+            }
+            surface->Release();
+        }
+    }
+}
+
+// FUNCTION: TH16 0x43f240
+void replay_ended_43f240()
+{
+    PauseMenu *menu = g_PauseMenu;
+    menu->set_state(1);
+    menu->set_unk_1f4(1);
+    g_GameThread->flags.flag_4 = 1;
+    menu->take_snapshot();
+    menu->front_anm = g_Gui->front_anm;
+    delete_vm_and_clear(menu->anm_id_1e4);
+    menu->anm_id_1e4 = menu->front_anm->create_ui_vm_at_origin(0x9f, 0);
+    AnmManager::interrupt_tree(menu->anm_id_1e4, 3);
+    SoundManager::pause_sounds();
+    g_SoundManager.modify_bgm(6, 0, "Pause");
+    menu->saved_game_speed = g_game_speed;
+    g_game_speed = 1.0f;
+    menu->saved_global_4d9d90 = g_unk_4d9d90;
+    g_unk_4d9d90 = 0;
+    menu->flags_3ec &= ~4;
+}
+
+// Matches but for its frame (the original does not realign it to 8 bytes),
+// and it stops LTCG from folding play_sound_centered's this everywhere:
+// any caller of CStreamingSound::get_play_time that also calls
+// play_sound_centered does that in our build while get_play_time does not
+// realign its own frame. Kept out until that is solved; the stub in
+// src/stub/unit34b.cpp stands in (0x43f350).
+#if 0
+HARNESS_CALLED void pause_menu_43f350()
+{
+    PauseMenu *menu = g_PauseMenu;
+    GameThread::update_play_time();
+    if (g_GameThread->replay_mode == 1)
+    {
+        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+        return;
+    }
+    menu->set_state(2);
+    menu->set_unk_1f4(2);
+    g_GameThread->flags.flag_4 = 1;
+    SoundManager::pause_sounds();
+    g_SoundManager.play_sound_centered(0xe, 0);
+    if (g_Globals.game_mode != 2)
+    {
+        g_SoundManager.modify_bgm(6, 0, "Pause");
+    }
+    while (SoundManager::update_sound_thread() != 0)
+    {
+    }
+    menu->take_snapshot();
+    menu->front_anm = g_Gui->front_anm;
+    if (g_Globals.game_mode != 2)
+    {
+        strcpy(menu->saved_bgm_name, g_SoundManager.bgm_name);
+        menu->saved_bgm_time = ((CStreamingSound *)g_SoundManager.bgm_stream)->get_play_time();
+        g_Supervisor.play_bgm_wav(0, "th128_08");
+        if (g_Supervisor.config.flags_2c & 0x10)
+        {
+            g_SoundManager.modify_bgm(4, 0, "dummy");
+        }
+        g_SoundManager.modify_bgm(2, 0, "dummy");
+        g_Scorefile->bgm_unlocked[0] = 1;
+    }
+    menu->unk_1fc = 0;
+    menu->saved_game_speed = g_game_speed;
+    g_game_speed = 1.0f;
+    menu->saved_global_4d9d90 = g_unk_4d9d90;
+    g_unk_4d9d90 = 1;
+    menu->flags_3ec &= ~4;
+}
+#endif
 
 // The original's callback is a jmp to the member function, most likely the
 // fastcall invoker of a capture-less lambda; a static thunk compiles the same.

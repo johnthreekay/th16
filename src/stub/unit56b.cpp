@@ -45,7 +45,3 @@ void InputState::update()
 {
 }
 
-// STUB: TH16 0x43f240
-void replay_ended_43f240()
-{
-}
