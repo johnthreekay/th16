@@ -202,8 +202,8 @@ extern AnmId g_anm_ids_4c0f4c[3];
 extern i32 g_unk_4a6ef0;
 // When set, Supervisor::on_draw_1a calls it instead of drawing.
 extern void (*g_draw_hook_4a6ee8)();
-// Cleared with g_draw_hook_4a6ee8; read by on_draw_01.
-extern i32 g_unk_4a6eec;
+// When set, Supervisor::on_draw_0f calls it instead of drawing.
+extern void (*g_draw_hook_4a6eec)();
 // Set to 3 by switch_gamemodes when it returns to the title screen (mode 16).
 extern i32 g_unk_4a6f1c;
 // Set once the loading screen is done.

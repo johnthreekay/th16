@@ -25,18 +25,6 @@ void BgmStream::set_volume(i32 volume)
 {
 }
 
-// STUB: TH16 0x43d140
-int __fastcall Supervisor::on_draw_01(void *arg)
-{
-    return 1;
-}
-
-// STUB: TH16 0x43d2f0
-int __fastcall Supervisor::on_draw_0f(void *arg)
-{
-    return 1;
-}
-
 #include "../PauseMenu.h"
 #include "../ReplayManager.h"
 

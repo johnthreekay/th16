@@ -151,7 +151,7 @@ i32 g_unk_4a6ef0;
 // GLOBAL: TH16 0x4a6ee8
 void (*g_draw_hook_4a6ee8)();
 // GLOBAL: TH16 0x4a6eec
-i32 g_unk_4a6eec;
+void (*g_draw_hook_4a6eec)();
 
 // FUNCTION: TH16 0x43c4b0
 HRESULT Supervisor::enable_d3d_fog()
@@ -493,6 +493,81 @@ done:
     return 1;
 }
 
+// Clears the frame and resets the render state the sprite code caches.
+// FUNCTION: TH16 0x43d140
+int __fastcall Supervisor::on_draw_01(void *arg)
+{
+    Supervisor *s = (Supervisor *)arg;
+    if (g_Supervisor.arcade_surface_0 != NULL)
+    {
+        g_Supervisor.d3d_device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0xffffffff, 1.0f, 0);
+        g_Supervisor.d3d_device->SetRenderTarget(0, g_Supervisor.arcade_surface_0);
+        D3DVIEWPORT9 &vp = g_Supervisor.cameras[3].viewport;
+        D3DRECT rect;
+        rect.x1 = vp.X;
+        rect.y1 = vp.Y;
+        rect.x2 = vp.X + vp.Width;
+        rect.y2 = vp.Y + vp.Height;
+        g_Supervisor.d3d_device->Clear(1, &rect, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, g_Supervisor.background_color,
+                                       1.0f, 0);
+        g_arcade_width = 384;
+        g_game_2d_origin_x = g_resolution_x / 2;
+        g_arcade_height = 448;
+        g_game_2d_origin_y = (i32)(g_resolution_y - 448.0f) / 2;
+    }
+    else
+    {
+        g_Supervisor.d3d_device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, g_Supervisor.background_color,
+                                       1.0f, 0);
+    }
+    AnmManager *anm = g_AnmManager;
+    anm->render_cache_184fbc0 = 0;
+    anm->render_cache_184fbb0 = -1;
+    anm->last_blend_mode = 10;
+    anm->render_cache_184fbb5 = 0xff;
+    anm->render_cache_184fbb7 = 0xff;
+    anm->render_cache_184fbb8 = 0xff;
+    anm->unk_1c7fd8c = 0;
+    anm->unk_1c7fd88.d3d = 0x80808080;
+    anm->last_filter_point = 0xff;
+    anm->last_color_op = 0xff;
+    anm->camera_unk_fc.y = 0.0f;
+    anm->camera_unk_fc.x = 0.0f;
+    anm->render_cache_184fbb6 = 0xff;
+    s->current_camera = &s->cameras[2];
+    s->swap_transform_matrices(&s->cameras[2]);
+    s->d3d_device->SetViewport(&s->current_camera->viewport);
+    s->current_camera_index = 2;
+    return 1;
+}
+
+// Draws the arcade region (vm_1bc and layer 0x22) onto the screen.
+// FUNCTION: TH16 0x43d2f0
+int __fastcall Supervisor::on_draw_0f(void *arg)
+{
+    if (g_Supervisor.arcade_surface_0 != NULL)
+    {
+        if (g_draw_hook_4a6eec == NULL)
+        {
+            g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+            g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+            g_Supervisor.disable_zwrite();
+            g_Supervisor.current_camera = &g_Supervisor.cameras[3];
+            g_Supervisor.swap_transform_matrices(&g_Supervisor.cameras[3]);
+            g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
+            g_Supervisor.current_camera_index = 3;
+            g_AnmManager->draw_vm(g_Supervisor.vm_1bc);
+            g_Supervisor.vm_1bc->color_1.d3d = 0xffffffff;
+            g_AnmManager->render_layer(0x22);
+            g_AnmManager->flush_sprites();
+            g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
+            return 1;
+        }
+        g_draw_hook_4a6eec();
+    }
+    return 1;
+}
+
 // FUNCTION: TH16 0x43d400
 int __fastcall Supervisor::on_draw_0e(void *arg)
 {
@@ -764,7 +839,7 @@ int __fastcall Supervisor::on_registration(void *arg)
     g_Supervisor.vm_1c0 = new AnmVm;
     g_Supervisor.vm_1c4 = new AnmVm;
     g_Supervisor.vm_1c8 = new AnmVm;
-    g_unk_4a6eec = 0;
+    g_draw_hook_4a6eec = NULL;
     g_draw_hook_4a6ee8 = NULL;
     return 0;
 }

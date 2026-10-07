@@ -237,7 +237,9 @@ struct AnmManager
     AnmVm layer_list_dummy_heads[0x2b];
     // The upper 19 bits of the next VM id.
     volatile i32 last_discriminator;
-    u8 unk_1c7fd88[0x1c7fd90 - 0x1c7fd88];
+    // Reset to these by Supervisor::on_draw_01 every frame.
+    ZunColor unk_1c7fd88;
+    i32 unk_1c7fd8c;
 
     // 0x46b7d0. Destroys every VM still alive.
     ~AnmManager();
