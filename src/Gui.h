@@ -465,7 +465,7 @@ struct Gui
     // called through g_Gui, which LTCG put in place of this.
     HARNESS_CALLED void release_msg();
     // ECL dialogRead: starts dialogue script n, or -1/-3 (boss or stage
-    // music), -2 (end of the stage or spell practice).
+    // music), -2 (end of the stage, or the game over menu).
     void start_dialogue(i32 script);
     static i32 __fastcall on_tick_callback(Gui *self);
     static i32 __fastcall on_draw_1_callback(Gui *self);

@@ -1165,7 +1165,8 @@ i32 StageInner::run_std()
         case STD_BG_COLOR:
             g_Supervisor.background_color = ins->args[0];
             break;
-        // Slot, script, layer.
+        // Slot, script, layer: script -2 hides the slot's VM, -1 also stops
+        // its script.
         case STD_SPRITE:
         {
             i32 script = ins->args[1];

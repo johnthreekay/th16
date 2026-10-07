@@ -1536,8 +1536,8 @@ GuiMsgVm::GuiMsgVm(void *script)
 
 // ECL dialogRead. Script -1 starts the boss theme and -3 the stage theme
 // (unless spell practice already plays it), with their titles; -2 ends
-// the stage, or the game when the spell practice card was captured;
-// otherwise the dialogue script with that number starts.
+// the stage (stage_clear), or opens the game over menu when Spellcard flag
+// 0x80 is set; otherwise the dialogue script with that number starts.
 // FUNCTION: TH16 0x429ff0
 void Gui::start_dialogue(i32 script)
 {
