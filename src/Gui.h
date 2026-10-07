@@ -182,6 +182,10 @@ struct Gui
     void sub_42c4f0();
     // Only called through g_Gui, which LTCG put in place of this.
     HARNESS_CALLED void sub_42c1b0();
+    // 0x4175d0 and 0x417650. Interrupt vm_94 and vm_98 with 2 (a spell card
+    // starts) or 3 (it ends) and run them. Only called through g_Gui.
+    HARNESS_CALLED void interrupt_spell_vms_2();
+    HARNESS_CALLED void interrupt_spell_vms_3();
     // Creates the textbox VM (0x426780) and the stage clear bonus (0x42c070).
     static void create_vm_110();
     static void show_stage_clear_bonus();
@@ -216,6 +220,8 @@ void __fastcall anm_vm_interrupt_3_run(AnmVm *vm);
 void __fastcall anm_vm_interrupt_4_run(AnmVm *vm);
 void __fastcall anm_vm_interrupt_4(AnmVm *vm);
 void __fastcall anm_vm_interrupt_5(AnmVm *vm);
+// 0x4173c0. GameThread::thread_start and Bullet::run_ex call it.
+void __fastcall anm_vm_interrupt_2(AnmVm *vm);
 
 // Debug logging, compiled out of the release build (0x42c9f0).
 void debug_log(const char *fmt, ...);

@@ -91,6 +91,12 @@ HARNESS_CALLED f32 zun_floorf(f32 x)
     return floorf(x);
 }
 
+// FUNCTION: TH16 0x405240
+HARNESS_CALLED f32 zun_fabsf(f32 x)
+{
+    return fabsf(x);
+}
+
 // FUNCTION: TH16 0x4052a0
 HARNESS_CALLED f32 zun_atan2f(f32 y, f32 x)
 {

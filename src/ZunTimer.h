@@ -154,6 +154,23 @@ struct ZunTimer
         current_f = cur_f;
     }
 
+    // tick with the updates made in each branch, as some callers inline it.
+    void tick_in_place()
+    {
+        f32 *speed = this->speed();
+        previous = current;
+        if (speed == NULL || (*speed > 0.99f && *speed < 1.01f))
+        {
+            current++;
+            current_f += 1.0f;
+        }
+        else
+        {
+            current_f += *speed;
+            current = (i32)current_f;
+        }
+    }
+
     // 0x406190. The out-of-line copy of tick. The int is C++'s postfix
     // marker; LTCG drops it but keeps the stack slot.
     HARNESS_CALLED void operator++(int);
@@ -177,4 +194,8 @@ struct ZunTimer
 
     // 0x40d490
     HARNESS_CALLED void operator--(int);
+
+    // Whether the timer moved onto a new frame that is a multiple of n
+    // (MainMenu's options screen uses it to pace a repeating sound).
+    i32 ticked_on_multiple_of(i32 n);
 };

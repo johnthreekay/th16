@@ -124,6 +124,9 @@ struct AnmLoaded
     // 0x42efb0. Like create_vm at rotation 0, for the UI list. HelpManual,
     // its only user, passes a constant for unused, which LTCG folds.
     HARNESS_CALLED AnmId create_ui_vm(i32 script, D3DXVECTOR3 *pos, i32 unused);
+    // 0x418fe0. create_ui_effect without the out pointer, at the origin.
+    // Every caller passes the same unused second argument.
+    HARNESS_CALLED AnmId create_ui_vm_at_origin(i32 script, i32 unused);
     // 0x426160. Like create_vm at the origin, but inserted at the front of
     // the world list.
     // Every caller passes 0 for unused, which LTCG folded.
@@ -400,7 +403,7 @@ struct AnmManager
     // 0x46f720. The same for snapshots; hands out the snapshot's id.
     AnmVm *allocate_snapshot_vm(i32 *id);
     // 0x46f810. Copies the VM and its children into snapshots.
-    AnmId store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused);
+    HARNESS_CALLED AnmId store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused);
     // 0x46f8f0. Brings a stored snapshot back to life as a new VM tree.
     // Every caller goes through g_AnmManager (see the list inserts).
     HARNESS_CALLED AnmId restore_snapshot(AnmId id);
@@ -410,7 +413,7 @@ struct AnmManager
     // the bytes used to *size.
     HARNESS_CALLED void save_vm_tree(AnmVm *dst, AnmVm *src, i32 *size);
     // 0x46fc30. Reads a tree written by save_vm_tree back into snapshot VMs.
-    AnmId load_vm_tree(AnmVm *src, AnmVm *parent, i32 *size);
+    HARNESS_CALLED AnmId load_vm_tree(AnmVm *src, AnmVm *parent, i32 *size);
     // 0x46e7d0 and the next three. Every caller goes through g_AnmManager,
     // so LTCG replaced this with a load of the global (and kept its stack
     // slot). They hand out the VM's new id.
@@ -420,6 +423,37 @@ struct AnmManager
     HARNESS_CALLED AnmId insert_in_ui_list_front(AnmVm *vm);
     // get_vm_with_id for snapshots.
     HARNESS_CALLED AnmVm *get_snapshot_vm_with_id(AnmId id);
+    // 0x469890. Draws a triangle fan of count points around center, each
+    // offset by offsets[i] and colored colors[i]. Every caller goes through
+    // g_AnmManager, so LTCG dropped this.
+    HARNESS_CALLED void draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors);
+
+    // get_snapshot_vm_with_id as LTCG inlined it into the ANM callbacks.
+    AnmVm *get_snapshot_vm_with_id_inline(AnmId id)
+    {
+        if (id.id == 0)
+        {
+            return NULL;
+        }
+        AnmVm *vm = NULL;
+        i32 fast_id = id.id & 0x1fff;
+        if (fast_id == 0x1fff)
+        {
+            for (ZunList<AnmVm> *node = &snapshot_list_head; node != NULL; node = node->next)
+            {
+                if (node->entry->id.id == id.id)
+                {
+                    vm = node->entry;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            vm = &snapshot_fast_array[fast_id].vm;
+        }
+        return vm;
+    }
     // UpdateFunc callbacks that run the VMs of each list and rebuild the
     // per-layer draw lists.
     DECOMP_NOINLINE static i32 __fastcall tick_world(AnmManager *mgr);

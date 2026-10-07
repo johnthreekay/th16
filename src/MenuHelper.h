@@ -28,6 +28,9 @@ struct MenuHelper
     }
 
     i32 move_cursor(i32 delta);
+    // 0x418720. Puts the cursor on a choice, clamped to the menu and moved
+    // past disabled choices.
+    i32 set_cursor(i32 selection);
     // 0x402de0. Enters a submenu, saving the cursor.
     void push();
     // 0x402e20. Back to the parent menu's cursor.

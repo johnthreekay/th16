@@ -1,7 +1,6 @@
 // Stand-in callers for wave 3, range C (0x42b480-0x43dc30), for functions
 // whose shape depends on how they are called.
 #include "../EnemyManager.h"
-#include "../Fog.h"
 #include "../Gui.h"
 #include "../HelpManual.h"
 #include "../Player.h"
@@ -25,15 +24,6 @@ void harness_w3c_expose_screen_globals()
 i32 harness_w3c_read_hud_origin()
 {
     return g_arcade_hud_origin_x + g_arcade_hud_origin_y + g_unk_4a6f1c;
-}
-
-// Like Fog's initialize at 0x418d8a.
-void harness_w3c_fog_create_vms(Fog *fog, i32 count)
-{
-    for (i32 i = 0; i < fog->vm_count - 1; i++)
-    {
-        fog->vm_ids[i] = g_Supervisor.create_fog_vm(count, 0x3b);
-    }
 }
 
 // Like HelpManual::on_tick at 0x42eb62, 0x42ed5c and 0x42eec3.

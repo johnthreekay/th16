@@ -290,6 +290,7 @@ HARNESS_CALLED i32 ReplayManager::set_end_stage(i32 extra_stage)
 
 static_assert(sizeof(RpyGamestate) == 0x294, "RpyGamestate");
 static_assert(offsetof(RpyGamestate, globals) == 0x14, "RpyGamestate::globals");
+static_assert(offsetof(RpyGamestate, spell_time_codes) == 0x240, "RpyGamestate::spell_time_codes");
 
 // FUNCTION: TH16 0x449030
 HARNESS_CALLED void ReplayManager::start_stage()

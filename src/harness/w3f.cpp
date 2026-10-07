@@ -8,15 +8,6 @@ void harness_w3f_timer_copy(AnmVm *vm)
     vm->interrupt_return_time.set_from(vm->script_time);
 }
 
-// Like the VM saving code around 0x406103, which writes the trees of the
-// snapshot VMs into a buffer.
-i32 harness_w3f_save_vm_tree(AnmVm *dst, i32 index)
-{
-    i32 size = 0;
-    g_AnmManager->save_vm_tree(dst, &g_AnmManager->snapshot_fast_array[index].vm, &size);
-    return size;
-}
-
 // Like the code around 0x42ed08, which refreshes a texture from an image in
 // memory.
 i32 harness_w3f_reload_texture(AnmLoaded *anm, void *data, u32 size)

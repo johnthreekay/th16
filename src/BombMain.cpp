@@ -250,6 +250,80 @@ i32 BombReimuAInf::method_10()
     return 0;
 }
 
+// TODO: register choice around the create_vm call (the original keeps the
+// return slot in ecx and g_Player in eax).
+// FUNCTION: TH16 0x4109d0
+void BombReimuAOrb::start(i32 index, D3DXVECTOR3 *pos)
+{
+    start_pos = *pos;
+    anm_id = g_Player->anm_file->create_vm(0xf, &this->pos, 0.0f, -1, 0);
+    active = 1;
+    timer.reset();
+    this->index = index;
+    damage_source = g_Player->create_damage_source(&this->pos, 56.0f, 0.0f, 9999, 0xf);
+    PlayerDamageSource *source = g_Player->get_damage_source(damage_source);
+    source->flags |= 4;
+    source->unk_80 = 3;
+}
+
+// The orb bursts: cancels bullets and lasers around it and hurts enemies
+// there, unless it already has, in which case it just goes away.
+// FUNCTION: TH16 0x410ae0
+void BombReimuAOrb::finish()
+{
+    if (!done)
+    {
+        if (active)
+        {
+            g_SoundManager.play_sound_at_position(0x1b, pos.x);
+            g_BulletManager->cancel_radius_as_bomb(&pos, 128.0f, 1);
+            g_LaserManager->cancel_in_radius(&pos, 128.0f, 1, 1);
+            g_Player->get_damage_source(g_Player->create_damage_source(&pos, 64.0f, 8.0f, 0xb, 100))->flags |= 4;
+        }
+        AnmManager::interrupt_tree(anm_id, 1);
+        active = 0;
+        if (damage_source != 0)
+        {
+            g_Player->inner.damage_sources[damage_source - 1].flags &= ~1;
+        }
+        damage_source = 0;
+        return;
+    }
+    delete_vm_and_clear(anm_id);
+}
+
+// finish for every orb, with the laser cancel and the VM deletion inlined.
+// TODO: the original loads the VM's child list after storing flags_hi (as
+// in ~EnemyInf).
+// FUNCTION: TH16 0x410bb0
+void BombReimuAOrbs::finish_all()
+{
+    BombReimuAOrb *orb = orbs;
+    for (i32 i = 0; i < 8; i++, orb++)
+    {
+        if (!orb->done)
+        {
+            if (orb->active)
+            {
+                D3DXVECTOR3 *pos = &orb->pos;
+                g_SoundManager.play_sound_at_position(0x1b, pos->x);
+                g_BulletManager->cancel_radius_as_bomb(pos, 128.0f, 1);
+                g_LaserManager->cancel_in_radius_inline(pos, 128.0f, 1, 1);
+                g_Player->get_damage_source(g_Player->create_damage_source(pos, 64.0f, 8.0f, 0xb, 100))->flags |= 4;
+            }
+            AnmManager::interrupt_tree(orb->anm_id, 1);
+            orb->active = 0;
+            if (orb->damage_source != 0)
+            {
+                g_Player->inner.damage_sources[orb->damage_source - 1].flags &= ~1;
+            }
+            orb->damage_source = 0;
+            continue;
+        }
+        delete_vm_inline_and_clear(orb->anm_id);
+    }
+}
+
 // FUNCTION: TH16 0x411320
 void BombReimuAInf::method_14()
 {

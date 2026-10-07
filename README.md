@@ -216,7 +216,13 @@ decompiled code the surroundings it had in the original:
 - HARNESS_CALLED also changes alias analysis inside the callee: with every
   caller visible, LTCG knows pointer arguments only point at callers'
   locals and keeps loads cached across stores and calls. An /INCLUDE'd
-  function loses that (CWaveFile::Read, save_vm_tree).
+  function loses that (CWaveFile::Read, save_vm_tree). So does a callee
+  whose caller also passes the same local's address to an /INCLUDE'd
+  function: save_vm_tree only kept caching `*size` once load_vm_tree, which
+  anm_effect_2_on_copy_1 hands the same `&child_size`, became
+  HARNESS_CALLED too.
+- `this->member % n` in an inline member keeps its `idiv` even when LTCG
+  inlines it with a constant n (BulletManager's `*_multiple_of`).
 - Pass-through members (every caller goes through `g_X->`): write the body
   with `this`; naming the global explicitly drops the `push ecx` slot.
 - Taking a global's address anywhere (even in a harness) keeps stores to it
