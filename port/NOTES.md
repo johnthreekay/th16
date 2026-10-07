@@ -944,8 +944,9 @@ used to, in `port/src/game_tables.cpp`, while main had them zero-filled).
   written as `sizeof` of what they measure, scoping, a declaration split
   from its assignment). After each change:
   `.venv/bin/python scripts/build.py`, `scripts/check_unchanged.py` (all
-  1214 functions unchanged) and `scripts/quickdiff.py | grep -c MATCH`
-  (863 after merging main 72c0ffa). `check_unchanged` always reports
+  1214 functions unchanged) and `scripts/quickdiff.py | grep -c MATCH`,
+  which must equal main's count (864 for both after merging main 550e004,
+  with identical quickdiff output). `check_unchanged` always reports
   `.rdata` as different: the linker writes a new timestamp and PDB id each
   time, even for identical builds. Build the baseline (main's tree) in a
   directory whose path has the same length as the one being checked: the
