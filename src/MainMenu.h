@@ -96,12 +96,12 @@ class TitleInf : public TaskInf
     static i32 __fastcall on_draw_thunk(void *arg);
 
     // Not decompiled yet (ExpHP's names).
-    i32 on_draw__practice_stage_select();
+    HARNESS_CALLED i32 on_draw__practice_stage_select();
     i32 on_draw__replay();
     i32 on_draw__player_data();
     i32 on_draw__4538b0();
-    i32 on_draw__4541b0();
-    i32 on_draw__spell_practice_histories();
+    HARNESS_CALLED i32 on_draw__4541b0();
+    HARNESS_CALLED i32 on_draw__spell_practice_histories();
 
     // States of on_tick (ExpHP: do_*).
     i32 do_manual();

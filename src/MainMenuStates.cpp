@@ -94,7 +94,7 @@ const char *const g_stage_names[10] = {"test   ",  "Stage 1", "Stage 2", "Stage 
 // The stages and practice high scores of stage practice.
 // TODO: the original frame has an unused 4-byte slot and saves ebx/esi on entry rather than in the branch.
 // FUNCTION: TH16 0x4513c0
-i32 TitleInf::on_draw__practice_stage_select()
+HARNESS_CALLED i32 TitleInf::on_draw__practice_stage_select()
 {
     switch (substate)
     {
@@ -159,7 +159,7 @@ i32 TitleInf::on_draw__practice_stage_select()
 // and the main game's).
 // TODO: ours saves esi/edi after the substate checks (shrink-wrapped); the original saves them in the prologue.
 // FUNCTION: TH16 0x456d50
-i32 TitleInf::on_draw__spell_practice_histories()
+HARNESS_CALLED i32 TitleInf::on_draw__spell_practice_histories()
 {
     if (substate > 0 && (substate <= 2 || (substate == 3 && state != 19)))
     {
@@ -240,7 +240,7 @@ const char g_name_entry_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrs
 // being entered and the character grid.
 // TODO: ours realigns its frame to 64 bytes (and esp, -64) because of the double vararg (the slowdown); unknown why.
 // FUNCTION: TH16 0x4541b0
-i32 TitleInf::on_draw__4541b0()
+HARNESS_CALLED i32 TitleInf::on_draw__4541b0()
 {
     Float3 pos;
     switch (substate)
