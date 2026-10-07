@@ -405,8 +405,9 @@ i32 __fastcall LaserManager::on_draw_callback(LaserManager *mgr)
     return 1;
 }
 
-// TODO: the original reserves an unused stack slot (push ecx) and keeps the
-// new laser in eax while linking it.
+// Each kind links and initializes its laser itself; the compiler merges the
+// four copies.
+// TODO: the original reserves an unused stack slot (push ecx).
 // FUNCTION: TH16 0x431760
 DECOMP_NOINLINE i32 LaserManager::allocate_new_laser(i32 kind, void *params)
 {
@@ -425,22 +426,29 @@ DECOMP_NOINLINE i32 LaserManager::allocate_new_laser(i32 kind, void *params)
     {
     case LASER_LINE:
         laser = new LaserLineInf();
+        laser->id = mgr->last_id;
+        mgr->append(laser);
+        laser->initialize(params);
         break;
     case LASER_INFINITE:
         laser = new LaserInfiniteInf();
+        laser->id = mgr->last_id;
+        mgr->append(laser);
+        laser->initialize(params);
         break;
     case LASER_BEAM:
         laser = new LaserBeamInf();
+        laser->id = mgr->last_id;
+        mgr->append(laser);
+        laser->initialize(params);
         break;
     case LASER_CURVE:
         laser = new LaserCurveInf();
+        laser->id = mgr->last_id;
+        mgr->append(laser);
+        laser->initialize(params);
         break;
-    default:
-        return mgr->last_id;
     }
-    laser->id = mgr->last_id;
-    mgr->append(laser);
-    laser->initialize(params);
     return mgr->last_id;
 }
 
