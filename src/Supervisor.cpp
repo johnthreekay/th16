@@ -1037,15 +1037,15 @@ int Supervisor::teardown_everything()
     }
     g_SoundManager.modify_bgm(4, 0, "dummy");
     g_TextHelper.release_buffer();
-    DeleteObject(g_font_904);
-    DeleteObject(g_font_90c);
-    DeleteObject(g_font_914);
-    DeleteObject(g_font_91c);
-    DeleteObject(g_font_924);
-    DeleteObject(g_font_910);
-    DeleteObject(g_font_918);
-    DeleteObject(g_font_920);
-    DeleteObject(g_font_928);
+    DeleteObject(g_text_font_default);
+    DeleteObject(g_text_font_0);
+    DeleteObject(g_text_font_2);
+    DeleteObject(g_text_font_4);
+    DeleteObject(g_text_font_6);
+    DeleteObject(g_text_font_1);
+    DeleteObject(g_text_font_3);
+    DeleteObject(g_text_font_5);
+    DeleteObject(g_text_font_7);
     if (keyboard != NULL)
     {
         keyboard->Unacquire();

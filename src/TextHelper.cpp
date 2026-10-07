@@ -38,36 +38,36 @@ TextHelper g_TextHelper;
 // ??__Fg_TextHelper@@YAXXZ
 
 // GLOBAL: TH16 0x4a5d90
-ThreadInf g_thread_4a5d90;
+ThreadInf g_unused_thread;
 // SYNTHETIC: TH16 0x401160
-// ??__Eg_thread_4a5d90@@YAXXZ
+// ??__Eg_unused_thread@@YAXXZ
 // SYNTHETIC: TH16 0x48acb0
-// ??__Fg_thread_4a5d90@@YAXXZ
+// ??__Fg_unused_thread@@YAXXZ
 
 // Set when the system has Meiryo; the fonts then use it instead of MS Gothic.
 // GLOBAL: TH16 0x4a6f2c
 i32 g_meiryo_available;
 
 // GLOBAL: TH16 0x4df904
-HFONT g_font_904;
+HFONT g_text_font_default;
 // GLOBAL: TH16 0x4df908
-HFONT g_font_908;
+HFONT g_text_font_8;
 // GLOBAL: TH16 0x4df90c
-HFONT g_font_90c;
+HFONT g_text_font_0;
 // GLOBAL: TH16 0x4df910
-HFONT g_font_910;
+HFONT g_text_font_1;
 // GLOBAL: TH16 0x4df914
-HFONT g_font_914;
+HFONT g_text_font_2;
 // GLOBAL: TH16 0x4df918
-HFONT g_font_918;
+HFONT g_text_font_3;
 // GLOBAL: TH16 0x4df91c
-HFONT g_font_91c;
+HFONT g_text_font_4;
 // GLOBAL: TH16 0x4df920
-HFONT g_font_920;
+HFONT g_text_font_5;
 // GLOBAL: TH16 0x4df924
-HFONT g_font_924;
+HFONT g_text_font_6;
 // GLOBAL: TH16 0x4df928
-HFONT g_font_928;
+HFONT g_text_font_7;
 
 // FUNCTION: TH16 0x458520
 HARNESS_CALLED bool TextHelper::release_buffer()
@@ -433,48 +433,48 @@ void create_fonts()
     }
     if (!g_meiryo_available)
     {
-        g_font_904 = CreateFontA(24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_default = CreateFontA(24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, GOTHIC);
-        g_font_908 = CreateFontA(28, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_8 = CreateFontA(28, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, GOTHIC);
-        g_font_90c = CreateFontA(32, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_0 = CreateFontA(32, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, GOTHIC);
-        g_font_91c = CreateFontA(40, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_4 = CreateFontA(40, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, GOTHIC);
-        g_font_910 = CreateFontA(32, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_1 = CreateFontA(32, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, MINCHO);
-        g_font_920 = CreateFontA(40, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_5 = CreateFontA(40, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, MINCHO);
-        g_font_914 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_2 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, GOTHIC);
-        g_font_918 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_3 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, MINCHO);
-        g_font_924 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_6 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, GOTHIC);
-        g_font_928 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_7 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, MINCHO);
     }
     else
     {
-        g_font_904 = CreateFontA(36, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_default = CreateFontA(36, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FIXED_PITCH, MEIRYO);
-        g_font_908 = CreateFontA(42, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_8 = CreateFontA(42, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FIXED_PITCH, MEIRYO);
-        g_font_90c = CreateFontA(48, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_0 = CreateFontA(48, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FIXED_PITCH, MEIRYO);
-        g_font_91c = CreateFontA(60, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_4 = CreateFontA(60, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FIXED_PITCH, MEIRYO);
-        g_font_910 = CreateFontA(32, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_1 = CreateFontA(32, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, MINCHO);
-        g_font_920 = CreateFontA(40, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_5 = CreateFontA(40, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, MINCHO);
-        g_font_914 = CreateFontA(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_2 = CreateFontA(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FIXED_PITCH, MEIRYO);
-        g_font_918 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_3 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, MINCHO);
-        g_font_924 = CreateFontA(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_6 = CreateFontA(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FIXED_PITCH, MEIRYO);
-        g_font_928 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
+        g_text_font_7 = CreateFontA(15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS,
                                  CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN | FIXED_PITCH, MINCHO);
     }
 }
@@ -490,34 +490,34 @@ HARNESS_CALLED void __stdcall draw_text(RECT *dst_rect, i32 x, i32 font_height, 
     switch (font_id)
     {
     case 8:
-        font = g_font_908;
+        font = g_text_font_8;
         break;
     case 0:
-        font = g_font_90c;
+        font = g_text_font_0;
         break;
     case 2:
-        font = g_font_914;
+        font = g_text_font_2;
         break;
     case 1:
-        font = g_font_910;
+        font = g_text_font_1;
         break;
     case 3:
-        font = g_font_918;
+        font = g_text_font_3;
         break;
     case 4:
-        font = g_font_91c;
+        font = g_text_font_4;
         break;
     case 6:
-        font = g_font_924;
+        font = g_text_font_6;
         break;
     case 5:
-        font = g_font_920;
+        font = g_text_font_5;
         break;
     case 7:
-        font = g_font_928;
+        font = g_text_font_7;
         break;
     default:
-        font = g_font_904;
+        font = g_text_font_default;
         break;
     }
     memset(g_TextHelper.buffer, 0, g_TextHelper.image_size);
