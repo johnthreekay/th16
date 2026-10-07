@@ -34,6 +34,12 @@ MsgFile *g_msg_file_cache;
 #define ANM_SLOT_FRONT 5
 #define ANM_SLOT_STAGE_LOGO 6
 
+// Scripts of the stage logo's anm file: the stage's title, and the titles
+// of the stage and boss themes.
+#define LOGO_ANM_STAGE_TITLE 0
+#define LOGO_ANM_STAGE_THEME 1
+#define LOGO_ANM_BOSS_THEME 2
+
 // Deletes the faces and text.
 // FUNCTION: TH16 0x4264a0
 GuiMsgVm::~GuiMsgVm()
@@ -690,7 +696,7 @@ HARNESS_CALLED i32 GuiMsgVm::run()
         // Starts the boss theme and shows its title (stage logo script 2).
         case MSG_MUSIC_BOSS:
             g_Supervisor.play_bgm(1, g_stage_data->music_ids[1]);
-            g_Gui->stage_logo_anm->create_effect(2, -1, NULL);
+            g_Gui->stage_logo_anm->create_effect(LOGO_ANM_BOSS_THEME, -1, NULL);
             break;
         // The boss's name and title, and the boss marker.
         case MSG_INTRO:
@@ -1193,7 +1199,7 @@ void show_stage_logo()
 {
     if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY))
     {
-        g_Gui->stage_logo_anm->create_effect(0, -1, NULL);
+        g_Gui->stage_logo_anm->create_effect(LOGO_ANM_STAGE_TITLE, -1, NULL);
     }
 }
 
@@ -1563,7 +1569,7 @@ void Gui::start_dialogue(i32 script)
         }
         g_SoundManager.modify_bgm(BGM_PLAY, boss, "dummy");
         g_Scorefile->bgm_unlocked[track] = 1;
-        g_Gui->stage_logo_anm->create_effect(boss + 1, -1, NULL);
+        g_Gui->stage_logo_anm->create_effect(boss + LOGO_ANM_STAGE_THEME, -1, NULL);
     }
     else if (script == -2)
     {
@@ -1684,7 +1690,7 @@ void Gui::setup_stage_hud()
     if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY) &&
         g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE)
     {
-        create_effect_inline(gui->stage_logo_anm, 1, -1, NULL);
+        create_effect_inline(gui->stage_logo_anm, LOGO_ANM_STAGE_THEME, -1, NULL);
     }
     if (g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY)
     {
@@ -1799,6 +1805,7 @@ i32 Gui::on_tick_body()
         {
             if (chapter_percent > 0.0f)
             {
+                // A tick every 4 frames while counting, a chime at the end.
                 if (notice_timer.current % 4 == 0)
                 {
                     g_SoundManager.play_sound_centered(0x27, 0);
@@ -1892,6 +1899,8 @@ i32 Gui::on_tick_body()
             anm_vm_interrupt_4_run(boss_timer_ones_vm);
             hud_flags &= ~GUI_BOSS_TIMER_STATE_MASK;
         }
+        // Each second of the last 5 is announced (sound 0xb, then 0xc for
+        // the last 2) in the digits' warning colors.
         if (boss_timer_seconds < boss_timer_shown_seconds)
         {
             if (boss_timer_seconds < 2)
