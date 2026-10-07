@@ -7,6 +7,7 @@
 #include "../PosVel.h"
 #include "../Spellcard.h"
 #include "../Supervisor.h"
+#include "../ZunMath.h"
 
 // Like the main menu (0x450d75, 0x4512f2, ...), which starts its cursor
 // effect this way.
@@ -114,4 +115,10 @@ void harness_gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
 void harness_spellcard_end()
 {
     g_Spellcard->end();
+}
+
+// Like ECL (0x41f251, 0x4200e2, ...) and the HUD (0x428c63).
+f32 harness_fabsf(f32 x, f32 y)
+{
+    return zun_fabsf(x) + zun_fabsf(y - x);
 }
