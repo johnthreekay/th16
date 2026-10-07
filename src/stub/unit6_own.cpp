@@ -84,18 +84,6 @@ LoadingThread::~LoadingThread()
 {
 }
 
-// STUB: TH16 0x43adc0
-unsigned __stdcall LoadingThread::thread_start(void *arg)
-{
-    return 0;
-}
-
-// STUB: TH16 0x43b300
-int LoadingThread::on_draw()
-{
-    return 1;
-}
-
 // STUB: TH16 0x447760
 int ReplayManager::initialize(i32 mode, const char *filename)
 {

@@ -165,7 +165,9 @@ struct SoundManager
     // File name of the BGM playing.
     char bgm_name[0x100];
     BgmCommandEntry bgm_commands[0x1f];
-    u8 unk_4454[0x5660 - 0x4454];
+    u8 unk_4454[0x5560 - 0x4454];
+    // The BGM archive's file name (thbgm.dat).
+    char bgm_dat_name[0x100];
     BgmStream *bgm_stream;
     u8 unk_5664[0x5668 - 0x5664];
     HANDLE bgm_event;
@@ -205,6 +207,9 @@ struct SoundManager
     // Stops one sound, or every sound when id is negative (remembering
     // which were playing).
     void stop_sound(i32 id);
+    // 0x45db10. Opens the BGM archive (thbgm.dat at the only call site,
+    // which LTCG folds).
+    DECOMP_NOINLINE i32 open_bgm_dat(const char *name);
     // Points the BGM stream at another track. Reaches the manager through
     // g_SoundManager; LTCG dropped this.
     i32 select_bgm(const char *path);

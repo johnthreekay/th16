@@ -26,7 +26,9 @@ struct ScorefileCharacter
 };
 
 // The decrypted contents of scoreth16.dat. Only the parts decompiled code
-// needs so far.
+// needs so far. 0x1a3ac bytes (new Scorefile at 0x43af25), so 4-byte packed
+// despite play_time.
+#pragma pack(push, 4)
 struct Scorefile
 {
     ScorefileCharacter characters[5];
@@ -36,7 +38,12 @@ struct Scorefile
     // Total of every character's play_time.
     __int64 play_time;
     u8 unk_19fd0[0x1a3ac - 0x19fd0];
+
+    // 0x4497e0 (ExpHP: sub_4497e0__reads_scorefile). Loads scoreth16.dat.
+    Scorefile();
 };
+#pragma pack(pop)
+static_assert(sizeof(Scorefile) == 0x1a3ac, "Scorefile size");
 
 extern Scorefile *g_Scorefile;
 
