@@ -12,6 +12,7 @@ cheap compile of each file without /GL.
 import argparse
 import functools
 import hashlib
+import os
 import re
 import struct
 import subprocess
@@ -79,7 +80,7 @@ def project_files():
 def input_key(flags, src, deps):
     """Hash of everything an object depends on: flags, source and the
     project headers it included (SDK and CRT headers never change)."""
-    h = hashlib.sha256(("deps-v2\0" + "\0".join(flags)).encode())
+    h = hashlib.sha256(("deps-v3\0" + "\0".join(flags)).encode())
     for path in [src, *deps]:
         p = Path(path)
         h.update(str(p).encode() + b"\0")
@@ -108,7 +109,8 @@ def compile_one(src, obj_dir, no_gl):
         if m:
             # cl lowercases the paths of quoted includes.
             path = re.sub(r"^[A-Za-z]:", "", m.group(1).strip()).replace("\\", "/")
-            real = project_files().get(path.lower())
+            # Includes like "../Supervisor.h" from src/harness/ keep the "..".
+            real = project_files().get(os.path.normpath(path).lower())
             if real:
                 deps.append(str(real))
         elif l.strip() and l.strip() != src.name:
