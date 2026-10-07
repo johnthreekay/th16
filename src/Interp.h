@@ -28,7 +28,7 @@ struct InterpFloat
 
     // Starts an interpolation from initial to goal over end_time frames
     // (ECL's move*Time instructions).
-    void start(i32 end_time, i32 method, f32 initial, f32 goal)
+    __forceinline void start(i32 end_time, i32 method, f32 initial, f32 goal)
     {
         this->initial = initial;
         this->end_time = end_time;
@@ -59,7 +59,7 @@ struct InterpFloat2
     D3DXVECTOR2 step();
     // Starts an interpolation from initial to goal over end_time frames
     // (ECL's moveCircleTime and moveEllipseTime).
-    void start(i32 end_time, i32 method, D3DXVECTOR2 *initial, D3DXVECTOR2 *goal)
+    __forceinline void start(i32 end_time, i32 method, D3DXVECTOR2 *initial, D3DXVECTOR2 *goal)
     {
         this->end_time = end_time;
         bezier_1 = g_zero_vec2;

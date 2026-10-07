@@ -12,7 +12,7 @@ struct Rng
     // TH06 equivalent: Rng::GetRandomU16
     u16 rand_u16();
     // TH06 equivalent: Rng::GetRandomU16InRange
-    u16 rand_u16_in_range(u16 range)
+    __forceinline u16 rand_u16_in_range(u16 range)
     {
         return range != 0 ? rand_u16() % range : 0;
     }

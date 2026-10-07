@@ -398,7 +398,7 @@ i32 __fastcall LaserManager::on_draw_callback(LaserManager *mgr)
 // TODO: the original reserves an unused stack slot (push ecx) and keeps the
 // new laser in eax while linking it.
 // FUNCTION: TH16 0x431760
-i32 LaserManager::allocate_new_laser(i32 kind, void *params)
+DECOMP_NOINLINE i32 LaserManager::allocate_new_laser(i32 kind, void *params)
 {
     LaserManager *mgr = g_LaserManager;
     if (mgr->list_length >= 0x200)
