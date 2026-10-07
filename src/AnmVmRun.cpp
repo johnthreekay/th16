@@ -268,6 +268,12 @@ static void __fastcall anm_sincosmul(Float3 *dst, f32 angle, f32 radius)
 #define ANM_FLAGS_LO ((AnmVmFlagsLoFields *)&flags_lo)
 #define ANM_FLAGS_HI ((AnmVmFlagsHiFields *)&flags_hi)
 
+// From a to b as t goes from 0 to 1.
+static inline f32 anm_lerp(f32 t, f32 a, f32 b)
+{
+    return t * (b - a) + a;
+}
+
 // Vector stores that take their components as separate values.
 static inline void anm_set_float3(Float3 *v, f32 x, f32 y, f32 z)
 {
@@ -542,7 +548,7 @@ __forceinline i32 AnmVm::run_script()
             f32 min = ANM_FLOAT(2);
             f32 max = ANM_FLOAT(3);
             f32 angle = g_replay_unsafe_rng.randf_neg_1_to_1() * ZUN_PI;
-            f32 radius = g_replay_unsafe_rng.randf_neg_1_to_1() * (max - min) + min;
+            f32 radius = anm_lerp(g_replay_unsafe_rng.randf_neg_1_to_1(), min, max);
             Float3 point;
             anm_sincosmul(&point, angle, radius);
             *ANM_FLOAT_PTR(0) = point.x;
