@@ -370,7 +370,9 @@ decompiled code the surroundings it had in the original:
   register allocation of an unrolled init loop.
 - Calling both CStreamingSound::get_play_time and play_sound_centered from
   one function makes LTCG stop folding play_sound_centered's `this`
-  program-wide (12 matches lost); 0x43f350 is parked under `#if 0`.
+  program-wide (12 matches lost). The cause is reading a field of
+  g_SoundManager (bgm_stream, or bgm_name's address) in a function that
+  also calls play_sound_centered; see the wave 6 notes below.
 - Open: our build adds a /GS cookie to functions with a memory-resident
   D3DXVECTOR3 copy that is never passed anywhere (Player::update_options,
   sht_on_tick, AnmVm::world_pos).
@@ -480,9 +482,9 @@ decompiled code the surroundings it had in the original:
   want an 8-aligned frame: the function realigns and so does every
   visible caller, up the call graph. ZUN's draw_vm keeps width and height
   in separate floats; with a Float2 three callers of draw_vm lost their
-  match. convert_texture (0x46c0d0) is parked under `#if 0` because its
-  caller load_texture_from_file realigns even with the lock rectangle
-  wrapped in a 12-byte struct.
+  match. convert_texture (0x46c0d0) made its caller load_texture_from_file
+  realign until that caller stopped being /INCLUDE'd (wave 6 notes below);
+  it now has a plain D3DLOCKED_RECT.
 - LTCG's call graph is built before inlining, and an inline helper is its
   own node there. Taking a function's address counts as a call: in a
   function that realigns its frame (WinMain), it gives the target known
@@ -505,6 +507,40 @@ decompiled code the surroundings it had in the original:
 - More callers can stop LTCG inlining a UCRT inline in one place: with
   Bullet::run_ex's calls, Player::angle_to_player had to spell out
   atan2f's body to keep it inline.
+
+- An /INCLUDE'd function never gets known stack alignment from its
+  callers: if it or a callee wants 8-byte alignment, it realigns itself.
+  load_texture_from_file realigned as soon as convert_texture had a body;
+  kept alive by its real caller (setup_entry) instead, it inherits the
+  alignment load_next_entry provides and matches. setup_entry stopped
+  realigning the same way.
+- Without /INCLUDE, a static (`__stdcall`) function gets LTCG register
+  arguments (ecx, edx), while a member that ignores `this` keeps its
+  stack arguments and only loses `this` (load_texture_from_file,
+  reload_texture, draw_replay_entry). Use the member form when the
+  original keeps `ret N` with every caller visible.
+- The "this folding" break above, made precise: a function that reads a
+  field of g_SoundManager itself (a load of bgm_stream, or taking
+  bgm_name's address) and also calls g_SoundManager.play_sound_centered
+  stops the folding everywhere. Through an inline SoundManager member
+  (bgm_play_time, seek_bgm, get_bgm_name) the access belongs to another
+  call graph node and the folding stays; an inline BgmStream member does
+  not help, because the caller still reads g_SoundManager.bgm_stream.
+- PauseMenu::tick_open: the jump table puts cases 12/15 before case 11,
+  and two shared tails are gotos (the score tail reached from cases 2-5,
+  the Esc tail reached from case 6); written twice, the compiler kept
+  the first copy instead. Where only a suffix is shared (the Q key path,
+  `set_cursor(1); set_unk_1f4(16)`), cross-jumping keeps the earlier copy
+  in ours and the later one in the original; no source form found.
+- Open: `menu.next_selection % 13` compiles to `mov reg, 13; idiv` in
+  tick_open, do_replay_save and do_score_name_entry, where the original
+  multiplies by the reciprocal; draw_keyboard's `i % 13` does multiply.
+  Not the expression form (a free inline helper, fewer uses of 13) and
+  not the frame realignment.
+- When two variables have the same use counts, the order of their first
+  assignment decides which gets the callee-saved register: in
+  convert_texture's 32-bit loop clearing b first puts b in ebx and the
+  count in esi like the original.
 
 ### Compiler-generated and CRT functions
 

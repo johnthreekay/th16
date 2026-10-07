@@ -32,7 +32,9 @@ struct PauseMenu
     i32 unk_1fc;
     // Nonzero once the score name is entered (the keyboard is hidden).
     i32 unk_200;
-    u8 unk_204[0x208 - 0x204];
+    // Nonzero in the menu shown when a replay ends, where the R (retry) and
+    // Esc (resume) shortcuts do nothing.
+    i32 unk_204;
     i32 saved_global_4d9d90;
     ReplayManager *replays[25];
     u8 unk_270[0x2d4 - 0x270];

@@ -180,8 +180,8 @@ D3DFORMAT g_anm_d3d_formats[9] = {
 #define ANM_TEXTURE_DOWNSCALED(entry) ((entry)->low_res_scale && 2.0f > g_screen_coord_scale)
 
 // FUNCTION: TH16 0x46c920
-i32 __stdcall AnmManager::load_texture_from_file(AnmLoadedD3D *d3d, i32 format, i32 unused, i32 width, i32 height,
-                                                 i32 offset_x, i32 offset_y)
+HARNESS_CALLED i32 AnmManager::load_texture_from_file(AnmLoadedD3D *d3d, i32 format, i32 unused, i32 width,
+                                                     i32 height, i32 offset_x, i32 offset_y)
 {
     IDirect3DTexture9 *texture;
     IDirect3DSurface9 *src_surface;
@@ -336,10 +336,10 @@ i32 __stdcall AnmManager::create_render_target(AnmLoadedD3D *d3d, i32 width, i32
     return 0;
 }
 
-// TODO: ours realigns the frame to 8 bytes; the original does not, and reloads g_resolution_x/y after storing them into the entry.
+// TODO: the original reloads g_resolution_x/y after storing them into the entry; register allocation and block order differ.
 // FUNCTION: TH16 0x46d3b0
-i32 __stdcall AnmManager::setup_entry(AnmLoaded *anm, i32 index, i32 first_sprite, i32 first_script,
-                                      AnmRawEntry *entry)
+HARNESS_CALLED i32 AnmManager::setup_entry(AnmLoaded *anm, i32 index, i32 first_sprite, i32 first_script,
+                                           AnmRawEntry *entry)
 {
     D3DSURFACE_DESC desc;
     AnmLoadedSprite sprite;
@@ -374,8 +374,8 @@ i32 __stdcall AnmManager::setup_entry(AnmLoaded *anm, i32 index, i32 first_sprit
         }
         else
         {
-            i32 size = load_texture_from_file(&anm->d3d[index], entry->format, 0, entry->width, entry->height,
-                                              (i16)entry->offset_x, (i16)entry->offset_y);
+            i32 size = g_AnmManager->load_texture_from_file(&anm->d3d[index], entry->format, 0, entry->width,
+                                                            entry->height, (i16)entry->offset_x, (i16)entry->offset_y);
             if (size < 0)
             {
                 g_GameErrorContext.fatal("\x83" "e\x83N\x83X\x83`\x83\x83 %s \x82\xaa\x8d\xec\x90\xac\x82\xc5\x82\xab\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x8e\xb8\x82\xed\x82\xea\x82\xc4\x82\xe9\x82\xa9\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n", image_path);
@@ -435,7 +435,7 @@ AnmLoaded *__stdcall AnmManager::load_next_entry(AnmLoaded *anm)
     {
         if (i == anm->load_wait - 1)
         {
-            if (setup_entry(anm, index, first_sprite, first_script, entry) < 0)
+            if (g_AnmManager->setup_entry(anm, index, first_sprite, first_script, entry) < 0)
             {
                 anm->load_wait = 0;
                 return NULL;

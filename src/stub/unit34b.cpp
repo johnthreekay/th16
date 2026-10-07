@@ -26,9 +26,3 @@ i32 Gui::on_tick_body()
 }
 
 
-// STUB: TH16 0x43f350
-void pause_menu_43f350()
-{
-}
-
-

@@ -447,8 +447,10 @@ struct AnmManager
     // VMs once all are done.
     static AnmLoaded *__stdcall load_next_entry(AnmLoaded *anm);
     // 0x46d3b0. Creates the texture, sprites and script table of one entry.
-    static i32 __stdcall setup_entry(AnmLoaded *anm, i32 index, i32 first_sprite, i32 first_script,
-                                     AnmRawEntry *entry);
+    // A member that ignores this, kept alive by load_next_entry rather than
+    // /INCLUDE so that it inherits load_next_entry's stack alignment.
+    HARNESS_CALLED i32 setup_entry(AnmLoaded *anm, i32 index, i32 first_sprite, i32 first_script,
+                                   AnmRawEntry *entry);
     // Texture creation for setup_entry. They return the bytes the texture
     // takes (0 for render targets), or a negative value on failure.
     // 0x46cd80. A render target ("@R" entries).
@@ -457,9 +459,13 @@ struct AnmManager
     static i32 __stdcall create_empty_texture(AnmLoadedD3D *d3d, i32 width, i32 height, i32 format);
     // 0x46c920. From the image file read by AnmLoaded::load_entry, cropped
     // to the entry's size. The third argument is the same at every call
-    // site; LTCG folded it.
-    static i32 __stdcall load_texture_from_file(AnmLoadedD3D *d3d, i32 format, i32 unused, i32 width, i32 height,
-                                                i32 offset_x, i32 offset_y);
+    // site; LTCG folded it. A member that does not use this (LTCG dropped
+    // it), kept alive by its real caller rather than /INCLUDE: only then does
+    // LTCG know its stack is 8-aligned (setup_entry's chain provides it), so
+    // convert_texture's needs do not make it realign. As a static it gets
+    // register arguments instead.
+    HARNESS_CALLED i32 load_texture_from_file(AnmLoadedD3D *d3d, i32 format, i32 unused, i32 width, i32 height,
+                                              i32 offset_x, i32 offset_y);
     // 0x46cb60. From a texture embedded in the .anm file.
     static i32 __stdcall load_texture_from_data(AnmLoadedD3D *d3d, AnmRawTexture *raw, i32 format, i32 width,
                                                 i32 height);

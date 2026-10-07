@@ -476,6 +476,23 @@ struct SoundManager
     HARNESS_CALLED void play_sound_centered(i32 id, i32 unused);
     // 0x45e1f0. Pans by the x coordinate.
     void play_sound_at_position(i32 id, f32 x);
+
+    // The BGM stream's play time and seek. A function that reads a field
+    // of g_SoundManager itself and also calls play_sound_centered makes
+    // LTCG stop folding play_sound_centered's this program-wide; the pause
+    // menu reaches the stream through these instead.
+    __forceinline double bgm_play_time()
+    {
+        return ((CStreamingSound *)bgm_stream)->get_play_time();
+    }
+    __forceinline void seek_bgm(double seconds)
+    {
+        ((CStreamingSound *)bgm_stream)->seek(seconds);
+    }
+    __forceinline const char *get_bgm_name()
+    {
+        return bgm_name;
+    }
 };
 
 extern SoundManager g_SoundManager;

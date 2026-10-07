@@ -1,16 +1,7 @@
 // AnmManager::convert_texture (0x46c0d0): fixing up the colors of
 // transparent texels.
-//
-// TODO: parked. The code below is functionally complete, but giving it a
-// visible body makes LTCG realign the frame of its caller
-// load_texture_from_file (0x46c920), which then stops matching. The
-// D3DLOCKED_RECT is wrapped in a 12-byte struct because as a plain 8-byte
-// local it makes convert_texture realign its own frame (the original does
-// not); the caller's realignment has no known fix yet. Until then the
-// opaque stub in src/stub/w5e.cpp stands in.
 #include "AnmManager.h"
 
-#if 0
 
 // Pixel layouts of the texture formats convert_texture handles.
 struct TexelA8R8G8B8
@@ -47,7 +38,9 @@ struct TexelA8R3G3B2
 
 // Gives every fully transparent texel the average color of its opaque
 // neighbors, so that filtering does not blend in black at sprite edges.
-#define BLEED_TRANSPARENT_TEXELS(T)                                                                                 \
+// ZERO_SUMS clears the sums; the order of the stores steers register
+// allocation (the 32-bit case only gets b into ebx with b cleared first).
+#define BLEED_TRANSPARENT_TEXELS(T, ZERO_SUMS)                                                                     \
     for (u32 y = 0; y < desc.Height; y++)                                                                           \
     {                                                                                                               \
         T *texel = (T *)((u8 *)locked.pBits + locked.Pitch * y);                                                    \
@@ -57,10 +50,8 @@ struct TexelA8R3G3B2
             {                                                                                                       \
                 continue;                                                                                           \
             }                                                                                                       \
-            u32 r = 0;                                                                                              \
-            u32 g = 0;                                                                                              \
-            u32 b = 0;                                                                                              \
-            u32 count = 0;                                                                                          \
+            u32 r, g, b, count;                                                                                     \
+            ZERO_SUMS;                                                                                              \
             if (x != 0 && texel[-1].a != 0)                                                                         \
             {                                                                                                       \
                 r = texel[-1].r;                                                                                    \
@@ -109,36 +100,32 @@ struct TexelA8R3G3B2
         }                                                                                                           \
     }
 
-// Not annotated while parked: 0x46c0d0
+// TODO: register allocation and spills differ; the original's 32-bit loop keeps a second pointer (texel - 2) beside the spilled texel pointer.
+// FUNCTION: TH16 0x46c0d0
 void __stdcall AnmManager::convert_texture(IDirect3DTexture9 *texture)
 {
     IDirect3DSurface9 *surface = NULL;
     texture->GetSurfaceLevel(0, &surface);
     D3DSURFACE_DESC desc;
     surface->GetDesc(&desc);
-    struct
-    {
-        D3DLOCKED_RECT rect;
-        i32 pad;
-    } locked_;
-    surface->LockRect(&locked_.rect, NULL, 0);
-#define locked locked_.rect
+    D3DLOCKED_RECT locked;
+    surface->LockRect(&locked, NULL, 0);
     switch (desc.Format)
     {
+    case D3DFMT_UNKNOWN:
     case D3DFMT_A8R8G8B8:
-        BLEED_TRANSPARENT_TEXELS(TexelA8R8G8B8);
+        BLEED_TRANSPARENT_TEXELS(TexelA8R8G8B8, (b = 0, g = 0, r = 0, count = 0));
         break;
     case D3DFMT_A1R5G5B5:
-        BLEED_TRANSPARENT_TEXELS(TexelA1R5G5B5);
+        BLEED_TRANSPARENT_TEXELS(TexelA1R5G5B5, (r = 0, g = 0, b = 0, count = 0));
         break;
     case D3DFMT_A4R4G4B4:
-        BLEED_TRANSPARENT_TEXELS(TexelA4R4G4B4);
+        BLEED_TRANSPARENT_TEXELS(TexelA4R4G4B4, (r = 0, g = 0, b = 0, count = 0));
         break;
     case D3DFMT_A8R3G3B2:
-        BLEED_TRANSPARENT_TEXELS(TexelA8R3G3B2);
+        BLEED_TRANSPARENT_TEXELS(TexelA8R3G3B2, (r = 0, g = 0, b = 0, count = 0));
         break;
     }
     surface->UnlockRect();
     surface->Release();
 }
-#endif
