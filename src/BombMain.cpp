@@ -652,7 +652,6 @@ void BombReimuAOrbs::finish_all()
 // Bursts the orbs and ends the bomb at once.
 // FUNCTION: TH16 0x411320
 void BombReimuAInf::end_at_stage_clear()
-
 {
     reimu_orbs->finish_all();
     AnmManager::interrupt_tree(anm_id_secondary, 1);

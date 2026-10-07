@@ -136,7 +136,6 @@ struct PlayerOption
     // Called each frame before the option moves (with the main option of
     // the same index, even for season options). Nothing in TH16 sets it.
     void(__fastcall *on_update)(PlayerOption *option);
-
     u8 unk_e0[0xe4 - 0xe0];
 };
 
@@ -572,7 +571,6 @@ struct Player
     }
     // 0x440d50
     void set_shoot_key_short_timer(i32 time);
-
     // 0x440dc0. At the start of a stage: brings the options back
     // (clears PLAYER_FLAG_STAGE_ENDED) and sends their VMs interrupt 2.
     void start_stage_options();

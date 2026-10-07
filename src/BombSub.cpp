@@ -355,7 +355,6 @@ void BombMarisaSubInf::end_at_stage_clear()
 // Spring: the widest circle; it deals 100 a frame.
 // FUNCTION: TH16 0x411460
 i32 BombReimuSubInf::begin()
-
 {
     Player *player = g_Player;
     pos = player->inner.pos;

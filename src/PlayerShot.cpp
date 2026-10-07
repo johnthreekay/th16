@@ -500,7 +500,9 @@ static __forceinline i32 option_laser_index(ShtShooter *shooter, i32 shooter_ref
 // Marisa's laser: follows its option, turns toward the shot angle and
 // grows up to 512 pixels; it ends once the shot key is released, the
 // option is gone or the power level changed.
-// TODO: ours gets a /GS cookie (offset goes to the asm sincosmul) and no 8-byte frame alignment; g_AnmManager is reloaded where the original keeps it in edi.
+// TODO: ours gets a /GS cookie (offset goes to the asm sincosmul) and no
+// 8-byte frame alignment; g_AnmManager is reloaded where the original keeps
+// it in edi.
 // FUNCTION: TH16 0x446260
 i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet)
 {
@@ -578,7 +580,8 @@ i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet)
 
 // Marisa's laser hitting an enemy: cut it short at the enemy (pos, and
 // size for rectangles, else radius) and spray sparks along it.
-// TODO: the original looks the damage source up in each branch (hoisting only g_Player) and spills more locals; frame and registers differ.
+// TODO: the original looks the damage source up in each branch (hoisting
+// only g_Player) and spills more locals; frame and registers differ.
 // FUNCTION: TH16 0x446870
 i32 __fastcall sht_on_hit_laser(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius)
 {
@@ -792,7 +795,6 @@ i32 PlayerBullet::create(i32 shooter_ref, i32 time, PlayerInner *inner)
         state = PLAYER_BULLET_FREE;
         delete_vm_and_clear(anm_id);
         source->flags &= ~DAMAGE_SOURCE_ACTIVE;
-
         return -1;
     }
     if (shooter->sfx_id >= 0)

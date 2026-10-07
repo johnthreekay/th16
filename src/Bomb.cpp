@@ -414,7 +414,6 @@ void BombInf::start_release_cooldown()
 // The bombs' and releases' unused virtual functions.
 // FUNCTION: TH16 0x40ebe0
 i32 BombAyaAInf::on_draw()
-
 {
     return 1;
 }

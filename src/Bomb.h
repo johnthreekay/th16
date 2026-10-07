@@ -50,7 +50,6 @@ class BombInf
     AnmId anm_id;
     // Deleted by the destructor; nothing in TH16 creates it.
     AnmId anm_id_60;
-
     // A second VM: an effect around the player (bombs) or the release's
     // outer ring.
     AnmId anm_id_secondary;

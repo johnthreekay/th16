@@ -642,6 +642,7 @@ i32 Player::do_shooting(i32 short_time, i32 long_time)
     i32 level = g_Globals.power / g_Globals.power_per_level;
     if (inner.is_focused)
     {
+        // The focused shooter arrays follow the unfocused ones.
         level += sht_file->num_power_levels + 1;
     }
     for (ShtShooter *shooter = sht_file->shooter_arrays[level]; shooter->fire_rate >= 0; shooter++, index++)
@@ -676,6 +677,7 @@ i32 Player::do_shooting(i32 short_time, i32 long_time)
         }
         if (fire)
         {
+            // 0x100 << 8 sets the season file bit of the shooter ref.
             shoot_one_bullet((season_level | 0x100) << 8 | index, short_time, &inner);
         }
     }
@@ -815,7 +817,6 @@ HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 wi
 // TODO: the original walks the sources with two pointers (source and
 // &lifetime.current) and rereads pos/size from the stack; ours keeps one
 // pointer and pos/size in registers.
-
 // FUNCTION: TH16 0x445a30
 HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f32 rotation, f32 radius,
                                                    i32 *bomb_hit, Float3 *hit_pos, i32 no_score, i32 enemy_id)
@@ -1711,7 +1712,6 @@ i32 Player::on_tick_body()
             i32 scripts[4] = {4, 4, 4, 4};
             AnmId id = anm_file->create_vm(scripts[g_Globals.character], &inner.pos, 0.0f, -1, 0);
             anm_file->set_sprite(get_vm_or_clear(id), vm.sprite_id);
-
             g_AnmManager->get_vm_with_id(id)->color_1.d3d = 0xffff0000;
         }
         else if (inner.speed_multiplier > 1.01f)
@@ -1779,7 +1779,6 @@ i32 Player::on_tick_body()
     inner.shot_time_in_stage.tick();
     // Shooting: not during dialogue or before the stage's enemies run.
     if (g_Gui->msg == NULL && g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 &&
-
         !(*(u32 *)&g_GameThread->flags & 0x4000) && inner.shot_time_in_stage.current >= 20 && !(inner.flags & PLAYER_FLAG_NO_SHOOTING) &&
         !(inner.flags & PLAYER_FLAG_SCALED))
     {
