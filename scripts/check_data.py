@@ -14,8 +14,12 @@ to corresponding things:
   original address; library functions come from build/lib.csv;
 - data: annotated globals and vtables (`// GLOBAL:`, `// VTABLE:`) and the
   library data and string literals in build/lib.csv, at the same offset;
+- other vtables: by the class name in the original's RTTI;
 - other string literals: our value points at a `??_C@` literal and both
-  point at the same NUL-terminated bytes.
+  point at the same NUL-terminated bytes;
+- other data our map names (a library's own tables, such as dinput8's
+  object format arrays): both point at contents that compare equal by these
+  same rules (noted in the output).
 Any other differing pair of in-image addresses is reported as an unmapped
 pointer.
 
@@ -25,6 +29,7 @@ Usage:
   scripts/check_data.py g_foo ...  # only these globals, with all details
 """
 
+import bisect
 import csv
 import os
 import re
@@ -47,8 +52,6 @@ class Image:
         self.base = self.pe.OPTIONAL_HEADER.ImageBase
         self.end = self.base + self.pe.OPTIONAL_HEADER.SizeOfImage
         self.data = self.pe.get_memory_mapped_image()
-        text = next(s for s in self.pe.sections if s.Name.rstrip(b"\0") == b".text")
-        self.text = (self.base + text.VirtualAddress, self.base + text.VirtualAddress + text.Misc_VirtualSize)
 
     def read(self, va, size):
         # The mapped image stops at the last section's raw data; the rest of
@@ -192,45 +195,69 @@ class PointerMap:
         return entries[0][0] if entries else None
 
 
-def compare(orig, ours, pointers, string_literals, orig_addr, our_addr, size):
-    """Differences of one global: list of (offset, kind, orig value, our value)."""
-    a, b = orig.read(orig_addr, size), ours.read(our_addr, size)
-    if a == b:
-        return []
-    diffs = []
-    off = 0
-    while off < size:
-        n = 4 if off + 4 <= size else size - off
-        if a[off:off + n] == b[off:off + n]:
-            off += n
-            continue
-        if n == 4:
+class Comparer:
+    """Compares a global's bytes, pointers by what they point at."""
+
+    def __init__(self, orig, ours, pointers, by_addr):
+        self.orig, self.ours, self.pointers = orig, ours, pointers
+        self.string_literals = {a for a, s in by_addr if s.startswith("??_C@")}
+        # Our symbols by address, sized up to the next symbol.
+        self.symbol_at = {}
+        addrs = sorted({a for a, _ in by_addr})
+        for a, s in by_addr:
+            if a not in self.symbol_at:
+                k = bisect.bisect_right(addrs, a)
+                self.symbol_at[a] = (s, (addrs[k] if k < len(addrs) else a + 4) - a)
+        # Pointers to unnamed library data that matched by contents.
+        self.by_contents = []
+
+    def pointer(self, va, vb, depth):
+        """None if the pointers correspond, else the kind of difference."""
+        want = self.pointers.expected(va)
+        if want is not None:
+            return None if want == vb else "pointer"
+        if vb in self.string_literals:
+            return None if self.orig.cstring(va) == self.ours.cstring(vb) else "string"
+        # Data no annotation names (a library's own tables): the pointers
+        # correspond when what they point at does, compared the same way.
+        if depth > 0 and vb in self.symbol_at:
+            name, size = self.symbol_at[vb]
+            if not self.diff(va, vb, size, depth - 1):
+                self.by_contents.append((va, vb, name))
+                return None
+        return "unmapped"
+
+    def diff(self, orig_addr, our_addr, size, depth=1):
+        """Differences of one global: list of (offset, kind, orig value, our value)."""
+        a, b = self.orig.read(orig_addr, size), self.ours.read(our_addr, size)
+        if a == b:
+            return []
+        diffs = []
+        for off in range(0, size, 4):
+            n = min(4, size - off)
+            if a[off:off + n] == b[off:off + n]:
+                continue
+            if n < 4:
+                diffs.append((off, "bytes", a[off:off + n].hex(), b[off:off + n].hex()))
+                continue
             va, vb = int.from_bytes(a[off:off + 4], "little"), int.from_bytes(b[off:off + 4], "little")
-            if orig.contains(va) and ours.contains(vb):
-                want = pointers.expected(va)
-                if want == vb:
-                    off += 4
-                    continue
-                if want is None and vb in string_literals and orig.cstring(va) == ours.cstring(vb):
-                    off += 4
-                    continue
-                diffs.append((off, "pointer" if want is not None else "unmapped", va, vb))
-                off += 4
+            if self.orig.contains(va) and self.ours.contains(vb):
+                kind = self.pointer(va, vb, depth)
+                if kind is not None:
+                    diffs.append((off, kind, va, vb))
                 continue
             diffs.append((off, "value", va, vb))
-            off += 4
-            continue
-        diffs.append((off, "bytes", a[off:off + n].hex(), b[off:off + n].hex()))
-        off += n
-    return diffs
+        return diffs
 
 
-def describe(d):
+def describe(d, orig, ours):
     off, kind, va, vb = d
     if kind == "bytes":
         return f"+{off:#x}: orig {va} ours {vb}"
     if kind == "pointer":
         return f"+{off:#x}: orig points at {va:#x}, ours at {vb:#x} (does not correspond)"
+    if kind == "string":
+        return f"+{off:#x}: orig points at {orig.cstring(va)!r}, ours at {ours.cstring(vb)!r}"
     if kind == "unmapped":
         return f"+{off:#x}: unmapped pointer: orig {va:#x}, ours {vb:#x}"
     return f"+{off:#x}: orig {va:#010x} ours {vb:#010x}"
@@ -244,7 +271,6 @@ def main():
     syms = read_map()
     sizes = pdb_sizes(ours)
     by_addr = sorted((a, s) for s, entries in syms.items() for a, _ in entries)
-    string_literals = {a for a, s in by_addr if s.startswith("??_C@")}
 
     annotations = []
     for kind, orig_addr, name, src in read_annotations():
@@ -256,7 +282,7 @@ def main():
             size = nxt - addr
         annotations.append((kind, orig_addr, name, src, sym, addr, size))
 
-    pointers = PointerMap(orig, syms, annotations)
+    comparer = Comparer(orig, ours, PointerMap(orig, syms, annotations), by_addr)
     counts = {"match": 0, "differ": 0, "unmapped": 0, "missing": 0}
     for kind, orig_addr, name, src, sym, addr, size in sorted(annotations, key=lambda x: x[1]):
         if kind != "GLOBAL" or (args and name not in args):
@@ -266,7 +292,7 @@ def main():
             counts["missing"] += 1
             print(f"{where}: not found in build/th16.map")
             continue
-        diffs = compare(orig, ours, pointers, string_literals, orig_addr, addr, size)
+        diffs = comparer.diff(orig_addr, addr, size)
         if not diffs:
             counts["match"] += 1
             if verbose:
@@ -277,9 +303,11 @@ def main():
         label = "DIFFERS" if status == "differ" else "UNMAPPED POINTERS"
         print(f"{where}: {label} at {len(diffs)} of {size:#x} bytes' dwords")
         for d in diffs[:None if verbose else 8]:
-            print(f"    {describe(d)}")
+            print(f"    {describe(d, orig, ours)}")
         if not verbose and len(diffs) > 8:
             print(f"    ... {len(diffs) - 8} more")
+    for va, vb, name in comparer.by_contents:
+        print(f"note: {vb:#x} ({name}) and the original's {va:#x} are unnamed data with equal contents")
     total = sum(counts.values())
     print(f"{total} globals: {counts['match']} match, {counts['differ']} differ, "
           f"{counts['unmapped']} only through unmapped pointers, {counts['missing']} not found")

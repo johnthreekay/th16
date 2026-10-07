@@ -113,10 +113,11 @@ calls to them stayed opaque), `src/placeholder/` (`/GL` stand-ins for
 callees whose shape LTCG had to see) and `src/harness/` (stand-in callers).
 With every function decompiled, what is left is:
 
-- `src/stub/Opaque.cpp`, compiled **without** `/GL`: one global LTCG must
-  not see (`g_zero_vec2`, which it would fold into constant zeros) and two
-  sinks the harness uses to make an address escape or a frame 8-byte
-  aligned.
+- `src/stub/Opaque.cpp`, compiled **without** `/GL`: globals LTCG must
+  not see (`g_zero_vec2`, which it would fold into constant zeros, and
+  `g_stage_table`, whose contents change code elsewhere; see "Data tables")
+  and two sinks the harness uses to make an address escape or a frame
+  8-byte aligned.
 - `src/harness/`, compiled **with** `/GL`: stand-in callers for functions
   whose shape still depends on calls our build does not reproduce (constant
   arguments LTCG must not fold, globals whose address the original takes
@@ -130,6 +131,37 @@ With every function decompiled, what is left is:
   conventions no keyword can request (`this` in `ecx` with a float in
   `xmm1`). Prefer it over spelling out `LTCG_FASTCALL`/`LTCG_VECTORCALL`,
   which only cover the simpler cases.
+
+### Data tables
+
+Every annotated global holds the original's initial contents, so the
+matching build is a complete program. `scripts/check_data.py` checks it:
+
+```sh
+.venv/bin/python scripts/check_data.py         # globals that differ
+.venv/bin/python scripts/check_data.py -v      # every global
+.venv/bin/python scripts/check_data.py g_foo   # one global, all details
+```
+
+For each `// GLOBAL:` it compares our bytes (address from build/th16.map,
+size from the PDB) with the original's at the annotated address. Differing
+dwords still count as equal when both are pointers to corresponding things:
+functions through build/functions.txt, annotated globals and vtables (also
+found through RTTI names), build/lib.csv symbols, string literals with the
+same text, and unnamed library data with equal contents (dinput8's object
+format arrays). Anything else is reported. The one global that still
+differs is `g_Supervisor`: our build folds the Config constructor's stores
+into static data, which the dynamic initializer's memset then clears (see
+the TODO there); the original's is all zero.
+
+Write tables as readable initializers: functions by name, strings as
+literals (`scripts/cstring.py` gives byte-exact Shift-JIS escapes), enums by
+name. Tables in `.rdata` in the original are `const` (the ANM callback
+tables, `g_spell_difficulty`); `.data` ones are not. Giving a table its
+contents can change code elsewhere even when nothing reads it differently:
+with `g_stage_table` filled in in /GL code, LTCG ordered the operands of
+two AnmVm::write_sprite_corners multiplications differently, so it lives
+in Opaque.cpp. Check with check_unchanged.py after each table.
 
 ### Things learned so far
 
@@ -958,7 +990,11 @@ Name-based annotations: the marker, then a comment line naming the function.
   The same holds for `// GLOBAL:`: with a comment line in between, reccmp
   names the variable after the comment and every use shows as a difference.
 - quickdiff misreports jump thunks and tail jumps; check those with
-  compare.py.
+  compare.py. It reads on until a `ret`, so for the atexit destructors at
+  the end of our .text (0x48ac40 to 0x48acd0) it disassembles the start of
+  .rdata, the import address table, whose entries point into .rdata: any
+  change to .rdata's size shows those five as changed in
+  check_unchanged.py although their code is the same.
 - Overloads are told apart by the object file that defines them and then
   by parameter types (typedefs mapped through `TYPEDEFS` in build.py; add
   new ones there if an overload is reported as ambiguous).

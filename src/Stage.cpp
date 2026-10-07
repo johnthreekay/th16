@@ -21,10 +21,8 @@ Stage *g_Stage;
 // GLOBAL: TH16 0x4a6d9c
 Stage *g_Stage2;
 
-// The stage table (file names, music and bosses per stage number; defined
-// here without the original's contents) and the current stage's entry.
-// GLOBAL: TH16 0x4a22d0
-StageData g_stage_table[8];
+// The stage table, g_stage_table (StageData.h), is defined in
+// src/stub/Opaque.cpp, out of LTCG's view.
 
 // GLOBAL: TH16 0x4a6f18
 StageData *g_stage_data;
