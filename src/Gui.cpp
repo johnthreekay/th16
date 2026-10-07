@@ -759,7 +759,7 @@ GuiMsgVm::GuiMsgVm(void *script)
     vec_168 = Float3(16.0f, 0.0f, 0.0f);
     vec_174 = Float3(16.0f, 0.0f, 0.0f);
     vec_180 = Float3(16.0f, 0.0f, 0.0f);
-    BulletManager::clear_all(0);
+    g_BulletManager->clear_all(0);
     // LaserManager::clear_all(0, 0), inlined.
     LaserDataInf *laser = g_LaserManager->list_head.next;
     while (laser != NULL)

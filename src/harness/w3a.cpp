@@ -131,3 +131,9 @@ void harness_shoot_bullets(EnemyBulletShooter *props)
     g_BulletManager->shoot_bullets(props);
     g_BulletManager->shoot_bullets(props + 1);
 }
+
+// Like ECL's bullet clear instructions (0x421656, 0x4216c9).
+void harness_clear_bullets()
+{
+    g_BulletManager->clear_all(0);
+}

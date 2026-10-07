@@ -263,33 +263,54 @@ static_assert(offsetof(Bullet, timer_144c) == 0x144c, "Bullet layout");
 static_assert(offsetof(BulletManager, anm_ids) == 0x13ffc8c, "BulletManager layout");
 static_assert(offsetof(BulletManager, unk_cancel_counter) == 0x1403b14, "BulletManager layout");
 
+// Bullet::cancel's body, which clear_all has inlined.
+static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
+{
+    bullet->vm0.interrupt(1);
+    bullet->vm0.run();
+    if (bullet->vm1.flags_lo & ANM_VM_VISIBLE)
+    {
+        bullet->vm1.interrupt(1);
+    }
+    if (!(bullet->flags & BULLET_FLAG_NO_DRAW))
+    {
+        if (bullet->cancel_script >= 0)
+        {
+            g_BulletManager->anm_ids[bullet->index] =
+                g_BulletManager->bullet_anm->create_vm(bullet->cancel_script, &bullet->pos, 0.0f, -1, 0);
+        }
+        g_SoundManager.play_sound_at_position(0x47, bullet->pos.x);
+        gen_items_from_cancel(&bullet->pos, mode);
+    }
+    D3DXVECTOR3 delta = bullet->velocity * g_game_speed * 0.5f;
+    bullet->pos.x = bullet->pos.x + delta.x;
+    bullet->pos.y = bullet->pos.y + delta.y;
+    bullet->pos.z = bullet->pos.z + delta.z;
+    bullet->state = 4;
+    bullet->timer_144c.reset();
+    return 0;
+}
+
 // TODO: the original loads the ANM file before pushing create_vm's
 // arguments and adds pos.x + delta.x with the operands swapped.
 // FUNCTION: TH16 0x416840
 i32 Bullet::cancel(i32 mode)
 {
-    vm0.interrupt(1);
-    vm0.run();
-    if (vm1.flags_lo & ANM_VM_VISIBLE)
+    return cancel_bullet(this, mode);
+}
+
+// TODO: as Bullet::cancel (create_vm argument order, vector add operands).
+// FUNCTION: TH16 0x416f40
+HARNESS_CALLED void BulletManager::clear_all(i32 unused)
+{
+    Bullet *bullet = g_BulletManager->bullets;
+    for (i32 i = 0; i < BULLET_COUNT; i++, bullet++)
     {
-        vm1.interrupt(1);
-    }
-    if (!(flags & BULLET_FLAG_NO_DRAW))
-    {
-        if (cancel_script >= 0)
+        if (bullet->state != BULLET_STATE_FREE && bullet->state != 3)
         {
-            g_BulletManager->anm_ids[index] = g_BulletManager->bullet_anm->create_vm(cancel_script, &pos, 0.0f, -1, 0);
+            cancel_bullet(bullet, 0);
         }
-        g_SoundManager.play_sound_at_position(0x47, pos.x);
-        gen_items_from_cancel(&pos, mode);
     }
-    D3DXVECTOR3 delta = velocity * g_game_speed * 0.5f;
-    pos.x = pos.x + delta.x;
-    pos.y = pos.y + delta.y;
-    pos.z = pos.z + delta.z;
-    state = 4;
-    timer_144c.reset();
-    return 0;
 }
 
 // Whether a bullet's hitbox touches a circle.

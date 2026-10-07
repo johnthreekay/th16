@@ -33,11 +33,6 @@ i32 Gui::on_tick_body()
 }
 
 
-// STUB: TH16 0x416f40
-void __stdcall BulletManager::clear_all(i32 unused)
-{
-}
-
 // STUB: TH16 0x41d900
 void EnemyManager::kill_all()
 {
