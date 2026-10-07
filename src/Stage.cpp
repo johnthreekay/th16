@@ -880,6 +880,62 @@ HARNESS_CALLED void Stage::start_fade_out()
     stage_flags |= STAGE_FADING_OUT;
 }
 
+// TODO: ours gets a /GS cookie (the CameraSky temporaries), which shifts every stack slot; the original also shares one return path per result.
+// FUNCTION: TH16 0x40cd10
+CameraSky InterpCameraSky::step()
+{
+    if (end_time > 0)
+    {
+        time.tick();
+        if (time.current >= end_time)
+        {
+            time.set(end_time);
+            end_time = 0;
+            if (method == 7 || method == 17)
+            {
+                return initial;
+            }
+            return goal;
+        }
+    }
+    else if (end_time == 0)
+    {
+        if (method == 7 || method == 17)
+        {
+            return initial;
+        }
+        return goal;
+    }
+    if (method == 7)
+    {
+        CameraSky tmp = initial;
+        initial = tmp.add_inline(goal);
+        current = initial;
+    }
+    else if (method == 17)
+    {
+        CameraSky tmp = initial;
+        initial = tmp + bezier_2;
+        bezier_2 = bezier_2 + goal;
+        current = initial;
+    }
+    else if (method == 8)
+    {
+        f32 t = time.current_f / (f32)end_time;
+        f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
+        f32 c_goal = t * t * (3.0f - 2.0f * t);
+        f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
+        f32 c_bezier_2 = (t - 1.0f) * t * t;
+        current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+    }
+    else
+    {
+        f32 x = interp_common_methods(method, time.current_f, (f32)end_time);
+        current = (goal - initial) * x + initial;
+    }
+    return current;
+}
+
 // FUNCTION: TH16 0x40d370
 HARNESS_CALLED CameraSky CameraSky::operator+(const CameraSky &other) const
 {
