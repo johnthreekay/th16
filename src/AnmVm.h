@@ -77,6 +77,12 @@ enum AnmVmFlagsLo
     ANM_VM_RENDER_MODE_SHIFT = 25,
     // Two bits of texture addressing along v: wrap, clamp, mirror.
     ANM_VM_ADDRESS_V_SHIFT = 30,
+    // Stopped by ANM instruction 3 or 4 (cleared when an interrupt runs).
+    ANM_VM_STOPPED = 1 << 14,
+    // AnmVmFlagsLoFields::follow_camera.
+    ANM_VM_FOLLOW_CAMERA = 1 << 15,
+    // AnmVm::run does nothing.
+    ANM_VM_FLAG_LO_100000 = 1 << 20,
 };
 
 enum AnmVmFlagsHi
@@ -110,6 +116,13 @@ enum AnmVmFlagsHi
     // A copy kept by AnmManager::store_snapshot_of_vm, not a live VM;
     // deleting it does nothing.
     ANM_VM_FLAG_HI_4000000 = 1 << 26,
+    // AnmVmFlagsHiFields::ignore_game_speed.
+    ANM_VM_IGNORE_GAME_SPEED = 1 << 9,
+    // AnmVmFlagsHiFields::uv_quad_from_corners.
+    ANM_VM_UV_QUAD_FROM_CORNERS = 1 << 13,
+    // Set by the instructions that start angular velocity, scale growth or
+    // UV scrolling: AnmVm::run calls step_velocities.
+    ANM_VM_HAS_VELOCITY = 1 << 24,
 };
 
 // The bitfields of AnmVm::flags_lo that code assigns (ECL's anmBlendMode);
@@ -119,6 +132,79 @@ struct AnmVmFlagsLoBits
     u32 unk_0 : 5;
     u32 blend_mode : 4;
     u32 unk_9 : 23;
+};
+
+// Every bitfield of AnmVm::flags_lo that ANM instructions assign
+// (AnmVm::run); the bit numbers are those of AnmVmFlagsLo.
+struct AnmVmFlagsLoFields
+{
+    u32 visible : 1;
+    u32 unk_1 : 4;
+    u32 blend_mode : 4;
+    u32 unk_9 : 4;
+    // Instruction 305.
+    u32 z_write_disable : 1;
+    u32 unk_14 : 1;
+    // Instruction 306: entity_pos follows the stage camera's unk_104.
+    u32 follow_camera : 1;
+    u32 unk_16 : 1;
+    // Which of color_1/color_2 to draw with (ANM_VM_COLOR_MODE_MASK).
+    u32 color_mode : 2;
+    u32 unk_19 : 2;
+    // Instruction 421: horizontal and vertical anchoring.
+    u32 anchor_x : 2;
+    u32 anchor_y : 2;
+    u32 render_mode : 5;
+    u32 address_v : 2;
+};
+
+// The same for AnmVm::flags_hi (AnmVmFlagsHi).
+struct AnmVmFlagsHiFields
+{
+    u32 address_u : 2;
+    // Instruction 437.
+    u32 rotation_mode : 3;
+    u32 unk_5 : 2;
+    u32 auto_rotate : 1;
+    // Instruction 431.
+    u32 flag_8 : 1;
+    // Instruction 432: AnmVm::run steps the VM at full game speed.
+    u32 ignore_game_speed : 1;
+    // Instruction 307 (truth: randMode).
+    u32 rand_mode : 1;
+    u32 filter_point : 1;
+    u32 unk_12 : 1;
+    // Instruction 419: refresh uv_quad_of_sprite from the sprite's
+    // corners every frame.
+    u32 uv_quad_from_corners : 1;
+    u32 unk_14 : 2;
+    u32 no_parent_pos : 1;
+    u32 unk_17 : 1;
+    // Instruction 438 (truth: originMode).
+    u32 origin_mode : 2;
+    // Instruction 313 (truth: resolutionMode).
+    u32 resolution_mode : 3;
+    u32 rotate_with_parent : 1;
+    u32 unk_24 : 1;
+    u32 colorize_children : 1;
+    u32 unk_26 : 6;
+};
+
+// One ANM instruction (ExpHP: zAnmRawInstr). Bit n of var_mask: argument n
+// names a script variable (AnmVar) rather than being a constant.
+union AnmInstrArg
+{
+    i32 i;
+    f32 f;
+};
+
+struct AnmRawInstr
+{
+    i16 opcode;
+    u16 offset_to_next;
+    i16 time;
+    u16 var_mask;
+    AnmInstrArg args[10];
 };
 
 // Variable numbers in ANM script arguments (names after ExpHP's truth).
@@ -170,6 +256,16 @@ typedef i32(__fastcall *AnmVmSwitchFunc)(AnmVm *vm, i32 interrupt);
 extern AnmVmSwitchFunc g_anm_on_switch_funcs[4];
 typedef i32(__fastcall *AnmVmFunc)(AnmVm *vm);
 extern AnmVmFunc g_anm_on_destroy_funcs[4];
+// Run first thing every frame by AnmVm::run, selected by index_of_on_tick;
+// nonzero skips the script (ExpHP: ANM_ON_TICK_CALLABLES).
+extern AnmVmFunc g_anm_on_tick_funcs[5];
+// Run after the script by AnmVm::run, selected by index_of_on_wait; nonzero
+// keeps the script time from advancing. Only entry 0 (none) exists.
+extern AnmVmFunc g_anm_on_wait_funcs[1];
+// Maps the sprite numbers of ANM instructions 300 and 301, selected by
+// index_of_sprite_mapping_func (ExpHP: ANM_ON_SPRITE_SET_FUNCS).
+typedef i32(__fastcall *AnmVmSpriteFunc)(AnmVm *vm, i32 sprite);
+extern AnmVmSpriteFunc g_anm_sprite_mapping_funcs[4];
 // Called with the copy, the original and an extra argument when a VM with
 // extra data is copied (ExpHP: ANM_ON_COPY_FUNC_2).
 typedef i32(__fastcall *AnmVmCopyFunc)(AnmVm *vm, const AnmVm *other, i32 arg);
@@ -287,6 +383,10 @@ struct AnmVm
     // 0x45f980. Nonzero once the script has ended (anm_effect_1_on_tick
     // counts on it).
     i32 run();
+    // 0x4632f0. Rebuilds the vertex data that the special render modes
+    // (9 to 25: textured circles and arcs, rings, cylinders) keep in
+    // ins_508_extra_data.
+    void update_special_vertices();
     HARNESS_CALLED f32 get_slowdown_factor();
     void alloc_extra_data(u32 size);
     void set_layer(i32 layer);

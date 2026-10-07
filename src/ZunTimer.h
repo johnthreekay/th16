@@ -195,6 +195,15 @@ struct ZunTimer
     // 0x40d490
     HARNESS_CALLED void operator--(int);
 
+    // Count back by whole frames, ignoring the speed multiplier (ANM's
+    // wait instruction, which AnmVm::run runs once the time has passed).
+    void rewind(i32 frames)
+    {
+        previous = current;
+        current_f -= frames;
+        current = (i32)current_f;
+    }
+
     // Whether the timer moved onto a new frame that is a multiple of n
     // (MainMenu's options screen uses it to pace a repeating sound).
     i32 ticked_on_multiple_of(i32 n);
