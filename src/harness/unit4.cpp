@@ -10,7 +10,7 @@
 // ecl_run_over_300 instructions for boss handling).
 void harness_enemy_manager_boss(int index, EnemyInf *enemy, int value)
 {
-    g_EnemyManager->set_boss_bit(value);
+    g_EnemyManager->set_life_bar_hidden(value);
     g_EnemyManager->set_boss_id(index, enemy);
 }
 

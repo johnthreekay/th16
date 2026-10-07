@@ -310,11 +310,11 @@ void Player::lose_life()
         if (g_Spellcard->time.current >= 60)
         {
             g_Spellcard->bonus = 0;
-            g_Spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_FLAG_20);
+            g_Spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_EARLY_BOMB);
         }
         else if (g_MainBomb->in_use == 1)
         {
-            g_Spellcard->flags |= SPELLCARD_FLAG_20;
+            g_Spellcard->flags |= SPELLCARD_EARLY_BOMB;
         }
     }
     g_EnemyManager->inner.miss_count++;
@@ -338,11 +338,11 @@ void Player::die()
         if (g_Spellcard->time.current >= 60)
         {
             g_Spellcard->bonus = 0;
-            g_Spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_FLAG_20);
+            g_Spellcard->flags &= ~(SPELLCARD_CAPTURABLE | SPELLCARD_EARLY_BOMB);
         }
         else if (g_MainBomb->in_use == 1)
         {
-            g_Spellcard->flags |= SPELLCARD_FLAG_20;
+            g_Spellcard->flags |= SPELLCARD_EARLY_BOMB;
         }
     }
     inner.time_in_state.reset();
@@ -767,7 +767,7 @@ HARNESS_CALLED void Player::do_graze(Float3 *pos)
     g_EffectManager->effect_anm->create_vm(0x18, &mid, 0.0f, -1, 0);
     g_PopupManager->generate_small_score_popup(&mid, g_Globals.graze_in_chapter, 0xffc0c0ff);
     g_SoundManager.play_sound_at_position(0x2a, pos->x);
-    g_ItemManager->spawn_item(0x10, pos, 0,
+    g_ItemManager->spawn_item(ITEM_SEASON, pos, 0,
                               (f32)atan2((double)(pos->y - player->inner.pos.y), (double)(pos->x - player->inner.pos.x)),
                               1.9f, 0, 0);
 }

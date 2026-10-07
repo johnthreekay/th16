@@ -1512,7 +1512,7 @@ void Gui::start_dialogue(i32 script)
     }
     else if (script == -2)
     {
-        if (g_Spellcard->flags & SPELLCARD_FLAG_80)
+        if (g_Spellcard->flags & SPELLCARD_TIMED_OUT)
         {
             pause_menu_43f350();
         }
@@ -1785,7 +1785,7 @@ i32 Gui::on_tick_body()
 
     // The boss's spell card counter.
     EnemyManager *enemies = g_EnemyManager;
-    if (enemies != NULL && unk_1d0 >= 0 && enemies->get_boss(0) != NULL && !enemies->inner.boss_bit && msg == NULL &&
+    if (enemies != NULL && unk_1d0 >= 0 && enemies->get_boss(0) != NULL && !enemies->inner.life_bar_hidden && msg == NULL &&
         !(*(u32 *)&g_GameThread->flags & 0x10000))
     {
         vm_94->set_flag_lo_2_tree();
@@ -1793,8 +1793,8 @@ i32 Gui::on_tick_body()
         u32 shown = flags_1ac & 0x600;
         if (shown == 0)
         {
-            if ((!(g_Spellcard->flags & 0x100) && 128.0f > g_Player->inner.pos.y) ||
-                ((g_Spellcard->flags & 0x100) && g_Player->inner.pos.y > 320.0f))
+            if ((!(g_Spellcard->flags & SPELLCARD_TEXT_AT_BOTTOM) && 128.0f > g_Player->inner.pos.y) ||
+                ((g_Spellcard->flags & SPELLCARD_TEXT_AT_BOTTOM) && g_Player->inner.pos.y > 320.0f))
             {
                 flags_1ac = flags_1ac & ~0x400 | 0x200;
                 anm_vm_interrupt_5(vm_94);
@@ -1803,8 +1803,8 @@ i32 Gui::on_tick_body()
         }
         else if (shown == 0x200)
         {
-            if ((!(g_Spellcard->flags & 0x100) && 160.0f > g_Player->inner.pos.y) ||
-                ((g_Spellcard->flags & 0x100) && g_Player->inner.pos.y > 288.0f))
+            if ((!(g_Spellcard->flags & SPELLCARD_TEXT_AT_BOTTOM) && 160.0f > g_Player->inner.pos.y) ||
+                ((g_Spellcard->flags & SPELLCARD_TEXT_AT_BOTTOM) && g_Player->inner.pos.y > 288.0f))
             {
                 anm_vm_interrupt_4(vm_94);
                 anm_vm_interrupt_4(vm_98);
@@ -1813,7 +1813,7 @@ i32 Gui::on_tick_body()
         }
         else
         {
-            if (g_Spellcard->flags & 1)
+            if (g_Spellcard->flags & SPELLCARD_ACTIVE)
             {
                 anm_vm_interrupt_2_run(vm_94);
                 anm_vm_interrupt_2_run(vm_98);
@@ -1862,7 +1862,7 @@ i32 Gui::on_tick_body()
     }
 
     // The life bars of the two bosses.
-    if (g_EnemyManager != NULL && !g_EnemyManager->inner.boss_bit)
+    if (g_EnemyManager != NULL && !g_EnemyManager->inner.life_bar_hidden)
     {
         for (i32 i = 0; i < 2; i++)
         {
@@ -1883,7 +1883,7 @@ i32 Gui::on_tick_body()
                 }
                 continue;
             }
-            if (boss->enemy.life.current >= 100000 || (boss->enemy.flags_low & 0x31) ||
+            if (boss->enemy.life.current >= 100000 || (boss->enemy.flags_low & ENEMY_FLAGS_UNDAMAGEABLE) ||
                 boss->enemy.set_invuln.current > 0 || msg != NULL)
             {
                 delete_boss_bar_vms(bar);
@@ -2021,12 +2021,12 @@ i32 Gui::on_tick_body()
     if (g_EnemyManager != NULL)
     {
         EnemyInf *boss = get_boss_inline(g_EnemyManager, 0);
-        if (boss != NULL && !((boss->enemy.flags_low >> 5) & 1) && !(boss->enemy.flags_low & 1))
+        if (boss != NULL && !((boss->enemy.flags_low >> 5) & 1) && !(boss->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX))
         {
             AnmVm *vm = get_vm_or_clear(id_9c);
             vm->set_flag_lo_2_tree_inline();
             u32 level = flags_1ac & 6;
-            if (g_Spellcard->flags & 1)
+            if (g_Spellcard->flags & SPELLCARD_ACTIVE)
             {
                 if (level == 0)
                 {
@@ -2245,14 +2245,14 @@ i32 Gui::on_draw_2_body()
             ascii->color.a = vm->color_1.a;
             ascii->group = 2;
             ascii->font_id = 4;
-            i32 seconds = g_Spellcard->unk_90 / 60;
+            i32 seconds = g_Spellcard->frames_taken / 60;
             ascii->create_stringf(&pos, "%3d.", seconds >= 1000 ? 999 : seconds);
             pos.x = 268.0f;
             pos.y = 150.0f;
             ascii = g_AsciiManager;
             ascii->scale.x = 0.6f;
             ascii->scale.y = 0.6f;
-            i32 frames = g_Spellcard->unk_90;
+            i32 frames = g_Spellcard->frames_taken;
             ascii->create_stringf(&pos, "%.2ds", frames % 60 * 100 / 60);
             ascii = g_AsciiManager;
             pos.x = 224.0f;
@@ -2379,7 +2379,7 @@ i32 Gui::on_draw_2_body()
 
     // The boss's spell card counter next to vm_94.
     if (g_EnemyManager != NULL && unk_1d0 >= 0 && g_EnemyManager->get_boss(0) != NULL &&
-        !g_EnemyManager->inner.boss_bit && msg == NULL && !(*(u32 *)&g_GameThread->flags & 0x10000))
+        !g_EnemyManager->inner.life_bar_hidden && msg == NULL && !(*(u32 *)&g_GameThread->flags & 0x10000))
     {
         AnmVm *vm = vm_94;
         f32 x = vm->pos.x + 16.0f;
