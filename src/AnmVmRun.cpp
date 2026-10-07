@@ -1227,7 +1227,7 @@ done:
     {
         return 1;
     }
-    script_time.tick();
+    script_time.tick_split();
     return 0;
 }
 

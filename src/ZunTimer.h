@@ -195,6 +195,25 @@ struct ZunTimer
     // 0x40d490
     HARNESS_CALLED void operator--(int);
 
+    // tick as AnmVm::run has it: current_f is stored in each branch.
+    void tick_split()
+    {
+        f32 *speed = this->speed();
+        i32 cur = current;
+        previous = cur;
+        if (speed != NULL && !(*speed > 0.99f && *speed < 1.01f))
+        {
+            current_f = *speed + current_f;
+            cur = (i32)current_f;
+        }
+        else
+        {
+            cur++;
+            current_f = current_f + 1.0f;
+        }
+        current = cur;
+    }
+
     // Count back by whole frames, ignoring the speed multiplier (ANM's
     // wait instruction, which AnmVm::run runs once the time has passed).
     void rewind(i32 frames)
