@@ -64,8 +64,6 @@ HARNESS_CALLED void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius)
     }
 }
 
-// TODO: the original realigns its frame (and esp, -8) around the call; ours
-// only does that for sinf and cosf.
 // FUNCTION: TH16 0x43dc90
 HARNESS_CALLED f32 zun_tanf(f32 x)
 {

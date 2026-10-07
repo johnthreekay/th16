@@ -612,7 +612,7 @@ i32 LaserCurveInf::method_3c()
 
 // An et_ex step: turns the curve by ex_state[2]'s angular speed and grows
 // it, until the step's time runs out.
-// TODO: the original stores the new angle after loading floats[0] (scheduling).
+// TODO: the original loads floats[0] before storing the new angle (scheduling; wrap_angle or reading floats[0] first do not help).
 // FUNCTION: TH16 0x439460
 i32 LaserCurveInf::method_40()
 {
@@ -1484,7 +1484,6 @@ i32 LaserInfiniteInf::on_draw()
 // Hits or grazes the player: a hit cancels the laser around the player, a
 // graze counts every third frame at the point of the laser nearest the
 // player.
-// TODO: the original adds position.x to the loaded start.x (operand order).
 // FUNCTION: TH16 0x433510
 i32 LaserLineInf::check_graze_or_kill(i32 graze_only)
 {
@@ -1494,7 +1493,7 @@ i32 LaserLineInf::check_graze_or_kill(i32 graze_only)
         if (!(inner.flags & 2))
         {
             laser_sincosmul(&start, angle, unk_70 / 10.0f);
-            start += position;
+            D3DXVec3Add(&start, &start, &position);
         }
         else
         {
@@ -2179,7 +2178,7 @@ static __forceinline f32 laser_mid_angle(f32 cur, f32 prev)
 // laser's width to each side across the segment's direction (averaged with
 // the previous segment's), with u running from 0 to 1 along the laser. The
 // origin VM sits on the last segment until the whole laser is out.
-// TODO: the original adds the vertex y to the loaded segment y (operand order) and stores pos.z = 0 after loading the y offset.
+// TODO: the original loads the segment z before adding the vertex z (operand order; += gets z right but y wrong, D3DXVec3Add or field-wise forms get z wrong).
 // FUNCTION: TH16 0x438750
 i32 LaserCurveInf::on_draw()
 {
@@ -2203,7 +2202,7 @@ i32 LaserCurveInf::on_draw()
             a = laser_mid_angle(cur, wrap_angle(segment[-1].angle + ZUN_PI / 2));
         }
         laser_sincosmul((Float3 *)&vertex->pos, a, inner.laser_new_arg_4 * 0.5f);
-        *(Float3 *)&vertex->pos += segment->pos;
+        D3DXVec3Add((Float3 *)&vertex->pos, &segment->pos, (Float3 *)&vertex->pos);
         vertex->pos.x += (f32)g_game_2d_origin_x;
         vertex->pos.y += (f32)g_early_arcade_offset_y;
         vertex->pos.z = 0.0f;
@@ -2222,7 +2221,7 @@ i32 LaserCurveInf::on_draw()
             a = laser_mid_angle(cur, wrap_angle(segment[-1].angle - ZUN_PI / 2));
         }
         laser_sincosmul((Float3 *)&vertex->pos, a, inner.laser_new_arg_4 * 0.5f);
-        *(Float3 *)&vertex->pos += segment->pos;
+        D3DXVec3Add((Float3 *)&vertex->pos, &segment->pos, (Float3 *)&vertex->pos);
         vertex->pos.x += (f32)g_game_2d_origin_x;
         vertex->pos.y += (f32)g_early_arcade_offset_y;
         vertex->pos.z = 0.0f;

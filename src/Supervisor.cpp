@@ -1294,9 +1294,6 @@ int Supervisor::initialize()
     return 0;
 }
 
-// TODO: the original stores ".wav" as an immediate (no literal in .rdata);
-// ours copies it from a literal.
-// TODO: the original pops call arguments right after each call and restores ebx/esi/edi only at the end; ours merges the pops and restores early.
 // FUNCTION: TH16 0x43c050
 HARNESS_CALLED int Supervisor::load_game_config(const char *path)
 {
