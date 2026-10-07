@@ -423,6 +423,7 @@ struct Gui
     AnmId hud_frame_id;
     ZunTimer time_in_stage;
     UpdateFunc *on_draw_2;
+    // Not used.
     i32 unk_16c;
     // The score shown, counting up towards the real one.
     i32 current_score;
@@ -532,8 +533,9 @@ extern Gui *g_Gui;
 // The dialogue file kept loaded across a stage restart.
 extern MsgFile *g_msg_file_cache;
 
-// 0x43f350 (ExpHP: sub_43f350_pause) and 0x42e150, which end a dialogue
-// script that asks for it.
+// What start_dialogue(-2) and MSG_STAGE_END end with: the pause menu's
+// game over state (0x43f350, in PauseMenu.cpp; ExpHP: sub_43f350_pause)
+// and the end of the stage (0x42e150, in GameThread.cpp).
 void pause_menu_43f350();
 i32 stage_clear();
 
