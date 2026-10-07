@@ -1931,6 +1931,139 @@ i32 LaserBeamInf::initialize(void *params)
     return 0;
 }
 
+// Sets a curvy laser up from its parameters: the body and origin VMs, the
+// segment buffers (every segment at the start), the start offset along the
+// aim, and the node list: a copy of the source laser's when a bomb split
+// this one off (et_ex then skipped), else one straight node. Then places
+// the segments for the starting time.
+// TODO: the original adds the offset onto the loaded position (operand order), reloads angle for the straight node's velocity, and loads unk_1524 before scaling i.
+// FUNCTION: TH16 0x4370a0
+i32 LaserCurveInf::initialize(void *params)
+{
+    inner = *(LaserCurveInner *)params;
+    bullet_type = inner.type;
+    state = 2;
+    kind = LASER_CURVE;
+    bullet_color = inner.color;
+    AnmVm *vm = &vm_92c;
+    vm->wipe();
+    if (bullet_type == 1)
+    {
+        g_LaserManager->bullet_anm->set_vm_script(vm, 0x142);
+    }
+    else
+    {
+        vm_92c.index_of_sprite_mapping_func = 3;
+        vm_92c.associated_game_entity = this;
+        g_LaserManager->bullet_anm->set_vm_script(vm, bullet_type + 0x8e);
+    }
+    vm->interrupt(2);
+    vm->run();
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    AnmVmFlagsLoFields *fields = (AnmVmFlagsLoFields *)&vm_92c.flags_lo;
+    fields->anchor_x = 0;
+    fields->anchor_y = 2;
+    fields->render_mode = 1;
+    vm_92c.flags_hi = vm_92c.flags_hi & ~0x80000 | 0x40000;
+    vm = &vm_f28;
+    g_LaserManager->bullet_anm->copy_vm(vm, inner.color + 0x38);
+    vm->unk_5b0 = NULL;
+    vm->parent = NULL;
+    vm->run();
+    vm->interrupt(2);
+    vm->run();
+    vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+    ((AnmVmFlagsLoFields *)&vm_f28.flags_lo)->render_mode = 1;
+    vm_f28.flags_hi = vm_f28.flags_hi & ~0x80000 | 0x40000;
+    unk_1528 = malloc(inner.segment_count * 0x38);
+    unk_1524 = malloc(inner.segment_count * sizeof(LaserCurveSegment));
+    position = inner.start_pos;
+    if (inner.distance != 0.0f)
+    {
+        Float3 offset;
+        laser_sincosmul(&offset, inner.ang_aim, inner.distance);
+        position.x += offset.x;
+        position.y += offset.y;
+        inner.start_pos = position;
+        inner.distance = 0.0f;
+    }
+    width = inner.laser_new_arg_4;
+    angle = inner.ang_aim;
+    length = inner.speed;
+    laser_sincosmul(&unk_60, angle, length);
+    unk_60.z = 0.0f;
+    for (i32 i = 0; i < inner.segment_count; i++)
+    {
+        ((LaserCurveSegment *)unk_1524)[i].pos = position;
+        *(Float3 *)((LaserCurveSegment *)unk_1524)[i].unk_c = g_zero_vec;
+        ((LaserCurveSegment *)unk_1524)[i].angle = inner.ang_aim;
+        ((LaserCurveSegment *)unk_1524)[i].length = inner.speed;
+    }
+    timer_40.set_f(inner.source_time);
+    if (inner.source_nodes != NULL)
+    {
+        nodes = *inner.source_nodes;
+        LaserCurveNode *dst = &nodes;
+        for (LaserCurveNode *src = inner.source_nodes; src != NULL; src = src->next)
+        {
+            if (src->next != NULL)
+            {
+                dst->next = new LaserCurveNode;
+                *dst->next = *src->next;
+                dst = dst->next;
+            }
+        }
+        inner.source_nodes = NULL;
+        ex_index = 99;
+    }
+    else
+    {
+        nodes.next = NULL;
+        nodes.speed = length;
+        nodes.angle = wrap_angle(angle);
+        laser_sincosmul(&nodes.velocity, angle, 1.0f);
+        nodes.start_pos = position;
+        nodes.velocity.z = 0.0f;
+        nodes.mode = 0;
+        nodes.unk_8 = 0.0f;
+        nodes.unk_c = 999999.0f;
+        ex_index = *(i32 *)inner.unk_34c;
+    }
+    *(Float3 *)((LaserCurveSegment *)unk_1524)->unk_c = unk_60;
+    for (i32 i = 0; i < inner.segment_count; i++)
+    {
+        LaserCurveSegment *segment = &((LaserCurveSegment *)unk_1524)[i];
+        Float3 *prev_pos = &segment[-1].pos;
+        f32 *out_length = &segment->length;
+        f32 prev_length = segment[-1].length;
+        f32 prev_angle = segment[-1].angle;
+        f32 *out_angle = &segment->angle;
+        f32 t = timer_40.current_f - (f32)i;
+        for (LaserCurveNode *node = &nodes; node != NULL; node = node->next)
+        {
+            if (t >= node->unk_8 && node->unk_c > t)
+            {
+                if (i == 0)
+                {
+                    node->get_state(&segment->pos, out_length, out_angle, t);
+                }
+                else
+                {
+                    node->step_back(&segment->pos, out_length, out_angle, prev_pos, prev_length, prev_angle, t);
+                }
+                break;
+            }
+        }
+    }
+    timer_5a0.set_inline(30);
+    if (inner.shot_sfx >= 0)
+    {
+        g_SoundManager.play_sound_at_position(inner.shot_sfx, 0.0f);
+    }
+    timer_2c.reset();
+    return 0;
+}
+
 // TODO: register allocation and the order of the vector temporaries differ (the original builds them with unpcklps).
 // FUNCTION: TH16 0x438370
 void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle,

@@ -8,13 +8,6 @@
 #include "Laser.h"
 
 // Placeholder (not decompiled yet).
-// STUB: TH16 0x4370a0
-i32 LaserCurveInf::initialize(void *params)
-{
-    return unit5_placeholder(this);
-}
-
-// Placeholder (not decompiled yet).
 // STUB: TH16 0x438cb0
 void LaserCurveInf::run_ex()
 {

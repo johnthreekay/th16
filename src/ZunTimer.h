@@ -115,6 +115,15 @@ struct ZunTimer
     // 0x406490. The out-of-line copy of set.
     HARNESS_CALLED void set_value(i32 time);
 
+    // set to a fractional frame (a curvy laser split off by a bomb).
+    void set_f(f32 time)
+    {
+        initialize_if_needed();
+        current = (i32)time;
+        current_f = time;
+        previous = current - 1;
+    }
+
     // 0x464d80. set() to another timer's current frame; the timer comes by
     // value (ExpHP: Timer::copy).
     HARNESS_CALLED void set_from(ZunTimer other);

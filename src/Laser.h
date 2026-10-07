@@ -249,6 +249,24 @@ struct LaserCurveNode
     {
     }
 
+    // Copies field by field (a split-off laser copies the node list); the
+    // implicit copy would be one block move.
+    LaserCurveNode &operator=(const LaserCurveNode &other)
+    {
+        next = other.next;
+        prev = other.prev;
+        unk_8 = other.unk_8;
+        unk_c = other.unk_c;
+        mode = other.mode;
+        velocity = other.velocity;
+        start_pos = other.start_pos;
+        angle = other.angle;
+        speed = other.speed;
+        speed_delta = other.speed_delta;
+        angle_delta = other.angle_delta;
+        return *this;
+    }
+
     // 0x438370. Steps a point of the curve back by one frame of this node's
     // motion (t is the node time, its fraction the part of the frame).
     void step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle, f32 t);
