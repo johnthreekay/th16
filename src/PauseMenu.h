@@ -62,6 +62,20 @@ enum PauseMenuItem
     PAUSE_ITEM_COUNT = 5,
 };
 
+// The menus' scripts in front.anm (menu_anm_id), and the snapshot's in
+// text.anm (snapshot_id).
+enum PauseMenuScripts
+{
+    PAUSE_SCRIPT_PAUSE_MENU = 0x9c,
+    PAUSE_SCRIPT_REPLAY_PAUSE_MENU = 0x9e,
+    PAUSE_SCRIPT_REPLAY_END_MENU = 0x9f,
+    // After a game over in the main game (with "continue").
+    PAUSE_SCRIPT_GAME_OVER_MENU = 0xa0,
+    // After practice or spell practice ends (no "continue").
+    PAUSE_SCRIPT_PRACTICE_END_MENU = 0xa1,
+    TEXT_SCRIPT_PAUSE_SNAPSHOT = 0x34,
+};
+
 // PauseMenu::menu_flags.
 enum PauseMenuFlags
 {

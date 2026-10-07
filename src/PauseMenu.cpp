@@ -398,7 +398,7 @@ int PauseMenu::on_draw()
 void PauseMenu::take_snapshot()
 {
     delete_vm_and_clear(snapshot_id);
-    snapshot_id = g_Supervisor.text_anm->create_ui_vm_at_origin(0x34, 0);
+    snapshot_id = g_Supervisor.text_anm->create_ui_vm_at_origin(TEXT_SCRIPT_PAUSE_SNAPSHOT, 0);
     // get_vm_or_clear with g_AnmManager read once (see on_draw).
     AnmManager *anm_manager = g_AnmManager;
     AnmVm *vm = anm_manager->get_vm_with_id(snapshot_id);
@@ -447,11 +447,11 @@ void PauseMenu::open()
     delete_vm_and_clear(menu_anm_id);
     if (thread->replay_mode != 0)
     {
-        menu_anm_id = front_anm->create_ui_vm_at_origin(0x9e, 0);
+        menu_anm_id = front_anm->create_ui_vm_at_origin(PAUSE_SCRIPT_REPLAY_PAUSE_MENU, 0);
     }
     else
     {
-        menu_anm_id = front_anm->create_ui_vm_at_origin(0x9c, 0);
+        menu_anm_id = front_anm->create_ui_vm_at_origin(PAUSE_SCRIPT_PAUSE_MENU, 0);
     }
     AnmManager::interrupt_tree(menu_anm_id, 3);
     SoundManager::pause_sounds();
@@ -500,7 +500,7 @@ void open_stage_end_menu()
     }
     if (g_Globals.game_mode == 0)
     {
-        menu->snapshot_id = g_Supervisor.text_anm->create_ui_vm_at_origin(0x34, 0);
+        menu->snapshot_id = g_Supervisor.text_anm->create_ui_vm_at_origin(TEXT_SCRIPT_PAUSE_SNAPSHOT, 0);
         g_AnmManager->copy_screen_to_sprite(menu->snapshot_id, (i32)(g_screen_coord_scale * 32.0f),
                                             (i32)(g_screen_coord_scale * 16.0f), (i32)(g_screen_coord_scale * 384.0f),
                                             (i32)(g_screen_coord_scale * 448.0f));
@@ -587,7 +587,7 @@ void open_replay_end_menu()
     menu->take_snapshot();
     menu->front_anm = g_Gui->front_anm;
     delete_vm_and_clear(menu->menu_anm_id);
-    menu->menu_anm_id = menu->front_anm->create_ui_vm_at_origin(0x9f, 0);
+    menu->menu_anm_id = menu->front_anm->create_ui_vm_at_origin(PAUSE_SCRIPT_REPLAY_END_MENU, 0);
     AnmManager::interrupt_tree(menu->menu_anm_id, 3);
     SoundManager::pause_sounds();
     g_SoundManager.modify_bgm(BGM_PAUSE, 0, "Pause");
@@ -1152,7 +1152,7 @@ void PauseMenu::tick_open()
                 item_menu.wraps = 1;
                 if (!(menu_flags & PAUSE_FROM_STAGE_END) && g_Globals.game_mode == 0)
                 {
-                    menu_anm_id = front_anm->create_ui_vm_at_origin(0xa0, 0);
+                    menu_anm_id = front_anm->create_ui_vm_at_origin(PAUSE_SCRIPT_GAME_OVER_MENU, 0);
                     if (g_Globals.continues_used > 0)
                     {
                         item_menu.disable(PAUSE_ITEM_SAVE_REPLAY);
@@ -1169,7 +1169,7 @@ void PauseMenu::tick_open()
                 }
                 else
                 {
-                    menu_anm_id = front_anm->create_ui_vm_at_origin(0xa1, 0);
+                    menu_anm_id = front_anm->create_ui_vm_at_origin(PAUSE_SCRIPT_PRACTICE_END_MENU, 0);
                     item_menu.disable(PAUSE_ITEM_RESUME);
                     item_menu.disable(PAUSE_ITEM_MANUAL);
                     item_menu.set_cursor(PAUSE_ITEM_RESUME);
