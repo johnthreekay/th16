@@ -130,3 +130,15 @@ BOOL __stdcall spell_practice_row_seen(i32 stage, i32 row)
     }
     return FALSE;
 }
+
+// 0x451560. Loads the replay list for the replay menu (on its own thread).
+void load_replay_list();
+
+// The replay menu's loading thread. Passed to ThreadInf::restart as a
+// ThreadStart, though ZUN declared it cdecl.
+// FUNCTION: TH16 0x451740
+unsigned replay_list_thread(void *arg)
+{
+    load_replay_list();
+    return 0;
+}

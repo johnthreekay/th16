@@ -5,6 +5,7 @@
 #include "../Supervisor.h"
 #include "../SoundManager.h"
 #include "../TextHelper.h"
+#include "../Thread.h"
 
 // Like WinMain and the Window frame functions around a device reset.
 void harness_w3e_device_reset()
@@ -87,4 +88,12 @@ i32 harness_w3e_startup()
     double aligned;
     w3e_opaque_double(&aligned);
     return check_startup_shortcut();
+}
+
+unsigned replay_list_thread(void *arg);
+
+// Like the replay menu (0x451844), which starts the thread.
+void harness_w3e_replay_thread(ThreadInf *thread, void *arg)
+{
+    thread->restart((ThreadStart)replay_list_thread, arg);
 }
