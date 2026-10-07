@@ -997,3 +997,45 @@ const char *EnemyInf::check_time_interrupts()
     }
     return NULL;
 }
+
+// TODO: the original loads g_AnmManager after pushing the id (LTCG knows the stubbed
+// get_vm_with_id leaves it alone, so it is loaded once).
+// FUNCTION: TH16 0x423260
+int EnemyData::ecl_anm_set_sprite()
+{
+    i32 slot = get_int_arg(0);
+    i32 script = get_int_arg(1);
+    delete_vm_and_clear(anm_ids[slot]);
+    if (script < 0)
+    {
+        return 0;
+    }
+    script = get_int_arg(1);
+    AnmLoaded *file = g_EnemyManager->anim_statement_anms[selected_anm_index];
+    anm_ids[slot] = file->create_vm_front(script, anm_layers + 7, 0);
+    if (slot == 0)
+    {
+        anm_slot_0_script = get_int_arg(1);
+        anm_slot_0_anm_index = selected_anm_index;
+    }
+    AnmManager *anm;
+    AnmVm *vm = (anm = g_AnmManager)->get_vm_with_id(anm_ids[slot]);
+    if (vm == NULL)
+    {
+        anm_ids[slot].id = 0;
+    }
+    if (slot == 0)
+    {
+        final_sprite_size.x = vm->scale.y * vm->sprite_size.y;
+        final_sprite_size.y = vm->scale.x * vm->sprite_size.x;
+    }
+    if (flags_low & 0x20)
+    {
+        vm = anm->get_vm_with_id(anm_ids[slot]);
+        if (vm != NULL)
+        {
+            vm->clear_flag_lo_2_tree_inline();
+        }
+    }
+    return 0;
+}

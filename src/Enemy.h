@@ -192,6 +192,9 @@ struct EnemyData
     // 0x41c1f0. Moves final_pos to abs_pos + rel_pos, then keeps it inside
     // the movement limit.
     void update_final_pos();
+    // ECL instructions.
+    // 0x423260. anmSetSprite(slot, script): replaces the VM in a slot.
+    int ecl_anm_set_sprite();
     i32 get_int_arg(int index);
     i32 *get_int_arg_ptr(int index);
     f32 get_float_arg(int index);

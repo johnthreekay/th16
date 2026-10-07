@@ -121,7 +121,8 @@ struct AnmLoaded
     AnmId create_ui_effect(i32 script, i32 unused, AnmVm **out);
     // 0x426160. Like create_vm at the origin, but inserted at the front of
     // the world list.
-    AnmId create_vm_front(i32 script, i32 layer, i32 unused);
+    // Every caller passes 0 for unused, which LTCG folded.
+    HARNESS_CALLED AnmId create_vm_front(i32 script, i32 layer, i32 unused);
     // 0x46ed60. A child of parent; mode bits 1 and 2 pick the list (see
     // AnmVm::mode_of_create_child).
     AnmId create_managed_child(i32 script, AnmVm *parent, i32 mode);
