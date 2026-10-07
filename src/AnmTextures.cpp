@@ -7,7 +7,7 @@
 HARNESS_CALLED void AnmManager::release_textures()
 {
     AnmLoaded **anm = loaded_anms;
-    for (i32 i = 0; i < 0x1f; i++, anm++)
+    for (i32 i = 0; i < ANM_SLOT_COUNT; i++, anm++)
     {
         if (*anm == NULL)
         {
@@ -37,7 +37,7 @@ inline void AnmLoadedD3D::create_render_target(i32 width, i32 height)
 HARNESS_CALLED void AnmManager::create_d3d_textures_for_loaded_anms()
 {
     AnmLoaded **anm = loaded_anms;
-    for (i32 i = 0; i < 0x1f; i++, anm++)
+    for (i32 i = 0; i < ANM_SLOT_COUNT; i++, anm++)
     {
         if (*anm == NULL)
         {

@@ -28,7 +28,8 @@ struct AnmId
     // 0x46f2e0 (ExpHP: anm_find_existing_or_clear_id). Looks the VM up and
     // forgets the id if it is gone.
     DECOMP_NOINLINE AnmVm *find_or_clear();
-    // 0x46f300 and 0x46f340. AnmVm::set/hide_tree.
+    // 0x46f300 and 0x46f340. AnmVm::show_tree and hide_tree on the VM, if
+    // it still exists.
     void show_tree();
     void hide_tree();
     // 0x46f3e0. Sets the entity_pos of the VM, if it still exists.
@@ -902,6 +903,7 @@ struct AnmVm
     // (script_id_short; -1 for any).
     HARNESS_CALLED AnmVm *search_children(i32 script, i32 nth);
     // 0x46f380 and 0x46f3b0 (ExpHP: set/clear_ins_316_flag_recursively).
+    // Set or clear ANM_VM_SHOWN on the VM and all its descendants.
     HARNESS_CALLED void show_tree();
     HARNESS_CALLED void hide_tree();
 
