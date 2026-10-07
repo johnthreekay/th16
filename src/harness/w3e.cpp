@@ -18,7 +18,7 @@ i32 harness_w3e_bgm(i32 slot, const char *name, SoundManager *other)
            g_SoundManager.play_preloaded_bgm(slot) + g_SoundManager.play_preloaded_bgm(2);
 }
 
-// The globals from g_unk_4d9d20 to g_unk_4d9d90 are fields of g_GameWindow,
+// The globals from g_device_reset_frames to g_frame_pacing.mode are fields of g_GameWindow,
 // whose address the Window methods take. Stores through pointers can
 // therefore change them, and code reloads them after such stores; taking
 // their addresses here tells LTCG the same.

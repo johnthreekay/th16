@@ -219,17 +219,17 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
             }
             if (menu.current_selection != menu.next_selection)
             {
-                g_SoundManager.play_sound_centered(10, 0);
+                g_SoundManager.play_sound_centered(SE_SELECT00, 0);
                 help_highlight_pages(this);
             }
             if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
             {
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 goto open_page;
             }
             if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
             {
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 help_hide_pages(this);
                 state = HELP_STATE_CLOSE;
                 substate = HELP_SUBSTATE_SETUP;
@@ -259,7 +259,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
             {
                 substate = HELP_SUBSTATE_TURNING;
                 timer.set_value(0);
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 menu.move_cursor(1);
                 AnmManager::interrupt_tree_and_run(page_vms[HELP_PAGE_COUNT], 7);
             }
@@ -267,7 +267,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
             {
                 substate = HELP_SUBSTATE_TURNING;
                 timer.set_value(0);
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 menu.move_cursor(-1);
                 AnmManager::interrupt_tree_and_run(page_vms[HELP_PAGE_COUNT], 8);
             }
@@ -275,7 +275,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
             {
                 if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_MENU | INPUT_BOMB | INPUT_SHOT))
                 {
-                    g_SoundManager.play_sound_centered(9, 0);
+                    g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                     substate = HELP_SUBSTATE_LIST;
                     timer.set_value(0);
                     AnmManager::interrupt_tree(page_vms[HELP_PAGE_COUNT], 1);

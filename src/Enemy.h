@@ -759,7 +759,7 @@ enum EclVar
     ECL_VAR_F7 = -9932,
     ECL_VAR_LAST_ENM_ID = -9931,
     ECL_VAR_POWER = -9930,
-    // 1 outside replays when Supervisor::unk_700 is set (ExpHP: DS3).
+    // 1 outside replays when Supervisor::new_game_started is set (ExpHP: DS3).
     ECL_VAR_DS3 = -9927,
     // Globals shared by every enemy (EnemyManagerInner).
     ECL_VAR_GI0 = -9926,

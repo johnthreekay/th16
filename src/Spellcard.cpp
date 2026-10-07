@@ -218,7 +218,7 @@ void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_i
     text_anm_ids[2] = g_AsciiManager->ascii_anm->create_effect(1, -1, NULL);
     AnmManager *anm = g_AnmManager;
     g_AnmManager->draw_text_right(get_vm_or_clear(text_anm_ids[1]), 0xffffff, 0, 0, 0, name);
-    g_SoundManager.play_sound_centered(0x21, 0);
+    g_SoundManager.play_sound_centered(SE_CAT00, 0);
     boss_anm_id = g_EffectManager->effect_anm->create_effect(0xd, -1, NULL);
     EnemyInf *boss = NULL;
     i32 boss_id = g_EnemyManager->inner.boss_ids[0];
@@ -292,7 +292,7 @@ HARNESS_CALLED void Spellcard::end()
                 spell->captures[practice]++;
             }
         }
-        g_SoundManager.play_sound_centered(0x2e, 0);
+        g_SoundManager.play_sound_centered(SE_CARDGET_2, 0);
     }
     else
     {
@@ -300,7 +300,7 @@ HARNESS_CALLED void Spellcard::end()
     }
     if (flags & SPELLCARD_TIMED_OUT)
     {
-        g_SoundManager.play_sound_centered(0x45, 0);
+        g_SoundManager.play_sound_centered(SE_FAULT, 0);
     }
 }
 

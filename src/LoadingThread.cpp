@@ -58,7 +58,7 @@ int LoadingThread::thread_start(void *arg)
                 g_SoundManager.reset();
                 if (file_exists("thbgm.dat"))
                 {
-                    if (!(g_Supervisor.config.flags_2c & 0x10))
+                    if (!(g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY))
                     {
                         g_SoundManager.open_bgm("thbgm.dat");
                     }
@@ -74,7 +74,7 @@ int LoadingThread::thread_start(void *arg)
             }
         }
     }
-    g_Supervisor.gamemode_to_switch_to = 3;
+    g_Supervisor.gamemode_to_switch_to = GAMEMODE_QUIT;
     t->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
     return 0;
 }
@@ -131,7 +131,7 @@ LoadingThread::~LoadingThread()
         delete anm->loaded_anms[ANM_SLOT_TEXT];
         anm->loaded_anms[ANM_SLOT_TEXT] = NULL;
     }
-    scorefile_save_449a00();
+    scorefile_save();
     if (g_Scorefile != NULL)
     {
         delete g_Scorefile;
@@ -153,20 +153,20 @@ LoadingThread *LoadingThread::create()
 
 // Once the thread has loaded everything (on_tick only becomes active
 // then), sets up the special ANM VMs, starts the ASCII manager and goes to
-// the title (game mode 4).
+// the title (GAMEMODE_TITLE).
 // FUNCTION: TH16 0x43b290
 int LoadingThread::on_tick()
 {
     if (flags & 2)
     {
         g_Supervisor.setup_special_anms();
-        g_unk_4d9d90 = 1;
+        g_frame_pacing.mode = FRAME_PACING_MENU;
         g_AsciiManager->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
         g_AsciiManager->on_draw_func_1->flags |= UPDATE_FUNC_ACTIVE;
         g_AsciiManager->on_draw_func_2->flags |= UPDATE_FUNC_ACTIVE;
         g_AsciiManager->on_draw_func_3->flags |= UPDATE_FUNC_ACTIVE;
-        g_Supervisor.flags &= ~0x2000;
-        g_Supervisor.gamemode_to_switch_to = 4;
+        g_Supervisor.flags &= ~SUPERVISOR_IDLE_ON_EXIT;
+        g_Supervisor.gamemode_to_switch_to = GAMEMODE_TITLE;
         flags &= ~2;
     }
     return UPDATE_FUNC_CONTINUE;

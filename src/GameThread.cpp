@@ -46,7 +46,7 @@ i32 g_cancel_screen_effects;
 extern i32 g_continues_remaining;
 // The practice menu's starting lives choice: 0 for the default (9),
 // otherwise one more than the lives.
-extern i32 g_unk_4a5bf8;
+extern i32 g_practice_lives_key;
 
 // g_Globals' flag word at 0x45c as a whole (flags_lo_45c, game_mode,
 // flags_hi_45c): GlobalsFlagsLo masks and GLOBALS_WORD_DEMO_PLAY.
@@ -71,7 +71,7 @@ GameThread::GameThread()
 HARNESS_CALLED GameThread *GameThread::create(i32 replay_mode)
 {
     GameThread *thread = new GameThread();
-    g_unk_4d9d90 = 0;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
     g_Supervisor.d3d_device->EvictManagedResources();
     g_GameThread = thread;
     thread->replay_mode = replay_mode;
@@ -84,7 +84,7 @@ HARNESS_CALLED GameThread *GameThread::create(i32 replay_mode)
 void GameThread::destroy()
 {
     GameThread *thread = g_GameThread;
-    g_unk_4d9d90 = 0;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
     if (thread != NULL)
     {
         delete thread;
@@ -154,18 +154,18 @@ i32 GameThread::thread_start()
     // Wait for the loading screen's screen copy to finish.
     while (g_AnmManager->screen_copies[0].anm_slot >= 0)
     {
-        if (g_Supervisor.flags & 0x180)
+        if (g_Supervisor.flags & (SUPERVISOR_QUIT_REQUESTED | SUPERVISOR_FLAG_100))
         {
             goto fail;
         }
         Sleep(1);
     }
-    if (g_Supervisor.unk_700 == 0)
+    if (g_Supervisor.new_game_started == 0)
     {
         Sleep(60);
     }
-    g_Supervisor.vm_1bc->interrupt(2);
-    g_Supervisor.vm_1bc->run();
+    g_Supervisor.arcade_blit_vm_0f->interrupt(2);
+    g_Supervisor.arcade_blit_vm_0f->run();
     g_game_speed = 1.0f;
     GAME_THREAD_FLAG_WORD(g_GameThread) &= ~GAME_THREAD_GAME_CLEARED;
     g_Globals.time_in_stage = 0;
@@ -178,7 +178,7 @@ i32 GameThread::thread_start()
     }
     // A new game (not the next stage): the hiscore to beat, then score,
     // lives, bombs, power and season power for the mode.
-    if (g_Supervisor.unk_700 != 0)
+    if (g_Supervisor.new_game_started != 0)
     {
         if (g_Globals.stage_num == 7)
         {
@@ -232,13 +232,13 @@ i32 GameThread::thread_start()
         {
             g_Globals.lives = 2;
         }
-        else if (g_unk_4a5bf8 == 0)
+        else if (g_practice_lives_key == 0)
         {
             g_Globals.lives = 9;
         }
         else
         {
-            g_Globals.lives = g_unk_4a5bf8 - 1;
+            g_Globals.lives = g_practice_lives_key - 1;
         }
         if (Player::create() == NULL)
         {
@@ -422,23 +422,23 @@ i32 GameThread::thread_start()
     (&g_Globals.unk_204)[g_Globals.stage_num] = 0;
     g_Globals.unk_224 = 0;
     // Wait for the sound thread to take the music commands.
-    while (g_SoundManager.bgm_commands[0].command != 0)
+    while (g_SoundManager.bgm_commands[0].command != BGM_NONE)
     {
         Sleep(16);
     }
     thread->music_restart_delay = 60;
-    g_Supervisor.sub_43c630();
+    g_Supervisor.end_stage_load_anms();
     GAME_THREAD_FLAG_WORD(thread) &= ~GAME_THREAD_LOADING;
     GLOBALS_FLAGS_45C &= ~(GLOBALS_SAME_STAGE_AGAIN | GLOBALS_NEXT_STAGE | GLOBALS_CONTINUED);
     g_Supervisor.thread.should_run = FALSE;
     g_Supervisor.thread.stop_requested = TRUE;
     g_cancel_screen_effects = 0;
-    g_draw_hook_4a6eec = NULL;
-    g_draw_hook_4a6ee8 = NULL;
-    anm_vm_interrupt_2(g_Supervisor.vm_1bc);
-    anm_vm_interrupt_2(g_Supervisor.vm_1c0);
-    anm_vm_interrupt_2(g_Supervisor.vm_1c4);
-    anm_vm_interrupt_2(g_Supervisor.vm_1c8);
+    g_draw_hook_0f = NULL;
+    g_draw_hook_1a = NULL;
+    anm_vm_interrupt_2(g_Supervisor.arcade_blit_vm_0f);
+    anm_vm_interrupt_2(g_Supervisor.arcade_blit_vm_1a);
+    anm_vm_interrupt_2(g_Supervisor.arcade_blit_vm_2c);
+    anm_vm_interrupt_2(g_Supervisor.arcade_blit_vm_39);
     if (g_GameThread->replay_mode == 0)
     {
         g_play_time_runtime = get_runtime();
@@ -448,7 +448,7 @@ i32 GameThread::thread_start()
 
 fail:
     GAME_THREAD_FLAG_WORD(thread) |= GAME_THREAD_FAILED;
-    g_Supervisor.sub_43c6a0();
+    g_Supervisor.abort_stage_load_anms();
     g_Supervisor.thread.should_run = FALSE;
     g_Supervisor.thread.stop_requested = TRUE;
     if (thread->on_tick != NULL)
@@ -465,19 +465,21 @@ fail:
 
 
 // Ends a game: saves the score file, shows "now loading" for what comes
-// next (game modes 10 and 11 retry, 12 is the next stage, 14 continues),
-// sets the GlobalsFlagsLo bits that say what the next GameThread keeps, and
+// next (GAMEMODE_RESTART or GAMEMODE_RESTART_REPLAY retries,
+// GAMEMODE_NEXT_STAGE goes on, GAMEMODE_RETRY_STAGE continues), sets the
+// GlobalsFlagsLo bits that say what the next GameThread keeps, and
 // deletes the game objects (keeping the stage, GUI and player for the next
 // stage) and the update functions.
 // FUNCTION: TH16 0x42d200
 DECOMP_NOINLINE GameThread::~GameThread()
 {
-    scorefile_save_449a00();
+    scorefile_save();
     GLOBALS_FLAGS_45C &= ~(GLOBALS_SAME_STAGE_AGAIN | GLOBALS_NEXT_STAGE);
     g_game_speed = 1.0f;
-    g_draw_hook_4a6eec = NULL;
-    g_draw_hook_4a6ee8 = NULL;
-    if (g_Supervisor.gamemode_to_switch_to == 10 || g_Supervisor.gamemode_to_switch_to == 11)
+    g_draw_hook_0f = NULL;
+    g_draw_hook_1a = NULL;
+    if (g_Supervisor.gamemode_to_switch_to == GAMEMODE_RESTART ||
+        g_Supervisor.gamemode_to_switch_to == GAMEMODE_RESTART_REPLAY)
     {
         g_AsciiManager->show_now_loading_inline(480.0f, 392.0f);
         if (g_Globals.weird_stage_num == g_Globals.stage_num)
@@ -485,20 +487,20 @@ DECOMP_NOINLINE GameThread::~GameThread()
             GLOBALS_FLAGS_45C |= GLOBALS_SAME_STAGE_AGAIN;
         }
     }
-    else if (g_Supervisor.gamemode_to_switch_to == 12)
+    else if (g_Supervisor.gamemode_to_switch_to == GAMEMODE_NEXT_STAGE)
     {
         g_AsciiManager->show_now_loading(480.0f, 392.0f);
         GLOBALS_FLAGS_45C |= GLOBALS_NEXT_STAGE;
     }
-    else if (g_Supervisor.gamemode_to_switch_to == 4)
+    else if (g_Supervisor.gamemode_to_switch_to == GAMEMODE_TITLE)
     {
         g_AsciiManager->show_now_loading(480.0f, 392.0f);
     }
-    else if (g_Supervisor.gamemode_to_switch_to == 16)
+    else if (g_Supervisor.gamemode_to_switch_to == GAMEMODE_TITLE_SCORE_ENTRY)
     {
         g_AsciiManager->show_now_loading(480.0f, 392.0f);
     }
-    else if (g_Supervisor.gamemode_to_switch_to == 14)
+    else if (g_Supervisor.gamemode_to_switch_to == GAMEMODE_RETRY_STAGE)
     {
         g_AsciiManager->show_now_loading(480.0f, 392.0f);
         if (g_Globals.weird_stage_num != g_Globals.stage_num)
@@ -514,7 +516,8 @@ DECOMP_NOINLINE GameThread::~GameThread()
     }
     if (!(GLOBALS_FLAGS_45C & GLOBALS_NEXT_STAGE))
     {
-        if (g_Supervisor.gamemode_to_switch_to != 15 && g_Supervisor.gamemode_to_switch_to != 16)
+        if (g_Supervisor.gamemode_to_switch_to != GAMEMODE_ENDING &&
+            g_Supervisor.gamemode_to_switch_to != GAMEMODE_TITLE_SCORE_ENTRY)
         {
             delete g_ReplayManager;
         }
@@ -552,9 +555,9 @@ DECOMP_NOINLINE GameThread::~GameThread()
             bullets->on_draw->flags &= ~UPDATE_FUNC_ACTIVE;
         }
         ReplayManager *replay = g_ReplayManager;
-        if (replay->on_tick_22_func != NULL)
+        if (replay->fast_forward_func != NULL)
         {
-            replay->on_tick_22_func->flags &= ~UPDATE_FUNC_ACTIVE;
+            replay->fast_forward_func->flags &= ~UPDATE_FUNC_ACTIVE;
         }
         if (replay->on_draw_func != NULL)
         {
@@ -582,13 +585,13 @@ DECOMP_NOINLINE GameThread::~GameThread()
     if (!(g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE && (GLOBALS_FLAGS_45C & GLOBALS_SAME_STAGE_AGAIN)) &&
         !(GLOBALS_FLAGS_45C & (GLOBALS_WORD_DEMO_PLAY | GLOBALS_NEXT_STAGE)))
     {
-        if (g_Supervisor.config.flags_2c & 0x10)
+        if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
-            g_SoundManager.modify_bgm(4, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
         }
         else
         {
-            g_SoundManager.modify_bgm(3, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_STOP, 0, "dummy");
         }
         g_SoundManager.bgm_name[0] = '\0';
     }
@@ -632,15 +635,17 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         {
             if (replay_mode != 0)
             {
-                replay_ended_43f240();
+                open_replay_end_menu();
             }
             else if (g_Globals.difficulty != DIFFICULTY_EXTRA)
             {
-                g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 15;
+                g_Supervisor.gamemode_to_switch_to =
+                    (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_ENDING;
             }
             else
             {
-                g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 16;
+                g_Supervisor.gamemode_to_switch_to =
+                    (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE_SCORE_ENTRY;
             }
         }
     }
@@ -667,7 +672,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
     }
     if (time_in_stage.current == 5)
     {
-        g_unk_4d9d90 = 2;
+        g_frame_pacing.mode = FRAME_PACING_GAME;
     }
     if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_LOADING)
     {
@@ -681,7 +686,8 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         if ((g_hardware_input & (INPUT_ENTER | INPUT_MENU | INPUT_BOMB | INPUT_SHOT)) ||
             (GAME_THREAD_FLAG_WORD(this) & (GAME_THREAD_IN_MENU | GAME_THREAD_FLAG_5 | GAME_THREAD_FLAG_6)))
         {
-            g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+            g_Supervisor.gamemode_to_switch_to =
+                (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         }
         if (time_in_stage.current == 0xf00)
         {
@@ -689,7 +695,8 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         }
         else if (time_in_stage.current == 0xf3c)
         {
-            g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+            g_Supervisor.gamemode_to_switch_to =
+                (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         }
     }
     Gui::update_score();
@@ -708,7 +715,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
             {
                 g_Supervisor.stop_bgm();
             }
-            AnmManager::interrupt_tree(*(AnmId *)&g_Supervisor.config.unk_0, 1);
+            AnmManager::interrupt_tree(*(AnmId *)&g_Supervisor.config.loading_effect_id, 1);
         }
         music_restart_time++;
         if (music_restart_time < music_restart_delay && music_restart_time > 1)
@@ -732,10 +739,10 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
             music_restart_time = 0;
         }
     }
-    g_Supervisor.vm_1bc->run();
-    g_Supervisor.vm_1c0->run();
-    g_Supervisor.vm_1c4->run();
-    g_Supervisor.vm_1c8->run();
+    g_Supervisor.arcade_blit_vm_0f->run();
+    g_Supervisor.arcade_blit_vm_1a->run();
+    g_Supervisor.arcade_blit_vm_2c->run();
+    g_Supervisor.arcade_blit_vm_39->run();
     g_Globals.time_in_stage++;
     g_Globals.time_in_chapter++;
     if (g_cancel_screen_effects != 0)
@@ -768,7 +775,7 @@ void GameThread::update_play_time()
     {
         return;
     }
-    if (g_Supervisor.gamemode_to_switch_to == -1 || g_Supervisor.gamemode_to_switch_to == 3)
+    if (g_Supervisor.gamemode_to_switch_to == GAMEMODE_INVALID || g_Supervisor.gamemode_to_switch_to == GAMEMODE_QUIT)
     {
         return;
     }
@@ -912,7 +919,7 @@ HARNESS_CALLED i32 GameThread::begin_stage()
     }
     AnmManager::interrupt_tree(g_AsciiManager->unk_19244, 1);
     g_AsciiManager->hide_now_loading_inline();
-    AnmManager::interrupt_tree(*(AnmId *)&g_Supervisor.config.unk_0, 1);
+    AnmManager::interrupt_tree(*(AnmId *)&g_Supervisor.config.loading_effect_id, 1);
     return 0;
 }
 
@@ -926,18 +933,18 @@ i32 GameThread::finish_stage_transition()
     {
         flags.stage_transition = 0;
         restart_stage_objects();
-        if (g_Supervisor.config.flags_2c & 0x10)
+        if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
-            g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
         }
         else
         {
             g_SoundManager.modify_bgm(BGM_STOP, 0, "dummy");
         }
         i32 music = g_stage_data->music_ids[0];
-        if (g_Supervisor.config.flags_2c & 0x10)
+        if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
-            g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
         }
         g_SoundManager.modify_bgm(BGM_PLAY, 0, "dummy");
         g_Scorefile->bgm_unlocked[music] = 1;
@@ -948,7 +955,7 @@ i32 GameThread::finish_stage_transition()
 }
 
 // The end of a stage (MSG_STAGE_END, or ECL dialogRead -2): the clear
-// bonus, then the next stage (game mode 12), the ending (stage 6 and the
+// bonus, then the next stage (GAMEMODE_NEXT_STAGE), the ending (stage 6 and the
 // extra stage, with the play and clear counts and a bonus of 5 million per
 // life and 1 million per bomb) or, in practice, the end of the game with
 // the practice records updated. Always 0.
@@ -969,7 +976,7 @@ i32 stage_clear()
     {
         if (g_GameThread->replay_mode != 0)
         {
-            replay_ended_43f240();
+            open_replay_end_menu();
             return 0;
         }
         if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE)
@@ -987,7 +994,7 @@ i32 stage_clear()
                 .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
                 .cleared = 1;
         }
-        game_over_43f500();
+        open_stage_end_menu();
         return 0;
     }
     if (g_Globals.stage_num == 6)
@@ -1016,7 +1023,7 @@ i32 stage_clear()
         g_Gui->stage_clear_bonus += bonus;
         if (g_GameThread->replay_mode != 0)
         {
-            replay_ended_43f240();
+            open_replay_end_menu();
             return 0;
         }
         if (g_Scorefile->characters[g_Globals.subshot + g_Globals.character].play_counts[g_Globals.difficulty] < 99999)
@@ -1038,7 +1045,7 @@ i32 stage_clear()
         g_Gui->stage_clear_bonus += bonus;
         if (g_GameThread->replay_mode != 0)
         {
-            replay_ended_43f240();
+            open_replay_end_menu();
         }
         else
         {
@@ -1065,7 +1072,7 @@ i32 stage_clear()
             .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
             .cleared = 1;
     }
-    g_Supervisor.gamemode_to_switch_to = 12;
+    g_Supervisor.gamemode_to_switch_to = GAMEMODE_NEXT_STAGE;
     if (g_Globals.stage_num < 7)
     {
         g_Globals.stage_num++;

@@ -112,7 +112,7 @@ void GameWindow::make_dirs_and_disable_screensaver()
 // FUNCTION: TH16 0x45a8a0
 HARNESS_CALLED i32 GameWindow::do_frame_sleeping()
 {
-    if (g_unk_4d9d1c & 0x40)
+    if (g_window_flags & WINDOW_SLEEP_PACING)
     {
         while (frame_start_time > next_frame_time)
         {
@@ -363,7 +363,7 @@ HARNESS_CALLED void GameWindow::update_window()
 {
     double now = get_runtime();
     frame_start_time = now;
-    if (g_Supervisor.config.unk_29 == 1)
+    if (g_Supervisor.config.frame_pacing == 1)
     {
         double elapsed = now - present_time;
         if (elapsed < 1.0 / 60.0 && elapsed > 0.0)
@@ -403,7 +403,7 @@ HARNESS_CALLED void GameWindow::take_screenshot()
 {
     char path[0x100];
     g_AnmManager->take_screenshots();
-    if (!(g_hardware_input_pressed & 0x40000))
+    if (!(g_hardware_input_pressed & INPUT_SCREENSHOT))
     {
         return;
     }
@@ -429,12 +429,12 @@ HARNESS_CALLED void GameWindow::take_screenshot()
 void GameWindow::set_resolution_from_config()
 {
     f32 scale;
-    u32 size = (g_unk_4d9d1c >> 2) & 0xf;
-    if (size == 2 || size == 5)
+    u32 size = (g_window_flags >> WINDOW_SIZE_SHIFT) & 0xf;
+    if (size == WINDOW_SIZE_FULLSCREEN_1280 || size == WINDOW_SIZE_WINDOWED_1280)
     {
         scale = 2.0f;
     }
-    else if (size == 1 || size == 4)
+    else if (size == WINDOW_SIZE_FULLSCREEN_960 || size == WINDOW_SIZE_WINDOWED_960)
     {
         scale = 1.5f;
     }
@@ -449,8 +449,8 @@ void GameWindow::set_resolution_from_config()
     early_arcade_offset_y = (i32)(g_resolution_y - 448.0f) / 2;
 }
 
-// Sets the window size option bits of g_unk_4d9d1c (GameWindow::flags).
-#define SET_WINDOW_SIZE(n) (g_unk_4d9d1c = (g_unk_4d9d1c & ~0x3c) | ((n) << 2))
+// Sets the window size option bits of g_window_flags (GameWindow::flags).
+#define SET_WINDOW_SIZE(n) (g_window_flags = (g_window_flags & ~WINDOW_SIZE_MASK) | ((n) << WINDOW_SIZE_SHIFT))
 
 // The window procedure (TH06: GameWindow_WindowProc). Alt+Enter and
 // maximizing switch between the windowed and fullscreen sizes.
@@ -464,25 +464,25 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         return 1;
     case WM_ACTIVATEAPP:
         g_GameWindow.is_app_active = wparam;
-        g_GameWindow.unk_14 = wparam == 0;
+        g_GameWindow.show_cursor = wparam == 0;
         break;
     case WM_SIZE:
-        if (g_unk_4d9d1c & 1)
+        if (g_window_flags & WINDOW_RUNNING)
         {
             switch (wparam)
             {
             case SIZE_MAXIMIZED:
-                g_unk_4d9d1c |= 2;
-                switch ((g_unk_4d9d1c >> 2) & 0xf)
+                g_window_flags |= WINDOW_CHANGE_MODE;
+                switch ((g_window_flags >> WINDOW_SIZE_SHIFT) & 0xf)
                 {
-                case 3:
-                    SET_WINDOW_SIZE(0);
+                case WINDOW_SIZE_WINDOWED_640:
+                    SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_640);
                     break;
-                case 4:
-                    SET_WINDOW_SIZE(1);
+                case WINDOW_SIZE_WINDOWED_960:
+                    SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_960);
                     break;
-                case 5:
-                    SET_WINDOW_SIZE(2);
+                case WINDOW_SIZE_WINDOWED_1280:
+                    SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_1280);
                     break;
                 }
                 break;
@@ -490,12 +490,12 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         }
         break;
     case WM_CLOSE:
-        g_Supervisor.flags = (g_Supervisor.flags & ~0x100) | 0x80;
+        g_Supervisor.flags = (g_Supervisor.flags & ~SUPERVISOR_FLAG_100) | SUPERVISOR_QUIT_REQUESTED;
         return 1;
     case WM_SETCURSOR:
         if (!g_Supervisor.present_params.Windowed)
         {
-            if (g_GameWindow.unk_14)
+            if (g_GameWindow.show_cursor)
             {
                 SetCursor(LoadCursorA(NULL, IDC_ARROW));
                 while (ShowCursor(TRUE) < 0)
@@ -530,26 +530,26 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     case WM_SYSKEYDOWN:
         if (wparam == VK_RETURN)
         {
-            g_unk_4d9d1c |= 2;
-            switch ((g_unk_4d9d1c >> 2) & 0xf)
+            g_window_flags |= WINDOW_CHANGE_MODE;
+            switch ((g_window_flags >> WINDOW_SIZE_SHIFT) & 0xf)
             {
-            case 3:
-                SET_WINDOW_SIZE(0);
+            case WINDOW_SIZE_WINDOWED_640:
+                SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_640);
                 break;
-            case 4:
-                SET_WINDOW_SIZE(1);
+            case WINDOW_SIZE_WINDOWED_960:
+                SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_960);
                 break;
-            case 5:
-                SET_WINDOW_SIZE(2);
+            case WINDOW_SIZE_WINDOWED_1280:
+                SET_WINDOW_SIZE(WINDOW_SIZE_FULLSCREEN_1280);
                 break;
-            case 0:
-                SET_WINDOW_SIZE(3);
+            case WINDOW_SIZE_FULLSCREEN_640:
+                SET_WINDOW_SIZE(WINDOW_SIZE_WINDOWED_640);
                 break;
-            case 1:
-                SET_WINDOW_SIZE(4);
+            case WINDOW_SIZE_FULLSCREEN_960:
+                SET_WINDOW_SIZE(WINDOW_SIZE_WINDOWED_960);
                 break;
-            case 2:
-                SET_WINDOW_SIZE(5);
+            case WINDOW_SIZE_FULLSCREEN_1280:
+                SET_WINDOW_SIZE(WINDOW_SIZE_WINDOWED_1280);
                 break;
             }
         }

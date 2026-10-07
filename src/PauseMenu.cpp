@@ -15,7 +15,7 @@
 
 static_assert(offsetof(PauseMenu, name) == 0x2d4, "PauseMenu::name");
 static_assert(offsetof(PauseMenu, saved_bgm_time) == 0x2e4, "PauseMenu::saved_bgm_time");
-static_assert(offsetof(PauseMenu, flags_3ec) == 0x3ec, "PauseMenu::flags_3ec");
+static_assert(offsetof(PauseMenu, menu_flags) == 0x3ec, "PauseMenu::menu_flags");
 static_assert(offsetof(Gui, front_anm) == 0x2d8, "Gui::front_anm");
 
 // GLOBAL: TH16 0x4a6ef4
@@ -24,24 +24,28 @@ PauseMenu *g_PauseMenu;
 // The characters of the name entry grid (MainMenuStates.cpp).
 extern const char g_name_entry_chars[];
 
+// Switches to another PauseState, back to its first substate.
 // FUNCTION: TH16 0x43e150
 HARNESS_CALLED void PauseMenu::set_state(i32 state)
 {
     prev_state = this->state;
     this->state = state;
-    unk_1f4 = 0;
+    substate = 0;
     time_in_current_menu.reset();
     time_since_pause_or_unpause.reset();
-    menu_34.num_disabled = 0;
+    item_menu.num_disabled = 0;
 }
 
+// Moves to another PauseSubstate, restarting its timer.
 // FUNCTION: TH16 0x43e200
-void PauseMenu::set_unk_1f4(i32 value)
+void PauseMenu::set_substate(i32 value)
 {
-    unk_1f4 = value;
+    substate = value;
     time_in_current_menu.reset();
 }
 
+// Puts the game's score into this character's top ten for the difficulty
+// played, with a blank name. Returns the rank, or -1 if it did not make it.
 // FUNCTION: TH16 0x43e250
 i32 ScorefileChara::insert_score()
 {
@@ -81,6 +85,8 @@ PauseMenu::PauseMenu()
     g_PauseMenu = this;
 }
 
+// Registers the tick (priority 10) and draw (0x4a) callbacks, inactive for
+// now.
 // FUNCTION: TH16 0x43e3f0
 int PauseMenu::initialize()
 {
@@ -108,7 +114,7 @@ PauseMenu::~PauseMenu()
 {
     g_UpdateFuncRegistry->unregister_locked(on_tick_func);
     g_UpdateFuncRegistry->unregister_locked(on_draw_func);
-    for (i32 i = 0; i < 25; i++)
+    for (i32 i = 0; i < REPLAY_SLOTS; i++)
     {
         delete replays[i];
     }
@@ -129,23 +135,26 @@ PauseMenu *PauseMenu::create()
 
 #include "Input.h"
 
+// Opens the pause menu on Esc (or after a device reset) once the stage has
+// run for 30 frames, unless a demo plays; runs the open menu.
 // TODO: the inlined timer ticks use other xmm registers for 1.0, 1.01 and the speed.
 // FUNCTION: TH16 0x43e5f0
 int PauseMenu::on_tick()
 {
     switch (state)
     {
-    case 0:
+    case PAUSE_CLOSED:
         if (!(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY) && !g_GameThread->flags.music_restart &&
-            ((g_hardware_input_pressed & 0x100) || (g_Supervisor.flags & 0x10)) && g_GameThread->on_tick != NULL &&
+            ((g_hardware_input_pressed & INPUT_MENU) || (g_Supervisor.flags & SUPERVISOR_DEVICE_WAS_RESET)) &&
+            g_GameThread->on_tick != NULL &&
             (g_GameThread->on_tick->flags & UPDATE_FUNC_ACTIVE) && g_GameThread->time_in_stage.current >= 30)
         {
             open();
         }
         break;
-    case 1:
-    case 2:
-    case 3:
+    case PAUSE_PAUSED:
+    case PAUSE_GAME_OVER:
+    case PAUSE_STAGE_END:
         tick_open();
         break;
     }
@@ -176,24 +185,24 @@ void PauseMenu::draw_keyboard(Float3 pos)
     g_AsciiManager->color.d3d = 0xffffffff;
     pos.x = 48.0f;
     Float3 key_pos(112.0f, 320.0f, 0.0f);
-    for (i32 i = 0; i < 0x5b; i++)
+    for (i32 i = 0; i < NAME_ENTRY_CHOICES; i++)
     {
-        g_AsciiManager->color.d3d = menu.next_selection == i ? 0xffffff00 : 0xff808080;
+        g_AsciiManager->color.d3d = name_entry_menu.next_selection == i ? 0xffffff00 : 0xff808080;
         i32 c;
-        if (i < 0x58)
+        if (i < NAME_ENTRY_CHAR_COUNT)
         {
             c = g_name_entry_chars[i];
         }
-        else if (i == 0x58)
+        else if (i == NAME_ENTRY_SPACE)
         {
             c = 0x81;
         }
         else
         {
-            c = i == 0x59 ? 0x7f : 0x80;
+            c = i == NAME_ENTRY_BACKSPACE ? 0x7f : 0x80;
         }
         g_AsciiManager->create_stringf(&key_pos, "%c", c);
-        if (i % 13 == 12)
+        if (i % NAME_ENTRY_COLUMNS == NAME_ENTRY_COLUMNS - 1)
         {
             key_pos.x = 112.0f;
             key_pos.y += 16.0f;
@@ -249,9 +258,9 @@ HARNESS_CALLED void PauseMenu::draw_replay_entry(i32 index, Float3 *pos, RpyInfo
 void PauseMenu::draw_replay_list()
 {
     Float3 pos(36.0f, 64.0f, 0.0f);
-    for (i32 i = 0; i < 25; i++)
+    for (i32 i = 0; i < REPLAY_SLOTS; i++)
     {
-        g_AsciiManager->color.d3d = menu_34.next_selection == i ? 0xffffff00 : 0xff808080;
+        g_AsciiManager->color.d3d = item_menu.next_selection == i ? 0xffffff00 : 0xff808080;
         if (replays[i] != NULL)
         {
             draw_replay_entry_inline(i, &pos, replays[i]->info);
@@ -270,7 +279,7 @@ void PauseMenu::draw_replay_name_entry()
 {
     Float3 pos;
     pos.z = 0.0f;
-    i32 selection = menu_34.next_selection;
+    i32 selection = item_menu.next_selection;
     if (time_in_current_menu.current < 10)
     {
         f32 start = selection * 15.0f + 64.0f;
@@ -293,12 +302,12 @@ void PauseMenu::draw_high_scores()
     Float3 pos;
     pos.x = 48.0f;
     pos.z = 0.0f;
-    i32 selection = menu_34.next_selection;
+    i32 selection = item_menu.next_selection;
     pos.y = 64.0f;
     g_AsciiManager->create_stringf(&pos, "            Score Ranking!!");
     pos.x = 75.0f;
     pos.y = selection * 18.0f + 96.0f;
-    if (unk_200 == 0)
+    if (score_not_ranked == 0)
     {
         draw_keyboard(pos);
     }
@@ -335,45 +344,47 @@ void PauseMenu::draw_high_scores()
 // GLOBAL: TH16 0x4a5bfc
 i32 g_continues_remaining;
 
+// Draws the text parts over the menu: the replay slots, the name entry, the
+// high scores and the remaining credits.
 // FUNCTION: TH16 0x43edc0
 int PauseMenu::on_draw()
 {
     g_AsciiManager->draw_shadows = 1;
-    if (get_vm_or_clear(anm_id_1e8) != NULL)
+    if (get_vm_or_clear(snapshot_id) != NULL)
     {
-        AnmVm *vm = find_child_of(anm_id_1e8, 0x39);
+        AnmVm *vm = find_child_of(snapshot_id, 0x39);
         if (vm != NULL)
         {
-            g_Supervisor.vm_1c4->color_1.d3d = vm->color_1.d3d | 0xff000000;
+            g_Supervisor.arcade_blit_vm_2c->color_1.d3d = vm->color_1.d3d | 0xff000000;
         }
     }
     switch (state)
     {
-    case 1:
-    case 3:
-        if ((flags_3ec & 3) == 1)
+    case PAUSE_PAUSED:
+    case PAUSE_STAGE_END:
+        if ((menu_flags & (PAUSE_SHOW_REPLAY_SLOTS | PAUSE_SHOW_REPLAY_NAME)) == PAUSE_SHOW_REPLAY_SLOTS)
         {
             draw_replay_list();
         }
-        else if ((flags_3ec & 3) == 2)
+        else if ((menu_flags & (PAUSE_SHOW_REPLAY_SLOTS | PAUSE_SHOW_REPLAY_NAME)) == PAUSE_SHOW_REPLAY_NAME)
         {
             draw_replay_name_entry();
         }
         break;
-    case 2:
-        if (unk_1f4 == 15)
+    case PAUSE_GAME_OVER:
+        if (substate == PAUSE_SUB_SCORE_NAME_ENTRY)
         {
             draw_high_scores();
         }
-        if ((flags_3ec & 3) == 1)
+        if ((menu_flags & (PAUSE_SHOW_REPLAY_SLOTS | PAUSE_SHOW_REPLAY_NAME)) == PAUSE_SHOW_REPLAY_SLOTS)
         {
             draw_replay_list();
         }
-        else if ((flags_3ec & 3) == 2)
+        else if ((menu_flags & (PAUSE_SHOW_REPLAY_SLOTS | PAUSE_SHOW_REPLAY_NAME)) == PAUSE_SHOW_REPLAY_NAME)
         {
             draw_replay_name_entry();
         }
-        else if (unk_1f4 != 14)
+        else if (substate != PAUSE_SUB_MANUAL)
         {
             g_AsciiManager->create_stringf(&Float3(184.0f, 448.0f, 0.0f), "Credit %d", g_continues_remaining);
         }
@@ -387,14 +398,14 @@ int PauseMenu::on_draw()
 // FUNCTION: TH16 0x43ef20
 void PauseMenu::take_snapshot()
 {
-    delete_vm_and_clear(anm_id_1e8);
-    anm_id_1e8 = g_Supervisor.text_anm->create_ui_vm_at_origin(0x34, 0);
+    delete_vm_and_clear(snapshot_id);
+    snapshot_id = g_Supervisor.text_anm->create_ui_vm_at_origin(TEXT_SCRIPT_PAUSE_SNAPSHOT, 0);
     // get_vm_or_clear with g_AnmManager read once (see on_draw).
     AnmManager *anm_manager = g_AnmManager;
-    AnmVm *vm = anm_manager->get_vm_with_id(anm_id_1e8);
+    AnmVm *vm = anm_manager->get_vm_with_id(snapshot_id);
     if (vm == NULL)
     {
-        anm_id_1e8.id = 0;
+        snapshot_id.id = 0;
     }
     AnmLoadedSprite *sprite = &anm_manager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id];
     RECT dst;
@@ -430,25 +441,25 @@ void PauseMenu::take_snapshot()
 void PauseMenu::open()
 {
     GameThread::update_play_time();
-    set_state(1);
+    set_state(PAUSE_PAUSED);
     GameThread *thread = g_GameThread;
     thread->flags.in_menu = 1;
     front_anm = g_Gui->front_anm;
-    delete_vm_and_clear(anm_id_1e4);
+    delete_vm_and_clear(menu_anm_id);
     if (thread->replay_mode != 0)
     {
-        anm_id_1e4 = front_anm->create_ui_vm_at_origin(0x9e, 0);
+        menu_anm_id = front_anm->create_ui_vm_at_origin(PAUSE_SCRIPT_REPLAY_PAUSE_MENU, 0);
     }
     else
     {
-        anm_id_1e4 = front_anm->create_ui_vm_at_origin(0x9c, 0);
+        menu_anm_id = front_anm->create_ui_vm_at_origin(PAUSE_SCRIPT_PAUSE_MENU, 0);
     }
-    AnmManager::interrupt_tree(anm_id_1e4, 3);
+    AnmManager::interrupt_tree(menu_anm_id, 3);
     SoundManager::pause_sounds();
-    g_SoundManager.play_sound_centered(0xe, 0);
+    g_SoundManager.play_sound_centered(SE_PAUSE, 0);
     if (g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE)
     {
-        g_SoundManager.modify_bgm(6, 0, "Pause");
+        g_SoundManager.modify_bgm(BGM_PAUSE, 0, "Pause");
     }
     while (SoundManager::update_sound_thread() != 0)
     {
@@ -456,8 +467,8 @@ void PauseMenu::open()
     take_snapshot();
     saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
-    saved_global_4d9d90 = g_unk_4d9d90;
-    g_unk_4d9d90 = 0;
+    saved_pacing_mode = g_frame_pacing.mode;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
     Gui *gui = g_Gui;
     if (gui->msg != NULL)
     {
@@ -468,46 +479,47 @@ void PauseMenu::open()
     {
         vm->hide_tree_inline();
     }
-    flags_3ec &= ~4;
+    menu_flags &= ~PAUSE_FROM_STAGE_END;
 }
 
 // FUNCTION: TH16 0x43f500
-void game_over_43f500()
+void open_stage_end_menu()
 {
     PauseMenu *menu = g_PauseMenu;
     GameThread::update_play_time();
     if (g_GameThread->replay_mode == 1)
     {
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+        g_Supervisor.gamemode_to_switch_to =
+            (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         return;
     }
     g_GameThread->flags.in_menu = 1;
-    menu->set_state(3);
-    menu->set_unk_1f4_inline(3);
+    menu->set_state(PAUSE_STAGE_END);
+    menu->set_substate_inline(PAUSE_SUB_OPEN_STAGE_END);
     if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE)
     {
-        menu->set_unk_1f4(5);
+        menu->set_substate(PAUSE_SUB_OPEN_SPELL_PRACTICE_END);
     }
     if (g_Globals.game_mode == GAME_MODE_NORMAL)
     {
-        menu->anm_id_1e8 = g_Supervisor.text_anm->create_ui_vm_at_origin(0x34, 0);
-        g_AnmManager->copy_screen_to_sprite(menu->anm_id_1e8, (i32)(g_screen_coord_scale * 32.0f),
+        menu->snapshot_id = g_Supervisor.text_anm->create_ui_vm_at_origin(TEXT_SCRIPT_PAUSE_SNAPSHOT, 0);
+        g_AnmManager->copy_screen_to_sprite(menu->snapshot_id, (i32)(g_screen_coord_scale * 32.0f),
                                             (i32)(g_screen_coord_scale * 16.0f), (i32)(g_screen_coord_scale * 384.0f),
                                             (i32)(g_screen_coord_scale * 448.0f));
     }
     Gui *gui = g_Gui;
     menu->front_anm = gui->front_anm;
-    menu->unk_1fc = 1;
+    menu->stage_finished = 1;
     menu->saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
-    menu->saved_global_4d9d90 = g_unk_4d9d90;
-    g_unk_4d9d90 = 1;
+    menu->saved_pacing_mode = g_frame_pacing.mode;
+    g_frame_pacing.mode = FRAME_PACING_MENU;
     if (gui->msg != NULL)
     {
         gui->msg->hide();
     }
     Gui::hide_chapter_result_vm();
-    menu->flags_3ec |= 4;
+    menu->menu_flags |= PAUSE_FROM_STAGE_END;
 }
 
 // TODO: ours folds the character offset into the practice index (one imul by 0xa63, scaled by 8); the original adds it to the pointer.
@@ -527,28 +539,28 @@ void PauseMenu::begin_score_entry()
         }
         else
         {
-            if (g_Globals.stage_num == 7 && unk_1fc != 0)
+            if (g_Globals.stage_num == 7 && stage_finished != 0)
             {
                 g_Globals.stage_num = 9;
             }
             i32 rank = ((ScorefileData *)g_Scorefile)->charas[g_Globals.subshot + g_Globals.character].insert_score();
-            if (g_Globals.stage_num == 9 && unk_1fc != 0)
+            if (g_Globals.stage_num == 9 && stage_finished != 0)
             {
                 g_Globals.stage_num = 7;
             }
             if (rank >= 0)
             {
-                menu_34.num_choices = 25;
-                menu_34.wraps = 1;
-                menu_34.set_cursor(rank);
-                menu.set_cursor(0);
-                menu.num_choices = 0x5b;
-                menu.wraps = 1;
+                item_menu.num_choices = 25;
+                item_menu.wraps = 1;
+                item_menu.set_cursor(rank);
+                name_entry_menu.set_cursor(0);
+                name_entry_menu.num_choices = NAME_ENTRY_CHOICES;
+                name_entry_menu.wraps = 1;
                 strcpy(name, ((ScorefileData *)g_Scorefile)->status.name);
                 name_cursor = 0;
                 if (strcmp(name, "        ") != 0)
                 {
-                    menu.move_cursor(-1);
+                    name_entry_menu.move_cursor(-1);
                 }
                 i32 i;
                 for (i = 8; i > 0; i--)
@@ -559,54 +571,55 @@ void PauseMenu::begin_score_entry()
                     }
                 }
                 name_cursor = i;
-                unk_200 = 0;
+                score_not_ranked = 0;
                 return;
             }
         }
     }
-    unk_200 = 1;
+    score_not_ranked = 1;
 }
 
 // FUNCTION: TH16 0x43f240
-void replay_ended_43f240()
+void open_replay_end_menu()
 {
     PauseMenu *menu = g_PauseMenu;
-    menu->set_state(1);
-    menu->set_unk_1f4_inline(1);
+    menu->set_state(PAUSE_PAUSED);
+    menu->set_substate_inline(PAUSE_SUB_OPEN_REPLAY_END);
     g_GameThread->flags.in_menu = 1;
     menu->take_snapshot();
     menu->front_anm = g_Gui->front_anm;
-    delete_vm_and_clear(menu->anm_id_1e4);
-    menu->anm_id_1e4 = menu->front_anm->create_ui_vm_at_origin(0x9f, 0);
-    AnmManager::interrupt_tree(menu->anm_id_1e4, 3);
+    delete_vm_and_clear(menu->menu_anm_id);
+    menu->menu_anm_id = menu->front_anm->create_ui_vm_at_origin(PAUSE_SCRIPT_REPLAY_END_MENU, 0);
+    AnmManager::interrupt_tree(menu->menu_anm_id, 3);
     SoundManager::pause_sounds();
-    g_SoundManager.modify_bgm(6, 0, "Pause");
+    g_SoundManager.modify_bgm(BGM_PAUSE, 0, "Pause");
     menu->saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
-    menu->saved_global_4d9d90 = g_unk_4d9d90;
-    g_unk_4d9d90 = 0;
-    menu->flags_3ec &= ~4;
+    menu->saved_pacing_mode = g_frame_pacing.mode;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
+    menu->menu_flags &= ~PAUSE_FROM_STAGE_END;
 }
 
 // TODO: the original keeps an ebp frame with a 4-byte pad (push ebp; push ecx), most likely known entry alignment through its callers (Player::on_tick_body, Gui::start_dialogue); ours has no frame (HARNESS_CALLED does not change it).
 // FUNCTION: TH16 0x43f350
-void pause_menu_43f350()
+void open_game_over_menu()
 {
     PauseMenu *menu = g_PauseMenu;
     GameThread::update_play_time();
     if (g_GameThread->replay_mode == 1)
     {
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+        g_Supervisor.gamemode_to_switch_to =
+            (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         return;
     }
-    menu->set_state(2);
-    menu->set_unk_1f4_inline(2);
+    menu->set_state(PAUSE_GAME_OVER);
+    menu->set_substate_inline(PAUSE_SUB_OPEN_GAME_OVER);
     g_GameThread->flags.in_menu = 1;
     SoundManager::pause_sounds();
-    g_SoundManager.play_sound_centered(0xe, 0);
+    g_SoundManager.play_sound_centered(SE_PAUSE, 0);
     if (g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE)
     {
-        g_SoundManager.modify_bgm(6, 0, "Pause");
+        g_SoundManager.modify_bgm(BGM_PAUSE, 0, "Pause");
     }
     while (SoundManager::update_sound_thread() != 0)
     {
@@ -618,19 +631,19 @@ void pause_menu_43f350()
         strcpy(menu->saved_bgm_name, g_SoundManager.get_bgm_name());
         menu->saved_bgm_time = g_SoundManager.bgm_play_time();
         g_Supervisor.play_bgm_wav(0, "th128_08");
-        if (g_Supervisor.config.flags_2c & 0x10)
+        if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
-            g_SoundManager.modify_bgm(4, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
         }
-        g_SoundManager.modify_bgm(2, 0, "dummy");
+        g_SoundManager.modify_bgm(BGM_PLAY, 0, "dummy");
         g_Scorefile->bgm_unlocked[0] = 1;
     }
-    menu->unk_1fc = 0;
+    menu->stage_finished = 0;
     menu->saved_game_speed = g_game_speed;
     g_game_speed = 1.0f;
-    menu->saved_global_4d9d90 = g_unk_4d9d90;
-    g_unk_4d9d90 = 1;
-    menu->flags_3ec &= ~4;
+    menu->saved_pacing_mode = g_frame_pacing.mode;
+    g_frame_pacing.mode = FRAME_PACING_MENU;
+    menu->menu_flags &= ~PAUSE_FROM_STAGE_END;
 }
 
 // The original's callback is a jmp to the member function, most likely the
@@ -646,7 +659,7 @@ double LTCG_VECTORCALL get_runtime();
 
 // TODO: the original pads its frame (push ecx) for the alignment its only caller, tick_open, provides; ours does not, even HARNESS_CALLED (also with GuiMsgVm::show or get_runtime HARNESS_CALLED).
 // FUNCTION: TH16 0x43f6a0
-void PauseMenu::leave_state_1()
+void PauseMenu::leave_paused()
 {
     if (g_GameThread->replay_mode == 0)
     {
@@ -664,30 +677,30 @@ void PauseMenu::leave_state_1()
     {
         vm->show_tree_inline();
     }
-    g_unk_4d9d90 = saved_global_4d9d90;
+    g_frame_pacing.mode = saved_pacing_mode;
 }
 
 // FUNCTION: TH16 0x43f740
-void PauseMenu::leave_state_2()
+void PauseMenu::leave_game_over()
 {
     if (g_GameThread->replay_mode == 0)
     {
         g_play_time_runtime = get_runtime();
     }
-    AnmManager::interrupt_tree(anm_id_1e8, 1);
-    AnmManager::interrupt_tree(anm_id_1e4, 1);
+    AnmManager::interrupt_tree(snapshot_id, 1);
+    AnmManager::interrupt_tree(menu_anm_id, 1);
     g_game_speed = saved_game_speed;
 }
 
 // FUNCTION: TH16 0x43f790
-void PauseMenu::leave_state_3()
+void PauseMenu::leave_stage_end()
 {
     if (g_GameThread->replay_mode == 0)
     {
         g_play_time_runtime = get_runtime();
     }
-    AnmManager::interrupt_tree(anm_id_1e8, 1);
-    AnmManager::interrupt_tree(anm_id_1e4, 1);
+    AnmManager::interrupt_tree(snapshot_id, 1);
+    AnmManager::interrupt_tree(menu_anm_id, 1);
     g_game_speed = saved_game_speed;
 }
 
@@ -723,54 +736,54 @@ void PauseMenu::tick_open()
 {
     char path[0x40];
 
-    switch (unk_1f4)
+    switch (substate)
     {
-    case 0:
+    case PAUSE_SUB_OPEN_PAUSE:
         // The pause menu opens.
         if (time_in_current_menu.current < 10)
         {
             break;
         }
-        set_unk_1f4(6);
-        menu_34.num_choices = 5;
+        set_substate(PAUSE_SUB_CHOOSE);
+        item_menu.num_choices = PAUSE_ITEM_COUNT;
         if (g_GameThread->replay_mode != 0)
         {
-            menu_34.disable(2);
-            menu_34.disable(3);
+            item_menu.disable(PAUSE_ITEM_SAVE_REPLAY);
+            item_menu.disable(PAUSE_ITEM_MANUAL);
         }
         if (g_Globals.continues_used > 0)
         {
-            menu_34.disable(2);
-            AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 7));
-            AnmManager::interrupt_tree(anm_id_1e4.search_children(0x82, 0), 5);
-            AnmManager::interrupt_tree(anm_id_1e4.search_children(0x8b, 0), 5);
-            AnmManager::interrupt_tree(anm_id_1e4.search_children(0x97, 0), 5);
+            item_menu.disable(PAUSE_ITEM_SAVE_REPLAY);
+            AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
+            AnmManager::interrupt_tree(menu_anm_id.search_children(0x82, 0), 5);
+            AnmManager::interrupt_tree(menu_anm_id.search_children(0x8b, 0), 5);
+            AnmManager::interrupt_tree(menu_anm_id.search_children(0x97, 0), 5);
         }
-        menu_34.wraps = 1;
-        menu_34.set_cursor(0);
-        AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 7));
-        unk_204 = 0;
+        item_menu.wraps = 1;
+        item_menu.set_cursor(PAUSE_ITEM_RESUME);
+        AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
+        replay_ended = 0;
         return;
-    case 1:
+    case PAUSE_SUB_OPEN_REPLAY_END:
         // The menu shown when a replay ends opens.
         if (time_in_current_menu.current < 10)
         {
             break;
         }
-        set_unk_1f4(6);
-        menu_34.num_choices = 5;
-        menu_34.disable(3);
-        menu_34.disable(2);
-        menu_34.disable(0);
-        menu_34.wraps = 1;
-        menu_34.set_cursor(1);
-        AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 7));
-        unk_204 = 1;
+        set_substate(PAUSE_SUB_CHOOSE);
+        item_menu.num_choices = PAUSE_ITEM_COUNT;
+        item_menu.disable(PAUSE_ITEM_MANUAL);
+        item_menu.disable(PAUSE_ITEM_SAVE_REPLAY);
+        item_menu.disable(PAUSE_ITEM_RESUME);
+        item_menu.wraps = 1;
+        item_menu.set_cursor(PAUSE_ITEM_QUIT);
+        AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
+        replay_ended = 1;
         return;
-    case 2:
-    case 3:
-    case 4:
-    case 5:
+    case PAUSE_SUB_OPEN_GAME_OVER:
+    case PAUSE_SUB_OPEN_STAGE_END:
+    case PAUSE_SUB_OPEN_4:
+    case PAUSE_SUB_OPEN_SPELL_PRACTICE_END:
         // The game ended: the score goes into the table first.
         if (time_in_current_menu.current < 10)
         {
@@ -785,100 +798,100 @@ void PauseMenu::tick_open()
             }
         }
         begin_score_entry();
-        if (unk_200 != 0)
+        if (score_not_ranked != 0)
         {
             // No name to enter.
             goto score_entered;
         }
-        set_unk_1f4(15);
-        anm_id_1e4.hide_tree();
+        set_substate(PAUSE_SUB_SCORE_NAME_ENTRY);
+        menu_anm_id.hide_tree();
         return;
-    case 6:
+    case PAUSE_SUB_CHOOSE:
         // The menu itself.
-        menu_save_selection(&menu_34);
+        menu_save_selection(&item_menu);
         if (input_pressed_or_repeating(INPUT_UP))
         {
-            menu_34.move_cursor(-1);
+            item_menu.move_cursor(-1);
         }
         if (input_pressed_or_repeating(INPUT_DOWN))
         {
-            menu_34.move_cursor(1);
+            item_menu.move_cursor(1);
         }
-        if (menu_selection_moved(&menu_34))
+        if (menu_selection_moved(&item_menu))
         {
-            AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 7));
-            g_SoundManager.play_sound_centered(10, 0);
+            AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
         {
-            g_SoundManager.play_sound_centered(7, 0);
-            switch (menu_34.next_selection)
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
+            switch (item_menu.next_selection)
             {
-            case 0:
-                AnmManager::interrupt_tree(anm_id_1e8, 1);
-                AnmManager::interrupt_tree(anm_id_1e4, 1);
-                set_unk_1f4(16);
+            case PAUSE_ITEM_RESUME:
+                AnmManager::interrupt_tree(snapshot_id, 1);
+                AnmManager::interrupt_tree(menu_anm_id, 1);
+                set_substate(PAUSE_SUB_CLOSE);
                 break;
-            case 1:
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x81, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x8a, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x92, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x94, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x96, 0), 6);
-                if (g_GameThread->replay_mode == 0 && state == 1)
+            case PAUSE_ITEM_QUIT:
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x81, 0), 6);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x8a, 0), 6);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x92, 0), 6);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x94, 0), 6);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x96, 0), 6);
+                if (g_GameThread->replay_mode == 0 && state == PAUSE_PAUSED)
                 {
-                    set_unk_1f4(7);
+                    set_substate(PAUSE_SUB_CONFIRM);
                 }
                 else
                 {
-                    set_unk_1f4(16);
+                    set_substate(PAUSE_SUB_CLOSE);
                 }
                 break;
-            case 2:
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x82, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x8b, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x97, 0), 6);
-                if (state == 1)
+            case PAUSE_ITEM_SAVE_REPLAY:
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x82, 0), 6);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x8b, 0), 6);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x97, 0), 6);
+                if (state == PAUSE_PAUSED)
                 {
-                    set_unk_1f4(9);
+                    set_substate(PAUSE_SUB_CONFIRM_SAVE);
                 }
                 else
                 {
-                    set_unk_1f4(10);
+                    set_substate(PAUSE_SUB_OPEN_REPLAY_SLOTS);
                 }
                 break;
-            case 3:
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x83, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x8c, 0), 6);
-                set_unk_1f4(14);
+            case PAUSE_ITEM_MANUAL:
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x83, 0), 6);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x8c, 0), 6);
+                set_substate(PAUSE_SUB_MANUAL);
                 break;
-            case 4:
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x84, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x8d, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x93, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x95, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x98, 0), 6);
-                if (g_GameThread->replay_mode == 0 && state == 1)
+            case PAUSE_ITEM_RESTART:
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x84, 0), 6);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x8d, 0), 6);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x93, 0), 6);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x95, 0), 6);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x98, 0), 6);
+                if (g_GameThread->replay_mode == 0 && state == PAUSE_PAUSED)
                 {
-                    set_unk_1f4(7);
+                    set_substate(PAUSE_SUB_CONFIRM);
                 }
                 else
                 {
-                    set_unk_1f4(16);
+                    set_substate(PAUSE_SUB_CLOSE);
                 }
                 break;
             }
             time_in_current_menu.set_value(0);
         }
-        if (unk_204 == 0)
+        if (replay_ended == 0)
         {
             if (g_hardware_input_pressed & INPUT_R)
             {
-                g_SoundManager.play_sound_centered(7, 0);
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x84, 0), 6);
-                AnmManager::interrupt_tree(anm_id_1e8, 1);
-                menu_34.set_cursor(4);
-                set_unk_1f4(16);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x84, 0), 6);
+                AnmManager::interrupt_tree(snapshot_id, 1);
+                item_menu.set_cursor(PAUSE_ITEM_RESTART);
+                set_substate(PAUSE_SUB_CLOSE);
             }
             if (g_hardware_input_pressed & INPUT_MENU)
             {
@@ -887,26 +900,27 @@ void PauseMenu::tick_open()
         }
         if (g_hardware_input_pressed & INPUT_Q)
         {
-            g_SoundManager.play_sound_centered(7, 0);
-            AnmManager::interrupt_tree(anm_id_1e4.search_children(0x81, 0), 6);
-            menu_34.set_cursor(1);
-            set_unk_1f4(16);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
+            AnmManager::interrupt_tree(menu_anm_id.search_children(0x81, 0), 6);
+            item_menu.set_cursor(PAUSE_ITEM_QUIT);
+            set_substate(PAUSE_SUB_CLOSE);
         }
         break;
-    case 7:
-    case 9:
-        // "Really?" for quitting (7) or retrying (9).
+    case PAUSE_SUB_CONFIRM:
+    case PAUSE_SUB_CONFIRM_SAVE:
+        // "Really?" before quitting or restarting, or before saving the
+        // replay (which ends the game). The cursor starts on "no" (1).
         if (time_in_current_menu.current < 20)
         {
             break;
         }
         if (time_in_current_menu.current == 20)
         {
-            menu_34.push();
-            menu_34.num_choices = 2;
-            menu_34.wraps = 1;
-            menu_34.set_cursor(1);
-            AnmManager::interrupt_tree(anm_id_1e4, 14);
+            item_menu.push();
+            item_menu.num_choices = 2;
+            item_menu.wraps = 1;
+            item_menu.set_cursor(1);
+            AnmManager::interrupt_tree(menu_anm_id, 14);
         }
         if (time_in_current_menu.current < 30)
         {
@@ -914,162 +928,162 @@ void PauseMenu::tick_open()
         }
         if (time_in_current_menu.current == 30)
         {
-            AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 15));
+            AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 15));
         }
-        menu_save_selection(&menu_34);
+        menu_save_selection(&item_menu);
         if (input_pressed_or_repeating(INPUT_UP))
         {
-            menu_34.move_cursor(-1);
+            item_menu.move_cursor(-1);
         }
         if (input_pressed_or_repeating(INPUT_DOWN))
         {
-            menu_34.move_cursor(1);
+            item_menu.move_cursor(1);
         }
-        if (menu_selection_moved(&menu_34))
+        if (menu_selection_moved(&item_menu))
         {
-            AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 15));
-            g_SoundManager.play_sound_centered(10, 0);
+            AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 15));
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
         {
-            switch (menu_34.next_selection)
+            switch (item_menu.next_selection)
             {
             case 0:
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x9a, 0), 6);
-                if (unk_1f4 == 9)
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x9a, 0), 6);
+                if (substate == PAUSE_SUB_CONFIRM_SAVE)
                 {
-                    set_unk_1f4(10);
+                    set_substate(PAUSE_SUB_OPEN_REPLAY_SLOTS);
                 }
                 else
                 {
-                    set_unk_1f4(8);
+                    set_substate(PAUSE_SUB_CONFIRM_CLOSE);
                 }
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 break;
             case 1:
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x9b, 0), 6);
-                set_unk_1f4(8);
-                g_SoundManager.play_sound_centered(9, 0);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x9b, 0), 6);
+                set_substate(PAUSE_SUB_CONFIRM_CLOSE);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 break;
             }
         }
         if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
         {
-            g_SoundManager.play_sound_centered(9, 0);
-            switch (menu_34.next_selection)
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
+            switch (item_menu.next_selection)
             {
             case 0:
-                menu_34.set_cursor(1);
-                AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 15));
+                item_menu.set_cursor(1);
+                AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 15));
                 break;
             case 1:
-                AnmManager::interrupt_tree(anm_id_1e4.search_children(0x9b, 0), 6);
-                set_unk_1f4(8);
+                AnmManager::interrupt_tree(menu_anm_id.search_children(0x9b, 0), 6);
+                set_substate(PAUSE_SUB_CONFIRM_CLOSE);
                 break;
             }
         }
         if (g_hardware_input_pressed & INPUT_MENU)
         {
         resume:
-            AnmManager::interrupt_tree(anm_id_1e8, 1);
-            AnmManager::interrupt_tree(anm_id_1e4, 1);
-            menu_34.set_cursor(0);
-            set_unk_1f4(16);
+            AnmManager::interrupt_tree(snapshot_id, 1);
+            AnmManager::interrupt_tree(menu_anm_id, 1);
+            item_menu.set_cursor(PAUSE_ITEM_RESUME);
+            set_substate(PAUSE_SUB_CLOSE);
             return;
         }
         break;
-    case 8:
+    case PAUSE_SUB_CONFIRM_CLOSE:
         // Leaving the "Really?" question.
         if (time_in_current_menu.current < 20)
         {
             break;
         }
-        switch (menu_34.next_selection)
+        switch (item_menu.next_selection)
         {
         case 0:
-            AnmManager::interrupt_tree(anm_id_1e4, 1);
-            menu_34.pop();
-            set_unk_1f4(16);
+            AnmManager::interrupt_tree(menu_anm_id, 1);
+            item_menu.pop();
+            set_substate(PAUSE_SUB_CLOSE);
             return;
         case 1:
-            menu_34.pop();
+            item_menu.pop();
             if (g_Globals.continues_used > 0)
             {
-                menu_34.disable(2);
+                item_menu.disable(PAUSE_ITEM_SAVE_REPLAY);
             }
-            AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 7));
-            set_unk_1f4(6);
+            AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
+            set_substate(PAUSE_SUB_CHOOSE);
             return;
         }
         break;
-    case 10:
+    case PAUSE_SUB_OPEN_REPLAY_SLOTS:
         // Opening the replay slots.
         if (time_in_current_menu.current < 20)
         {
             break;
         }
-        flags_3ec &= ~2;
-        flags_3ec |= 1;
-        set_unk_1f4(11);
-        anm_id_1e4.hide_tree();
-        menu_34.push();
-        menu_34.num_choices = 25;
-        menu_34.wraps = 1;
-        menu_34.set_cursor(0);
-        for (i32 i = 1; i <= 25; i++)
+        menu_flags &= ~PAUSE_SHOW_REPLAY_NAME;
+        menu_flags |= PAUSE_SHOW_REPLAY_SLOTS;
+        set_substate(PAUSE_SUB_REPLAY_SLOT_SELECT);
+        menu_anm_id.hide_tree();
+        item_menu.push();
+        item_menu.num_choices = REPLAY_SLOTS;
+        item_menu.wraps = 1;
+        item_menu.set_cursor(0);
+        for (i32 i = 1; i <= REPLAY_SLOTS; i++)
         {
             sprintf(path, "th16_%.2d.rpy", i);
             replays[i - 1] = ReplayManager::create_from_file(path);
         }
         return;
-    case 12:
-    case 15:
-        // Entering the replay name (12) or the score name (15).
+    case PAUSE_SUB_REPLAY_NAME_ENTRY:
+    case PAUSE_SUB_SCORE_NAME_ENTRY:
+        // Entering the replay name or the score name.
         if (time_in_current_menu.current < 10)
         {
             break;
         }
-        menu_save_selection(&menu);
+        menu_save_selection(&name_entry_menu);
         if (input_pressed_or_repeating(INPUT_UP))
         {
-            menu.move_cursor(-13);
+            name_entry_menu.move_cursor(-NAME_ENTRY_COLUMNS);
         }
         if (input_pressed_or_repeating(INPUT_DOWN))
         {
-            menu.move_cursor(13);
+            name_entry_menu.move_cursor(NAME_ENTRY_COLUMNS);
         }
         if (input_pressed_or_repeating(INPUT_LEFT))
         {
-            i32 selection = menu.next_selection;
-            if (selection % 13 != 0)
+            i32 selection = name_entry_menu.next_selection;
+            if (selection % NAME_ENTRY_COLUMNS != 0)
             {
-                menu.move_cursor(-1);
+                name_entry_menu.move_cursor(-1);
             }
             else
             {
-                menu.move_cursor(12);
+                name_entry_menu.move_cursor(NAME_ENTRY_COLUMNS - 1);
             }
         }
         if (input_pressed_or_repeating(INPUT_RIGHT))
         {
-            i32 selection = menu.next_selection;
-            if (selection % 13 != 12)
+            i32 selection = name_entry_menu.next_selection;
+            if (selection % NAME_ENTRY_COLUMNS != NAME_ENTRY_COLUMNS - 1)
             {
-                menu.move_cursor(1);
+                name_entry_menu.move_cursor(1);
             }
             else
             {
-                menu.move_cursor(-12);
+                name_entry_menu.move_cursor(-(NAME_ENTRY_COLUMNS - 1));
             }
         }
-        if (menu_selection_moved(&menu))
+        if (menu_selection_moved(&name_entry_menu))
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
         {
-            i32 choice = menu.next_selection;
-            if (choice < 0x58)
+            i32 choice = name_entry_menu.next_selection;
+            if (choice < NAME_ENTRY_CHAR_COUNT)
             {
                 if (name_cursor < 8)
                 {
@@ -1077,7 +1091,7 @@ void PauseMenu::tick_open()
                     name_cursor++;
                     if (name_cursor >= 8)
                     {
-                        menu.set_cursor(0x5a);
+                        name_entry_menu.set_cursor(NAME_ENTRY_END);
                     }
                 }
                 else
@@ -1085,7 +1099,7 @@ void PauseMenu::tick_open()
                     name[name_cursor - 1] = g_name_entry_chars[choice];
                 }
             }
-            else if (choice == 0x58)
+            else if (choice == NAME_ENTRY_SPACE)
             {
                 if (name_cursor < 8)
                 {
@@ -1093,7 +1107,7 @@ void PauseMenu::tick_open()
                     name_cursor++;
                     if (name_cursor >= 8)
                     {
-                        menu.set_cursor(0x5a);
+                        name_entry_menu.set_cursor(NAME_ENTRY_END);
                     }
                 }
                 else
@@ -1101,7 +1115,7 @@ void PauseMenu::tick_open()
                     name[name_cursor - 1] = ' ';
                 }
             }
-            else if (choice == 0x59)
+            else if (choice == NAME_ENTRY_BACKSPACE)
             {
                 if (name_cursor == 0)
                 {
@@ -1109,81 +1123,81 @@ void PauseMenu::tick_open()
                 }
                 name_cursor--;
                 name[name_cursor] = ' ';
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 return;
             }
-            else if (choice == 0x5a)
+            else if (choice == NAME_ENTRY_END)
             {
-                if (unk_1f4 == 12)
+                if (substate == PAUSE_SUB_REPLAY_NAME_ENTRY)
                 {
-                    flags_3ec &= ~2;
-                    flags_3ec |= 1;
-                    g_SoundManager.play_sound_centered(0x11, 0);
-                    sprintf(path, "th16_%.2d.rpy", menu_34.next_selection + 1);
-                    ReplayManager::destroy(replays[menu_34.next_selection]);
+                    menu_flags &= ~PAUSE_SHOW_REPLAY_NAME;
+                    menu_flags |= PAUSE_SHOW_REPLAY_SLOTS;
+                    g_SoundManager.play_sound_centered(SE_EXTEND, 0);
+                    sprintf(path, "th16_%.2d.rpy", item_menu.next_selection + 1);
+                    ReplayManager::destroy(replays[item_menu.next_selection]);
                     g_ReplayManager->save(path, name, 0, 1);
-                    replays[menu_34.next_selection] = ReplayManager::create_from_file(path);
-                    set_unk_1f4(11);
+                    replays[item_menu.next_selection] = ReplayManager::create_from_file(path);
+                    set_substate(PAUSE_SUB_REPLAY_SLOT_SELECT);
                     strcpy(g_Scorefile->last_replay_name, name);
-                    g_SoundManager.play_sound_centered(7, 0);
+                    g_SoundManager.play_sound_centered(SE_OK00, 0);
                     return;
                 }
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 strcpy(((ScorefileData *)g_Scorefile)
                            ->charas[g_Globals.subshot + g_Globals.character]
-                           .scores[g_Globals.difficulty][menu_34.next_selection]
+                           .scores[g_Globals.difficulty][item_menu.next_selection]
                            .name,
                        name);
                 strcpy(g_Scorefile->last_replay_name, name);
             score_entered:
-                set_unk_1f4(6);
-                menu_34.num_choices = 5;
-                menu_34.wraps = 1;
-                if (!(flags_3ec & 4) && g_Globals.game_mode == GAME_MODE_NORMAL)
+                set_substate(PAUSE_SUB_CHOOSE);
+                item_menu.num_choices = PAUSE_ITEM_COUNT;
+                item_menu.wraps = 1;
+                if (!(menu_flags & PAUSE_FROM_STAGE_END) && g_Globals.game_mode == GAME_MODE_NORMAL)
                 {
-                    anm_id_1e4 = front_anm->create_ui_vm_at_origin(0xa0, 0);
+                    menu_anm_id = front_anm->create_ui_vm_at_origin(PAUSE_SCRIPT_GAME_OVER_MENU, 0);
                     if (g_Globals.continues_used > 0)
                     {
-                        menu_34.disable(2);
+                        item_menu.disable(PAUSE_ITEM_SAVE_REPLAY);
                     }
                     if (g_continues_remaining <= 0)
                     {
-                        menu_34.disable(0);
-                        menu_34.set_cursor(1);
+                        item_menu.disable(PAUSE_ITEM_RESUME);
+                        item_menu.set_cursor(PAUSE_ITEM_QUIT);
                     }
                     else
                     {
-                        menu_34.set_cursor(0);
+                        item_menu.set_cursor(PAUSE_ITEM_RESUME);
                     }
                 }
                 else
                 {
-                    anm_id_1e4 = front_anm->create_ui_vm_at_origin(0xa1, 0);
-                    menu_34.disable(0);
-                    menu_34.disable(3);
-                    menu_34.set_cursor(0);
-                    if (!(flags_3ec & 4))
+                    menu_anm_id = front_anm->create_ui_vm_at_origin(PAUSE_SCRIPT_PRACTICE_END_MENU, 0);
+                    item_menu.disable(PAUSE_ITEM_RESUME);
+                    item_menu.disable(PAUSE_ITEM_MANUAL);
+                    item_menu.set_cursor(PAUSE_ITEM_RESUME);
+                    if (!(menu_flags & PAUSE_FROM_STAGE_END))
                     {
-                        menu_34.set_cursor(4);
+                        item_menu.set_cursor(PAUSE_ITEM_RESTART);
                     }
                 }
-                AnmManager::interrupt_tree_and_run(anm_id_1e4, 3);
-                AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 7));
+                AnmManager::interrupt_tree_and_run(menu_anm_id, 3);
+                AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
                 return;
             }
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             return;
         }
         if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
         {
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             if (name_cursor == 0)
             {
-                if (unk_1f4 == 12)
+                if (substate == PAUSE_SUB_REPLAY_NAME_ENTRY)
                 {
-                    flags_3ec &= ~2;
-                    flags_3ec |= 1;
-                    set_unk_1f4(11);
+                    menu_flags &= ~PAUSE_SHOW_REPLAY_NAME;
+                    menu_flags |= PAUSE_SHOW_REPLAY_SLOTS;
+                    set_substate(PAUSE_SUB_REPLAY_SLOT_SELECT);
                     return;
                 }
                 break;
@@ -1193,34 +1207,34 @@ void PauseMenu::tick_open()
             return;
         }
         break;
-    case 11:
+    case PAUSE_SUB_REPLAY_SLOT_SELECT:
         // Choosing the replay slot.
         if (time_in_current_menu.current < 10)
         {
             break;
         }
-        menu_save_selection(&menu_34);
+        menu_save_selection(&item_menu);
         if (input_pressed_or_repeating(INPUT_UP))
         {
-            menu_34.move_cursor(-1);
+            item_menu.move_cursor(-1);
         }
         if (input_pressed_or_repeating(INPUT_DOWN))
         {
-            menu_34.move_cursor(1);
+            item_menu.move_cursor(1);
         }
-        if (menu_selection_moved(&menu_34))
+        if (menu_selection_moved(&item_menu))
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
         {
-            flags_3ec &= ~1;
-            flags_3ec |= 2;
-            set_unk_1f4(12);
-            menu.set_cursor(0);
-            menu.num_choices = 0x5b;
-            menu.wraps = 1;
-            if (unk_1fc != 0 && g_Globals.game_mode == GAME_MODE_NORMAL)
+            menu_flags &= ~PAUSE_SHOW_REPLAY_SLOTS;
+            menu_flags |= PAUSE_SHOW_REPLAY_NAME;
+            set_substate(PAUSE_SUB_REPLAY_NAME_ENTRY);
+            name_entry_menu.set_cursor(0);
+            name_entry_menu.num_choices = NAME_ENTRY_CHOICES;
+            name_entry_menu.wraps = 1;
+            if (stage_finished != 0 && g_Globals.game_mode == GAME_MODE_NORMAL)
             {
                 g_ReplayManager->set_end_stage(1);
             }
@@ -1232,7 +1246,7 @@ void PauseMenu::tick_open()
             name_cursor = 0;
             if (strcmp(name, "        ") != 0)
             {
-                menu.move_cursor(-1);
+                name_entry_menu.move_cursor(-1);
             }
             i32 i;
             for (i = 8; i > 0; i--)
@@ -1243,90 +1257,90 @@ void PauseMenu::tick_open()
                 }
             }
             name_cursor = i;
-            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(SE_OK00, 0);
             return;
         }
         if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
         {
-            flags_3ec &= ~3;
-            menu_34.pop();
-            menu_34.num_choices = 5;
-            menu_34.wraps = 1;
-            AnmManager::interrupt_tree(anm_id_1e4, (i16)(menu_34.next_selection + 7));
-            for (i32 i = 0; i < 25; i++)
+            menu_flags &= ~(PAUSE_SHOW_REPLAY_SLOTS | PAUSE_SHOW_REPLAY_NAME);
+            item_menu.pop();
+            item_menu.num_choices = PAUSE_ITEM_COUNT;
+            item_menu.wraps = 1;
+            AnmManager::interrupt_tree(menu_anm_id, (i16)(item_menu.next_selection + 7));
+            for (i32 i = 0; i < REPLAY_SLOTS; i++)
             {
                 ReplayManager::destroy(replays[i]);
                 replays[i] = NULL;
             }
-            if (state == 1)
+            if (state == PAUSE_PAUSED)
             {
-                set_unk_1f4(16);
-                menu_34.set_cursor(1);
-                g_SoundManager.play_sound_centered(9, 0);
+                set_substate(PAUSE_SUB_CLOSE);
+                item_menu.set_cursor(PAUSE_ITEM_QUIT);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 return;
             }
-            set_unk_1f4(6);
-            anm_id_1e4.show_tree();
+            set_substate(PAUSE_SUB_CHOOSE);
+            menu_anm_id.show_tree();
             if (g_Globals.game_mode != GAME_MODE_NORMAL)
             {
-                menu_34.disable(0);
-                menu_34.disable(3);
+                item_menu.disable(PAUSE_ITEM_RESUME);
+                item_menu.disable(PAUSE_ITEM_MANUAL);
             }
-            g_SoundManager.play_sound_centered(9, 0);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             return;
         }
         break;
-    case 14:
+    case PAUSE_SUB_MANUAL:
         // The manual.
         if (time_in_current_menu.current == 20)
         {
-            anm_id_1e4.hide_tree();
+            menu_anm_id.hide_tree();
             HelpManual::create();
             g_HelpManual->x_offset = 32.0f;
         }
         if (g_HelpManual != NULL && g_HelpManual->closed != 0)
         {
             HelpManual::destroy();
-            set_unk_1f4(6);
-            anm_id_1e4.show_tree();
+            set_substate(PAUSE_SUB_CHOOSE);
+            menu_anm_id.show_tree();
             return;
         }
         break;
-    case 16:
+    case PAUSE_SUB_CLOSE:
         // Leaving the menu: resume, retry, quit or continue.
         if (time_in_current_menu.current < 12)
         {
             break;
         }
-        if (state == 1)
+        if (state == PAUSE_PAUSED)
         {
-            leave_state_1();
+            leave_paused();
         }
-        else if (state == 2)
+        else if (state == PAUSE_GAME_OVER)
         {
-            leave_state_2();
+            leave_game_over();
         }
-        else if (state == 3)
+        else if (state == PAUSE_STAGE_END)
         {
-            leave_state_3();
+            leave_stage_end();
         }
-        switch (menu_34.next_selection)
+        switch (item_menu.next_selection)
         {
-        case 0:
-            if (state == 1)
+        case PAUSE_ITEM_RESUME:
+            if (state == PAUSE_PAUSED)
             {
                 SoundManager::resume_sounds();
-                g_SoundManager.modify_bgm(7, 0, "UnPause");
+                g_SoundManager.modify_bgm(BGM_UNPAUSE, 0, "UnPause");
             }
-            else if (state == 2)
+            else if (state == PAUSE_GAME_OVER)
             {
-                if (unk_1fc != 0)
+                if (stage_finished != 0)
                 {
-                    g_Supervisor.gamemode_to_switch_to = 10;
+                    g_Supervisor.gamemode_to_switch_to = GAMEMODE_RESTART;
                 }
                 else if (g_Globals.stage_num == 7)
                 {
-                    g_Supervisor.gamemode_to_switch_to = 14;
+                    g_Supervisor.gamemode_to_switch_to = GAMEMODE_RETRY_STAGE;
                 }
                 else
                 {
@@ -1361,7 +1375,7 @@ void PauseMenu::tick_open()
                     g_continues_remaining--;
                     g_GameThread->flags.in_menu = 0;
                     SoundManager::resume_sounds();
-                    g_SoundManager.modify_bgm(2, -1, saved_bgm_name);
+                    g_SoundManager.modify_bgm(BGM_PLAY, -1, saved_bgm_name);
                     while (SoundManager::update_sound_thread() != 0)
                     {
                     }
@@ -1373,22 +1387,24 @@ void PauseMenu::tick_open()
                         gui->msg->show();
                     }
                     Gui::show_chapter_result_vm();
-                    g_unk_4d9d90 = saved_global_4d9d90;
+                    g_frame_pacing.mode = saved_pacing_mode;
                 }
             }
             break;
-        case 1:
-            AnmManager::interrupt_tree(anm_id_1e8, 1);
-            AnmManager::interrupt_tree(anm_id_1e4, 1);
-            g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
+        case PAUSE_ITEM_QUIT:
+            AnmManager::interrupt_tree(snapshot_id, 1);
+            AnmManager::interrupt_tree(menu_anm_id, 1);
+            g_Supervisor.gamemode_to_switch_to =
+                (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
             break;
-        case 4:
-            delete_vm_and_clear(anm_id_1e8);
-            delete_vm_and_clear(anm_id_1e4);
-            g_Supervisor.gamemode_to_switch_to = g_GameThread->replay_mode != 0 ? 11 : 10;
+        case PAUSE_ITEM_RESTART:
+            delete_vm_and_clear(snapshot_id);
+            delete_vm_and_clear(menu_anm_id);
+            g_Supervisor.gamemode_to_switch_to =
+                g_GameThread->replay_mode != 0 ? GAMEMODE_RESTART_REPLAY : GAMEMODE_RESTART;
             break;
         }
-        set_state(0);
+        set_state(PAUSE_CLOSED);
         break;
     }
 }

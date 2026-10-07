@@ -86,11 +86,11 @@ i32 __fastcall ScreenEffect::on_draw_viewport(ScreenEffect *self)
     ZunRect rect = {0.0f, 0.0f, (f32)g_resolution_x, (f32)g_resolution_y};
 
     g_AnmManager->flush_sprites();
-    g_Supervisor.viewport_dc.X = 0;
-    g_Supervisor.viewport_dc.Y = 0;
-    g_Supervisor.viewport_dc.Width = g_resolution_x;
-    g_Supervisor.viewport_dc.Height = g_resolution_y;
-    g_Supervisor.d3d_device->SetViewport(&g_Supervisor.viewport_dc);
+    g_Supervisor.full_window_viewport.X = 0;
+    g_Supervisor.full_window_viewport.Y = 0;
+    g_Supervisor.full_window_viewport.Width = g_resolution_x;
+    g_Supervisor.full_window_viewport.Height = g_resolution_y;
+    g_Supervisor.d3d_device->SetViewport(&g_Supervisor.full_window_viewport);
     screen_effect_draw_rect(&rect, (self->alpha << 24) | self->arg_1c);
     return UPDATE_FUNC_CONTINUE;
 }

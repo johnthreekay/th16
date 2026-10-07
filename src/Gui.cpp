@@ -680,7 +680,7 @@ HARNESS_CALLED i32 GuiMsgVm::run()
             }
             else
             {
-                g_SoundManager.play_sound_centered(0, 0);
+                g_SoundManager.play_sound_centered(SE_PLST00, 0);
             }
             pause_timer.set_value(0);
             next_text_line = 0;
@@ -1189,11 +1189,11 @@ HARNESS_CALLED void Gui::hide_stage_clear_bonus()
     notice_timer.reset();
 }
 
-// Not in game mode 8 or the demo.
+// Not in GAMEMODE_UNUSED_8 or the demo.
 // FUNCTION: TH16 0x42c240
 void show_stage_logo()
 {
-    if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY))
+    if (g_Supervisor.gamemode_to_switch_to != GAMEMODE_UNUSED_8 && !(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY))
     {
         g_Gui->stage_logo_anm->create_effect(LOGO_ANM_STAGE_TITLE, -1, NULL);
     }
@@ -1559,9 +1559,9 @@ void Gui::start_dialogue(i32 script)
             }
         }
         i32 track = stage->music_ids[boss];
-        if (g_Supervisor.config.flags_2c & 0x10)
+        if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
         {
-            g_SoundManager.modify_bgm(BGM_STOP_4, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
         }
         g_SoundManager.modify_bgm(BGM_PLAY, boss, "dummy");
         g_Scorefile->bgm_unlocked[track] = 1;
@@ -1571,7 +1571,7 @@ void Gui::start_dialogue(i32 script)
     {
         if (g_Spellcard->flags & SPELLCARD_TIMED_OUT)
         {
-            pause_menu_43f350();
+            open_game_over_menu();
         }
         else
         {
@@ -1683,7 +1683,7 @@ void Gui::setup_stage_hud()
     gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
     gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
     // The stage theme's title.
-    if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY) &&
+    if (g_Supervisor.gamemode_to_switch_to != GAMEMODE_UNUSED_8 && !(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY) &&
         g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE)
     {
         create_effect_inline(gui->stage_logo_anm, LOGO_ANM_STAGE_THEME, -1, NULL);
@@ -1706,7 +1706,7 @@ void Gui::setup_stage_hud()
             vm->entity_pos = pos;
         }
     }
-    if (g_Supervisor.unk_700 != 0)
+    if (g_Supervisor.new_game_started != 0)
     {
         gui->id_104 = create_effect_inline(gui->front_anm, g_Globals.difficulty + FRONT_ANM_DIFFICULTY_2, -1, NULL);
         AnmManager::interrupt_tree(gui->id_104, 3);
@@ -1718,7 +1718,7 @@ void Gui::setup_stage_hud()
     {
         gui->boss_bars[i].vms_created = 0;
     }
-    if (g_Supervisor.unk_700 != 0)
+    if (g_Supervisor.new_game_started != 0)
     {
         gui->release_ready = 0;
         gui->season_gauge_id = create_effect_inline(gui->front_anm, FRONT_ANM_SEASON_GAUGE, -1, NULL);
@@ -1804,7 +1804,7 @@ i32 Gui::on_tick_body()
                 // A tick every 4 frames while counting, a chime at the end.
                 if (notice_timer.current % 4 == 0)
                 {
-                    g_SoundManager.play_sound_centered(0x27, 0);
+                    g_SoundManager.play_sound_centered(SE_KIRA01, 0);
                 }
                 chapter_percent -= 1.0f;
                 chapter_bonus += chapter_bonus_step;
@@ -1813,7 +1813,7 @@ i32 Gui::on_tick_body()
             {
                 if (notice_timer.current != 90)
                 {
-                    g_SoundManager.play_sound_centered(0x2f, 0);
+                    g_SoundManager.play_sound_centered(SE_BONUS, 0);
                 }
                 chapter_percent = chapter_percent_final;
                 chapter_bonus = chapter_bonus_final;
@@ -1903,13 +1903,13 @@ i32 Gui::on_tick_body()
             {
                 boss_timer_tens_vm->interrupt_out_of_line(9);
                 boss_timer_ones_vm->interrupt_out_of_line(9);
-                g_SoundManager.play_sound_centered(0xc, 0);
+                g_SoundManager.play_sound_centered(SE_TIMEOUT2, 0);
             }
             else if (boss_timer_seconds < 5)
             {
                 boss_timer_tens_vm->interrupt_out_of_line(8);
                 boss_timer_ones_vm->interrupt_out_of_line(8);
-                g_SoundManager.play_sound_centered(0xb, 0);
+                g_SoundManager.play_sound_centered(SE_TIMEOUT, 0);
             }
         }
         else if (boss_timer_seconds > boss_timer_shown_seconds)

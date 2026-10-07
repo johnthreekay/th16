@@ -60,7 +60,7 @@ i32 BombAllSubInf::begin()
     Player *player = g_Player;
     pos = player->inner.pos;
     angle = -ZUN_PI / 2;
-    g_SoundManager.play_sound_centered(74, 0);
+    g_SoundManager.play_sound_centered(SE_BONUS4, 0);
 
     anm_id = player->subseason_anm_file->create_vm(RELEASE_SCRIPT, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm_or_clear(anm_id);
@@ -135,7 +135,7 @@ i32 BombAyaSubInf::begin()
     Player *player = g_Player;
     pos = player->inner.pos;
     angle = -ZUN_PI / 2;
-    g_SoundManager.play_sound_centered(74, 0);
+    g_SoundManager.play_sound_centered(SE_BONUS4, 0);
 
     anm_id = player->subseason_anm_file->create_vm(RELEASE_SCRIPT, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm_or_clear(anm_id);
@@ -217,7 +217,7 @@ i32 BombCirnoSubInf::begin()
     Player *player = g_Player;
     pos = player->inner.pos;
     angle = -ZUN_PI / 2;
-    g_SoundManager.play_sound_centered(74, 0);
+    g_SoundManager.play_sound_centered(SE_BONUS4, 0);
 
     anm_id = player->subseason_anm_file->create_vm(RELEASE_SCRIPT, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm_or_clear(anm_id);
@@ -291,7 +291,7 @@ i32 BombMarisaSubInf::begin()
     Player *player = g_Player;
     pos = player->inner.pos;
     angle = -ZUN_PI / 2;
-    g_SoundManager.play_sound_centered(74, 0);
+    g_SoundManager.play_sound_centered(SE_BONUS4, 0);
 
     anm_id = player->subseason_anm_file->create_vm(WINTER_RELEASE_SCRIPT, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm_or_clear(anm_id);
@@ -369,7 +369,7 @@ i32 BombReimuSubInf::begin()
     Player *player = g_Player;
     pos = player->inner.pos;
     angle = -ZUN_PI / 2;
-    g_SoundManager.play_sound_centered(74, 0);
+    g_SoundManager.play_sound_centered(SE_BONUS4, 0);
 
     anm_id = player->subseason_anm_file->create_vm(RELEASE_SCRIPT, &pos, 0.0f, -1, 0);
     AnmVm *vm = get_vm_or_clear(anm_id);

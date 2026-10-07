@@ -166,7 +166,7 @@ static_assert(offsetof(PopupManager, strings) == 0x614, "PopupManager::strings")
 // FUNCTION: TH16 0x44a000
 int PopupManager::on_draw()
 {
-    if (!(g_Supervisor.config.flags_2c & 4))
+    if (!(g_Supervisor.config.flags & CONFIG_NO_FOG))
     {
         g_Supervisor.disable_d3d_fog_inline();
     }

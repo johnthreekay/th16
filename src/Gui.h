@@ -537,7 +537,7 @@ extern MsgFile *g_msg_file_cache;
 // What start_dialogue(-2) and MSG_STAGE_END end with: the pause menu's
 // game over state (0x43f350, in PauseMenu.cpp; ExpHP: sub_43f350_pause)
 // and the end of the stage (0x42e150, in GameThread.cpp).
-void pause_menu_43f350();
+void open_game_over_menu();
 i32 stage_clear();
 
 // ECL instruction 554: shows the stage logo.

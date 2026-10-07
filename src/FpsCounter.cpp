@@ -69,11 +69,11 @@ HARNESS_CALLED int FpsCounter::update()
 }
 
 // Draws the frame rate in the bottom right corner (red below 30, pink
-// below 40); not in the ending (game mode 15) or on the title (4).
+// below 40); not in GAMEMODE_ENDING or GAMEMODE_TITLE.
 // FUNCTION: TH16 0x4263e0
 int FpsCounter::draw()
 {
-    if (g_Supervisor.gamemode_to_switch_to == 15 || g_Supervisor.gamemode_to_switch_to == 4)
+    if (g_Supervisor.gamemode_to_switch_to == GAMEMODE_ENDING || g_Supervisor.gamemode_to_switch_to == GAMEMODE_TITLE)
     {
         return UPDATE_FUNC_CONTINUE;
     }

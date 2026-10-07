@@ -161,7 +161,7 @@ void Globals::collect_bomb(i32 unused)
     }
     else
     {
-        g_SoundManager.play_sound_centered(0x2e, 0);
+        g_SoundManager.play_sound_centered(SE_CARDGET_2, 0);
     }
     g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
 }
@@ -195,7 +195,7 @@ HARNESS_CALLED void Globals::add_to_score(i32 amount)
     {
         if (g_Globals.collect_extend(0))
         {
-            g_SoundManager.play_sound_centered(0x11, 0);
+            g_SoundManager.play_sound_centered(SE_EXTEND, 0);
             g_Gui->show_notice(0, GUI_NOTICE_EXTEND);
         }
         g_Globals.next_score_extend_index++;

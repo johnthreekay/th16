@@ -20,14 +20,14 @@ static_assert(offsetof(TitleInf, state) == 0x18, "TitleInf::state");
 static_assert(offsetof(TitleInf, menu) == 0x24, "TitleInf::menu");
 static_assert(offsetof(TitleInf, time_in_state) == 0x2ac, "TitleInf::time_in_state");
 static_assert(offsetof(TitleInf, anm_ids) == 0x2c0, "TitleInf::anm_ids");
-static_assert(offsetof(TitleInf, anm_id_73c) == 0x73c, "TitleInf::anm_id_73c");
+static_assert(offsetof(TitleInf, submenu_ascii_id) == 0x73c, "TitleInf::submenu_ascii_id");
 static_assert(offsetof(TitleInf, music_track_count) == 0x7f4, "TitleInf::music_track_count");
 static_assert(offsetof(TitleInf, music_filenames) == 0x804, "TitleInf::music_filenames");
 static_assert(offsetof(TitleInf, music_titles) == 0x1004, "TitleInf::music_titles");
 static_assert(offsetof(TitleInf, music_comments) == 0x1844, "TitleInf::music_comments");
 static_assert(offsetof(TitleInf, music_scroll) == 0x5a44, "TitleInf::music_scroll");
 static_assert(offsetof(TitleInf, replay_name) == 0x5a48, "TitleInf::replay_name");
-static_assert(offsetof(TitleInf, menu_5a5c) == 0x5a5c, "TitleInf::menu_5a5c");
+static_assert(offsetof(TitleInf, name_entry_menu) == 0x5a5c, "TitleInf::name_entry_menu");
 static_assert(offsetof(TitleInf, key_config) == 0x5b34, "TitleInf::key_config");
 static_assert(offsetof(TitleInf, unk_5b44) == 0x5b44, "TitleInf::unk_5b44");
 static_assert(offsetof(TitleInf, replay_slot) == 0x5b48, "TitleInf::replay_slot");
@@ -47,6 +47,7 @@ u32 TitleInf::get_size()
     return sizeof(TitleInf);
 }
 
+// Switches to another TitleState, back to its first substate.
 // FUNCTION: TH16 0x44a560
 void TitleInf::set_state(i32 state)
 {
@@ -56,6 +57,7 @@ void TitleInf::set_state(i32 state)
     time_in_state.reset();
 }
 
+// Moves to another step of the current screen.
 // The dead double is not ZUN's code but stands in for whatever double math
 // the optimizer removed from his body: LTCG's double stack alignment pass
 // sees it at the IL level, so every caller (exactly the menu states that
@@ -114,27 +116,34 @@ TitleInf::TitleInf()
     flags |= 2;
 }
 
+// The menu's setup thread: initializes the menu, waits for the loading
+// screen to have run for 3 seconds, then turns the menu's tick on. If setup
+// fails the game quits.
 // FUNCTION: TH16 0x44abc0
 unsigned __stdcall TitleInf::thread_start()
 {
     if (g_MainMenu->initialize() != 0)
     {
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 3;
+        g_Supervisor.gamemode_to_switch_to =
+            (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_QUIT;
         return 0;
     }
     if (g_LoadingThread != NULL)
     {
-        while (g_LoadingThread->draw_count < 180 && !(g_Supervisor.flags & 0x180))
+        while (g_LoadingThread->draw_count < 180 &&
+               !(g_Supervisor.flags & (SUPERVISOR_QUIT_REQUESTED | SUPERVISOR_FLAG_100)))
         {
             Sleep(16);
         }
         g_AnmManager->unload_anm(ANM_SLOT_SIG);
     }
     g_MainMenu->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
-    g_unk_4d9d90 = 1;
+    g_frame_pacing.mode = FRAME_PACING_MENU;
     return 0;
 }
 
+// Registers the tick (priority 6) and draw (0x45) callbacks, inactive for
+// now, and loads title.anm and title_v.anm.
 // FUNCTION: TH16 0x44ac70
 HARNESS_CALLED i32 TitleInf::initialize()
 {
@@ -170,6 +179,8 @@ HARNESS_CALLED i32 TitleInf::initialize()
     return 0;
 }
 
+// Waits for the menu's thread, unregisters the callbacks, unloads the
+// menu's ANM files and frees the replay list and musiccmt.txt.
 // FUNCTION: TH16 0x44ad20
 TitleInf::~TitleInf()
 {
@@ -182,11 +193,11 @@ TitleInf::~TitleInf()
     {
         delete replays[i];
     }
-    AnmManager::interrupt_tree(anm_id_73c, 1);
-    if (unk_5ce0 != NULL)
+    AnmManager::interrupt_tree(submenu_ascii_id, 1);
+    if (music_comment_file != NULL)
     {
-        free(unk_5ce0);
-        unk_5ce0 = NULL;
+        free(music_comment_file);
+        music_comment_file = NULL;
     }
     g_MainMenu = NULL;
 }
@@ -195,7 +206,7 @@ TitleInf::~TitleInf()
 TitleInf *TitleInf::create()
 {
     TitleInf *menu = new TitleInf;
-    g_unk_4d9d90 = 0;
+    g_frame_pacing.mode = FRAME_PACING_IDLE;
     menu->thread.restart((ThreadStart)thread_start, menu);
     return menu;
 }
@@ -216,23 +227,23 @@ i32 TitleInf::on_draw()
 {
     switch (state)
     {
-    case 11:
+    case TITLE_STATE_REPLAY_MENU:
         on_draw__replay();
         break;
-    case 10:
+    case TITLE_STATE_PLAYER_DATA:
         on_draw__player_data();
         break;
-    case 14:
-        on_draw__4538b0();
+    case TITLE_STATE_SCORE_NAME_ENTRY:
+        on_draw__score_name_entry();
         break;
-    case 15:
-        on_draw__4541b0();
+    case TITLE_STATE_REPLAY_SAVE:
+        on_draw__replay_save();
         break;
-    case 8:
+    case TITLE_STATE_PRACTICE_STAGE_SELECT:
         on_draw__practice_stage_select();
         break;
-    case 18:
-    case 19:
+    case TITLE_STATE_SPELL_PRACTICE_ROW_SELECT:
+    case TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT:
         on_draw__spell_practice_histories();
         break;
     }
@@ -264,7 +275,7 @@ i32 TitleInf::do_options()
     switch (substate)
     {
     case 0:
-        menu.num_choices = 5;
+        menu.num_choices = OPTIONS_ITEM_COUNT;
         menu.set_cursor(0);
         anm_ids[1] = title_anm->create_effect(1, -1, NULL);
         update_options_sprites();
@@ -291,17 +302,17 @@ i32 TitleInf::do_options()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[1], 3);
             AnmManager::interrupt_tree(anm_ids[1], (i16)(menu.next_selection + 7));
             update_options_cursor();
         }
         if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
         {
-            if (menu.next_selection != 4)
+            if (menu.next_selection != OPTIONS_ITEM_QUIT)
             {
-                g_SoundManager.play_sound_centered(9, 0);
-                menu.set_cursor(4);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
+                menu.set_cursor(OPTIONS_ITEM_QUIT);
                 AnmManager::interrupt_tree_and_run(anm_ids[1], 3);
                 AnmManager::interrupt_tree(anm_ids[1], (i16)(menu.next_selection + 7));
                 update_options_cursor();
@@ -309,15 +320,15 @@ i32 TitleInf::do_options()
             }
             goto leave;
         }
-        if (menu.next_selection == 1 && time_in_state.ticked_on_multiple_of(60))
+        if (menu.next_selection == OPTIONS_ITEM_SE_VOLUME && time_in_state.ticked_on_multiple_of(60))
         {
-            g_SoundManager.play_sound_centered(2, 0);
+            g_SoundManager.play_sound_centered(SE_PLDEAD00, 0);
         }
         if (input_pressed_or_repeating(INPUT_LEFT))
         {
             switch (menu.next_selection)
             {
-            case 0:
+            case OPTIONS_ITEM_BGM_VOLUME:
                 if (g_Supervisor.config.bgm_volume < 5)
                 {
                     g_Supervisor.config.bgm_volume = 0;
@@ -328,7 +339,7 @@ i32 TitleInf::do_options()
                 }
                 update_options_sprites();
                 break;
-            case 1:
+            case OPTIONS_ITEM_SE_VOLUME:
                 if (g_Supervisor.config.se_volume < 5)
                 {
                     g_Supervisor.config.se_volume = 0;
@@ -345,14 +356,14 @@ i32 TitleInf::do_options()
         {
             switch (menu.next_selection)
             {
-            case 0:
+            case OPTIONS_ITEM_BGM_VOLUME:
             {
                 i8 volume = g_Supervisor.config.bgm_volume + 5;
                 g_Supervisor.config.bgm_volume = volume > 100 ? 100 : volume;
                 update_options_sprites();
                 break;
             }
-            case 1:
+            case OPTIONS_ITEM_SE_VOLUME:
             {
                 i8 volume = g_Supervisor.config.se_volume + 5;
                 g_Supervisor.config.se_volume = volume > 100 ? 100 : volume;
@@ -365,22 +376,22 @@ i32 TitleInf::do_options()
         {
             switch (menu.next_selection)
             {
-            case 2:
+            case OPTIONS_ITEM_KEY_CONFIG:
                 AnmManager::interrupt_tree(anm_ids[1], 6);
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 set_substate(4);
                 return 1;
-            case 3:
+            case OPTIONS_ITEM_DEFAULT:
                 g_Supervisor.config.bgm_volume = 100;
                 g_Supervisor.config.se_volume = 80;
                 g_Supervisor.config.unk_28 = 0;
                 update_options_sprites();
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 return 1;
-            case 4:
+            case OPTIONS_ITEM_QUIT:
             leave:
                 AnmManager::interrupt_tree(anm_ids[1], 6);
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 set_substate(4);
                 return 1;
             }
@@ -391,12 +402,12 @@ i32 TitleInf::do_options()
         {
             switch (menu.next_selection)
             {
-            case 2:
-                set_state(4);
+            case OPTIONS_ITEM_KEY_CONFIG:
+                set_state(TITLE_STATE_KEY_CONFIG);
                 menu.push();
                 break;
-            case 4:
-                set_state(1);
+            case OPTIONS_ITEM_QUIT:
+                set_state(TITLE_STATE_MAIN);
                 menu.pop();
                 return 1;
             }
@@ -415,46 +426,46 @@ void TitleInf::update_options_cursor()
     i32 i;
     for (i = 0; i < menu.next_selection; i++)
     {
-        interrupt_child_and_run(1, i + 0x17, 0x1e);
-        interrupt_child_and_run(1, i + 0x1c, 0x1e);
+        interrupt_child_and_run(1, i + 0x17, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run(1, i + 0x1c, TITLE_INTERRUPT_ABOVE_CURSOR);
     }
     for (i++; i < 5; i++)
     {
-        interrupt_child_and_run(1, i + 0x17, 0x1f);
-        interrupt_child_and_run(1, i + 0x1c, 0x1f);
+        interrupt_child_and_run(1, i + 0x17, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, i + 0x1c, TITLE_INTERRUPT_BELOW_CURSOR);
     }
     if (menu.next_selection > 0)
     {
-        interrupt_child_and_run_inline(anm_ids[1], 0x21, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x22, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x23, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x24, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x25, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x26, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x27, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x28, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x21, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x22, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x23, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x24, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x25, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x26, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x27, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x28, TITLE_INTERRUPT_ABOVE_CURSOR);
     }
     if (menu.next_selection > 1)
     {
-        interrupt_child_and_run_inline(anm_ids[1], 0x29, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2a, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2b, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2c, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2d, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2e, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x2f, 0x1e);
-        interrupt_child_and_run_inline(anm_ids[1], 0x30, 0x1e);
+        interrupt_child_and_run_inline(anm_ids[1], 0x29, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2a, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2b, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2c, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2d, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2e, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x2f, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run_inline(anm_ids[1], 0x30, TITLE_INTERRUPT_ABOVE_CURSOR);
     }
     else if (menu.next_selection < 1)
     {
-        interrupt_child_and_run(1, 0x29, 0x1f);
-        interrupt_child_and_run(1, 0x2a, 0x1f);
-        interrupt_child_and_run(1, 0x2b, 0x1f);
-        interrupt_child_and_run(1, 0x2c, 0x1f);
-        interrupt_child_and_run(1, 0x2d, 0x1f);
-        interrupt_child_and_run(1, 0x2e, 0x1f);
-        interrupt_child_and_run(1, 0x2f, 0x1f);
-        interrupt_child_and_run(1, 0x30, 0x1f);
+        interrupt_child_and_run(1, 0x29, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2a, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2b, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2c, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2d, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2e, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x2f, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(1, 0x30, TITLE_INTERRUPT_BELOW_CURSOR);
     }
 }
 
@@ -464,7 +475,7 @@ void TitleInf::update_options_cursor()
 void TitleInf::update_options_sprites()
 {
     g_SoundManager.bgm_volume = g_Supervisor.config.bgm_volume;
-    g_SoundManager.modify_bgm(8, 0, "SetVol");
+    g_SoundManager.modify_bgm(BGM_RESET_VOLUME, 0, "SetVol");
     g_SoundManager.se_volume = g_Supervisor.config.se_volume;
     if (g_SoundManager.se_volume != 0)
     {
@@ -540,15 +551,15 @@ i32 TitleInf::do_key_config()
     switch (substate)
     {
     case 0:
-        menu.num_choices = 7;
+        menu.num_choices = KEY_CONFIG_COUNT;
         menu.set_cursor(0);
         anm_ids[2] = title_anm->create_effect(2, -1, NULL);
         set_substate(1);
-        key_config[0] = g_pad_mapping[0];
-        key_config[1] = g_pad_mapping[1];
-        key_config[2] = g_pad_mapping[9];
-        key_config[3] = g_pad_mapping[2];
-        key_config[4] = g_pad_mapping[3];
+        key_config[KEY_CONFIG_SHOT] = g_pad_mapping[PAD_SHOT];
+        key_config[KEY_CONFIG_BOMB] = g_pad_mapping[PAD_BOMB];
+        key_config[KEY_CONFIG_RELEASE] = g_pad_mapping[PAD_RELEASE];
+        key_config[KEY_CONFIG_FOCUS] = g_pad_mapping[PAD_FOCUS];
+        key_config[KEY_CONFIG_PAUSE] = g_pad_mapping[PAD_PAUSE];
         update_key_config_sprites();
     case 1:
         if (time_in_state.current > 6)
@@ -573,7 +584,7 @@ i32 TitleInf::do_key_config()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[2], 3);
             AnmManager::interrupt_tree(anm_ids[2], (i16)(menu.next_selection + 7));
             update_key_config_cursor();
@@ -583,20 +594,20 @@ i32 TitleInf::do_key_config()
         {
             if ((i8)pad[i] < 0)
             {
-                if (menu.next_selection <= 4)
+                if (menu.next_selection <= KEY_CONFIG_PAUSE)
                 {
                     set_key(menu.next_selection, i);
                 }
                 break;
             }
         }
-        if ((g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB)) && menu.next_selection == 6)
+        if ((g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB)) && menu.next_selection == KEY_CONFIG_QUIT)
         {
-            key_config[0] = g_pad_mapping[0];
-            key_config[1] = g_pad_mapping[1];
-            key_config[2] = g_pad_mapping[9];
-            key_config[3] = g_pad_mapping[2];
-            key_config[4] = g_pad_mapping[3];
+            key_config[KEY_CONFIG_SHOT] = g_pad_mapping[PAD_SHOT];
+            key_config[KEY_CONFIG_BOMB] = g_pad_mapping[PAD_BOMB];
+            key_config[KEY_CONFIG_RELEASE] = g_pad_mapping[PAD_RELEASE];
+            key_config[KEY_CONFIG_FOCUS] = g_pad_mapping[PAD_FOCUS];
+            key_config[KEY_CONFIG_PAUSE] = g_pad_mapping[PAD_PAUSE];
             update_key_config_sprites();
         }
         else
@@ -607,28 +618,28 @@ i32 TitleInf::do_key_config()
             }
             switch (menu.next_selection)
             {
-            case 5:
-                key_config[0] = g_pad_mapping[0];
-                key_config[1] = g_pad_mapping[1];
-                key_config[2] = g_pad_mapping[9];
-                key_config[3] = g_pad_mapping[2];
-                key_config[4] = g_pad_mapping[3];
+            case KEY_CONFIG_DEFAULT:
+                key_config[KEY_CONFIG_SHOT] = g_pad_mapping[PAD_SHOT];
+                key_config[KEY_CONFIG_BOMB] = g_pad_mapping[PAD_BOMB];
+                key_config[KEY_CONFIG_RELEASE] = g_pad_mapping[PAD_RELEASE];
+                key_config[KEY_CONFIG_FOCUS] = g_pad_mapping[PAD_FOCUS];
+                key_config[KEY_CONFIG_PAUSE] = g_pad_mapping[PAD_PAUSE];
                 update_key_config_sprites();
-                g_SoundManager.play_sound_centered(7, 0);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 return 1;
-            case 6:
-                g_pad_mapping[0] = key_config[0];
-                g_pad_mapping[1] = key_config[1];
-                g_pad_mapping[9] = key_config[2];
-                g_pad_mapping[2] = key_config[3];
-                g_pad_mapping[3] = key_config[4];
-                memcpy(g_Supervisor.config.pad_mapping_copy, g_pad_mapping, sizeof(g_pad_mapping));
+            case KEY_CONFIG_QUIT:
+                g_pad_mapping[PAD_SHOT] = key_config[KEY_CONFIG_SHOT];
+                g_pad_mapping[PAD_BOMB] = key_config[KEY_CONFIG_BOMB];
+                g_pad_mapping[PAD_RELEASE] = key_config[KEY_CONFIG_RELEASE];
+                g_pad_mapping[PAD_FOCUS] = key_config[KEY_CONFIG_FOCUS];
+                g_pad_mapping[PAD_PAUSE] = key_config[KEY_CONFIG_PAUSE];
+                memcpy(g_Supervisor.config.pad_mapping, g_pad_mapping, sizeof(g_pad_mapping));
                 break;
             default:
                 return 1;
             }
         }
-        g_SoundManager.play_sound_centered(9, 0);
+        g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
         AnmManager::interrupt_tree(anm_ids[2], 6);
         set_substate(4);
         return 1;
@@ -636,7 +647,7 @@ i32 TitleInf::do_key_config()
     case 4:
         if (time_in_state.current >= 10)
         {
-            set_state(3);
+            set_state(TITLE_STATE_OPTIONS);
             menu.pop();
         }
         break;
@@ -649,26 +660,26 @@ i32 TitleInf::do_key_config()
 // FUNCTION: TH16 0x44ec60
 void TitleInf::update_key_config_sprites()
 {
-    set_child_sprite(get_child_vm(anm_ids[2], 0x3f), key_config[0] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x40), key_config[0] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x49), key_config[0] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4a), key_config[0] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x41), key_config[1] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x42), key_config[1] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4b), key_config[1] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4c), key_config[1] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x43), key_config[2] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x44), key_config[2] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4d), key_config[2] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4e), key_config[2] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x45), key_config[3] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x46), key_config[3] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x4f), key_config[3] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x50), key_config[3] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x47), key_config[4] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x48), key_config[4] % 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x51), key_config[4] / 10 + 0x2a);
-    set_child_sprite(get_child_vm(anm_ids[2], 0x52), key_config[4] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x3f), key_config[KEY_CONFIG_SHOT] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x40), key_config[KEY_CONFIG_SHOT] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x49), key_config[KEY_CONFIG_SHOT] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4a), key_config[KEY_CONFIG_SHOT] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x41), key_config[KEY_CONFIG_BOMB] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x42), key_config[KEY_CONFIG_BOMB] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4b), key_config[KEY_CONFIG_BOMB] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4c), key_config[KEY_CONFIG_BOMB] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x43), key_config[KEY_CONFIG_RELEASE] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x44), key_config[KEY_CONFIG_RELEASE] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4d), key_config[KEY_CONFIG_RELEASE] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4e), key_config[KEY_CONFIG_RELEASE] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x45), key_config[KEY_CONFIG_FOCUS] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x46), key_config[KEY_CONFIG_FOCUS] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x4f), key_config[KEY_CONFIG_FOCUS] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x50), key_config[KEY_CONFIG_FOCUS] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x47), key_config[KEY_CONFIG_PAUSE] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x48), key_config[KEY_CONFIG_PAUSE] % 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x51), key_config[KEY_CONFIG_PAUSE] / 10 + 0x2a);
+    set_child_sprite(get_child_vm(anm_ids[2], 0x52), key_config[KEY_CONFIG_PAUSE] % 10 + 0x2a);
 }
 
 // FUNCTION: TH16 0x44f710
@@ -687,7 +698,7 @@ void TitleInf::set_key(i32 action, i32 key)
     }
     key_config[action] = key;
     update_key_config_sprites();
-    g_SoundManager.play_sound_centered(7, 0);
+    g_SoundManager.play_sound_centered(SE_OK00, 0);
 }
 
 // Rows above the cursor get interrupt 30, rows below it 31; the five
@@ -698,27 +709,27 @@ void TitleInf::update_key_config_cursor()
     i32 i;
     for (i = 0; i < menu.next_selection; i++)
     {
-        interrupt_child_and_run(2, i + 0x31, 0x1e);
-        interrupt_child_and_run(2, i + 0x38, 0x1e);
+        interrupt_child_and_run(2, i + 0x31, TITLE_INTERRUPT_ABOVE_CURSOR);
+        interrupt_child_and_run(2, i + 0x38, TITLE_INTERRUPT_ABOVE_CURSOR);
         if (i < 5)
         {
-            interrupt_child_and_run(2, i * 2 + 0x3f, 0x1e);
-            interrupt_child_and_run(2, i * 2 + 0x40, 0x1e);
-            interrupt_child_and_run(2, i * 2 + 0x49, 0x1e);
-            interrupt_child_and_run(2, i * 2 + 0x4a, 0x1e);
+            interrupt_child_and_run(2, i * 2 + 0x3f, TITLE_INTERRUPT_ABOVE_CURSOR);
+            interrupt_child_and_run(2, i * 2 + 0x40, TITLE_INTERRUPT_ABOVE_CURSOR);
+            interrupt_child_and_run(2, i * 2 + 0x49, TITLE_INTERRUPT_ABOVE_CURSOR);
+            interrupt_child_and_run(2, i * 2 + 0x4a, TITLE_INTERRUPT_ABOVE_CURSOR);
         }
     }
     for (i++; i < 7; i++)
     {
-        interrupt_child_and_run(2, i + 0x31, 0x1f);
-        interrupt_child_and_run(2, i + 0x38, 0x1f);
+        interrupt_child_and_run(2, i + 0x31, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(2, i + 0x38, TITLE_INTERRUPT_BELOW_CURSOR);
     }
     for (i = menu.next_selection + 1; i < 5; i++)
     {
-        interrupt_child_and_run(2, i * 2 + 0x3f, 0x1f);
-        interrupt_child_and_run(2, i * 2 + 0x40, 0x1f);
-        interrupt_child_and_run(2, i * 2 + 0x49, 0x1f);
-        interrupt_child_and_run(2, i * 2 + 0x4a, 0x1f);
+        interrupt_child_and_run(2, i * 2 + 0x3f, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(2, i * 2 + 0x40, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(2, i * 2 + 0x49, TITLE_INTERRUPT_BELOW_CURSOR);
+        interrupt_child_and_run(2, i * 2 + 0x4a, TITLE_INTERRUPT_BELOW_CURSOR);
     }
 }
 
@@ -934,11 +945,13 @@ i32 g_demo_replay_index;
 // GLOBAL: TH16 0x49371c
 const char *const g_demo_replay_names[3] = {"demo/demo1.rpy", "demo/demo2.rpy", "demo/demo3.rpy"};
 
+// Plays a demo replay after 30 idle seconds on the title screen, starts the
+// title BGM a few frames after it appears, and runs the current screen.
 // TODO: the original computes the demo index as x % -3 would (imul 0x55555555; sub; sar 1); ours uses idiv, or the /3 magic through a local (also with % -3); it also calls the Supervisor members without this and keeps the replay info in ecx.
 // FUNCTION: TH16 0x44af80
 i32 TitleInf::on_tick()
 {
-    if (state == 1)
+    if (state == TITLE_STATE_MAIN)
     {
         g_title_idle_frames++;
         if ((u16)g_hardware_input != 0)
@@ -962,7 +975,7 @@ i32 TitleInf::on_tick()
             }
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
-            g_Supervisor.gamemode_to_switch_to = 13;
+            g_Supervisor.gamemode_to_switch_to = GAMEMODE_START_REPLAY;
             RpyInfo *info = replay->info;
             g_stage_data = &g_stage_table[stage];
             g_Globals.character = info->character;
@@ -972,38 +985,38 @@ i32 TitleInf::on_tick()
             g_Globals.difficulty = info->difficulty;
             replay->~ReplayManager();
             operator delete(replay, sizeof(ReplayManager));
-            g_unk_4a6f1c = 1;
+            g_title_return_point = TITLE_RETURN_MAIN;
             g_title_idle_frames = 0;
         }
     }
-    if (flags_5ce8 & 1)
+    if (menu_flags & TITLE_START_BGM)
     {
-        unk_5ce4++;
-        if (unk_5ce4 >= 10)
+        bgm_start_delay++;
+        if (bgm_start_delay >= 10)
         {
-            if (g_Supervisor.config.flags_2c & 0x10)
+            if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
             {
-                g_SoundManager.modify_bgm(4, 0, "dummy");
+                g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
             }
             else
             {
-                g_SoundManager.modify_bgm(3, 0, "dummy");
+                g_SoundManager.modify_bgm(BGM_STOP, 0, "dummy");
             }
             g_SoundManager.bgm_name[0] = 0;
             g_Supervisor.play_bgm_wav(0, "th16_01");
-            if (g_Supervisor.config.flags_2c & 0x10)
+            if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
             {
-                g_SoundManager.modify_bgm(4, 0, "dummy");
+                g_SoundManager.modify_bgm(BGM_RELEASE, 0, "dummy");
             }
-            g_SoundManager.modify_bgm(2, 0, "dummy");
+            g_SoundManager.modify_bgm(BGM_PLAY, 0, "dummy");
             g_Scorefile->bgm_unlocked[0] = 1;
-            flags_5ce8 &= ~1;
-            unk_5ce4 = 0;
+            menu_flags &= ~TITLE_START_BGM;
+            bgm_start_delay = 0;
         }
     }
     switch (state)
     {
-    case 0:
+    case TITLE_STATE_INIT:
     {
         AnmManager *anm = g_AnmManager;
         anm->disable_vms_from_anm_file(anm->loaded_anms[ANM_SLOT_FRONT]);
@@ -1011,77 +1024,77 @@ i32 TitleInf::on_tick()
         anm->disable_vms_from_anm_file(anm->loaded_anms[ANM_SLOT_ASCII]);
         anm->disable_vms_from_anm_file(anm->loaded_anms[ANM_SLOT_TEXT]);
         g_AsciiManager->hide_now_loading();
-        if (g_unk_4a6f1c == 3)
+        if (g_title_return_point == TITLE_RETURN_SCORE_ENTRY)
         {
             menu.num_choices = 10;
             menu.set_cursor(0);
             menu.push();
-            set_state(14);
-            g_unk_4a6f1c = 1;
+            set_state(TITLE_STATE_SCORE_NAME_ENTRY);
+            g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_score_name_entry();
             break;
         }
         if (!(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY))
         {
-            flags_5ce8 |= 1;
-            unk_5ce4 = 0;
+            menu_flags |= TITLE_START_BGM;
+            bgm_start_delay = 0;
         }
         else
         {
-            flags_5ce8 &= ~1;
+            menu_flags &= ~TITLE_START_BGM;
             g_Globals.difficulty = g_Globals.difficulty_before_demo;
         }
         g_Globals.flags_hi_45c &= ~GLOBALS_HI_DEMO_PLAY;
-        if (g_unk_4a6f1c == 0)
+        if (g_title_return_point == TITLE_RETURN_FIRST)
         {
-            flags_5ce8 |= 2;
-            set_state(1);
-            g_unk_4a6f1c = 1;
+            menu_flags |= TITLE_FIRST_SHOW;
+            set_state(TITLE_STATE_MAIN);
+            g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_title_screen();
             break;
         }
-        flags_5ce8 &= ~2;
-        if (g_unk_4a6f1c == 1)
+        menu_flags &= ~TITLE_FIRST_SHOW;
+        if (g_title_return_point == TITLE_RETURN_MAIN)
         {
             if (g_Globals.difficulty == DIFFICULTY_EXTRA)
             {
-                menu.set_cursor(1);
+                menu.set_cursor(TITLE_ITEM_EXTRA_START);
             }
-            set_state(1);
+            set_state(TITLE_STATE_MAIN);
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_title_screen();
         }
-        else if (g_unk_4a6f1c == 2)
+        else if (g_title_return_point == TITLE_RETURN_REPLAY_MENU)
         {
             g_Supervisor.play_bgm_wav(0, "th16_01");
             g_Supervisor.play_bgm(0, 0);
             g_Globals.set_game_mode(GAME_MODE_NORMAL);
-            menu.num_choices = 10;
-            menu.set_cursor(4);
+            menu.num_choices = TITLE_ITEM_COUNT;
+            menu.set_cursor(TITLE_ITEM_REPLAY);
             menu.push();
-            set_state(11);
-            g_unk_4a6f1c = 1;
+            set_state(TITLE_STATE_REPLAY_MENU);
+            g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_replay_menu();
         }
-        else if (g_unk_4a6f1c == 5)
+        else if (g_title_return_point == TITLE_RETURN_SPELL_PRACTICE)
         {
             ScreenEffect::create(SCREEN_EFFECT_HOLD, 30, 0, 0, 0, 0x54);
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(17);
-            g_unk_4a6f1c = 1;
+            set_state(TITLE_STATE_SPELL_PRACTICE_STAGE_SELECT);
+            g_title_return_point = TITLE_RETURN_MAIN;
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_spell_practice_stage_select();
         }
-        else if (g_unk_4a6f1c == 4)
+        else if (g_title_return_point == TITLE_RETURN_PRACTICE)
         {
             ScreenEffect::create(SCREEN_EFFECT_HOLD, 30, 0, 0, 0, 0x54);
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(5);
+            set_state(TITLE_STATE_DIFFICULTY_SELECT);
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
             do_difficulty_select();
         }
@@ -1092,66 +1105,67 @@ i32 TitleInf::on_tick()
         }
         break;
     }
-    case 1:
+    case TITLE_STATE_MAIN:
         on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
         do_title_screen();
         break;
-    case 5:
+    case TITLE_STATE_DIFFICULTY_SELECT:
         do_difficulty_select();
         break;
-    case 11:
+    case TITLE_STATE_REPLAY_MENU:
         do_replay_menu();
         break;
-    case 14:
+    case TITLE_STATE_SCORE_NAME_ENTRY:
         do_score_name_entry();
         break;
-    case 17:
+    case TITLE_STATE_SPELL_PRACTICE_STAGE_SELECT:
         do_spell_practice_stage_select();
         break;
-    case 3:
+    case TITLE_STATE_OPTIONS:
         do_options();
         break;
-    case 4:
+    case TITLE_STATE_KEY_CONFIG:
         do_key_config();
         break;
-    case 2:
-        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_FLAG_2000) ? 2 : 3;
+    case TITLE_STATE_EXIT:
+        g_Supervisor.gamemode_to_switch_to =
+            (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_QUIT;
         g_Supervisor.stop_bgm();
         break;
-    case 9:
+    case TITLE_STATE_UNUSED_9:
         g_Supervisor.stop_bgm();
         break;
-    case 12:
+    case TITLE_STATE_UNUSED_12:
         g_Supervisor.stop_bgm();
         break;
-    case 6:
+    case TITLE_STATE_CHARACTER_SELECT:
         do_character_select();
         break;
-    case 7:
+    case TITLE_STATE_SUBSEASON_SELECT:
         do_subseason_select();
         break;
-    case 8:
+    case TITLE_STATE_PRACTICE_STAGE_SELECT:
         do_practice_stage_select();
         break;
-    case 13:
+    case TITLE_STATE_MUSIC_ROOM:
         do_music_room();
         break;
-    case 18:
+    case TITLE_STATE_SPELL_PRACTICE_ROW_SELECT:
         do_spell_practice_row();
         break;
-    case 19:
+    case TITLE_STATE_SPELL_PRACTICE_DIFFICULTY_SELECT:
         do_spell_practice_difficulty();
         break;
-    case 20:
+    case TITLE_STATE_SPELL_PRACTICE_SUBSEASON_SELECT:
         do_spell_practice_subseason();
         break;
-    case 10:
+    case TITLE_STATE_PLAYER_DATA:
         do_player_data();
         break;
-    case 16:
+    case TITLE_STATE_MANUAL:
         do_manual();
         break;
-    case 15:
+    case TITLE_STATE_REPLAY_SAVE:
         do_replay_save();
         break;
     }
@@ -1185,13 +1199,13 @@ static __forceinline void title_highlight_inline(TitleInf *menu)
     i32 i;
     for (i = 0; i < menu->menu.next_selection; i++)
     {
-        title_interrupt_child_and_run(menu, i + 3, 30);
-        title_interrupt_child_and_run(menu, i + 13, 30);
+        title_interrupt_child_and_run(menu, i + 3, TITLE_INTERRUPT_ABOVE_CURSOR);
+        title_interrupt_child_and_run(menu, i + 13, TITLE_INTERRUPT_ABOVE_CURSOR);
     }
     for (i++; i < 10; i++)
     {
-        title_interrupt_child_and_run(menu, i + 3, 31);
-        title_interrupt_child_and_run(menu, i + 13, 31);
+        title_interrupt_child_and_run(menu, i + 3, TITLE_INTERRUPT_BELOW_CURSOR);
+        title_interrupt_child_and_run(menu, i + 13, TITLE_INTERRUPT_BELOW_CURSOR);
     }
 }
 
@@ -1202,28 +1216,28 @@ i32 TitleInf::do_title_screen()
     switch (substate)
     {
     case 0:
-        menu.num_choices = 10;
+        menu.num_choices = TITLE_ITEM_COUNT;
         menu.wraps = 1;
         if (!g_Scorefile->any_cleared())
         {
-            menu.disable(1);
+            menu.disable(TITLE_ITEM_EXTRA_START);
         }
         if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE)
         {
-            menu.set_cursor(3);
+            menu.set_cursor(TITLE_ITEM_SPELL_PRACTICE);
             g_Globals.set_game_mode(GAME_MODE_NORMAL);
         }
         else if (g_Globals.game_mode != GAME_MODE_NORMAL)
         {
-            menu.set_cursor(2);
+            menu.set_cursor(TITLE_ITEM_PRACTICE_START);
             g_Globals.set_game_mode(GAME_MODE_NORMAL);
         }
         set_substate(1);
-        if (flags_5ce8 & 2)
+        if (menu_flags & TITLE_FIRST_SHOW)
         {
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             anm_ids[0x65] = title_anm->create_effect(0x65, -1, NULL);
-            flags_5ce8 &= ~2;
+            menu_flags &= ~TITLE_FIRST_SHOW;
         }
         else
         {
@@ -1237,7 +1251,7 @@ i32 TitleInf::do_title_screen()
                 anm_ids[0x65] = title_anm->create_effect(0x65, -1, NULL);
                 AnmManager::interrupt_tree_and_run(anm_ids[0x65], 2);
             }
-            if (prev_state != 3)
+            if (prev_state != TITLE_STATE_OPTIONS)
             {
                 AnmManager::interrupt_tree_and_run(anm_ids[0x61], 2);
             }
@@ -1247,25 +1261,25 @@ i32 TitleInf::do_title_screen()
         if (time_in_state.current == 120)
         {
             anm_ids[0] = title_anm->create_effect(0, -1, NULL);
-            if (get_vm_or_clear(anm_ids_7d0[8]) == NULL)
+            if (get_vm_or_clear(comment_line_ids[8]) == NULL)
             {
-                anm_ids_7d0[8] = title_v_anm->create_effect(0, -1, NULL);
+                comment_line_ids[8] = title_v_anm->create_effect(0, -1, NULL);
             }
             i32 i;
             for (i = 0; i < menu.next_selection; i++)
             {
-                interrupt_child_and_run(0, i + 3, 30);
-                interrupt_child_and_run(0, i + 13, 30);
+                interrupt_child_and_run(0, i + 3, TITLE_INTERRUPT_ABOVE_CURSOR);
+                interrupt_child_and_run(0, i + 13, TITLE_INTERRUPT_ABOVE_CURSOR);
             }
             for (i++; i < 10; i++)
             {
-                title_interrupt_child_and_run(this, i + 3, 31);
-                title_interrupt_child_and_run(this, i + 13, 31);
+                title_interrupt_child_and_run(this, i + 3, TITLE_INTERRUPT_BELOW_CURSOR);
+                title_interrupt_child_and_run(this, i + 13, TITLE_INTERRUPT_BELOW_CURSOR);
             }
             if (!g_Scorefile->any_cleared())
             {
-                interrupt_child(0, 4, 29);
-                interrupt_child(0, 14, 29);
+                interrupt_child(0, 4, TITLE_INTERRUPT_DISABLED);
+                interrupt_child(0, 14, TITLE_INTERRUPT_DISABLED);
             }
         }
         if (time_in_state.current > 130)
@@ -1277,8 +1291,8 @@ i32 TitleInf::do_title_screen()
             title_highlight_inline(this);
             if (!g_Scorefile->any_cleared())
             {
-                title_interrupt_child(this, 4, 29);
-                title_interrupt_child(this, 14, 29);
+                title_interrupt_child(this, 4, TITLE_INTERRUPT_DISABLED);
+                title_interrupt_child(this, 14, TITLE_INTERRUPT_DISABLED);
             }
         }
         break;
@@ -1294,43 +1308,43 @@ i32 TitleInf::do_title_screen()
         }
         if (menu.current_selection != menu.next_selection)
         {
-            g_SoundManager.play_sound_centered(10, 0);
+            g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             AnmManager::interrupt_tree_and_run(anm_ids[0], 3);
             AnmManager::interrupt_tree(anm_ids[0], (i16)(menu.next_selection + 7));
             i32 i;
             for (i = 0; i < menu.next_selection; i++)
             {
-                interrupt_child_and_run(0, i + 3, 30);
-                interrupt_child_and_run(0, i + 13, 30);
+                interrupt_child_and_run(0, i + 3, TITLE_INTERRUPT_ABOVE_CURSOR);
+                interrupt_child_and_run(0, i + 13, TITLE_INTERRUPT_ABOVE_CURSOR);
             }
             for (i++; i < 10; i++)
             {
-                interrupt_child_and_run(0, i + 3, 31);
-                interrupt_child_and_run(0, i + 13, 31);
+                interrupt_child_and_run(0, i + 3, TITLE_INTERRUPT_BELOW_CURSOR);
+                interrupt_child_and_run(0, i + 13, TITLE_INTERRUPT_BELOW_CURSOR);
             }
             if (!g_Scorefile->any_cleared())
             {
-                interrupt_child(0, 4, 29);
-                interrupt_child(0, 14, 29);
+                interrupt_child(0, 4, TITLE_INTERRUPT_DISABLED);
+                interrupt_child(0, 14, TITLE_INTERRUPT_DISABLED);
             }
         }
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
-            if (menu.next_selection == 9)
+            if (menu.next_selection == TITLE_ITEM_QUIT)
             {
-                g_SoundManager.play_sound_centered(9, 0);
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 set_substate(4);
                 return 1;
             }
-            g_SoundManager.play_sound_centered(9, 0);
-            menu.set_cursor(9);
+            g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
+            menu.set_cursor(TITLE_ITEM_QUIT);
             AnmManager::interrupt_tree_and_run(anm_ids[0], 3);
             AnmManager::interrupt_tree(anm_ids[0], (i16)(menu.next_selection + 7));
             title_highlight_inline(this);
             if (!g_Scorefile->any_cleared())
             {
-                title_interrupt_child(this, 4, 29);
-                title_interrupt_child(this, 14, 29);
+                title_interrupt_child(this, 4, TITLE_INTERRUPT_DISABLED);
+                title_interrupt_child(this, 14, TITLE_INTERRUPT_DISABLED);
             }
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
@@ -1338,26 +1352,26 @@ i32 TitleInf::do_title_screen()
             AnmManager::interrupt_tree(anm_ids[0], 6);
             switch (menu.next_selection)
             {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-            case 4:
-            case 5:
-            case 6:
-            case 8:
-                g_SoundManager.play_sound_centered(7, 0);
+            case TITLE_ITEM_START:
+            case TITLE_ITEM_EXTRA_START:
+            case TITLE_ITEM_PRACTICE_START:
+            case TITLE_ITEM_SPELL_PRACTICE:
+            case TITLE_ITEM_REPLAY:
+            case TITLE_ITEM_PLAYER_DATA:
+            case TITLE_ITEM_MUSIC_ROOM:
+            case TITLE_ITEM_MANUAL:
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 AnmManager::interrupt_tree(anm_ids[0x65], 1);
                 anm_ids[0x65].id = 0;
-                AnmManager::interrupt_tree(anm_ids_7d0[8], 1);
+                AnmManager::interrupt_tree(comment_line_ids[8], 1);
                 set_substate(4);
                 return 1;
-            case 7:
-                g_SoundManager.play_sound_centered(7, 0);
+            case TITLE_ITEM_OPTION:
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
                 set_substate(4);
                 return 1;
-            case 9:
-                g_SoundManager.play_sound_centered(9, 0);
+            case TITLE_ITEM_QUIT:
+                g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
                 set_substate(4);
                 return 1;
             }
@@ -1370,66 +1384,66 @@ i32 TitleInf::do_title_screen()
         }
         switch (menu.next_selection)
         {
-        case 0:
+        case TITLE_ITEM_START:
             g_Globals.set_game_mode(GAME_MODE_NORMAL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(5);
+            set_state(TITLE_STATE_DIFFICULTY_SELECT);
             menu.push();
             menu.set_cursor(g_last_difficulty);
             g_Globals.difficulty = g_last_difficulty;
             return 1;
-        case 1:
+        case TITLE_ITEM_EXTRA_START:
             g_Globals.set_game_mode(GAME_MODE_NORMAL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(5);
+            set_state(TITLE_STATE_DIFFICULTY_SELECT);
             menu.push();
             g_Globals.difficulty = DIFFICULTY_EXTRA;
             menu.set_cursor(0);
             return 1;
-        case 2:
+        case TITLE_ITEM_PRACTICE_START:
             g_Globals.set_game_mode(GAME_MODE_STAGE_PRACTICE);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             menu.push();
             menu.set_cursor(g_last_difficulty);
-            set_state(5);
+            set_state(TITLE_STATE_DIFFICULTY_SELECT);
             g_Globals.difficulty = g_last_difficulty;
             return 1;
-        case 3:
+        case TITLE_ITEM_SPELL_PRACTICE:
             g_Globals.set_game_mode(GAME_MODE_SPELL_PRACTICE);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(17);
+            set_state(TITLE_STATE_SPELL_PRACTICE_STAGE_SELECT);
             menu.push();
-            menu_5cec.wraps = 1;
-            menu_5cec.num_choices = 4;
-            menu_5cec.set_cursor(g_last_character);
+            spell_character_menu.wraps = 1;
+            spell_character_menu.num_choices = 4;
+            spell_character_menu.set_cursor(g_last_character);
             menu.set_cursor(0);
             return 1;
-        case 4:
+        case TITLE_ITEM_REPLAY:
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(11);
+            set_state(TITLE_STATE_REPLAY_MENU);
             menu.push();
             return 1;
-        case 5:
+        case TITLE_ITEM_PLAYER_DATA:
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(10);
+            set_state(TITLE_STATE_PLAYER_DATA);
             menu.push();
             return 1;
-        case 6:
+        case TITLE_ITEM_MUSIC_ROOM:
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(13);
+            set_state(TITLE_STATE_MUSIC_ROOM);
             menu.push();
             return 1;
-        case 7:
-            set_state(3);
+        case TITLE_ITEM_OPTION:
+            set_state(TITLE_STATE_OPTIONS);
             menu.push();
             return 1;
-        case 8:
+        case TITLE_ITEM_MANUAL:
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
-            set_state(16);
+            set_state(TITLE_STATE_MANUAL);
             menu.push();
             return 1;
-        case 9:
-            set_state(2);
+        case TITLE_ITEM_QUIT:
+            set_state(TITLE_STATE_EXIT);
             break;
         }
         break;

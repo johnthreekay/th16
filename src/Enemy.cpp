@@ -565,11 +565,11 @@ static inline void enemy_play_hit_sound(EnemyData *enemy, i32 low_life_spell, i3
         (((spell_flags & SPELLCARD_ACTIVE) && enemy->full->enemy.life.remaining_for_cur_attack < low_life_spell) ||
          (!(spell_flags & SPELLCARD_ACTIVE) && enemy->full->enemy.life.remaining_for_cur_attack < low_life)))
     {
-        g_SoundManager.play_sound_at_position(0x23, enemy->final_pos.pos.x);
+        g_SoundManager.play_sound_at_position(SE_DAMAGE01, enemy->final_pos.pos.x);
     }
     else
     {
-        g_SoundManager.play_sound_at_position(0x22, enemy->final_pos.pos.x);
+        g_SoundManager.play_sound_at_position(SE_DAMAGE00, enemy->final_pos.pos.x);
     }
 }
 
@@ -683,7 +683,7 @@ int EnemyData::step_logic()
         {
             if (dealt != 0 && 0.0f >= bomb_damage_multiplier)
             {
-                g_SoundManager.play_sound_at_position(0x24, final_pos.pos.x);
+                g_SoundManager.play_sound_at_position(SE_NODAMAGE, final_pos.pos.x);
             }
             life_damage = dealt * bomb_damage_multiplier;
         }
@@ -1745,7 +1745,7 @@ int EnemyInf::get_int_global(int var)
     case ECL_VAR_POWER:
         return g_Globals.power;
     case ECL_VAR_DS3:
-        if (g_GameThread->replay_mode == 0 && g_Supervisor.unk_700 != 0)
+        if (g_GameThread->replay_mode == 0 && g_Supervisor.new_game_started != 0)
         {
             return 1;
         }
@@ -2050,7 +2050,7 @@ f32 EnemyInf::get_float_global(int var)
     case ECL_VAR_POWER:
         return g_Globals.power;
     case ECL_VAR_DS3:
-        return (f32)(g_GameThread->replay_mode == 0) && g_Supervisor.unk_700 != 0;
+        return (f32)(g_GameThread->replay_mode == 0) && g_Supervisor.new_game_started != 0;
     case ECL_VAR_PARENT_ID:
         return (u32)parent_enemy_id;
     case ECL_VAR_GI0:

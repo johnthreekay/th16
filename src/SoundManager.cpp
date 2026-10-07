@@ -76,6 +76,8 @@ const char *const g_sound_file_names[SOUND_FILE_COUNT] = {
     "se_big.wav", "se_item01.wav", "se_release.wav",
 };
 
+// Runs the BGM fade one frame (see BgmStream::fade_mode); a fade out
+// stops the buffer at its end.
 // FUNCTION: TH16 0x43dcf0
 void SoundManager::tick_bgm_fade()
 {
@@ -142,7 +144,7 @@ void SoundManager::tick_bgm_fade()
 void SoundManager::pause_sounds()
 {
     g_SoundManager.queued_ids[0] = -1;
-    for (i32 i = 0; i < 78; i++)
+    for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
     {
         SoundBufferEntry *sound = &g_SoundManager.sound_buffers[i];
         sound->was_playing = 0;
@@ -159,7 +161,7 @@ void SoundManager::pause_sounds()
 // FUNCTION: TH16 0x440bd0
 void SoundManager::resume_sounds()
 {
-    for (i32 i = 0; i < 78; i++)
+    for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
     {
         SoundBufferEntry *sound = &g_SoundManager.sound_buffers[i];
         if (sound->buffer != NULL && sound->was_playing)
@@ -195,6 +197,8 @@ i32 SoundManager::stop_threads()
     return 0;
 }
 
+// The startup sound thread: sets up DirectSound and the sound effects, then
+// waits until it is told to stop.
 // FUNCTION: TH16 0x45d4d0
 void SoundManager::thread_init(void *arg)
 {
@@ -237,6 +241,9 @@ inline CSoundManager::~CSoundManager()
 }
 
 // TODO: code identical; the loop's end pointer is g_anchor_corners_x+4 in the original (0x4a304c), which reccmp cannot name: our data layout puts the anchor tables before g_sound_effect_table even when they are defined in this file.
+// Creates the DirectSound device (44.1 kHz 16-bit stereo), starts a silent
+// looping buffer and creates a buffer for every sound effect, waiting for
+// thread_load_sound_files to read each file.
 // FUNCTION: TH16 0x45d510
 i32 SoundManager::initialize(HWND window)
 {
@@ -268,6 +275,7 @@ i32 SoundManager::initialize(HWND window)
     manager = new CSoundManager;
     if (manager->Initialize(window, DSSCL_PRIORITY, 2, 44100, 16) < 0)
     {
+        // "Initializing the DirectSound object failed"
         g_GameErrorContext.log("DirectSound \x83I\x83u\x83W\x83" "F\x83N\x83g\x82\xcc\x8f\x89\x8a\xfa\x89\xbb\x82\xaa\x8e\xb8\x94s\x82\xb5\x82\xbd\x82\xe6\r\n");
         if (manager != NULL)
         {
@@ -314,14 +322,18 @@ i32 SoundManager::initialize(HWND window)
         }
         if (g_SoundManager.sound_buffers[i].load(g_sound_file_names[g_sound_effect_table[i].file_index]) != 0)
         {
+            // "Cannot read the sound file, check the data"
             g_GameErrorContext.log("error : Sound \x83t\x83@\x83" "C\x83\x8b\x82\xaa\x93\xc7\x82\xdd\x8d\x9e\x82\xdf\x82\xc8\x82\xa2 \x83" "f\x81[\x83^\x82\xf0\x8am\x94" "F %s\r\n", g_sound_file_names[g_sound_effect_table[i].file_index]);
             return -1;
         }
     }
+    // "DirectSound was initialized normally"
     g_GameErrorContext.log("DirectSound \x82\xcd\x90\xb3\x8f\xed\x82\xc9\x8f\x89\x8a\xfa\x89\xbb\x82\xb3\x82\xea\x82\xdc\x82\xb5\x82\xbd\r\n");
     return 0;
 }
 
+// Reads every se_*.wav into sound_file_data, then waits until it is told to
+// stop.
 // FUNCTION: TH16 0x45d7e0
 void SoundManager::thread_load_sound_files(void *arg)
 {
@@ -334,6 +346,7 @@ void SoundManager::thread_load_sound_files(void *arg)
         g_SoundManager.sound_file_data[i] = file_read_all(g_sound_file_names[i], NULL, 0);
         if (g_SoundManager.sound_file_data[i] == NULL)
         {
+            // "Cannot read the sound file, check the data"
             g_GameErrorContext.log("error : Sound \x83t\x83@\x83" "C\x83\x8b\x82\xaa\x93\xc7\x82\xdd\x8d\x9e\x82\xdf\x82\xc8\x82\xa2 \x83" "f\x81[\x83^\x82\xf0\x8am\x94" "F %s\r\n", g_sound_file_names[i]);
             return;
         }
@@ -391,7 +404,7 @@ HARNESS_CALLED i32 SoundManager::release()
         delete manager;
         manager = NULL;
     }
-    for (i32 i = 0; i < 0x10; i++)
+    for (i32 i = 0; i < BGM_PRELOAD_SLOTS; i++)
     {
         if (preload_data[i] != NULL)
         {
@@ -462,9 +475,10 @@ HARNESS_CALLED i32 SoundManager::open_bgm(const char *path)
     ThBgmFormat *format = bgm_format;
     DWORD block_align = format->format.nBlockAlign;
     i32 samples_per_sec = format->format.nSamplesPerSec;
+    // The stream buffer holds 4 seconds, refilled in 8 parts.
     DWORD notify_size = samples_per_sec * block_align * 4 / 8;
     bgm_event = CreateEventA(NULL, FALSE, FALSE, NULL);
-    bgm_thread = CreateThread(NULL, 0, bgm_thread_proc, g_Supervisor.unk_58, 0, &bgm_thread_id);
+    bgm_thread = CreateThread(NULL, 0, bgm_thread_proc, g_Supervisor.main_window, 0, &bgm_thread_id);
     notify_size -= notify_size % block_align;
     if (FAILED(manager->CreateStreaming((CStreamingSound **)&bgm_stream, "thbgm.dat", 0, GUID_NULL, 8, notify_size,
                                         bgm_event, format)))
@@ -496,7 +510,7 @@ HARNESS_CALLED i32 SoundManager::preload_bgm(i32 slot, const char *name)
         return 0;
     }
     strcpy(g_SoundManager.preload_names[slot], name);
-    if (!(g_Supervisor.config.flags_2c & 0x10))
+    if (!(g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY))
     {
         return 0;
     }
@@ -520,7 +534,7 @@ HARNESS_CALLED i32 SoundManager::preload_bgm(i32 slot, const char *name)
     }
     i32 track = g_SoundManager.find_bgm(name);
     SetFilePointer(file, g_SoundManager.bgm_format[track].start_offset, NULL, FILE_BEGIN);
-    u8 *data = (u8 *)malloc(g_SoundManager.bgm_format[track].unk_14);
+    u8 *data = (u8 *)malloc(g_SoundManager.bgm_format[track].data_size);
     if (data == NULL)
     {
         CloseHandle(file);
@@ -529,13 +543,13 @@ HARNESS_CALLED i32 SoundManager::preload_bgm(i32 slot, const char *name)
         return -1;
     }
     DWORD read;
-    ReadFile(file, data, g_SoundManager.bgm_format[track].unk_14, &read, NULL);
+    ReadFile(file, data, g_SoundManager.bgm_format[track].data_size, &read, NULL);
     CloseHandle(file);
     g_CriticalSections.leave(CS_FILE);
     g_SoundManager.preload_format[slot] = &g_SoundManager.bgm_format[track];
     g_SoundManager.preload_data[slot] = data;
     g_SoundManager.preload_cursor[slot] = data;
-    g_SoundManager.preload_size[slot] = g_SoundManager.preload_format[slot]->unk_14;
+    g_SoundManager.preload_size[slot] = g_SoundManager.preload_format[slot]->data_size;
     return 0;
 }
 
@@ -554,7 +568,7 @@ HARNESS_CALLED i32 SoundManager::play_preloaded_bgm(i32 slot)
     {
         return -1;
     }
-    if (!(g_Supervisor.config.flags_2c & 0x10))
+    if (!(g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY))
     {
         return g_SoundManager.select_bgm(g_SoundManager.preload_names[slot]);
     }
@@ -569,7 +583,7 @@ HARNESS_CALLED i32 SoundManager::play_preloaded_bgm(i32 slot)
     DWORD notify_size = samples_per_sec * block_align * 4 / 8;
     g_SoundManager.bgm_event = CreateEventA(NULL, FALSE, FALSE, NULL);
     g_SoundManager.bgm_thread =
-        CreateThread(NULL, 0, bgm_thread_proc, g_Supervisor.unk_58, 0, &g_SoundManager.bgm_thread_id);
+        CreateThread(NULL, 0, bgm_thread_proc, g_Supervisor.main_window, 0, &g_SoundManager.bgm_thread_id);
     notify_size -= notify_size % block_align;
     if (FAILED(g_SoundManager.manager->CreateStreamingFromMemory(
             (CStreamingSound **)&g_SoundManager.bgm_stream, g_SoundManager.preload_cursor[slot],
@@ -708,7 +722,7 @@ void SoundManager::stop_sound(i32 id)
 {
     if (id < 0)
     {
-        for (i32 i = 0; i < 0x4e; i++)
+        for (i32 i = 0; i < SOUND_EFFECT_COUNT; i++)
         {
             g_SoundManager.sound_buffers[i].was_playing = 0;
             if (g_SoundManager.sound_buffers[i].buffer != NULL)
@@ -783,7 +797,7 @@ DWORD WINAPI SoundManager::bgm_thread_proc(void *arg)
         switch (result)
         {
         case WAIT_OBJECT_0:
-            if (g_SoundManager.bgm_stream != NULL && g_SoundManager.bgm_stream->unk_50 != 0)
+            if (g_SoundManager.bgm_stream != NULL && g_SoundManager.bgm_stream->playing != 0)
             {
                 g_SoundManager.bgm_stream->refilling = 1;
                 g_SoundManager.bgm_stream->handle_wave_stream_notification(0);
@@ -804,18 +818,19 @@ DWORD WINAPI SoundManager::bgm_thread_proc(void *arg)
     return 0;
 }
 
+// Appends a command to the BGM queue (dropped if all 31 entries are taken).
 // FUNCTION: TH16 0x45ed00
 void SoundManager::modify_bgm(i32 command, i32 arg, const char *name)
 {
     ENTER_CS(CS_SOUND);
-    for (i32 i = 0; i < 0x1f; i++)
+    for (i32 i = 0; i < BGM_QUEUE_SIZE; i++)
     {
-        if (bgm_commands[i].command == 0)
+        if (bgm_commands[i].command == BGM_NONE)
         {
             bgm_commands[i].command = command;
             bgm_commands[i].arg = arg;
             strcpy(bgm_commands[i].name, name);
-            bgm_commands[i].unk_8 = 0;
+            bgm_commands[i].step = 0;
             break;
         }
     }
@@ -946,7 +961,7 @@ static inline IDirectSoundBuffer *bgm_buffer(CStreamingSound *sound)
 #define BGM_STREAM ((CStreamingSound *)g_SoundManager.bgm_stream)
 
 // Runs the first queued BGM command one step further (commands take several
-// calls, counted in unk_8) and plays or stops the queued sound effects.
+// calls, counted in step) and plays or stops the queued sound effects.
 // Returns the BGM command now first in the queue.
 // TODO: 44%; the BGM command switch shares fewer tails than the original.
 // FUNCTION: TH16 0x45e330
@@ -965,16 +980,16 @@ i32 SoundManager::update_sound_thread()
         again = 0;
         switch (cmd->command)
         {
-        case 8:
+        case BGM_RESET_VOLUME:
             if (BGM_STREAM != NULL)
             {
                 BGM_STREAM->SetVolume(0);
             }
             goto pop;
-        case 1:
-            if (g_Supervisor.config.flags_2c & 0x10)
+        case BGM_LOAD:
+            if (g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY)
             {
-                if (cmd->unk_8 != 0)
+                if (cmd->step != 0)
                 {
                     goto step;
                 }
@@ -983,10 +998,10 @@ i32 SoundManager::update_sound_thread()
             g_SoundManager.preload_bgm(cmd->arg, cmd->name);
             again = 1;
             goto pop;
-        case 2:
-            if ((g_Supervisor.config.flags_2c & 0x10) && cmd->arg >= 0)
+        case BGM_PLAY:
+            if ((g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY) && cmd->arg >= 0)
             {
-                switch (cmd->unk_8)
+                switch (cmd->step)
                 {
                 case 0:
                     if (g_SoundManager.play_preloaded_bgm(cmd->arg) == 0)
@@ -1017,7 +1032,7 @@ i32 SoundManager::update_sound_thread()
                     BGM_STREAM->Play(0, DSBPLAY_LOOPING, 0);
                     goto step;
                 }
-                if (cmd->unk_8 < 0x14)
+                if (cmd->step < 0x14)
                 {
                     goto step;
                 }
@@ -1027,7 +1042,7 @@ i32 SoundManager::update_sound_thread()
             {
                 goto pop;
             }
-            switch (cmd->unk_8)
+            switch (cmd->step)
             {
             case 0:
                 BGM_STREAM->Stop(FALSE);
@@ -1060,17 +1075,17 @@ i32 SoundManager::update_sound_thread()
                 BGM_STREAM->Play(0, DSBPLAY_LOOPING, 0);
                 goto step;
             }
-            if (cmd->unk_8 < 7)
+            if (cmd->step < 7)
             {
                 goto step;
             }
             goto pop;
-        case 4:
+        case BGM_RELEASE:
             if (BGM_STREAM == NULL)
             {
                 goto pop;
             }
-            switch (cmd->unk_8)
+            switch (cmd->step)
             {
             case 0:
                 BGM_STREAM->Stop(TRUE);
@@ -1086,7 +1101,7 @@ i32 SoundManager::update_sound_thread()
                 if (WaitForSingleObject(g_SoundManager.bgm_thread, 0x100) != WAIT_OBJECT_0)
                 {
                     PostThreadMessageA(g_SoundManager.bgm_thread_id, WM_QUIT, 0, 0);
-                    cmd->unk_8--;
+                    cmd->step--;
                     goto step;
                 }
                 g_SoundManager.bgm_thread = NULL;
@@ -1105,12 +1120,12 @@ i32 SoundManager::update_sound_thread()
                 goto pop;
             }
             goto step;
-        case 3:
+        case BGM_STOP:
             if (BGM_STREAM == NULL)
             {
                 goto pop;
             }
-            switch (cmd->unk_8)
+            switch (cmd->step)
             {
             case 0:
                 BGM_STREAM->Stop(TRUE);
@@ -1119,7 +1134,7 @@ i32 SoundManager::update_sound_thread()
                 goto pop;
             }
             goto step;
-        case 5: {
+        case BGM_FADE_OUT: {
             i32 frames = cmd->arg * 60.0f;
             if (BGM_STREAM != NULL)
             {
@@ -1128,7 +1143,7 @@ i32 SoundManager::update_sound_thread()
             }
             goto pop;
         }
-        case 6:
+        case BGM_PAUSE:
             if (g_Supervisor.config.bgm_mode == 1)
             {
                 if (BGM_STREAM->m_refilling)
@@ -1138,7 +1153,7 @@ i32 SoundManager::update_sound_thread()
                 BGM_STREAM->Pause();
             }
             goto pop;
-        case 7:
+        case BGM_UNPAUSE:
             if (g_Supervisor.config.bgm_mode == 1)
             {
                 if (BGM_STREAM->m_refilling)
@@ -1148,7 +1163,7 @@ i32 SoundManager::update_sound_thread()
                 BGM_STREAM->Unpause();
             }
             goto pop;
-        case 9:
+        case BGM_SWITCH_TRACK:
             BGM_STREAM->switch_track(&g_SoundManager.bgm_format[g_SoundManager.find_bgm(cmd->name)]);
             goto pop;
         default:
@@ -1156,12 +1171,12 @@ i32 SoundManager::update_sound_thread()
         }
     pop:
         // Drops the command; cmd moves along with the copy.
-        for (i32 i = 0; cmd->command != 0;)
+        for (i32 i = 0; cmd->command != BGM_NONE;)
         {
             i++;
             *cmd = cmd[1];
             cmd++;
-            if (i >= 0x1f)
+            if (i >= BGM_QUEUE_SIZE)
             {
                 break;
             }
@@ -1169,9 +1184,9 @@ i32 SoundManager::update_sound_thread()
     } while (again);
     goto done;
 step:
-    cmd->unk_8++;
+    cmd->step++;
 done:
-    if (g_Supervisor.config.unk_22)
+    if (g_Supervisor.config.se_enabled)
     {
         for (i32 i = 0; i < SOUND_QUEUE_SIZE; i++)
         {

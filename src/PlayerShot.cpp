@@ -191,7 +191,7 @@ i32 __fastcall sht_on_init_laser(PlayerBullet *bullet)
 {
     Player *player = g_Player;
     bullet->hitbox_width_i = 0;
-    g_SoundManager.play_sound_at_position(0x14, player->inner.pos.x);
+    g_SoundManager.play_sound_at_position(SE_LAZER02, player->inner.pos.x);
     PlayerDamageSource *source = bullet->damage_source();
     source->hit_interval = 1;
     source->width = 0.0f;
@@ -367,7 +367,7 @@ i32 __fastcall sht_on_hit_burst_rising(PlayerBullet *bullet, i32 enemy_pos, i32 
     bullet->damage_source_index = 0;
     bullet->pos.speed = 0.3f;
     source->pos = bullet->pos;
-    g_SoundManager.play_sound_at_position(0x41, bullet->pos.pos.x);
+    g_SoundManager.play_sound_at_position(SE_MSL2, bullet->pos.pos.x);
     return bullet->damage;
 }
 
@@ -416,7 +416,7 @@ i32 __fastcall sht_on_hit_burst(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_s
     source->pos = bullet->pos;
     bullet->damage_source()->flags &= ~DAMAGE_SOURCE_ACTIVE;
     bullet->damage_source_index = 0;
-    g_SoundManager.play_sound_at_position(0x41, bullet->pos.pos.x);
+    g_SoundManager.play_sound_at_position(SE_MSL2, bullet->pos.pos.x);
     return bullet->damage;
 }
 

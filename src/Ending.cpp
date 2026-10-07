@@ -105,7 +105,8 @@ i32 Ending::on_tick_body()
     }
     else
     {
-        g_Supervisor.gamemode_to_switch_to = g_Supervisor.flags & SUPERVISOR_FLAG_2000 ? 2 : 16;
+        g_Supervisor.gamemode_to_switch_to =
+            g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT ? GAMEMODE_IDLE : GAMEMODE_TITLE_SCORE_ENTRY;
     }
     return UPDATE_FUNC_CONTINUE;
 }
@@ -346,7 +347,7 @@ i32 EndingScriptVm::run()
             }
             if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT) || wait_timer.current <= 0)
             {
-                g_SoundManager.play_sound_centered(0, 0);
+                g_SoundManager.play_sound_centered(SE_PLST00, 0);
                 wait_timer.set_value(0);
                 break;
             }
@@ -387,7 +388,7 @@ i32 EndingScriptVm::run()
             }
             else
             {
-                g_SoundManager.play_sound_centered(0, 0);
+                g_SoundManager.play_sound_centered(SE_PLST00, 0);
             }
             wait_timer.set_value(0);
             line_index = 0;

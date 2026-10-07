@@ -35,7 +35,7 @@ struct LoadingThread
     static LoadingThread *create();
 
     // Started through ThreadInf::restart; like the other loaders a plain
-    // cdecl function. On failure the game quits (game mode 3).
+    // cdecl function. On failure the game quits (GAMEMODE_QUIT).
     static int thread_start(void *arg);
     // Registered through jmp thunks (ExpHP's "__stub" functions).
     DECOMP_NOINLINE int on_tick();

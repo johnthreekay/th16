@@ -8,6 +8,25 @@
 #include "ZunList.h"
 #include "types.h"
 
+// .rpy files: an RpyFileHeader, then the encrypted, LZSS-compressed replay
+// (RpyInfo, then per stage an RpyGamestate followed by its frames of input
+// and its frame rate samples), then two USER sections (the info text and a
+// comment) that the game writes but never reads.
+
+// "t16r"
+constexpr u32 RPY_MAGIC = 0x72363174;
+constexpr u16 RPY_VERSION = 2;
+// "USER"
+constexpr u32 RPY_USER_MAGIC = 0x52455355;
+
+// The numbered replay slots (th16_01.rpy to th16_25.rpy), which is also
+// the replay menu's page size, and how many th16_ud????.rpy files the replay
+// menu lists after them.
+constexpr i32 REPLAY_SLOTS = 25;
+constexpr i32 REPLAY_USER_SLOTS = 50;
+
+// One frame of recorded input (the game's button bits). A frame of all
+// 0xffff marks where the replay ends.
 struct RpyFrameInput
 {
     union
@@ -41,8 +60,8 @@ struct RpyGamestate
     // Capture times (Spellcard::time_code) of the stage's spell cards, in
     // the order they ended.
     i32 spell_time_codes[0x14];
-    // Supervisor::unk_700 when the stage began.
-    u32 flag_290 : 1;
+    // Supervisor::new_game_started when the stage began.
+    u32 new_game_started : 1;
     u32 flags_290_hi : 31;
 
     RpyGamestate()
@@ -96,8 +115,8 @@ struct RpyInfo
 };
 #pragma pack(pop)
 
-// The start of a .rpy file as the replay manager builds it (ExpHP:
-// zRpyRawFile; "t16r", version 2).
+// The start of a .rpy file as the replay manager allocates it (ExpHP:
+// zRpyRawFile); RpyFileHeader has its fields.
 struct RpyHeader
 {
     u8 data[0x24];
@@ -108,14 +127,16 @@ struct RpyHeader
     }
 };
 
-// RpyHeader's fields as read_replay_file uses them.
+// RpyHeader's fields.
 struct RpyFileHeader
 {
+    // RPY_MAGIC and RPY_VERSION.
     u32 magic;
     u16 version;
     u8 unk_6[0xc - 0x6];
-    // Of the whole file (header plus compressed data).
-    u32 file_size;
+    // Where the USER sections start: the header plus the compressed data.
+    u32 user_offset;
+    // 0x100 in every file the game writes.
     u32 unk_10;
     u8 unk_14[0x1c - 0x14];
     // Of the encrypted, compressed data after the header.
@@ -123,7 +144,8 @@ struct RpyFileHeader
     u32 size;
 };
 
-// A block of recorded input, 900 frames long. ExpHP: zRpyChunk.
+// A block of recorded input, 900 frames long, with a frame rate sample for
+// every 30 frames. ExpHP: zRpyChunk.
 struct RpyChunk
 {
     RpyFrameInput input[900];
@@ -158,39 +180,50 @@ enum ReplayManagerMode
 {
     REPLAY_RECORDING = 0,
     REPLAY_PLAYBACK = 1,
+    // Only read, for the replay menus.
     REPLAY_LOADED = 2,
 };
 
-// Records and plays back replays. Layout from ExpHP's th-re-data
+// Records the game's input into a replay and saves it, plays one back, or
+// just reads one for the menus. Layout from ExpHP's th-re-data
 // (zReplayManager).
 struct ReplayManager
 {
     u32 flags;
     UpdateFunc *on_tick_func;
     UpdateFunc *on_draw_func;
+    // A ReplayManagerMode.
     i32 mode;
+    // Set to 1 when playback reaches stage 3; never read.
     i32 unk_10;
+    // The file header (an RpyHeader).
     void *rpy_file;
     union
     {
         i32 flags_18;
         RpyInfo *info;
     };
+    // While recording: each stage's RpyGamestate.
     void *stage_gamestate_snapshots[8];
     ZunList<RpyChunk> recorded_chunks_by_stage[8];
     ZunList<RpyChunk> *currently_recording_chunk;
     i32 num_chunks_recorded;
+    // While playing back: where each stage's data is in replay_data.
     ReplayStageData stages[8];
-    void *rpy_thing_204;
+    // The decompressed replay (RpyInfo first) read from the file.
+    void *replay_data;
+    // The frame rate recorded for the current 30 frames of playback.
     union
     {
         i32 current_fps_during_playback;
         u8 current_fps;
     };
     i32 current_tick_num_in_stage;
-    UpdateFunc *on_tick_22_func;
+    UpdateFunc *fast_forward_func;
     i32 stage_num;
-    i32 unk_218;
+    // Bit 0: the replay was saved already, so saving again does not add
+    // the end marker or count the stages' frames again.
+    i32 save_flags;
     char filename[0x100];
 
     ReplayManager()
@@ -198,21 +231,36 @@ struct ReplayManager
         memset(this, 0, sizeof(ReplayManager));
     }
     ~ReplayManager();
+    // 0x447760. Sets up recording (the file header, the info and the
+    // first stage's snapshot) or playback, with their callbacks.
     int initialize(i32 mode, const char *filename);
+    // 0x448c10. Reads, decrypts and decompresses a .rpy file (from the
+    // replay directory, or the game's data for a demo) and finds each
+    // stage's data in it.
     int read_replay_file(const char *filename);
     HARNESS_CALLED static ReplayManager *create(i32 mode);
     HARNESS_CALLED static ReplayManager *create_from_file(const char *filename);
     HARNESS_CALLED static void destroy(ReplayManager *replay);
+    // 0x4491c0. Appends an empty chunk to the stage's recording.
     ZunList<RpyChunk> *new_chunk(i32 stage);
+    // 0x449270. Frees the stage's recorded chunks.
     void free_chunks(i32 stage);
 
+    // 0x447fd0. Records the frame's input (and every 30 frames the frame
+    // rate). Priority 0x10, before the game reads input.
     int on_tick_record();
+    // 0x448130. Replaces the frame's input with the recorded one; at the
+    // end marker, opens the replay end menu.
     int on_tick_playback();
     static int __fastcall on_tick_record_thunk(void *arg);
     static int __fastcall on_tick_playback_thunk(void *arg);
-    static int __fastcall on_tick_22(void *arg);
-    static int __fastcall on_draw_47(void *arg);
-    static int __fastcall on_draw_47_body(void *arg);
+    // 0x448e40. Fast-forwards playback while shot or skip is held: the
+    // tick list runs 8 times per frame (priority 0x22).
+    static int __fastcall on_tick_fast_forward(void *arg);
+    // 0x448e90 and 0x4482f0. Shows the recorded frame rate during playback
+    // (priority 0x47), unless the game is paused.
+    static int __fastcall on_draw_fps(void *arg);
+    static int __fastcall draw_fps(void *arg);
 
     // 0x449030. Saves the game state at the start of a stage, or restores
     // it during playback. Every caller goes through g_ReplayManager.
@@ -225,9 +273,10 @@ struct ReplayManager
     // 0x4483b0. Dates the replay and records the stage it ends on (the
     // extra stage as 8 and up). Every caller goes through g_ReplayManager.
     HARNESS_CALLED i32 set_end_stage(i32 extra_stage);
-    // 0x448400. Saves g_ReplayManager's replay under the name. The third
+    // 0x448400. Saves g_ReplayManager's replay under the name, adding the
+    // end marker the first time if add_end_marker is set. The third
     // argument is the same at every call site; LTCG folded it.
-    HARNESS_CALLED i32 save(const char *path, const char *name, i32 unused, i32 unk_4);
+    HARNESS_CALLED i32 save(const char *path, const char *name, i32 unused, i32 add_end_marker);
 };
 
 // 0x449120. Clears the game's button state (not the hardware's).
