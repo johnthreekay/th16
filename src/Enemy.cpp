@@ -194,8 +194,6 @@ EnemyInf *EnemyManager::find_enemy_by_id(int id)
     return enemy;
 }
 
-// TODO: create_func/register_on_* still get this in ecx here (LTCG drops it in the original),
-// and the inlined UpdateFunc constructor keeps its stores in the original.
 // FUNCTION: TH16 0x41ae70
 int EnemyManager::initialize(const char *ecl_filename)
 {
@@ -216,8 +214,8 @@ int EnemyManager::initialize(const char *ecl_filename)
     f->function = (UpdateFuncCallback)on_draw_callback;
     f->on_registration = NULL;
     f->on_cleanup = NULL;
-    f->flags &= ~UPDATE_FUNC_ACTIVE;
     f->arg = this;
+    f->flags &= ~UPDATE_FUNC_ACTIVE;
     g_UpdateFuncRegistry->register_on_draw(f, 0x17);
     on_draw = f;
 
@@ -518,7 +516,8 @@ int __fastcall ecl_ext_damage_stored(EnemyData *enemy, int damage)
 // The third damage hook: the damage the player deals to the hurtboxes
 // around the VM in anm_ids[1] (a rotated bar and a circle below it), on top
 // of the damage the enemy took itself.
-// TODO: the original loads vm->rotation.z into xmm3 after pushing enemy_id; ours before the size.x store.
+// TODO: the original loads vm->rotation.z into xmm3 after pushing enemy_id; ours before the size.x store
+// (separate size.x/size.y stores and get_vm_or_clear do not change it).
 // FUNCTION: TH16 0x425410
 int __fastcall ecl_ext_damage_anm_hurtbox(EnemyData *enemy, int damage)
 {
@@ -831,7 +830,6 @@ int EnemyData::step_logic()
 // GLOBAL: TH16 0x4a6dc0
 EnemyManager *g_EnemyManager;
 
-// TODO: inlined delete_vm loads the child list before storing the flags.
 // FUNCTION: TH16 0x41ba10
 EnemyInf::~EnemyInf()
 {
@@ -1317,8 +1315,6 @@ const char *EnemyInf::check_time_interrupts()
     return NULL;
 }
 
-// TODO: the original loads g_AnmManager after pushing the id (LTCG knows the stubbed
-// get_vm_with_id leaves it alone, so it is loaded once).
 // FUNCTION: TH16 0x423260
 int EnemyData::ecl_anm_set_sprite()
 {
@@ -1337,12 +1333,7 @@ int EnemyData::ecl_anm_set_sprite()
         anm_slot_0_script = full->context.current_context->get_int_arg(1);
         anm_slot_0_anm_index = selected_anm_index;
     }
-    AnmManager *anm;
-    AnmVm *vm = (anm = g_AnmManager)->get_vm_with_id(anm_ids[slot]);
-    if (vm == NULL)
-    {
-        anm_ids[slot].id = 0;
-    }
+    AnmVm *vm = get_vm_or_clear(anm_ids[slot]);
     if (slot == 0)
     {
         final_sprite_size.x = vm->scale.y * vm->sprite_size.y;
@@ -1350,7 +1341,7 @@ int EnemyData::ecl_anm_set_sprite()
     }
     if (flags_low & 0x20)
     {
-        vm = anm->get_vm_with_id(anm_ids[slot]);
+        vm = get_vm(anm_ids[slot]);
         if (vm != NULL)
         {
             vm->clear_flag_lo_2_tree_inline();
