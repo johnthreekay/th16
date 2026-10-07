@@ -3,11 +3,6 @@
 #include "../MainMenu.h"
 #include "../Player.h"
 
-// STUB: TH16 0x44af80
-i32 TitleInf::on_tick()
-{
-    return 1;
-}
 
 // STUB: TH16 0x440fb0
 i32 Player::initialize()

@@ -87,7 +87,9 @@ struct Globals
     i32 unk_224;
     i32 hiscore;
     i32 hiscore_continues;
-    u8 unk_230[0x45c - 0x230];
+    // The difficulty to go back to after the title screen's demo replay.
+    i32 difficulty_before_demo;
+    u8 unk_234[0x45c - 0x234];
     u32 flags_lo_45c : 4;
     // 2: spell practice.
     u32 game_mode : 2;

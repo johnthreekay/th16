@@ -7,7 +7,10 @@
 
 #include "GameErrorContext.h"
 #include "Input.h"
+#include "Globals.h"
 #include "LoadingThread.h"
+#include "ScreenEffect.h"
+#include "StageData.h"
 #include "ReplayManager.h"
 #include "Scorefile.h"
 #include "SoundManager.h"
@@ -724,4 +727,236 @@ unsigned TitleInf::replay_list_thread(void *arg)
 {
     load_replay_list();
     return 0;
+}
+
+// GLOBAL: TH16 0x4a5bf0
+i32 g_title_idle_frames;
+// GLOBAL: TH16 0x4a5bf4
+i32 g_demo_replay_index;
+
+// GLOBAL: TH16 0x49371c
+const char *const g_demo_replay_names[3] = {"demo/demo1.rpy", "demo/demo2.rpy", "demo/demo3.rpy"};
+
+// FUNCTION: TH16 0x44af80
+i32 TitleInf::on_tick()
+{
+    if (state == 1)
+    {
+        g_title_idle_frames++;
+        if ((u16)g_hardware_input != 0)
+        {
+            g_title_idle_frames = 0;
+        }
+        else if (g_title_idle_frames >= 1800)
+        {
+            // Idle on the title screen for 30 seconds: play a demo replay.
+            g_Globals.flags_hi_45c = (g_Globals.flags_hi_45c & ~2) | 1;
+            strcpy(g_current_replay_filename, g_demo_replay_names[g_demo_replay_index]);
+            ReplayManager *replay = ReplayManager::create_from_file(g_current_replay_filename);
+            g_demo_replay_index = (g_demo_replay_index + 1) % 3;
+            i32 stage;
+            for (stage = 0; stage < 8; stage++)
+            {
+                if (replay->stages[stage].gamestate_at_stage_begin != NULL)
+                {
+                    break;
+                }
+            }
+            g_Globals.stage_num = stage;
+            g_Globals.weird_stage_num = stage;
+            g_Supervisor.gamemode_to_switch_to = 13;
+            RpyInfo *info = replay->info;
+            g_stage_data = &g_stage_table[stage];
+            g_Globals.character = info->character;
+            g_Globals.subshot = info->subshot;
+            g_Globals.subseason = info->subseason;
+            g_Globals.difficulty_before_demo = g_Globals.difficulty;
+            g_Globals.difficulty = info->difficulty;
+            replay->~ReplayManager();
+            operator delete(replay, sizeof(ReplayManager));
+            g_unk_4a6f1c = 1;
+            g_title_idle_frames = 0;
+        }
+    }
+    if (flags_5ce8 & 1)
+    {
+        unk_5ce4++;
+        if (unk_5ce4 >= 10)
+        {
+            if (g_Supervisor.config.flags_2c & 0x10)
+            {
+                g_SoundManager.modify_bgm(4, 0, "dummy");
+            }
+            else
+            {
+                g_SoundManager.modify_bgm(3, 0, "dummy");
+            }
+            g_SoundManager.bgm_name[0] = 0;
+            g_Supervisor.play_bgm_wav(0, "th16_01");
+            if (g_Supervisor.config.flags_2c & 0x10)
+            {
+                g_SoundManager.modify_bgm(4, 0, "dummy");
+            }
+            g_SoundManager.modify_bgm(2, 0, "dummy");
+            g_Scorefile->bgm_unlocked[0] = 1;
+            flags_5ce8 &= ~1;
+            unk_5ce4 = 0;
+        }
+    }
+    switch (state)
+    {
+    case 0:
+    {
+        AnmManager *anm = g_AnmManager;
+        anm->disable_vms_from_anm_file(anm->loaded_anms[5]);
+        anm->disable_vms_from_anm_file(anm->loaded_anms[7]);
+        anm->disable_vms_from_anm_file(anm->loaded_anms[2]);
+        anm->disable_vms_from_anm_file(anm->loaded_anms[0]);
+        g_AsciiManager->hide_now_loading();
+        if (g_unk_4a6f1c == 3)
+        {
+            menu.num_choices = 10;
+            menu.set_cursor(0);
+            menu.push();
+            set_state(14);
+            g_unk_4a6f1c = 1;
+            on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+            do_state_4532f0();
+            break;
+        }
+        if (!(g_Globals.flags_hi_45c & 1))
+        {
+            flags_5ce8 |= 1;
+            unk_5ce4 = 0;
+        }
+        else
+        {
+            flags_5ce8 &= ~1;
+            g_Globals.difficulty = g_Globals.difficulty_before_demo;
+        }
+        g_Globals.flags_hi_45c &= ~1;
+        if (g_unk_4a6f1c == 0)
+        {
+            flags_5ce8 |= 2;
+            set_state(1);
+            g_unk_4a6f1c = 1;
+            on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+            do_title_screen();
+            break;
+        }
+        flags_5ce8 &= ~2;
+        if (g_unk_4a6f1c == 1)
+        {
+            if (g_Globals.difficulty == 4)
+            {
+                menu.set_cursor(1);
+            }
+            set_state(1);
+            on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+            do_title_screen();
+        }
+        else if (g_unk_4a6f1c == 2)
+        {
+            g_Supervisor.play_bgm_wav(0, "th16_01");
+            g_Supervisor.play_bgm(0, 0);
+            g_Globals.set_game_mode(0);
+            menu.num_choices = 10;
+            menu.set_cursor(4);
+            menu.push();
+            set_state(11);
+            g_unk_4a6f1c = 1;
+            on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+            do_replay_menu();
+        }
+        else if (g_unk_4a6f1c == 5)
+        {
+            ScreenEffect::create(9, 30, 0, 0, 0, 0x54);
+            anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
+            AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
+            set_state(17);
+            g_unk_4a6f1c = 1;
+            on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+            do_spell_practice_stage_select();
+        }
+        else if (g_unk_4a6f1c == 4)
+        {
+            ScreenEffect::create(9, 30, 0, 0, 0, 0x54);
+            anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
+            AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
+            set_state(5);
+            on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+            do_difficulty_select();
+        }
+        else
+        {
+            on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+            do_title_screen();
+        }
+        break;
+    }
+    case 1:
+        on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+        do_title_screen();
+        break;
+    case 5:
+        do_difficulty_select();
+        break;
+    case 11:
+        do_replay_menu();
+        break;
+    case 14:
+        do_state_4532f0();
+        break;
+    case 17:
+        do_spell_practice_stage_select();
+        break;
+    case 3:
+        do_options();
+        break;
+    case 4:
+        do_key_config();
+        break;
+    case 2:
+        g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & SUPERVISOR_FLAG_2000) ? 2 : 3;
+        g_Supervisor.stop_bgm();
+        break;
+    case 9:
+        g_Supervisor.stop_bgm();
+        break;
+    case 12:
+        g_Supervisor.stop_bgm();
+        break;
+    case 6:
+        do_character_select();
+        break;
+    case 7:
+        do_subseason_select();
+        break;
+    case 8:
+        do_practice_stage_select();
+        break;
+    case 13:
+        do_music_room();
+        break;
+    case 18:
+        do_spell_practice_row();
+        break;
+    case 19:
+        do_spell_practice_difficulty();
+        break;
+    case 20:
+        do_spell_practice_subseason();
+        break;
+    case 10:
+        do_state_452330();
+        break;
+    case 16:
+        do_manual();
+        break;
+    case 15:
+        do_replay_save();
+        break;
+    }
+    time_in_state.tick();
+    return 1;
 }
