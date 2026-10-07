@@ -61,3 +61,21 @@ i32 harness_w4f_line(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 length)
                                    (vm->flags_hi >> 21) & 3, 0) +
            other->draw_line(x, y, length, vm->rotation.x, vm->color_2.d3d, vm->color_1.d3d, vm->int_vars[0], 0);
 }
+
+// AnmManager::draw_vm (0x4688b8) draws rectangles for render mode 17.
+i32 harness_w4f_rect(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 width)
+{
+    return g_AnmManager->draw_rect(x, y, width, vm->scale.y, vm->rotation.z, vm->color_1.d3d, vm->color_1.d3d,
+                                   (vm->flags_hi >> 21) & 3, (vm->flags_hi >> 23) & 3) +
+           other->draw_rect(x, y, width, vm->scale.x, vm->rotation.x, vm->color_2.d3d, vm->color_1.d3d,
+                            vm->int_vars[0], vm->int_vars[1]);
+}
+
+// AnmManager::draw_vm (0x4689a4) draws bordered rectangles for render mode 20.
+i32 harness_w4f_rect_bordered(AnmManager *other, AnmVm *vm, f32 x, f32 y, f32 width)
+{
+    return g_AnmManager->draw_rect_bordered(x, y, width, vm->scale.y, vm->rotation.z, vm->color_1.d3d,
+                                            vm->color_2.d3d, (vm->flags_hi >> 21) & 3, (vm->flags_hi >> 23) & 3) +
+           other->draw_rect_bordered(x, y, width, vm->scale.x, vm->rotation.x, vm->color_2.d3d, vm->color_1.d3d,
+                                     vm->int_vars[0], vm->int_vars[1]);
+}

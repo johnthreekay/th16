@@ -451,6 +451,13 @@ struct AnmManager
     // 0x469a00. A circle outline of count segments around (x, y), from
     // angle on. draw_vm passes x, y and radius in xmm registers.
     HARNESS_CALLED i32 draw_circle_outline(f32 x, f32 y, f32 radius, f32 angle, i32 count, D3DCOLOR color);
+    // 0x468c70. A rotated rectangle at (x, y), anchored by anchor_x and
+    // anchor_y (0 center, 1 left/top, 2 right/bottom).
+    HARNESS_CALLED i32 draw_rect(f32 x, f32 y, f32 width, f32 height, f32 angle, D3DCOLOR color_1, D3DCOLOR color_2,
+                                 i32 anchor_x, i32 anchor_y);
+    // 0x469570. draw_rect over a half-transparent one pixel border.
+    HARNESS_CALLED i32 draw_rect_bordered(f32 x, f32 y, f32 width, f32 height, f32 angle, D3DCOLOR color_1,
+                                          D3DCOLOR color_2, i32 anchor_x, i32 anchor_y);
     // 0x469330. A line through (x, y) at angle (anchor: 0 center, 1 start,
     // 2 end). The last argument is the same at every call site; LTCG folded
     // it.
