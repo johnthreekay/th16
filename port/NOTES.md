@@ -423,8 +423,12 @@ with fog, enemies, items, HUD, the spring season release, the player's
 invincibility blink), the pause menu (its blurred copy of the playfield
 goes through D3DXLoadSurfaceFromSurface from a render target), and the
 in-game screenshot (P: back buffer LockRect, written as a BMP by the
-game's thread). Text drawn through GDI (TextHelper) stays blank until the
-GDI layer exists; the textures it fills work like any other.
+game's thread). Also on Mesa (llvmpipe, through EGL: point
+`__EGL_VENDOR_LIBRARY_FILENAMES` at glvnd's `50_mesa.json`), and with BGM
+on through dsound_sdl.cpp on SDL's dummy audio driver (the stage starts,
+so the BGM thread drains its queue). Text drawn through GDI (TextHelper)
+stays blank until the GDI layer exists; the textures it fills work like
+any other.
 
 ## Game data in src/stub/
 
