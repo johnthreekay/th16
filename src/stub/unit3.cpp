@@ -25,9 +25,3 @@ i8 g_spell_difficulty[0x78];
 // GLOBAL: TH16 0x4a51c4
 u32 g_hardware_input_held_4a51c4;
 
-// STUB: TH16 0x417930
-i32 Spellcard::on_tick_body()
-{
-    return 1;
-}
-
