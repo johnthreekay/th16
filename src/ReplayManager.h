@@ -57,7 +57,10 @@ struct RpyInfo
 {
     u8 unk_0[0xc];
     __time64_t timestamp;
-    u8 unk_14[0x84 - 0x14];
+    u8 unk_14[0x7c - 0x14];
+    // Percentage of frames slowed down.
+    f32 slowdown;
+    u8 unk_80[0x84 - 0x80];
     i32 character;
     i32 subshot;
     i32 difficulty;

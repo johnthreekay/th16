@@ -33,9 +33,16 @@ class TitleInf : public TaskInf
     AnmId anm_id_73c;
     AnmId anm_ids_740[0x24];
     AnmId anm_ids_7d0[9];
-    u8 unk_7f4[0x5a5c - 0x7f4];
+    u8 unk_7f4[0x5a48 - 0x7f4];
+    // The replay name being entered, and the cursor in it.
+    char replay_name[0xc];
+    i32 replay_name_cursor;
+    i32 unk_5a58;
     MenuHelper menu_5a5c;
-    u8 unk_5b34[0x5b50 - 0x5b34];
+    u8 unk_5b34[0x5b48 - 0x5b34];
+    // The replay slot being saved to.
+    i32 replay_slot;
+    u8 unk_5b4c[0x5b50 - 0x5b4c];
     ReplayManager *replays[100];
     // Allocated with malloc.
     void *unk_5ce0;

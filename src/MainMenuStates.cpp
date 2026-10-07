@@ -3,6 +3,7 @@
 #include <direct.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "MainMenu.h"
 
@@ -214,6 +215,139 @@ i32 TitleInf::on_draw__spell_practice_histories()
         g_AsciiManager->draw_shadows = 0;
         g_AsciiManager->color.d3d = 0xffffffff;
     }
+    return 1;
+}
+
+// Name tables of the replay lists.
+// GLOBAL: TH16 0x4918c0
+const char *const g_season_names[5] = {"Spring", "Summer", "Autumn", "Winter", "Full  "};
+// GLOBAL: TH16 0x4918d4
+const char *const g_difficulty_letters[6] = {"E ", "N ", "H ", "L ", "EX", "OD"};
+// GLOBAL: TH16 0x4918f0
+const char *const g_stage_short_names[8] = {"tst", "St1", "St2", "St3", "St4", "St5", "St6", "Ex "};
+// GLOBAL: TH16 0x491910
+const char *const g_all_stages_names[2] = {"All", "ExA"};
+// GLOBAL: TH16 0x491950
+const char *const g_difficulty_names[6] = {"Easy   ", "Normal ", "Hard   ", "Lunatic", "Extra  ", "O.D.   "};
+// GLOBAL: TH16 0x491970
+const char *const g_character_names[4] = {"Reimu  ", "Cirno  ", "Aya    ", "Marisa "};
+// The characters of the name entry grid; the last three are drawn as the
+// special glyphs 0x81, 0x7f and 0x80.
+// GLOBAL: TH16 0x492840
+const char g_name_entry_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-=.,!?@:;[]()_/{}|~^#$%&*   ";
+
+// The replay save screen: the 25 slots, then the chosen slot with the name
+// being entered and the character grid.
+// TODO: ours realigns its frame to 64 bytes (and esp, -64) because of the double vararg (the slowdown); unknown why.
+// FUNCTION: TH16 0x4541b0
+i32 TitleInf::on_draw__4541b0()
+{
+    Float3 pos;
+    switch (substate)
+    {
+    case 2:
+    {
+        pos.x = 58.0f;
+        pos.y = 80.0f;
+        pos.z = 0.0f;
+        g_AsciiManager->draw_shadows = 1;
+        for (i32 i = 0; i < 25;)
+        {
+            g_AsciiManager->color.d3d = menu.next_selection == i ? 0xffffff00 : 0xff808080;
+            if (replays[i] != NULL)
+            {
+                RpyInfo *info = replays[i]->info;
+                struct tm *time = localtime(&info->timestamp);
+                i++;
+                g_AsciiManager->create_stringf(&pos, "No.%.2d %s %.2d/%.2d/%.2d %.2d:%.2d %s %s %s %2.1f%%", i,
+                                               (const char *)info->unk_0, time->tm_year % 100, time->tm_mon + 1,
+                                               time->tm_mday, time->tm_hour, time->tm_min,
+                                               g_character_names[info->character + info->subshot],
+                                               g_difficulty_names[info->difficulty],
+                                               g_stage_short_names[info->stage], info->slowdown);
+            }
+            else
+            {
+                i++;
+                g_AsciiManager->create_stringf(
+                    &pos, "No.%.2d -------- --/--/-- --:-- ------- ------- --- ---%%", i);
+            }
+            pos.y += 15.0f;
+        }
+        break;
+    }
+    case 3:
+    {
+        i32 slot = replay_slot;
+        pos.x = 58.0f;
+        pos.y = 240.0f;
+        pos.z = 0.0f;
+        if (time_in_state.current < 10)
+        {
+            pos.y = (10.0f - time_in_state.current_f) * ((f32)(slot * 15 + 80) - 240.0f) / 10.0f + 240.0f;
+        }
+        RpyInfo *info = g_ReplayManager->info;
+        struct tm *time = localtime(&info->timestamp);
+        g_AsciiManager->create_stringf(&pos, "No.%.2d %s %.2d/%.2d/%.2d %.2d:%.2d %s %s %s %2.1f%%", slot + 1,
+                                       "        ", time->tm_year % 100, time->tm_mon + 1, time->tm_mday,
+                                       time->tm_hour, time->tm_min,
+                                       g_character_names[info->character + info->subshot],
+                                       g_difficulty_names[info->difficulty], g_all_stages_names[0],
+                                       info->slowdown);
+        if (time_in_state.current >= 10)
+        {
+            pos.x = 112.0f;
+            pos.y = 240.0f;
+            pos.z = 0.0f;
+            g_AsciiManager->color.d3d = 0xffffffff;
+            g_AsciiManager->create_stringf(&pos, "%s", replay_name);
+            pos.x = replay_name_cursor * 9 + 112.0f;
+            if (replay_name_cursor == 8)
+            {
+                pos.x -= 9.0f;
+            }
+            g_AsciiManager->color.d3d = 0xffffff00;
+            g_AsciiManager->create_stringf(&pos, "_");
+            pos.x = 212.0f;
+            pos.y = 360.0f;
+            pos.z = 0.0f;
+            g_AsciiManager->color.d3d = 0xffffffff;
+            for (i32 i = 0; i < 91; i++)
+            {
+                g_AsciiManager->color.d3d = menu_5a5c.next_selection == i ? 0xffffff00 : 0xff808080;
+                i32 c;
+                if (i < 88)
+                {
+                    c = g_name_entry_chars[i];
+                }
+                else if (i == 88)
+                {
+                    c = 0x81;
+                }
+                else
+                {
+                    c = (i != 89) + 0x7f;
+                }
+                g_AsciiManager->create_stringf(&pos, "%c", c);
+                if (i % 13 == 12)
+                {
+                    pos.x = 212.0f;
+                    pos.y += 16.0f;
+                }
+                else
+                {
+                    pos.x += 18.0f;
+                }
+            }
+            g_AsciiManager->color.d3d = 0xffffffff;
+        }
+        break;
+    }
+    default:
+        return 1;
+    }
+    g_AsciiManager->color.d3d = 0xffffffff;
+    g_AsciiManager->draw_shadows = 0;
     return 1;
 }
 
