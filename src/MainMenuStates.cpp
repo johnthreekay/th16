@@ -410,6 +410,128 @@ i32 TitleInf::do_spell_practice_subseason()
     return 1;
 }
 
+// Spell practice: picking the spell card (the difficulty row). Extra stage
+// cards start the game right away; the others go on to the subseason.
+// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// FUNCTION: TH16 0x456a20
+i32 TitleInf::do_spell_practice_difficulty()
+{
+    switch (substate)
+    {
+    case 0:
+        menu.num_choices = 5;
+        for (i32 i = 0; i < 5; i++)
+        {
+            if (spell_ids[i] < 0)
+            {
+                menu.disable(i);
+            }
+        }
+        menu.set_cursor(0);
+        if (g_spell_practice_last_index >= 0)
+        {
+            menu.set_cursor(g_spell_practice_last_index);
+            g_spell_practice_last_index = -1;
+        }
+        highlight_spell_row(menu.next_selection);
+        set_substate(1);
+    case 1:
+        if (time_in_state.current > 10)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        menu.current_selection = menu.next_selection;
+        if (input_pressed_or_repeating(INPUT_UP))
+        {
+            menu.move_cursor(-1);
+        }
+        if (input_pressed_or_repeating(INPUT_DOWN))
+        {
+            menu.move_cursor(1);
+        }
+        if (menu.current_selection != menu.next_selection)
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+            highlight_spell_row(menu.next_selection);
+        }
+        do_spell_practice_character();
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            set_substate(4);
+            g_SoundManager.play_sound_centered(9, 0);
+            return 1;
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            AnmManager::interrupt_tree(anm_ids_740[menu.next_selection], 6);
+            set_substate(3);
+            g_SoundManager.play_sound_centered(7, 0);
+            if (spell_stage == 6)
+            {
+                g_Supervisor.fade_out_bgm(0.05f);
+                g_SoundManager.play_sound_centered(50, 0);
+                return 1;
+            }
+        }
+        break;
+    case 3:
+        if (spell_stage == 6)
+        {
+            if (time_in_state.current == 10)
+            {
+                g_AsciiManager->show_now_loading(480.0f, 392.0f);
+                AnmId id;
+                id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+                g_Supervisor.config.unk_0 = id.id;
+                AnmManager::interrupt_tree(id, 7);
+            }
+            if (time_in_state.current >= 40)
+            {
+                menu.push();
+                set_state(2);
+                g_unk_4a6f1c = 5;
+                i32 stage = spell_stage + 1;
+                g_Globals.stage_num = stage;
+                g_Globals.weird_stage_num = stage;
+                g_stage_data = &g_stage_table[stage];
+                g_Globals.spell_id = spell_ids[menu.next_selection];
+                g_Globals.character = menu_5cec.next_selection;
+                g_Globals.subshot = 0;
+                g_Globals.subseason = 4;
+                g_Supervisor.gamemode_to_switch_to = 7;
+                g_Globals.difficulty = g_spell_difficulty[spell_ids[menu.next_selection]];
+                g_spell_practice_last_stage = spell_stage;
+                g_spell_practice_last_row = spell_row;
+                g_spell_practice_last_index = menu.next_selection;
+                return 1;
+            }
+        }
+        else if (time_in_state.current >= 14)
+        {
+            spell_index = menu.next_selection;
+            set_state(20);
+            menu.push();
+            interrupt_and_clear(0x6b);
+            menu.set_cursor(0);
+            return 1;
+        }
+        break;
+    case 4:
+        if (time_in_state.current >= 6)
+        {
+            AnmManager::interrupt_tree(anm_ids[0xd8], 1);
+            anm_ids[0xd8].id = 0;
+            set_state(18);
+            menu.pop();
+        }
+        break;
+    }
+    return 1;
+}
+
 // Highlights the selected row of the spell list (interrupt 2) and dims the
 // others (3), with the difficulty icon of each row's spell card.
 // FUNCTION: TH16 0x4569a0
