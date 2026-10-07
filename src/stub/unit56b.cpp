@@ -9,17 +9,6 @@ i32 Player::on_tick_body()
     return 1;
 }
 
-// STUB: TH16 0x446260
-i32 __fastcall sht_on_tick_446260(PlayerBullet *bullet)
-{
-    return 0;
-}
-
-// STUB: TH16 0x446870
-i32 __fastcall sht_on_hit_446870(PlayerBullet *bullet, i32 unk, i32 enemy, f32 x, f32 y)
-{
-    return 0;
-}
 
 
 // STUB: TH16 0x418650

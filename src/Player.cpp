@@ -6,6 +6,7 @@
 #include "Player.h"
 
 #include "Bomb.h"
+#include "Collision.h"
 #include "FileSystem.h"
 #include "EffectManager.h"
 #include "EnemyManager.h"
@@ -748,4 +749,107 @@ HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 wi
     }
     die();
     return 1;
+}
+
+// FUNCTION: TH16 0x445a30
+HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f32 rotation, f32 radius,
+                                                   i32 *hit_flag, Float3 *hit_pos, i32 no_score, i32 enemy_id)
+{
+    Player *player = g_Player;
+    if (player->inner.time_in_state.current == player->inner.time_in_state.previous)
+    {
+        return 0;
+    }
+    i32 total = g_MainBomb->in_use == 0 ? 0 : g_MainBomb->method_c((i32)pos, (i32)size);
+    if (hit_flag != NULL)
+    {
+        *hit_flag = total > 0 ? 1 : 0;
+    }
+    for (i32 i = 0; i < 0x100; i++)
+    {
+        PlayerDamageSource *source = &player->inner.damage_sources[i];
+        if (!(source->flags & 1))
+        {
+            continue;
+        }
+        if (source->timer_60.current == source->timer_60.previous || source->timer_60.current % source->unk_80 != 0)
+        {
+            continue;
+        }
+        if (!(source->flags & 2))
+        {
+            if (size != NULL)
+            {
+                if (!collision_test_rect_rect(source->pos.pos.x, source->pos.pos.y, source->unk_14, source->unk_18,
+                                              source->unk_c, pos->x, pos->y, size->x, size->y, rotation))
+                {
+                    continue;
+                }
+            }
+            else if (!collision_test_circle_rect(source->pos.pos.x, source->pos.pos.y, source->unk_14,
+                                                 source->unk_18, source->unk_c, pos->x, pos->y, radius))
+            {
+                continue;
+            }
+        }
+        else if (size != NULL)
+        {
+            if (!collision_test_circle_rect(pos->x, pos->y, size->x, size->y, rotation, source->pos.pos.x,
+                                            source->pos.pos.y, source->radius))
+            {
+                continue;
+            }
+        }
+        else
+        {
+            f32 dx = source->pos.pos.x - pos->x;
+            f32 dy = source->pos.pos.y - pos->y;
+            f32 r = source->radius + radius;
+            if (dx * dx + dy * dy > r * r)
+            {
+                continue;
+            }
+        }
+        if (enemy_id != 0)
+        {
+            if (source->unk_84 == enemy_id)
+            {
+                continue;
+            }
+            source->unk_84 = enemy_id;
+        }
+        if (hit_flag != NULL && (source->flags & 4))
+        {
+            *hit_flag = 1;
+        }
+        i32 damage = source->damage;
+        if (!no_score)
+        {
+            if (source->unk_90 != 0)
+            {
+                source->hit_func = enemy_id;
+                damage = g_damage_source_hit_funcs[source->unk_90](source, (i32)pos, (i32)size, rotation, radius);
+            }
+            source->total_damage_dealt += source->damage;
+        }
+        total += damage;
+        if (hit_pos != NULL)
+        {
+            *hit_pos = source->pos.pos;
+        }
+        if (source->unk_7c < 9999999 && source->unk_7c <= source->total_damage_dealt)
+        {
+            source->flags &= ~1;
+            source->damage = 0;
+        }
+    }
+    if (total > player->sht_file->max_damage)
+    {
+        total = player->sht_file->max_damage;
+    }
+    if (!no_score && total != 0)
+    {
+        g_Globals.add_to_score(total / 10 + 10);
+    }
+    return total;
 }

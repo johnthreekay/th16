@@ -65,7 +65,12 @@ struct PlayerBullet
     i32 unk_94;
     i32 unk_98;
     i32 unk_9c;
-    i32 unk_a0;
+    union
+    {
+        i32 unk_a0;
+        // Marisa's laser (sht_on_tick_446260): its current length.
+        f32 laser_length;
+    };
     i32 unk_a4;
     i32 unk_a8;
     // Which shooter of the .sht file fired it: index in the low byte,
@@ -150,7 +155,8 @@ struct PlayerInner
     i32 unk_16074;
     // Set every frame by the autumn release.
     f32 speed_multiplier;
-    u8 unk_1607c[0x16090 - 0x1607c];
+    u8 unk_1607c[0x1608c - 0x1607c];
+    i32 num_season_options;
 
     // 0x440ec0. Only the members' constructors; out of line, as the
     // original calls it for both of Player's copies and a global one.
@@ -310,6 +316,13 @@ struct Player
     // use this.
     i32 read_sht_file(ShtFile **out, const char *path);
 
+    // The option a shooter's option number (minus one) names: 100 and up
+    // are season options.
+    PlayerOption *get_option(i32 index)
+    {
+        return index >= 100 ? &inner.subseason_options[index - 100] : &inner.main_options[index];
+    }
+
     // The shooter a bullet's shooter_ref names.
     ShtShooter *get_shooter(i32 ref)
     {
@@ -341,6 +354,17 @@ struct Player
     i32 on_tick_body();
     static i32 __fastcall on_tick_callback(Player *player);
     static i32 __fastcall on_draw_callback(Player *player);
+
+    // 0x445a30. Applies the player's damage sources (and the bomb) to an
+    // enemy at pos: a rectangle of size rotated by rotation, or a circle
+    // of radius when size is NULL. Returns the damage (capped by the shot
+    // type), sets *hit_flag when something hit that should flash the enemy
+    // and *hit_pos to the last hitting source. no_score skips the score
+    // and the sources' hit callbacks; enemy_id stops a source hitting the
+    // same enemy twice in a row. Reaches the player through g_Player; LTCG
+    // dropped this and passes rotation in xmm3.
+    HARNESS_CALLED i32 compute_damage_to_enemy(Float3 *pos, Float3 *size, f32 rotation, f32 radius, i32 *hit_flag,
+                                               Float3 *hit_pos, i32 no_score, i32 enemy_id);
 
     // Members that reach the player through g_Player; LTCG dropped this.
     // 0x444cf0. Counts a graze at pos: effect, popup, sound and a graze
