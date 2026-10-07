@@ -600,7 +600,7 @@ void AnmManager::remove_tree(AnmVm *vm, ZunList<AnmVm> *delete_list)
 // FUNCTION: TH16 0x46e710
 i32 __fastcall AnmManager::on_tick_21_world(AnmManager *mgr)
 {
-    if (g_GameThread != NULL && (g_GameThread->flags.flag_0 | g_GameThread->flags.paused) &&
+    if (g_GameThread != NULL && (g_GameThread->flags.flag_0 | g_GameThread->flags.loading) &&
         g_GameThread->flags.flag_1)
     {
         return 1;

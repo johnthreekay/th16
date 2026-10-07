@@ -2,7 +2,8 @@
 
 #include "types.h"
 
-// ExpHP: zTableStageDataArrayItem.
+// A boss in the stage table: its spell card background and effect, and the
+// ECL anm scripts of its intro and face. ExpHP: zTableStageDataArrayItem.
 struct StageBoss
 {
     // The anm slot and script of the spell card background, and whether
@@ -36,7 +37,9 @@ struct StageData
     // One dialogue file per character.
     const char *msg_files[4];
     const char *logo_anm_filename;
+    // The two themes' BGM numbers (play_bgm, and the music room unlocks).
     i32 music_ids[2];
+    // Not used.
     i32 unk_30;
     StageBoss bosses[4];
 };

@@ -44,15 +44,15 @@ void harness_w3c_gui_spell_bonus(i32 captured, i32 bonus)
 {
     if (captured)
     {
-        g_Gui->sub_42bcf0(bonus, 0);
+        g_Gui->show_notice(bonus, GUI_NOTICE_SPELL_BONUS);
     }
     else
     {
-        g_Gui->sub_42bcf0(0, 1);
+        g_Gui->show_notice(0, GUI_NOTICE_BONUS_FAILED);
     }
 }
 
-// Like the stage clear code at 0x42e171 (stage_clear_42e150).
+// Like the stage clear code at 0x42e171 (stage_clear).
 void harness_w3c_player_withdraw_options()
 {
     g_Player->withdraw_options();

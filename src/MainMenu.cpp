@@ -36,7 +36,7 @@ static_assert(offsetof(TitleInf, replays) == 0x5b50, "TitleInf::replays");
 static_assert(offsetof(TitleInf, thread) == 0x5de4, "TitleInf::thread");
 static_assert(sizeof(TitleInf) == 0x5e00, "TitleInf");
 
-extern i32 g_unk_4c0f40;
+extern i32 g_cancel_screen_effects;
 
 // GLOBAL: TH16 0x4a6f20
 TitleInf *g_MainMenu;
@@ -124,7 +124,7 @@ unsigned __stdcall TitleInf::thread_start()
     }
     if (g_LoadingThread != NULL)
     {
-        while (g_LoadingThread->count_638 < 180 && !(g_Supervisor.flags & 0x180))
+        while (g_LoadingThread->draw_count < 180 && !(g_Supervisor.flags & 0x180))
         {
             Sleep(16);
         }
@@ -166,7 +166,7 @@ HARNESS_CALLED i32 TitleInf::initialize()
         return -1;
     }
     menu.wraps = 1;
-    g_unk_4c0f40 = 0;
+    g_cancel_screen_effects = 0;
     return 0;
 }
 
@@ -948,7 +948,7 @@ i32 TitleInf::on_tick()
         else if (g_title_idle_frames >= 1800)
         {
             // Idle on the title screen for 30 seconds: play a demo replay.
-            g_Globals.flags_hi_45c = (g_Globals.flags_hi_45c & ~2) | 1;
+            g_Globals.flags_hi_45c = (g_Globals.flags_hi_45c & ~GLOBALS_HI_2) | GLOBALS_HI_DEMO_PLAY;
             strcpy(g_current_replay_filename, g_demo_replay_names[g_demo_replay_index]);
             ReplayManager *replay = ReplayManager::create_from_file(g_current_replay_filename);
             g_demo_replay_index = (g_demo_replay_index + 1) % 3;
@@ -1022,7 +1022,7 @@ i32 TitleInf::on_tick()
             do_score_name_entry();
             break;
         }
-        if (!(g_Globals.flags_hi_45c & 1))
+        if (!(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY))
         {
             flags_5ce8 |= 1;
             unk_5ce4 = 0;
@@ -1032,7 +1032,7 @@ i32 TitleInf::on_tick()
             flags_5ce8 &= ~1;
             g_Globals.difficulty = g_Globals.difficulty_before_demo;
         }
-        g_Globals.flags_hi_45c &= ~1;
+        g_Globals.flags_hi_45c &= ~GLOBALS_HI_DEMO_PLAY;
         if (g_unk_4a6f1c == 0)
         {
             flags_5ce8 |= 2;
@@ -1045,7 +1045,7 @@ i32 TitleInf::on_tick()
         flags_5ce8 &= ~2;
         if (g_unk_4a6f1c == 1)
         {
-            if (g_Globals.difficulty == 4)
+            if (g_Globals.difficulty == DIFFICULTY_EXTRA)
             {
                 menu.set_cursor(1);
             }
@@ -1057,7 +1057,7 @@ i32 TitleInf::on_tick()
         {
             g_Supervisor.play_bgm_wav(0, "th16_01");
             g_Supervisor.play_bgm(0, 0);
-            g_Globals.set_game_mode(0);
+            g_Globals.set_game_mode(GAME_MODE_NORMAL);
             menu.num_choices = 10;
             menu.set_cursor(4);
             menu.push();
@@ -1208,15 +1208,15 @@ i32 TitleInf::do_title_screen()
         {
             menu.disable(1);
         }
-        if (g_Globals.game_mode == 2)
+        if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE)
         {
             menu.set_cursor(3);
-            g_Globals.set_game_mode(0);
+            g_Globals.set_game_mode(GAME_MODE_NORMAL);
         }
-        else if (g_Globals.game_mode != 0)
+        else if (g_Globals.game_mode != GAME_MODE_NORMAL)
         {
             menu.set_cursor(2);
-            g_Globals.set_game_mode(0);
+            g_Globals.set_game_mode(GAME_MODE_NORMAL);
         }
         set_substate(1);
         if (flags_5ce8 & 2)
@@ -1371,7 +1371,7 @@ i32 TitleInf::do_title_screen()
         switch (menu.next_selection)
         {
         case 0:
-            g_Globals.set_game_mode(0);
+            g_Globals.set_game_mode(GAME_MODE_NORMAL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             set_state(5);
             menu.push();
@@ -1379,15 +1379,15 @@ i32 TitleInf::do_title_screen()
             g_Globals.difficulty = g_last_difficulty;
             return 1;
         case 1:
-            g_Globals.set_game_mode(0);
+            g_Globals.set_game_mode(GAME_MODE_NORMAL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             set_state(5);
             menu.push();
-            g_Globals.difficulty = 4;
+            g_Globals.difficulty = DIFFICULTY_EXTRA;
             menu.set_cursor(0);
             return 1;
         case 2:
-            g_Globals.set_game_mode(1);
+            g_Globals.set_game_mode(GAME_MODE_STAGE_PRACTICE);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             menu.push();
             menu.set_cursor(g_last_difficulty);
@@ -1395,7 +1395,7 @@ i32 TitleInf::do_title_screen()
             g_Globals.difficulty = g_last_difficulty;
             return 1;
         case 3:
-            g_Globals.set_game_mode(2);
+            g_Globals.set_game_mode(GAME_MODE_SPELL_PRACTICE);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             set_state(17);
             menu.push();

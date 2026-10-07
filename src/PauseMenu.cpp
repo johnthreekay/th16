@@ -136,7 +136,7 @@ int PauseMenu::on_tick()
     switch (state)
     {
     case 0:
-        if (!(g_Globals.flags_hi_45c & 1) && !g_GameThread->flags.flag_16 &&
+        if (!(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY) && !g_GameThread->flags.music_restart &&
             ((g_hardware_input_pressed & 0x100) || (g_Supervisor.flags & 0x10)) && g_GameThread->on_tick != NULL &&
             (g_GameThread->on_tick->flags & UPDATE_FUNC_ACTIVE) && g_GameThread->time_in_stage.current >= 30)
         {
@@ -432,7 +432,7 @@ void PauseMenu::open()
     GameThread::update_play_time();
     set_state(1);
     GameThread *thread = g_GameThread;
-    thread->flags.flag_4 = 1;
+    thread->flags.in_menu = 1;
     front_anm = g_Gui->front_anm;
     delete_vm_and_clear(anm_id_1e4);
     if (thread->replay_mode != 0)
@@ -446,7 +446,7 @@ void PauseMenu::open()
     AnmManager::interrupt_tree(anm_id_1e4, 3);
     SoundManager::pause_sounds();
     g_SoundManager.play_sound_centered(0xe, 0);
-    if (g_Globals.game_mode != 2)
+    if (g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE)
     {
         g_SoundManager.modify_bgm(6, 0, "Pause");
     }
@@ -463,7 +463,7 @@ void PauseMenu::open()
     {
         gui->msg->hide();
     }
-    AnmVm *vm = g_AnmManager->get_vm_with_id(gui->ids_11c[4]);
+    AnmVm *vm = g_AnmManager->get_vm_with_id(gui->overlay_ids[4]);
     if (vm != NULL)
     {
         vm->hide_tree_inline();
@@ -481,14 +481,14 @@ void game_over_43f500()
         g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
         return;
     }
-    g_GameThread->flags.flag_4 = 1;
+    g_GameThread->flags.in_menu = 1;
     menu->set_state(3);
     menu->set_unk_1f4_inline(3);
-    if (g_Globals.game_mode == 2)
+    if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE)
     {
         menu->set_unk_1f4(5);
     }
-    if (g_Globals.game_mode == 0)
+    if (g_Globals.game_mode == GAME_MODE_NORMAL)
     {
         menu->anm_id_1e8 = g_Supervisor.text_anm->create_ui_vm_at_origin(0x34, 0);
         g_AnmManager->copy_screen_to_sprite(menu->anm_id_1e8, (i32)(g_screen_coord_scale * 32.0f),
@@ -506,7 +506,7 @@ void game_over_43f500()
     {
         gui->msg->hide();
     }
-    Gui::sub_42c580();
+    Gui::hide_chapter_result_vm();
     menu->flags_3ec |= 4;
 }
 
@@ -514,9 +514,9 @@ void game_over_43f500()
 // FUNCTION: TH16 0x43f7e0
 void PauseMenu::begin_score_entry()
 {
-    if (g_Globals.game_mode != 2)
+    if (g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE)
     {
-        if (g_Globals.game_mode != 0)
+        if (g_Globals.game_mode != GAME_MODE_NORMAL)
         {
             ScorefilePractice *practice = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
                                                .practices[g_Globals.difficulty][g_Globals.stage_num - 1];
@@ -573,7 +573,7 @@ void replay_ended_43f240()
     PauseMenu *menu = g_PauseMenu;
     menu->set_state(1);
     menu->set_unk_1f4_inline(1);
-    g_GameThread->flags.flag_4 = 1;
+    g_GameThread->flags.in_menu = 1;
     menu->take_snapshot();
     menu->front_anm = g_Gui->front_anm;
     delete_vm_and_clear(menu->anm_id_1e4);
@@ -601,10 +601,10 @@ void pause_menu_43f350()
     }
     menu->set_state(2);
     menu->set_unk_1f4_inline(2);
-    g_GameThread->flags.flag_4 = 1;
+    g_GameThread->flags.in_menu = 1;
     SoundManager::pause_sounds();
     g_SoundManager.play_sound_centered(0xe, 0);
-    if (g_Globals.game_mode != 2)
+    if (g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE)
     {
         g_SoundManager.modify_bgm(6, 0, "Pause");
     }
@@ -613,7 +613,7 @@ void pause_menu_43f350()
     }
     menu->take_snapshot();
     menu->front_anm = g_Gui->front_anm;
-    if (g_Globals.game_mode != 2)
+    if (g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE)
     {
         strcpy(menu->saved_bgm_name, g_SoundManager.get_bgm_name());
         menu->saved_bgm_time = g_SoundManager.bgm_play_time();
@@ -652,14 +652,14 @@ void PauseMenu::leave_state_1()
     {
         g_play_time_runtime = get_runtime();
     }
-    g_GameThread->flags.flag_4 = 0;
+    g_GameThread->flags.in_menu = 0;
     g_game_speed = saved_game_speed;
     Gui *gui = g_Gui;
     if (gui->msg != NULL)
     {
         gui->msg->show();
     }
-    AnmVm *vm = g_AnmManager->get_vm_with_id(gui->ids_11c[4]);
+    AnmVm *vm = g_AnmManager->get_vm_with_id(gui->overlay_ids[4]);
     if (vm != NULL)
     {
         vm->show_tree_inline();
@@ -1139,7 +1139,7 @@ void PauseMenu::tick_open()
                 set_unk_1f4(6);
                 menu_34.num_choices = 5;
                 menu_34.wraps = 1;
-                if (!(flags_3ec & 4) && g_Globals.game_mode == 0)
+                if (!(flags_3ec & 4) && g_Globals.game_mode == GAME_MODE_NORMAL)
                 {
                     anm_id_1e4 = front_anm->create_ui_vm_at_origin(0xa0, 0);
                     if (g_Globals.continues_used > 0)
@@ -1220,7 +1220,7 @@ void PauseMenu::tick_open()
             menu.set_cursor(0);
             menu.num_choices = 0x5b;
             menu.wraps = 1;
-            if (unk_1fc != 0 && g_Globals.game_mode == 0)
+            if (unk_1fc != 0 && g_Globals.game_mode == GAME_MODE_NORMAL)
             {
                 g_ReplayManager->set_end_stage(1);
             }
@@ -1267,7 +1267,7 @@ void PauseMenu::tick_open()
             }
             set_unk_1f4(6);
             anm_id_1e4.show_tree();
-            if (g_Globals.game_mode != 0)
+            if (g_Globals.game_mode != GAME_MODE_NORMAL)
             {
                 menu_34.disable(0);
                 menu_34.disable(3);
@@ -1282,9 +1282,9 @@ void PauseMenu::tick_open()
         {
             anm_id_1e4.hide_tree();
             HelpManual::create();
-            g_HelpManual->unk_128 = 32.0f;
+            g_HelpManual->x_offset = 32.0f;
         }
-        if (g_HelpManual != NULL && g_HelpManual->unk_124 != 0)
+        if (g_HelpManual != NULL && g_HelpManual->closed != 0)
         {
             HelpManual::destroy();
             set_unk_1f4(6);
@@ -1359,7 +1359,7 @@ void PauseMenu::tick_open()
                         g_Globals.continues_used = 9;
                     }
                     g_continues_remaining--;
-                    g_GameThread->flags.flag_4 = 0;
+                    g_GameThread->flags.in_menu = 0;
                     SoundManager::resume_sounds();
                     g_SoundManager.modify_bgm(2, -1, saved_bgm_name);
                     while (SoundManager::update_sound_thread() != 0)
@@ -1372,7 +1372,7 @@ void PauseMenu::tick_open()
                     {
                         gui->msg->show();
                     }
-                    Gui::sub_42c5c0();
+                    Gui::show_chapter_result_vm();
                     g_unk_4d9d90 = saved_global_4d9d90;
                 }
             }

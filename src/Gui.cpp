@@ -30,6 +30,13 @@ Gui *g_Gui;
 // GLOBAL: TH16 0x4a6dd0
 MsgFile *g_msg_file_cache;
 
+// Scripts of the stage logo's anm file: the stage's title, and the titles
+// of the stage and boss themes.
+#define LOGO_ANM_STAGE_TITLE 0
+#define LOGO_ANM_STAGE_THEME 1
+#define LOGO_ANM_BOSS_THEME 2
+
+// Deletes the faces and text.
 // FUNCTION: TH16 0x4264a0
 GuiMsgVm::~GuiMsgVm()
 {
@@ -71,6 +78,8 @@ static inline UpdateFuncCallback gui_on_draw_2_callback()
     return (UpdateFuncCallback)Gui::on_draw_2_callback;
 }
 
+// Loads front.anm and the stage's files and registers the update
+// functions (inactive until setup_stage_hud).
 // FUNCTION: TH16 0x426b00
 i32 Gui::initialize()
 {
@@ -112,6 +121,8 @@ i32 Gui::initialize()
     return 0;
 }
 
+// Loads the stage logo and the dialogue file for the character, unless a
+// stage restart kept the latter in g_msg_file_cache.
 // FUNCTION: TH16 0x426c10
 i32 Gui::load_stage_files()
 {
@@ -135,21 +146,24 @@ i32 Gui::load_stage_files()
         msg_file = (MsgFile *)file_read_all(g_ecl_path, NULL, 0);
         if (msg_file == NULL)
         {
+            // "The data is corrupt."
             g_GameErrorContext.log("\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
             return -1;
         }
     }
     time_in_stage.reset();
     current_score = g_Globals.score;
-    unk_1d0 = -1;
-    unk_1d8 = -1;
+    boss_timer_seconds = -1;
+    boss_timer_shown_seconds = -1;
     return 0;
 }
 
+// Ends the stage's part of the HUD: across a stage restart the stage logo
+// and the dialogue file stay loaded (the latter in g_msg_file_cache).
 // FUNCTION: TH16 0x427730
 void Gui::release_stage_files()
 {
-    if (!(g_Globals.flags_lo_45c & 9))
+    if (!(g_Globals.flags_lo_45c & GLOBALS_STAGE_RESTART_MASK))
     {
         g_AnmManager->unload_anm(ANM_SLOT_STAGE_LOGO);
     }
@@ -163,7 +177,7 @@ void Gui::release_stage_files()
         delete msg;
         msg = NULL;
     }
-    if (!(g_Globals.flags_lo_45c & 9))
+    if (!(g_Globals.flags_lo_45c & GLOBALS_STAGE_RESTART_MASK))
     {
         if (msg_file != NULL)
         {
@@ -181,26 +195,26 @@ void Gui::release_stage_files()
     {
         on_tick->flags &= ~UPDATE_FUNC_ACTIVE;
     }
-    delete_vm_and_clear(id_c8);
-    delete_vm_and_clear(id_cc);
-    delete_vm_and_clear(boss_id_d8);
+    delete_vm_and_clear(spell_notice_id);
+    delete_vm_and_clear(notice_id);
+    delete_vm_and_clear(boss_marker_id);
     for (i32 i = 0; i < 9; i++)
     {
         boss_star_ids[i].id = 0;
     }
-    id_100.id = 0;
+    boss_star_id_9.id = 0;
     AnmManager *anm = g_AnmManager;
     for (i32 i = 0; i < 10; i++)
     {
-        anm->delete_vm_inline(ids_a0[i]);
-        ids_a0[i].id = 0;
+        anm->delete_vm_inline(bonus_digit_ids[i]);
+        bonus_digit_ids[i].id = 0;
     }
     boss_star_count = 0;
     for (i32 i = 0; i < 3; i++)
     {
-        boss_bars[i].unk_4c = 0;
+        boss_bars[i].vms_created = 0;
     }
-    flags_1ac |= 0xe0;
+    hud_flags |= GUI_FLAGS_STAGE_RELEASED;
 }
 
 // FUNCTION: TH16 0x427970
@@ -211,7 +225,7 @@ HARNESS_CALLED void Gui::release_msg()
         delete msg;
         msg = NULL;
     }
-    if (!(g_Globals.flags_lo_45c & 9))
+    if (!(g_Globals.flags_lo_45c & GLOBALS_STAGE_RESTART_MASK))
     {
         g_AnmManager->unload_anm(ANM_SLOT_STAGE_LOGO);
         stage_logo_anm = NULL;
@@ -224,6 +238,7 @@ HARNESS_CALLED void Gui::release_msg()
     }
 }
 
+// Also deletes the HUD's own VMs and disables front.anm's.
 // FUNCTION: TH16 0x427a20
 Gui::~Gui()
 {
@@ -233,15 +248,15 @@ Gui::~Gui()
     g_UpdateFuncRegistry->unregister_locked(on_draw_2);
     on_tick = NULL;
     delete_vm_and_clear(id_104);
-    delete_vm_and_clear(ids_11c[2]);
+    delete_vm_and_clear(overlay_ids[2]);
     AnmManager *anm = g_AnmManager;
     for (i32 i = 0; i < 10; i++)
     {
-        anm->delete_vm_inline(ids_a0[i]);
-        ids_a0[i].id = 0;
+        anm->delete_vm_inline(bonus_digit_ids[i]);
+        bonus_digit_ids[i].id = 0;
     }
-    delete_vm_inline_and_clear(id_4c);
-    delete_vm_inline_and_clear(id_50);
+    delete_vm_inline_and_clear(boss_timer_tens_id);
+    delete_vm_inline_and_clear(boss_timer_ones_id);
     g_AnmManager->disable_vms_from_anm_file(front_anm);
     g_Gui = NULL;
 }
@@ -270,7 +285,7 @@ i32 __fastcall Gui::on_tick_callback(Gui *self)
 // FUNCTION: TH16 0x429b00
 i32 __fastcall Gui::on_draw_1_callback(Gui *self)
 {
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // FUNCTION: TH16 0x429b10
@@ -283,32 +298,52 @@ i32 __fastcall Gui::on_draw_2_callback(Gui *self)
 // GLOBAL: TH16 0x492260
 static const i32 g_msg_player_face_scripts[4] = {26, 16, 22, 35};
 
-// Fills a text VM with the text or (blank) clears it, in the current
-// side's color.
+// ANM interrupts the dialogue sends to faces and text: fade out and go,
+// highlight a face (or show text), darken a face (or fade text out), shake
+// a face, and the first expression (MSG_PLAYER_FACE / MSG_BOSS_FACE add the
+// expression number).
+#define MSG_ANM_REMOVE 1
+#define MSG_ANM_ACTIVE 2
+#define MSG_ANM_INACTIVE 3
+#define MSG_ANM_SHAKE 7
+#define MSG_ANM_FACE_0 0x11
+
+// The font of the text: 0, or 1 after MSG_TEXT_FONT_2.
 #define MSG_TEXT_FONT() ((flags >> 1) & 1)
-#define MSG_TEXT_COLOR() ((&unk_1a0)[active_side])
+// The current side's text color.
+#define MSG_TEXT_COLOR() ((&side_text_color_0)[active_side])
 // The speech bubble shape: per side, and per bubble type set by
-// instruction 29.
+// MSG_BUBBLE_TYPE.
 #define MSG_TEXTBOX_KIND() (active_side + ((flags >> 2) & 0xf) * 2)
 
-// Dialogue instructions; names from truth's msgmap.
-// TODO: ours gets a /GS cookie (from the Float3 locals of instruction 17 and
+// Bit numbers of the shot and skip buttons (InputState::hold_time indices),
+// and how long one of them is held before skipping starts.
+#define MSG_BUTTON_SHOT_BIT 0
+#define MSG_BUTTON_SKIP_BIT 9
+#define MSG_SKIP_HOLD_TIME 0x14
+
+// Runs the dialogue instructions whose time has come; -1 once the script
+// has ended. Holding shot or skip in a skippable script runs every
+// instruction at once, and MSG_TEXT_PAUSE waits for a key. Then keeps the
+// text next to the speech bubble.
+// TODO: ours gets a /GS cookie (from the Float3 locals of MSG_TEXT_ADD and
 // the bubble code; still unexplained) and uses ebx; the original keeps the
 // instruction pointer in ecx and reloads it after calls.
 // FUNCTION: TH16 0x42a1d0
 HARNESS_CALLED i32 GuiMsgVm::run()
 {
-    if (unk_18c > 0)
+    if (ecl_resume_timer > 0)
     {
-        unk_18c--;
+        ecl_resume_timer--;
     }
-    if (g_InputState.input_rising & 0x201)
+    if (g_InputState.input_rising & (INPUT_SHOT | INPUT_SKIP))
     {
-        flags |= 0x40;
+        flags |= MSG_FLAG_KEY_PRESSED;
     }
     // Skipping: jump to the next instruction's time.
-    if ((flags & 0x41) == 0x41 && ((g_InputState.input & (1 << 9)) && (u32)g_InputState.hold_time[9] >= 0x14 ||
-                                   (g_InputState.input & (1 << 0)) && (u32)g_InputState.hold_time[0] >= 0x14))
+    if ((flags & MSG_FLAG_CAN_SKIP) == MSG_FLAG_CAN_SKIP &&
+        ((g_InputState.input & INPUT_SKIP) && (u32)g_InputState.hold_time[MSG_BUTTON_SKIP_BIT] >= MSG_SKIP_HOLD_TIME ||
+         (g_InputState.input & INPUT_SHOT) && (u32)g_InputState.hold_time[MSG_BUTTON_SHOT_BIT] >= MSG_SKIP_HOLD_TIME))
     {
         time_in_script.set(instr()->time);
     }
@@ -316,39 +351,38 @@ HARNESS_CALLED i32 GuiMsgVm::run()
     {
         switch (instr()->opcode)
         {
-        case 26:
-            flags |= 2;
+        case MSG_TEXT_FONT_2:
+            flags |= MSG_FLAG_FONT_2;
             break;
-        // textLine1, textLine2
-        case 15:
+        // Never used by the scripts: replace a line outright.
+        case MSG_TEXT_LINE_1:
         {
             AnmVm *vm = get_vm_or_clear(text_line_1);
             const char *text = decode_msg_string(instr()->args.s);
             g_AnmManager->draw_text(vm, MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT() + 4, 0, 0, text);
-            AnmManager::interrupt_tree(text_line_1, 2);
+            AnmManager::interrupt_tree(text_line_1, MSG_ANM_ACTIVE);
             break;
         }
-        case 16:
+        case MSG_TEXT_LINE_2:
         {
             AnmVm *vm = get_vm_or_clear(text_line_2);
             const char *text = decode_msg_string(instr()->args.s);
             g_AnmManager->draw_text(vm, MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT() + 4, 0, 0, text);
-            AnmManager::interrupt_tree(text_line_2, 2);
+            AnmManager::interrupt_tree(text_line_2, MSG_ANM_ACTIVE);
             break;
         }
-        // bubblePos
-        case 28:
-            unk_1b0 = instr()->args.f[0] * 2.0f;
-            unk_1b4 = instr()->args.f[1] * 2.0f;
+        case MSG_BUBBLE_POS:
+            bubble_x = instr()->args.f[0] * 2.0f;
+            bubble_y = instr()->args.f[1] * 2.0f;
             break;
-        // textAdd: the next line of text, or furigana ("|x,y,text") for the
-        // line being written.
-        case 17:
+        // The next line of text, or furigana ("|x,y,text") for the line
+        // being written. The bubble grows to the longest line.
+        case MSG_TEXT_ADD:
             if (next_text_line == 0)
             {
-                if (unk_198 == 0)
+                if (text_cleared == 0)
                 {
-                    unk_1bc = 0.0f;
+                    bubble_width = 0.0f;
                     g_AnmManager->draw_text(text_line_1.find_or_clear(), MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT(), 0, 0,
                                             "  ");
                     g_AnmManager->draw_text(text_line_2.find_or_clear(), MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT(), 0, 0,
@@ -357,11 +391,11 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                                             "  ");
                     g_AnmManager->draw_text(furigana_2.find_or_clear(), MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT(), 0, 1,
                                             "  ");
-                    unk_198 = 1;
-                    AnmManager::interrupt_tree(text_line_1, 3);
-                    AnmManager::interrupt_tree(text_line_2, 3);
-                    AnmManager::interrupt_tree(furigana_1, 3);
-                    AnmManager::interrupt_tree(furigana_2, 3);
+                    text_cleared = 1;
+                    AnmManager::interrupt_tree(text_line_1, MSG_ANM_INACTIVE);
+                    AnmManager::interrupt_tree(text_line_2, MSG_ANM_INACTIVE);
+                    AnmManager::interrupt_tree(furigana_1, MSG_ANM_INACTIVE);
+                    AnmManager::interrupt_tree(furigana_2, MSG_ANM_INACTIVE);
                 }
                 const char *text = decode_msg_string(instr()->args.s);
                 if (text[0] == '|')
@@ -372,20 +406,20 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                     rest = strchr(rest, ',');
                     furigana_1.find_or_clear()->flags_hi |= 0x1000;
                     g_AnmManager->draw_text(furigana_1.find_or_clear(), 0, 0xa0a0a0, 2, x, y, rest + 1);
-                    furigana_1.set_entity_pos((Float3 *)&unk_1b0);
-                    AnmManager::interrupt_tree_and_run(furigana_1, 2);
+                    furigana_1.set_entity_pos((Float3 *)&bubble_x);
+                    AnmManager::interrupt_tree_and_run(furigana_1, MSG_ANM_ACTIVE);
                 }
                 else
                 {
                     f32 width = (strlen(text) / 2 * 16 - 28) * 2.0f;
-                    unk_1bc = width > unk_1bc ? width : unk_1bc;
-                    set_textbox(unk_1b0, unk_1b4, unk_1bc, MSG_TEXTBOX_KIND());
-                    set_textbox_width(unk_1bc, MSG_TEXTBOX_KIND());
+                    bubble_width = width > bubble_width ? width : bubble_width;
+                    set_textbox(bubble_x, bubble_y, bubble_width, MSG_TEXTBOX_KIND());
+                    set_textbox_width(bubble_width, MSG_TEXTBOX_KIND());
                     g_AnmManager->draw_text(text_line_1.find_or_clear(), MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT(), 0, 0,
                                             text);
                     if (active_side >= 1)
                     {
-                        Float3 pos = *(Float3 *)&unk_1b0;
+                        Float3 pos = *(Float3 *)&bubble_x;
                         text_line_1.set_entity_pos(&pos);
                         furigana_1.set_entity_pos(&pos);
                         text_line_2.set_entity_pos(&pos);
@@ -393,10 +427,10 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                     }
                     else
                     {
-                        Float3 pos = *(Float3 *)&unk_1b0;
+                        Float3 pos = *(Float3 *)&bubble_x;
                         text_line_1.set_entity_pos(&pos);
                     }
-                    AnmManager::interrupt_tree_and_run(text_line_1, 2);
+                    AnmManager::interrupt_tree_and_run(text_line_1, MSG_ANM_ACTIVE);
                     next_text_line++;
                 }
             }
@@ -411,20 +445,20 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                     rest = strchr(rest, ',');
                     furigana_2.find_or_clear()->flags_hi |= 0x1000;
                     g_AnmManager->draw_text(furigana_2.find_or_clear(), 0, 0xa0a0a0, 2, x, y, rest + 1);
-                    furigana_2.set_entity_pos((Float3 *)&unk_1b0);
-                    AnmManager::interrupt_tree(furigana_2, 2);
+                    furigana_2.set_entity_pos((Float3 *)&bubble_x);
+                    AnmManager::interrupt_tree(furigana_2, MSG_ANM_ACTIVE);
                 }
                 else
                 {
                     f32 width = (strlen(text) / 2 * 16 - 28) * 2.0f;
-                    unk_1bc = width > unk_1bc ? width : unk_1bc;
-                    set_textbox(unk_1b0, unk_1b4, unk_1bc, MSG_TEXTBOX_KIND() + 8);
-                    set_textbox_width(unk_1bc, MSG_TEXTBOX_KIND() + 8);
+                    bubble_width = width > bubble_width ? width : bubble_width;
+                    set_textbox(bubble_x, bubble_y, bubble_width, MSG_TEXTBOX_KIND() + 8);
+                    set_textbox_width(bubble_width, MSG_TEXTBOX_KIND() + 8);
                     g_AnmManager->draw_text(text_line_2.find_or_clear(), MSG_TEXT_COLOR(), 0, MSG_TEXT_FONT(), 0, 0,
                                             text);
                     if (active_side >= 1)
                     {
-                        Float3 pos = *(Float3 *)&unk_1b0;
+                        Float3 pos = *(Float3 *)&bubble_x;
                         text_line_1.set_entity_pos(&pos);
                         furigana_1.set_entity_pos(&pos);
                         text_line_2.set_entity_pos(&pos);
@@ -432,25 +466,25 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                     }
                     else
                     {
-                        Float3 pos = *(Float3 *)&unk_1b0;
+                        Float3 pos = *(Float3 *)&bubble_x;
                         text_line_2.set_entity_pos(&pos);
                     }
-                    AnmManager::interrupt_tree_and_run(text_line_2, 2);
+                    AnmManager::interrupt_tree_and_run(text_line_2, MSG_ANM_ACTIVE);
                     next_text_line = 0;
-                    unk_198 = 0;
+                    text_cleared = 0;
                 }
             }
             break;
-        // textClear
-        case 18:
+        case MSG_TEXT_CLEAR:
             delete_vm_and_clear(textbox);
-            AnmManager::interrupt_tree(text_line_1, 3);
-            AnmManager::interrupt_tree(text_line_2, 3);
-            AnmManager::interrupt_tree(furigana_1, 3);
-            AnmManager::interrupt_tree(furigana_2, 3);
+            AnmManager::interrupt_tree(text_line_1, MSG_ANM_INACTIVE);
+            AnmManager::interrupt_tree(text_line_2, MSG_ANM_INACTIVE);
+            AnmManager::interrupt_tree(furigana_1, MSG_ANM_INACTIVE);
+            AnmManager::interrupt_tree(furigana_2, MSG_ANM_INACTIVE);
             break;
-        // playerShow
-        case 1:
+        // Argument 0: the character's own face; otherwise the face from ECL
+        // anm slot 5.
+        case MSG_PLAYER_SHOW:
             if (instr()->args.i[0] == 0)
             {
                 player_face = g_Player->anm_file->create_effect(g_msg_player_face_scripts[g_Globals.character], -1, NULL);
@@ -460,8 +494,7 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                 player_face = g_EnemyManager->anim_statement_anms[5]->create_effect(0xb, -1, NULL);
             }
             break;
-        // bossShow
-        case 2:
+        case MSG_BOSS_SHOW:
         {
             i32 i = instr()->args.i[0];
             StageBoss *boss = &g_stage_data->bosses[i];
@@ -470,7 +503,7 @@ HARNESS_CALLED i32 GuiMsgVm::run()
             unk_1c0 = 0;
             break;
         }
-        case 31:
+        case MSG_BOSS_SHOW_SECOND:
         {
             StageBoss *boss = &g_stage_data->bosses[1];
             enemy_faces[1] =
@@ -478,67 +511,65 @@ HARNESS_CALLED i32 GuiMsgVm::run()
             unk_1c0 = 0;
             break;
         }
-        // textOffsetY
-        case 25:
+        case MSG_TEXT_OFFSET_Y:
             get_vm_or_clear(text_line_1)->pos_2.y = instr()->args.i[0];
             get_vm_or_clear(text_line_2)->pos_2.y = instr()->args.i[0];
             get_vm_or_clear(furigana_1)->pos_2.y = instr()->args.i[0];
             get_vm_or_clear(furigana_2)->pos_2.y = instr()->args.i[0];
             break;
-        // playerShake, bossShake
-        case 23:
-            AnmManager::interrupt_tree(player_face, 7);
+        case MSG_PLAYER_SHAKE:
+            AnmManager::interrupt_tree(player_face, MSG_ANM_SHAKE);
             break;
-        case 24:
-            AnmManager::interrupt_tree(enemy_faces[0], 7);
-            AnmManager::interrupt_tree(enemy_faces[1], 7);
+        case MSG_BOSS_SHAKE:
+            AnmManager::interrupt_tree(enemy_faces[0], MSG_ANM_SHAKE);
+            AnmManager::interrupt_tree(enemy_faces[1], MSG_ANM_SHAKE);
             break;
-        // playerHide, bossHide, textboxHide
-        case 4:
-            AnmManager::interrupt_tree(player_face, 1);
+        case MSG_PLAYER_HIDE:
+            AnmManager::interrupt_tree(player_face, MSG_ANM_REMOVE);
             player_face.id = 0;
             break;
-        case 5:
-            AnmManager::interrupt_tree(enemy_faces[instr()->args.i[0]], 1);
+        case MSG_BOSS_HIDE:
+            AnmManager::interrupt_tree(enemy_faces[instr()->args.i[0]], MSG_ANM_REMOVE);
             enemy_faces[instr()->args.i[0]].id = 0;
-            AnmManager::interrupt_tree(intro, 1);
+            AnmManager::interrupt_tree(intro, MSG_ANM_REMOVE);
             break;
-        case 6:
-            AnmManager::interrupt_tree(text_line_1, 1);
-            AnmManager::interrupt_tree(text_line_2, 1);
-            AnmManager::interrupt_tree(furigana_1, 1);
-            AnmManager::interrupt_tree(furigana_2, 1);
+        case MSG_TEXTBOX_HIDE:
+            AnmManager::interrupt_tree(text_line_1, MSG_ANM_REMOVE);
+            AnmManager::interrupt_tree(text_line_2, MSG_ANM_REMOVE);
+            AnmManager::interrupt_tree(furigana_1, MSG_ANM_REMOVE);
+            AnmManager::interrupt_tree(furigana_2, MSG_ANM_REMOVE);
             delete_vm_and_clear(textbox);
             break;
-        // portraitDarken, portraitHighlight
-        case 33:
+        // Argument 0 picks the player (0) or a boss (argument 1).
+        case MSG_PORTRAIT_DARKEN:
             if (instr()->args.i[0] == 0)
             {
-                AnmManager::interrupt_tree_and_run(player_face, 3);
+                AnmManager::interrupt_tree_and_run(player_face, MSG_ANM_INACTIVE);
             }
             else
             {
-                AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[1]], 3);
+                AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[1]], MSG_ANM_INACTIVE);
             }
             break;
-        case 34:
+        case MSG_PORTRAIT_HIGHLIGHT:
             if (instr()->args.i[0] == 0)
             {
-                AnmManager::interrupt_tree_and_run(player_face, 2);
+                AnmManager::interrupt_tree_and_run(player_face, MSG_ANM_ACTIVE);
             }
             else
             {
-                AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[1]], 2);
+                AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[1]], MSG_ANM_ACTIVE);
             }
             break;
-        // speakerPlayer
-        case 7:
+        // The speaker instructions highlight the speaker's face, darken the
+        // others and reset the text.
+        case MSG_SPEAKER_PLAYER:
             for (i32 i = 0; i < 4; i++)
             {
-                AnmManager::interrupt_tree_and_run(enemy_faces[i], 3);
+                AnmManager::interrupt_tree_and_run(enemy_faces[i], MSG_ANM_INACTIVE);
             }
-            AnmManager::interrupt_tree_and_run(player_face, 2);
-            AnmManager::interrupt_tree(id_54, 2);
+            AnmManager::interrupt_tree_and_run(player_face, MSG_ANM_ACTIVE);
+            AnmManager::interrupt_tree(id_54, MSG_ANM_ACTIVE);
             active_side = 0;
             get_vm_or_clear(text_line_1)->pos_2.y = 0.0f;
             get_vm_or_clear(text_line_2)->pos_2.y = 0.0f;
@@ -546,23 +577,22 @@ HARNESS_CALLED i32 GuiMsgVm::run()
             get_vm_or_clear(furigana_2)->pos_2.y = 0.0f;
             flags &= ~2;
             next_text_line = 0;
-            unk_198 = 0;
+            text_cleared = 0;
             break;
-        // speakerBoss
-        case 8:
-            AnmManager::interrupt_tree_and_run(player_face, 3);
+        case MSG_SPEAKER_BOSS:
+            AnmManager::interrupt_tree_and_run(player_face, MSG_ANM_INACTIVE);
             for (i32 i = 0; i < 4; i++)
             {
                 if (i == instr()->args.i[0])
                 {
-                    AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[0]], 2);
+                    AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[0]], MSG_ANM_ACTIVE);
                 }
                 else
                 {
-                    AnmManager::interrupt_tree_and_run(enemy_faces[i], 3);
+                    AnmManager::interrupt_tree_and_run(enemy_faces[i], MSG_ANM_INACTIVE);
                 }
             }
-            AnmManager::interrupt_tree(id_54, 3);
+            AnmManager::interrupt_tree(id_54, MSG_ANM_INACTIVE);
             active_side = 1;
             get_vm_or_clear(text_line_1)->pos_2.y = 0.0f;
             get_vm_or_clear(text_line_2)->pos_2.y = 0.0f;
@@ -570,10 +600,10 @@ HARNESS_CALLED i32 GuiMsgVm::run()
             get_vm_or_clear(furigana_2)->pos_2.y = 0.0f;
             flags &= ~2;
             next_text_line = 0;
-            unk_198 = 0;
+            text_cleared = 0;
             break;
-        case 32:
-            AnmManager::interrupt_tree(id_54, 3);
+        case MSG_SPEAKER_SIDE:
+            AnmManager::interrupt_tree(id_54, MSG_ANM_INACTIVE);
             active_side = instr()->args.i[0];
             get_vm_or_clear(text_line_1)->pos_2.y = 0.0f;
             get_vm_or_clear(text_line_2)->pos_2.y = 0.0f;
@@ -581,69 +611,69 @@ HARNESS_CALLED i32 GuiMsgVm::run()
             get_vm_or_clear(furigana_2)->pos_2.y = 0.0f;
             flags &= ~2;
             next_text_line = 0;
-            unk_198 = 0;
+            text_cleared = 0;
             break;
-        // speakerNone
-        case 9:
+        case MSG_SPEAKER_NONE:
         {
-            AnmManager::interrupt_tree_and_run(player_face, 3);
+            AnmManager::interrupt_tree_and_run(player_face, MSG_ANM_INACTIVE);
             for (i32 i = 0; i < 4; i++)
             {
-                AnmManager::interrupt_tree_and_run(enemy_faces[i], 3);
+                AnmManager::interrupt_tree_and_run(enemy_faces[i], MSG_ANM_INACTIVE);
             }
-            AnmManager::interrupt_tree(id_54, 3);
+            AnmManager::interrupt_tree(id_54, MSG_ANM_INACTIVE);
             active_side = 0;
             AnmVm *vm = g_AnmManager->get_vm_with_id(text_line_1);
             if (vm != NULL)
             {
-                vm->entity_pos = (&vec_15c)[active_side];
+                vm->entity_pos = (&side_text_pos_0)[active_side];
             }
             vm = g_AnmManager->get_vm_with_id(text_line_2);
             if (vm != NULL)
             {
-                vm->entity_pos = (&vec_15c)[active_side];
+                vm->entity_pos = (&side_text_pos_0)[active_side];
             }
             get_vm_or_clear(text_line_1)->pos_2.y = 0.0f;
             get_vm_or_clear(text_line_2)->pos_2.y = 0.0f;
             vm = g_AnmManager->get_vm_with_id(furigana_1);
             if (vm != NULL)
             {
-                vm->entity_pos = (&vec_15c)[active_side];
+                vm->entity_pos = (&side_text_pos_0)[active_side];
             }
             vm = g_AnmManager->get_vm_with_id(furigana_2);
             if (vm != NULL)
             {
-                vm->entity_pos = (&vec_15c)[active_side];
+                vm->entity_pos = (&side_text_pos_0)[active_side];
             }
             get_vm_or_clear(furigana_1)->pos_2.y = 0.0f;
             get_vm_or_clear(furigana_2)->pos_2.y = 0.0f;
             flags &= ~2;
             next_text_line = 0;
-            unk_198 = 0;
+            text_cleared = 0;
             break;
         }
-        // skippable: bit 0 of flags.
-        case 10:
+        case MSG_SKIPPABLE:
             ((GuiMsgVmFlags *)&flags)->skippable = instr()->args.s[0];
             break;
-        // playerFace, bossFace
-        case 13:
-            AnmManager::interrupt_tree_and_run(player_face, instr()->args.i[0] + 0x11);
+        // Change a face's expression.
+        case MSG_PLAYER_FACE:
+            AnmManager::interrupt_tree_and_run(player_face, instr()->args.i[0] + MSG_ANM_FACE_0);
             break;
-        case 14:
-            AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[1]], instr()->args.i[0] + 0x11);
+        case MSG_BOSS_FACE:
+            AnmManager::interrupt_tree_and_run(enemy_faces[instr()->args.i[1]], instr()->args.i[0] + MSG_ANM_FACE_0);
             break;
-        // textPause: wait for the given time or a key.
-        case 11:
+        // Waits for the given time or a key (shot or enter). Holding shot or
+        // skip in a skippable script ends the wait too.
+        case MSG_TEXT_PAUSE:
             if (pause_timer.current <= 0)
             {
                 pause_timer.set_value(instr()->args.i[0]);
             }
             pause_timer--;
-            if (!(g_InputState.input_rising & 0x80001) && pause_timer.current > 0)
+            if (!(g_InputState.input_rising & (INPUT_ENTER | INPUT_SHOT)) && pause_timer.current > 0)
             {
-                if ((flags & 0x41) != 0x41 ||
-                    ((u32)g_InputState.get_hold_time(9) < 0x14 && (u32)g_InputState.get_hold_time(0) < 0x14))
+                if ((flags & MSG_FLAG_CAN_SKIP) != MSG_FLAG_CAN_SKIP ||
+                    ((u32)g_InputState.get_hold_time(MSG_BUTTON_SKIP_BIT) < MSG_SKIP_HOLD_TIME &&
+                     (u32)g_InputState.get_hold_time(MSG_BUTTON_SHOT_BIT) < MSG_SKIP_HOLD_TIME))
                 {
                     goto waiting;
                 }
@@ -654,19 +684,18 @@ HARNESS_CALLED i32 GuiMsgVm::run()
             }
             pause_timer.set_value(0);
             next_text_line = 0;
-            unk_198 = 0;
+            text_cleared = 0;
             break;
-        // eclResume
-        case 12:
-            unk_18c = 1;
+        case MSG_ECL_RESUME:
+            ecl_resume_timer = 1;
             break;
-        // musicBoss
-        case 19:
+        // Starts the boss theme and shows its title (stage logo script 2).
+        case MSG_MUSIC_BOSS:
             g_Supervisor.play_bgm(1, g_stage_data->music_ids[1]);
-            g_Gui->stage_logo_anm->create_effect(2, -1, NULL);
+            g_Gui->stage_logo_anm->create_effect(LOGO_ANM_BOSS_THEME, -1, NULL);
             break;
-        // intro
-        case 20:
+        // The boss's name and title, and the boss marker.
+        case MSG_INTRO:
         {
             StageBoss *boss = &g_stage_data->bosses[instr()->args.i[0]];
             intro = g_EnemyManager->anim_statement_anms[boss->intro_anm_slot]->create_effect(boss->intro_script, -1,
@@ -674,12 +703,11 @@ HARNESS_CALLED i32 GuiMsgVm::run()
             g_Gui->show_boss_marker();
             break;
         }
-        // stageEnd
-        case 21:
-            stage_clear_42e150();
+        case MSG_STAGE_END:
+            stage_clear();
             break;
-        // musicEnd
-        case 22:
+        // Fades the music out, faster on stage 6.
+        case MSG_MUSIC_END:
             if (g_Globals.stage_num == 6)
             {
                 g_Supervisor.fade_out_bgm(2.0f);
@@ -689,23 +717,19 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                 g_Supervisor.fade_out_bgm(8.0f);
             }
             break;
-        // musicFade
-        case 27:
+        case MSG_MUSIC_FADE:
             g_Supervisor.fade_out_bgm(instr()->args.f[0]);
             break;
-        // bubbleType: bits 2-5 of flags.
-        case 29:
+        case MSG_BUBBLE_TYPE:
             ((GuiMsgVmFlags *)&flags)->textbox_type = instr()->args.i[0];
             break;
-        // lightsOut
-        case 35:
-            Gui::create_vm_110();
+        case MSG_LIGHTS_OUT:
+            Gui::show_lights_out();
             break;
-        case 3:
-        case 30:
+        case MSG_TEXTBOX_SHOW:
+        case MSG_ROUTE_SELECT:
             break;
-        // end
-        case 0:
+        case MSG_END:
             return -1;
         }
         current_instr = (u8 *)current_instr + instr()->args_size + 4;
@@ -713,7 +737,7 @@ HARNESS_CALLED i32 GuiMsgVm::run()
     time_in_script.tick();
 waiting:
     // Keep the text next to the speech bubble.
-    i32 script = textbox_kind + 0xb4;
+    i32 script = textbox_kind + FRONT_ANM_BUBBLE_BODY;
     if (get_vm_or_clear(textbox) == NULL)
     {
         return 0;
@@ -768,12 +792,13 @@ waiting:
     return 0;
 }
 
+// Puts vm just outside the bubble's body, on the side of the speaker.
 // TODO: the original aligns its frame to 8 bytes and adds two of the
 // vector components the other way round.
 // FUNCTION: TH16 0x42b480
 void GuiMsgVm::update_callout(AnmVm *vm)
 {
-    i32 script = textbox_kind + 0xb4;
+    i32 script = textbox_kind + FRONT_ANM_BUBBLE_BODY;
     if (get_vm_or_clear(textbox) == NULL)
     {
         return;
@@ -814,6 +839,7 @@ i32 __fastcall Gui::textbox_on_draw(AnmVm *vm)
     return 0;
 }
 
+// The pause menu hides the dialogue and shows it again.
 // FUNCTION: TH16 0x42b610
 void GuiMsgVm::hide()
 {
@@ -932,33 +958,38 @@ void GuiMsgVm::show()
     }
 }
 
+// A new speech bubble of the given kind at (x, y), with its body and edge
+// stretched to width.
 // FUNCTION: TH16 0x42ba30
 HARNESS_CALLED void GuiMsgVm::set_textbox(f32 x, f32 y, f32 width, i32 kind)
 {
     delete_vm_and_clear(textbox);
     AnmLoaded *anm = g_Gui->front_anm;
     Float3 pos(x, y, 0.0f);
-    textbox = anm->create_vm(kind + 0xe4, &pos, 0.0f, -1, 0);
-    find_child_of(textbox, kind + 0xb4)->float_vars[0] = width;
-    find_child_of(textbox, kind + 0xd4)->float_vars[0] = width;
+    textbox = anm->create_vm(kind + FRONT_ANM_BUBBLE, &pos, 0.0f, -1, 0);
+    find_child_of(textbox, kind + FRONT_ANM_BUBBLE_BODY)->float_vars[0] = width;
+    find_child_of(textbox, kind + FRONT_ANM_BUBBLE_EDGE)->float_vars[0] = width;
     textbox_kind = kind;
 }
 
+// Stretches the bubble's body and edge to width plus a 16-pixel margin.
 // FUNCTION: TH16 0x42bb30
 HARNESS_CALLED void GuiMsgVm::set_textbox_width(f32 width, i32 kind)
 {
-    find_child_of(textbox, kind + 0xb4)->float_vars[0] = width + 16.0f;
-    find_child_of(textbox, kind + 0xd4)->float_vars[0] = width + 16.0f;
+    find_child_of(textbox, kind + FRONT_ANM_BUBBLE_BODY)->float_vars[0] = width + 16.0f;
+    find_child_of(textbox, kind + FRONT_ANM_BUBBLE_EDGE)->float_vars[0] = width + 16.0f;
 }
 
 // TODO: the original aligns its frame to 8 bytes, which LTCG adds for
-// Gui::sub_42bcf0's sake.
+// Gui::show_notice's sake.
 // FUNCTION: TH16 0x42bc10
 void Gui::update_score()
 {
     Gui *gui = g_Gui;
     if (g_Globals.score != gui->current_score)
     {
+        // A 32nd of the gap per frame, at least 1 and at most 579934 (score
+        // units of 10), never slowing down until it arrives.
         u32 step = (g_Globals.score - gui->current_score) >> 5;
         if (step >= 0x8d55e)
         {
@@ -986,37 +1017,39 @@ void Gui::update_score()
     {
         g_Globals.hiscore = gui->current_score;
         g_Globals.hiscore_continues = g_Globals.continues_used;
-        g_Globals.flags_lo_45c |= 4;
-        if (!(g_Globals.flags_lo_45c & 4))
+        // The flag is set before it is tested, so the hiscore notice never
+        // shows.
+        g_Globals.flags_lo_45c |= GLOBALS_HISCORE_BEATEN;
+        if (!(g_Globals.flags_lo_45c & GLOBALS_HISCORE_BEATEN))
         {
-            gui->sub_42bcf0(0, 3);
+            gui->show_notice(0, GUI_NOTICE_HISCORE);
         }
     }
 }
 
-// Shows a HUD notice: kind 0 is the spell card bonus (unk is the amount),
-// 1 bonus failed, 2 full power, 3 hiscore, 4 extend. Every caller passes
-// 0-4, which is how the original's jump table goes without a bounds check;
-// the __assume reproduces that.
+// Shows a HUD notice (GuiNotice). The spell card bonus also spells out
+// bonus in digits, leaving out leading zeros and adding the commas it needs.
+// Every caller passes 0-4, which is how the original's jump table goes
+// without a bounds check; the __assume reproduces that.
 // TODO: in the digit loop the original keeps the manager in ebx and spills the counter; ours does the reverse.
 // FUNCTION: TH16 0x42bcf0
-HARNESS_CALLED void Gui::sub_42bcf0(i32 unk, i32 kind)
+HARNESS_CALLED void Gui::show_notice(i32 bonus, i32 kind)
 {
     switch (kind)
     {
-    case 0:
+    case GUI_NOTICE_SPELL_BONUS:
     {
-        delete_vm_and_clear(id_c8);
-        id_c8 = front_anm->create_effect(0x3d, -1, NULL);
+        delete_vm_and_clear(spell_notice_id);
+        spell_notice_id = front_anm->create_effect(FRONT_ANM_SPELL_BONUS, -1, NULL);
         i32 divisor = 10000000;
-        i32 rest = unk;
+        i32 rest = bonus;
         i32 shown = 0;
         AnmManager *anm;
         AnmVm *vm;
         for (i32 i = 0; i < 8; i++)
         {
-            delete_vm_and_clear(ids_a0[i]);
-            ids_a0[i] = g_AsciiManager->ascii_anm->create_effect(i + 4, -1, NULL);
+            delete_vm_and_clear(bonus_digit_ids[i]);
+            bonus_digit_ids[i] = g_AsciiManager->ascii_anm->create_effect(i + ASCII_ANM_BONUS_DIGITS, -1, NULL);
             anm = g_AnmManager;
             i32 digit = rest / divisor;
             rest = rest % divisor;
@@ -1024,14 +1057,14 @@ HARNESS_CALLED void Gui::sub_42bcf0(i32 unk, i32 kind)
             {
                 shown = 1;
             }
-            vm = anm->get_vm_with_id(ids_a0[i]);
+            vm = anm->get_vm_with_id(bonus_digit_ids[i]);
             if (vm != NULL)
             {
-                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, digit + 0xef);
+                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, digit + ASCII_ANM_SPRITE_DIGIT_0);
             }
             if (!shown)
             {
-                vm = anm->get_vm_with_id(ids_a0[i]);
+                vm = anm->get_vm_with_id(bonus_digit_ids[i]);
                 if (vm != NULL)
                 {
                     vm->hide_tree_inline();
@@ -1039,7 +1072,7 @@ HARNESS_CALLED void Gui::sub_42bcf0(i32 unk, i32 kind)
             }
             else
             {
-                vm = anm->get_vm_with_id(ids_a0[i]);
+                vm = anm->get_vm_with_id(bonus_digit_ids[i]);
                 if (vm != NULL)
                 {
                     vm->show_tree_inline();
@@ -1047,53 +1080,53 @@ HARNESS_CALLED void Gui::sub_42bcf0(i32 unk, i32 kind)
             }
             divisor /= 10;
         }
-        delete_vm_and_clear(ids_a0[8]);
-        if (unk >= 1000000)
+        delete_vm_and_clear(bonus_digit_ids[8]);
+        if (bonus >= 1000000)
         {
-            ids_a0[8] = g_AsciiManager->ascii_anm->create_effect(0xc, -1, NULL);
+            bonus_digit_ids[8] = g_AsciiManager->ascii_anm->create_effect(ASCII_ANM_BONUS_COMMA_1, -1, NULL);
             anm = g_AnmManager;
-            vm = anm->get_vm_with_id(ids_a0[8]);
+            vm = anm->get_vm_with_id(bonus_digit_ids[8]);
             if (vm != NULL)
             {
-                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, 0xfd);
+                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, ASCII_ANM_SPRITE_COMMA);
             }
         }
-        delete_vm_and_clear(ids_a0[9]);
-        if (unk >= 1000)
+        delete_vm_and_clear(bonus_digit_ids[9]);
+        if (bonus >= 1000)
         {
-            ids_a0[9] = g_AsciiManager->ascii_anm->create_effect(0xd, -1, NULL);
+            bonus_digit_ids[9] = g_AsciiManager->ascii_anm->create_effect(ASCII_ANM_BONUS_COMMA_2, -1, NULL);
             anm = g_AnmManager;
-            vm = anm->get_vm_with_id(ids_a0[9]);
+            vm = anm->get_vm_with_id(bonus_digit_ids[9]);
             if (vm != NULL)
             {
-                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, 0xfd);
+                anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, ASCII_ANM_SPRITE_COMMA);
             }
         }
-        unk_14c = 1;
-        ids_11c[3] = front_anm->create_effect(0x60, -1, NULL);
+        spell_bonus_shown = 1;
+        overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK] = front_anm->create_effect(FRONT_ANM_SPELL_BONUS_BACK, -1, NULL);
         break;
     }
-    case 1:
-        delete_vm_and_clear(id_c8);
-        id_c8 = front_anm->create_effect(0x3e, -1, NULL);
-        unk_14c = 1;
-        ids_11c[3] = front_anm->create_effect(0x60, -1, NULL);
+    case GUI_NOTICE_BONUS_FAILED:
+        delete_vm_and_clear(spell_notice_id);
+        spell_notice_id = front_anm->create_effect(FRONT_ANM_BONUS_FAILED, -1, NULL);
+        spell_bonus_shown = 1;
+        overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK] = front_anm->create_effect(FRONT_ANM_SPELL_BONUS_BACK, -1, NULL);
         break;
-    case 2:
-        delete_vm_and_clear(id_cc);
-        id_cc = front_anm->create_effect(0x3f, -1, NULL);
+    case GUI_NOTICE_FULL_POWER:
+        delete_vm_and_clear(notice_id);
+        notice_id = front_anm->create_effect(FRONT_ANM_FULL_POWER, -1, NULL);
         break;
-    case 3:
-        delete_vm_and_clear(id_cc);
-        id_cc = front_anm->create_effect(0x40, -1, NULL);
+    case GUI_NOTICE_HISCORE:
+        delete_vm_and_clear(notice_id);
+        notice_id = front_anm->create_effect(FRONT_ANM_HISCORE, -1, NULL);
         break;
-    case 4:
-        delete_vm_and_clear(id_cc);
-        id_cc = front_anm->create_effect(0x41, -1, NULL);
+    case GUI_NOTICE_EXTEND:
+        delete_vm_and_clear(notice_id);
+        notice_id = front_anm->create_effect(FRONT_ANM_EXTEND, -1, NULL);
         break;
-    case 6:
-        delete_vm_and_clear(id_c8);
-        id_c8 = front_anm->create_effect(0x42, -1, NULL);
+    case GUI_NOTICE_6:
+        delete_vm_and_clear(spell_notice_id);
+        spell_notice_id = front_anm->create_effect(FRONT_ANM_NOTICE_6, -1, NULL);
         break;
     default:
         __assume(0);
@@ -1134,35 +1167,41 @@ static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECT
     return id;
 }
 
+// The stage clear bonus is a million points per stage number.
 // FUNCTION: TH16 0x42c070
 void Gui::show_stage_clear_bonus()
 {
     Gui *gui = g_Gui;
-    gui->ids_11c[1] = create_vm_inline(gui->front_anm, 0x78, NULL, 0.0f, -1);
+    gui->overlay_ids[GUI_OVERLAY_STAGE_CLEAR_BONUS] =
+        create_vm_inline(gui->front_anm, FRONT_ANM_STAGE_CLEAR_BONUS, NULL, 0.0f, -1);
     gui->stage_clear_bonus = g_Globals.stage_num * 1000000;
     g_Globals.add_to_score(gui->stage_clear_bonus);
-    gui->flags_1ac |= 0x100;
-    gui->timer_1b0.reset();
+    gui->hud_flags |= GUI_STAGE_CLEAR_BONUS;
+    gui->notice_timer.reset();
 }
 
 // FUNCTION: TH16 0x42c1b0
-HARNESS_CALLED void Gui::sub_42c1b0()
+HARNESS_CALLED void Gui::hide_stage_clear_bonus()
 {
-    AnmManager::interrupt_tree(ids_11c[1], 1);
-    AnmManager::interrupt_tree(ids_11c[2], 1);
-    flags_1ac &= ~0x100;
-    timer_1b0.reset();
+    AnmManager::interrupt_tree(overlay_ids[GUI_OVERLAY_STAGE_CLEAR_BONUS], 1);
+    AnmManager::interrupt_tree(overlay_ids[GUI_OVERLAY_2], 1);
+    hud_flags &= ~GUI_STAGE_CLEAR_BONUS;
+    notice_timer.reset();
 }
 
+// Not in game mode 8 or the demo.
 // FUNCTION: TH16 0x42c240
 void show_stage_logo()
 {
-    if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & 1))
+    if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY))
     {
-        g_Gui->stage_logo_anm->create_effect(0, -1, NULL);
+        g_Gui->stage_logo_anm->create_effect(LOGO_ANM_STAGE_TITLE, -1, NULL);
     }
 }
 
+// Interrupt 2 shows a full piece of the counter and 3 an empty one; the
+// piece after the last full one shows the score progress towards the next
+// extend in fifths (interrupt 7 + n).
 // FUNCTION: TH16 0x42c280
 void Gui::update_lives(i32 lives, u32 fragments)
 {
@@ -1186,6 +1225,7 @@ void Gui::update_lives(i32 lives, u32 fragments)
     }
 }
 
+// Like update_lives, with the bomb fragments (of 5) in the next piece.
 // FUNCTION: TH16 0x42c390
 void Gui::update_bombs(i32 bombs, i32 fragments)
 {
@@ -1208,12 +1248,14 @@ void Gui::update_bombs(i32 bombs, i32 fragments)
     }
 }
 
+// The marker is the stage table's for boss 0 from chapter 0x29 on, and
+// boss 1's before that.
 // TODO: the original tests the script again after adding 0xa4 instead of
 // using the add's flags.
 // FUNCTION: TH16 0x42c480
 void Gui::show_boss_marker()
 {
-    if (get_vm_or_clear(boss_id_d8) != NULL)
+    if (get_vm_or_clear(boss_marker_id) != NULL)
     {
         return;
     }
@@ -1228,26 +1270,26 @@ void Gui::show_boss_marker()
     }
     if (script >= 0)
     {
-        script += 0xa4;
+        script += FRONT_ANM_BOSS_MARKER;
         if (script >= 0)
         {
-            boss_id_d8 = front_anm->create_effect(script, -1, NULL);
+            boss_marker_id = front_anm->create_effect(script, -1, NULL);
         }
     }
 }
 
 // FUNCTION: TH16 0x42c4f0
-void Gui::sub_42c4f0()
+void Gui::hide_chapter_result()
 {
-    AnmManager::interrupt_tree(ids_11c[4], 1);
-    flags_1ac = flags_1ac & ~0x1000 | 0x800;
-    timer_1b0.reset();
+    AnmManager::interrupt_tree(overlay_ids[GUI_OVERLAY_CHAPTER_RESULT], 1);
+    hud_flags = hud_flags & ~GUI_CHAPTER_RESULT_DONE | GUI_CHAPTER_RESULT_COUNTING;
+    notice_timer.reset();
 }
 
 // FUNCTION: TH16 0x42c580
-void Gui::sub_42c580()
+void Gui::hide_chapter_result_vm()
 {
-    AnmVm *vm = g_AnmManager->get_vm_with_id(g_Gui->ids_11c[4]);
+    AnmVm *vm = g_AnmManager->get_vm_with_id(g_Gui->overlay_ids[GUI_OVERLAY_CHAPTER_RESULT]);
     if (vm != NULL)
     {
         vm->hide_tree_inline();
@@ -1255,9 +1297,9 @@ void Gui::sub_42c580()
 }
 
 // FUNCTION: TH16 0x42c5c0
-void Gui::sub_42c5c0()
+void Gui::show_chapter_result_vm()
 {
-    AnmVm *vm = g_AnmManager->get_vm_with_id(g_Gui->ids_11c[4]);
+    AnmVm *vm = g_AnmManager->get_vm_with_id(g_Gui->overlay_ids[GUI_OVERLAY_CHAPTER_RESULT]);
     if (vm != NULL)
     {
         vm->show_tree_inline();
@@ -1290,14 +1332,17 @@ static inline AnmId find_child_id_of(AnmManager *anm, AnmId &id, i32 script)
     return result;
 }
 
+// Fills the season gauge bar towards the next level and shows the level
+// (interrupt 7 + level), switching the gauge's look (interrupt 2 or 3) when
+// the first level is reached or lost.
 // TODO: the original keeps g_AnmManager and then the level in ebx; ours spills both (get_vm_with_id is an opaque stub here).
 // FUNCTION: TH16 0x42c600
 void Gui::update_season_gauge()
 {
     AnmManager *anm = g_AnmManager;
     Gui *gui = g_Gui;
-    AnmVm *gauge = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, 0x73));
-    AnmVm *level_vm = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, 0x74));
+    AnmVm *gauge = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, FRONT_ANM_SEASON_GAUGE_BAR));
+    AnmVm *level_vm = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, FRONT_ANM_SEASON_GAUGE_LEVEL));
     i32 level = g_Globals.season_level();
     if (level == 0)
     {
@@ -1352,24 +1397,25 @@ void __fastcall anm_vm_interrupt_5(AnmVm *vm)
     vm->interrupt(5);
 }
 
+// The two digit VMs take their spell card look.
 // FUNCTION: TH16 0x4175d0
-HARNESS_CALLED void Gui::interrupt_spell_vms_2()
+HARNESS_CALLED void Gui::boss_timer_on_spell_start()
 {
-    AnmVm *vm = vm_94;
+    AnmVm *vm = boss_timer_tens_vm;
     vm->interrupt(2);
     vm->run();
-    vm = vm_98;
+    vm = boss_timer_ones_vm;
     vm->interrupt(2);
     vm->run();
 }
 
 // FUNCTION: TH16 0x417650
-HARNESS_CALLED void Gui::interrupt_spell_vms_3()
+HARNESS_CALLED void Gui::boss_timer_on_spell_end()
 {
-    AnmVm *vm = vm_94;
+    AnmVm *vm = boss_timer_tens_vm;
     vm->interrupt(3);
     vm->run();
-    vm = vm_98;
+    vm = boss_timer_ones_vm;
     vm->interrupt(3);
     vm->run();
 }
@@ -1419,13 +1465,18 @@ void __fastcall anm_vm_interrupt_2_run(AnmVm *vm)
     vm->run();
 }
 
+// Starts a dialogue script: creates the text and furigana VMs (text.anm
+// scripts 0 and 1; the second of each gets interrupt 7, presumably to make
+// it the lower line),
+// clears bullets, lasers and enemies, and puts the bubble at its default
+// place.
 // TODO: ours gets a /GS cookie and keeps the create_effect results in a
 // local; the original has no cookie and reuses script's argument slot for them.
 // FUNCTION: TH16 0x429b20
 GuiMsgVm::GuiMsgVm(void *script)
 {
     memset(this, 0, sizeof(GuiMsgVm));
-    timer_4.reset();
+    time_alive.reset();
     time_in_script.reset();
     unk_154 = 0;
     pause_timer.reset();
@@ -1433,6 +1484,7 @@ GuiMsgVm::GuiMsgVm(void *script)
     text_line_1 = g_Supervisor.text_anm->create_effect(0, -1, NULL);
     text_line_2 = g_Supervisor.text_anm->create_effect(0, -1, NULL);
     AnmManager::interrupt_tree_and_run(text_line_2, 7);
+    // Both lines and both furigana VMs use 21-pixel glyphs.
     get_vm_or_clear(text_line_1)->font_dims[0] = 0x15;
     get_vm_or_clear(text_line_1)->font_dims[1] = 0x15;
     get_vm_or_clear(text_line_2)->font_dims[0] = 0x15;
@@ -1453,16 +1505,17 @@ GuiMsgVm::GuiMsgVm(void *script)
     get_vm_or_clear(furigana_1)->index_of_on_draw = ANM_ON_DRAW_TEXTBOX;
     get_vm_or_clear(furigana_2)->index_of_on_draw = ANM_ON_DRAW_TEXTBOX;
     next_text_line = 0;
-    unk_198 = 0;
-    unk_1a0 = 0;
-    unk_1a4 = 0;
-    unk_1a8 = 0;
-    unk_1ac = 0;
+    text_cleared = 0;
+    side_text_color_0 = 0;
+    side_text_color_1 = 0;
+    side_text_color_2 = 0;
+    side_text_color_3 = 0;
     active_side = 0;
-    vec_15c = Float3(16.0f, 0.0f, 0.0f);
-    vec_168 = Float3(16.0f, 0.0f, 0.0f);
-    vec_174 = Float3(16.0f, 0.0f, 0.0f);
-    vec_180 = Float3(16.0f, 0.0f, 0.0f);
+    side_text_pos_0 = Float3(16.0f, 0.0f, 0.0f);
+    side_text_pos_1 = Float3(16.0f, 0.0f, 0.0f);
+    side_text_pos_2 = Float3(16.0f, 0.0f, 0.0f);
+    side_text_pos_3 = Float3(16.0f, 0.0f, 0.0f);
+    // Dialogue starts on a clean screen.
     g_BulletManager->clear_all(0);
     // LaserManager::clear_all(0, 0), inlined.
     LaserDataInf *laser = g_LaserManager->list_head.next;
@@ -1476,13 +1529,17 @@ GuiMsgVm::GuiMsgVm(void *script)
         laser = next;
     }
     EnemyManager::kill_all();
-    flags &= ~0x40;
-    unk_1b0 = 384.0f;
-    unk_1b4 = 640.0f;
-    unk_1b8 = 0.0f;
-    unk_1bc = 320.0f;
+    flags &= ~MSG_FLAG_KEY_PRESSED;
+    bubble_x = 384.0f;
+    bubble_y = 640.0f;
+    bubble_z = 0.0f;
+    bubble_width = 320.0f;
 }
 
+// ECL dialogRead. Script -1 starts the boss theme and -3 the stage theme
+// (unless spell practice already plays it), with their titles; -2 ends
+// the stage (stage_clear), or opens the game over menu when Spellcard flag
+// 0x80 is set; otherwise the dialogue script with that number starts.
 // FUNCTION: TH16 0x429ff0
 void Gui::start_dialogue(i32 script)
 {
@@ -1491,7 +1548,7 @@ void Gui::start_dialogue(i32 script)
     {
         i32 boss = script == -1;
         StageData *stage = g_stage_data;
-        if (g_Globals.game_mode == 2 && g_GameThread->replay_mode == 0)
+        if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE && g_GameThread->replay_mode == 0)
         {
             char path[0x100];
             strcpy(path, stage->music_names[boss]);
@@ -1508,7 +1565,7 @@ void Gui::start_dialogue(i32 script)
         }
         g_SoundManager.modify_bgm(BGM_PLAY, boss, "dummy");
         g_Scorefile->bgm_unlocked[track] = 1;
-        g_Gui->stage_logo_anm->create_effect(boss + 1, -1, NULL);
+        g_Gui->stage_logo_anm->create_effect(boss + LOGO_ANM_STAGE_THEME, -1, NULL);
     }
     else if (script == -2)
     {
@@ -1518,7 +1575,7 @@ void Gui::start_dialogue(i32 script)
         }
         else
         {
-            stage_clear_42e150();
+            stage_clear();
         }
     }
     else
@@ -1533,7 +1590,7 @@ void Gui::start_dialogue(i32 script)
     }
 }
 
-// AnmLoaded::create_effect as LTCG inlined it into sub_426d70.
+// AnmLoaded::create_effect as LTCG inlined it into setup_stage_hud.
 static __forceinline AnmId create_effect_inline(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out)
 {
     ENTER_CS(CS_ANM_MANAGER);
@@ -1564,7 +1621,7 @@ static __forceinline AnmId create_effect_inline(AnmLoaded *anm, i32 script, i32 
     return id;
 }
 
-// AnmManager::interrupt_tree as LTCG inlined it into sub_426d70.
+// AnmManager::interrupt_tree as LTCG inlined it into setup_stage_hud.
 static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
 {
     AnmVm *vm = g_AnmManager->get_vm_with_id(id);
@@ -1579,11 +1636,11 @@ static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
     }
 }
 
-//// Sets the HUD up for a stage: the life and bomb counters, the spell VMs,
+// Sets the HUD up for a stage: the life and bomb counters, the boss timer,
 // the stage logo, the demo and difficulty markers and the season gauge.
 // TODO: ours gets a /GS cookie for pos (see README) and realigns through ebx; the original realigns plainly.
 // FUNCTION: TH16 0x426d70
-void Gui::sub_426d70()
+void Gui::setup_stage_hud()
 {
     Gui *gui = g_Gui;
     if (gui->on_tick != NULL)
@@ -1598,44 +1655,50 @@ void Gui::sub_426d70()
     {
         gui->on_draw_2->flags |= UPDATE_FUNC_ACTIVE;
     }
-    if (gui->id_150.id == 0)
+    if (gui->hud_frame_id.id == 0)
     {
-        gui->id_150 = gui->front_anm->create_ui_vm_at_origin(0, 0);
+        gui->hud_frame_id = gui->front_anm->create_ui_vm_at_origin(FRONT_ANM_HUD_FRAME, 0);
     }
     if (gui->life_counter_vms[0] == NULL)
     {
         for (u32 i = 0; i < 8; i++)
         {
-            gui->life_counter_ids[i] = gui->front_anm->create_ui_effect(i + 0x1e, 0, &gui->life_counter_vms[i]);
+            gui->life_counter_ids[i] =
+                gui->front_anm->create_ui_effect(i + FRONT_ANM_LIFE_COUNTER, 0, &gui->life_counter_vms[i]);
         }
         for (u32 i = 0; i < 8; i++)
         {
-            gui->bomb_counter_ids[i] = gui->front_anm->create_ui_effect(i + 0x26, 0, &gui->bomb_counter_vms[i]);
+            gui->bomb_counter_ids[i] =
+                gui->front_anm->create_ui_effect(i + FRONT_ANM_BOMB_COUNTER, 0, &gui->bomb_counter_vms[i]);
         }
+        // The boss timer's tens and ones digits, hidden for now.
         for (i32 i = 0; i < 2; i++)
         {
-            (&gui->id_4c)[i] = create_effect_inline(g_AsciiManager->ascii_anm, i + 2, -1, &(&gui->vm_94)[i]);
-            (&gui->vm_94)[i]->hide_tree_inline();
-            (&gui->vm_94)[i]->flags_hi &= ~ANM_VM_ORIGIN_MODE_MASK;
+            (&gui->boss_timer_tens_id)[i] = create_effect_inline(
+                g_AsciiManager->ascii_anm, i + ASCII_ANM_BOSS_TIMER_DIGITS, -1, &(&gui->boss_timer_tens_vm)[i]);
+            (&gui->boss_timer_tens_vm)[i]->hide_tree_inline();
+            (&gui->boss_timer_tens_vm)[i]->flags_hi &= ~ANM_VM_ORIGIN_MODE_MASK;
         }
     }
     gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
     gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
-    if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & 1) && g_Globals.game_mode != 2)
+    // The stage theme's title.
+    if (g_Supervisor.gamemode_to_switch_to != 8 && !(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY) &&
+        g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE)
     {
-        create_effect_inline(gui->stage_logo_anm, 1, -1, NULL);
+        create_effect_inline(gui->stage_logo_anm, LOGO_ANM_STAGE_THEME, -1, NULL);
     }
-    if (g_Globals.flags_hi_45c & 1)
+    if (g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY)
     {
-        create_effect_inline(gui->front_anm, 0x77, -1, NULL);
+        create_effect_inline(gui->front_anm, FRONT_ANM_DEMO_PLAY, -1, NULL);
     }
-    if (gui->id_9c.id == 0)
+    if (gui->enemy_marker_id.id == 0)
     {
-        gui->id_9c = create_effect_inline(gui->front_anm, 0x70, -1, NULL);
+        gui->enemy_marker_id = create_effect_inline(gui->front_anm, FRONT_ANM_ENEMY_MARKER, -1, NULL);
     }
     if (g_Globals.stage_num == 1 && g_GameThread->replay_mode == 0 && g_Globals.continues_used == 0)
     {
-        AnmId id = create_effect_inline(gui->front_anm, 0x45, -1, NULL);
+        AnmId id = create_effect_inline(gui->front_anm, FRONT_ANM_GAME_START, -1, NULL);
         Float3 pos(0.0f, g_Globals.character == CHARACTER_MARISA ? 148 : 128, 0.0f);
         AnmVm *vm = g_AnmManager->get_vm_with_id(id);
         if (vm != NULL)
@@ -1645,41 +1708,41 @@ void Gui::sub_426d70()
     }
     if (g_Supervisor.unk_700 != 0)
     {
-        gui->id_104 = create_effect_inline(gui->front_anm, g_Globals.difficulty + 0x51, -1, NULL);
+        gui->id_104 = create_effect_inline(gui->front_anm, g_Globals.difficulty + FRONT_ANM_DIFFICULTY_2, -1, NULL);
         AnmManager::interrupt_tree(gui->id_104, 3);
     }
-    gui->difficulty_id = create_effect_inline(gui->front_anm, g_Globals.difficulty + 0x57, -1, NULL);
+    gui->difficulty_id = create_effect_inline(gui->front_anm, g_Globals.difficulty + FRONT_ANM_DIFFICULTY, -1, NULL);
     interrupt_tree_inline(gui->id_104, 3);
     gui->boss_star_count = 0;
     for (i32 i = 0; i < 3; i++)
     {
-        gui->boss_bars[i].unk_4c = 0;
+        gui->boss_bars[i].vms_created = 0;
     }
     if (g_Supervisor.unk_700 != 0)
     {
-        gui->unk_118 = 0;
-        gui->season_gauge_id = create_effect_inline(gui->front_anm, 0x71, -1, NULL);
+        gui->release_ready = 0;
+        gui->season_gauge_id = create_effect_inline(gui->front_anm, FRONT_ANM_SEASON_GAUGE, -1, NULL);
         AnmManager *anm = g_AnmManager;
-        AnmVm *vm = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, 0x75));
+        AnmVm *vm = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, FRONT_ANM_SEASON_GAUGE_ICON));
         if (vm != NULL)
         {
-            anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, g_Globals.subseason + 0x52);
+            anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, g_Globals.subseason + FRONT_ANM_SPRITE_SUBSEASON);
         }
     }
     update_season_gauge();
-    if (gui->id_110.id != 0)
+    if (gui->lights_out_id.id != 0)
     {
-        AnmManager::interrupt_tree(gui->id_110, 1);
-        gui->id_110.id = 0;
+        AnmManager::interrupt_tree(gui->lights_out_id, 1);
+        gui->lights_out_id.id = 0;
     }
 }
 
 // TODO: the original realigns the frame (and esp, -8) and has 4 more bytes of it.
 // FUNCTION: TH16 0x426780
-void Gui::create_vm_110()
+void Gui::show_lights_out()
 {
     Gui *gui = g_Gui;
-    gui->id_110 = gui->front_anm->create_vm_inline(0x3c, NULL, 0.0f, -1);
+    gui->lights_out_id = gui->front_anm->create_vm_inline(FRONT_ANM_LIGHTS_OUT, NULL, 0.0f, -1);
 }
 
 // EnemyManager::get_boss as LTCG inlined it into Gui::on_tick_body: the
@@ -1707,7 +1770,7 @@ static __forceinline EnemyInf *get_boss_inline(EnemyManager *enemies, i32 i)
 // Deletes the seven VMs of a boss life bar.
 static __forceinline void delete_boss_bar_vms(GuiBossBar *bar)
 {
-    if (bar->unk_4c)
+    if (bar->vms_created)
     {
         AnmManager *anm = g_AnmManager;
         for (i32 j = 0; j < 7; j++)
@@ -1715,153 +1778,164 @@ static __forceinline void delete_boss_bar_vms(GuiBossBar *bar)
             anm->delete_vm_inline(bar->ids[j]);
             bar->ids[j].id = 0;
         }
-        bar->unk_4c = 0;
+        bar->vms_created = 0;
     }
 }
 
-// The HUD's frame: notices and their count-down, the season gauge moving
-// out of the player's way, the boss's spell card counter, life bars and
-// stars, the dialogue, the boss marker at the bottom and the subseason
-// gauge.
+// The HUD's frame: the chapter result's count-up, the season gauge moving
+// out of the player's way, the boss timer, life bars and stars, the
+// dialogue, the enemy marker below the game area and the subseason
+// gauge's glow.
 // TODO: written for behaviour; register allocation and block order are not matched yet.
 // FUNCTION: TH16 0x427cf0
 i32 Gui::on_tick_body()
 {
-    if (flags_1ac & 0x100)
+    if (hud_flags & GUI_STAGE_CLEAR_BONUS)
     {
-        timer_1b0.tick_in_place();
+        notice_timer.tick_in_place();
     }
-    if (flags_1ac & 0x1800)
+    if (hud_flags & GUI_CHAPTER_RESULT_MASK)
     {
-        timer_1b0.tick();
-        if ((flags_1ac & 0x1800) == 0x800 && timer_1b0.current >= 90)
+        notice_timer.tick();
+        if ((hud_flags & GUI_CHAPTER_RESULT_MASK) == GUI_CHAPTER_RESULT_COUNTING && notice_timer.current >= 90)
         {
-            if (unk_134 > 0.0f)
+            if (chapter_percent > 0.0f)
             {
-                if (timer_1b0.current % 4 == 0)
+                // A tick every 4 frames while counting, a chime at the end.
+                if (notice_timer.current % 4 == 0)
                 {
                     g_SoundManager.play_sound_centered(0x27, 0);
                 }
-                unk_134 -= 1.0f;
-                unk_140 += unk_144;
+                chapter_percent -= 1.0f;
+                chapter_bonus += chapter_bonus_step;
             }
             else
             {
-                if (timer_1b0.current != 90)
+                if (notice_timer.current != 90)
                 {
                     g_SoundManager.play_sound_centered(0x2f, 0);
                 }
-                unk_134 = unk_138;
-                unk_140 = unk_13c;
-                unk_144 = 0;
-                flags_1ac = flags_1ac & ~0x800 | 0x1000;
+                chapter_percent = chapter_percent_final;
+                chapter_bonus = chapter_bonus_final;
+                chapter_bonus_step = 0;
+                hud_flags = hud_flags & ~GUI_CHAPTER_RESULT_COUNTING | GUI_CHAPTER_RESULT_DONE;
             }
         }
-        if (timer_1b0.current >= unk_1c4)
+        if (notice_timer.current >= chapter_result_duration)
         {
-            sub_42c4f0();
-            flags_1ac &= ~0x1800;
+            hide_chapter_result();
+            hud_flags &= ~GUI_CHAPTER_RESULT_MASK;
         }
     }
-    if (unk_14c != 0 && g_AnmManager->get_vm_with_id(ids_11c[3]) == NULL)
+    if (spell_bonus_shown != 0 && g_AnmManager->get_vm_with_id(overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK]) == NULL)
     {
-        ids_11c[3].id = 0;
-        unk_14c = 0;
+        overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK].id = 0;
+        spell_bonus_shown = 0;
     }
+    // The season gauge (bottom left) moves away while the player is near it.
     Player *player = g_Player;
-    if (!(flags_1ac & 1))
+    if (!(hud_flags & GUI_SEASON_GAUGE_AWAY))
     {
         if (player != NULL && player->inner.pos.y > 400.0f && -64.0f > player->inner.pos.x)
         {
             AnmManager::interrupt_tree(season_gauge_id, 5);
-            flags_1ac |= 1;
+            hud_flags |= GUI_SEASON_GAUGE_AWAY;
         }
     }
     else if (player != NULL && (384.0f > player->inner.pos.y || player->inner.pos.x > -64.0f))
     {
         AnmManager::interrupt_tree(season_gauge_id, 4);
-        flags_1ac &= ~1;
+        hud_flags &= ~GUI_SEASON_GAUGE_AWAY;
     }
 
-    // The boss's spell card counter.
+    // The boss timer: moves away while the player is near it (at the top,
+    // or at the bottom with Spellcard flag 0x100), and ticks in its last
+    // seconds.
     EnemyManager *enemies = g_EnemyManager;
-    if (enemies != NULL && unk_1d0 >= 0 && enemies->get_boss(0) != NULL && !enemies->inner.life_bar_hidden && msg == NULL &&
-        !(*(u32 *)&g_GameThread->flags & 0x10000))
+    if (enemies != NULL && boss_timer_seconds >= 0 && enemies->get_boss(0) != NULL && !enemies->inner.life_bar_hidden &&
+        msg == NULL && !(*(u32 *)&g_GameThread->flags & GAME_THREAD_MUSIC_RESTART))
     {
-        vm_94->show_tree();
-        vm_98->show_tree();
-        u32 shown = flags_1ac & 0x600;
+        boss_timer_tens_vm->show_tree();
+        boss_timer_ones_vm->show_tree();
+        u32 shown = hud_flags & GUI_BOSS_TIMER_STATE_MASK;
         if (shown == 0)
         {
             if ((!(g_Spellcard->flags & SPELLCARD_TEXT_AT_BOTTOM) && 128.0f > g_Player->inner.pos.y) ||
                 ((g_Spellcard->flags & SPELLCARD_TEXT_AT_BOTTOM) && g_Player->inner.pos.y > 320.0f))
             {
-                flags_1ac = flags_1ac & ~0x400 | 0x200;
-                anm_vm_interrupt_5(vm_94);
-                anm_vm_interrupt_5(vm_98);
+                hud_flags = hud_flags & ~GUI_BOSS_TIMER_HIDDEN | GUI_BOSS_TIMER_AWAY;
+                anm_vm_interrupt_5(boss_timer_tens_vm);
+                anm_vm_interrupt_5(boss_timer_ones_vm);
             }
         }
-        else if (shown == 0x200)
+        else if (shown == GUI_BOSS_TIMER_AWAY)
         {
             if ((!(g_Spellcard->flags & SPELLCARD_TEXT_AT_BOTTOM) && 160.0f > g_Player->inner.pos.y) ||
                 ((g_Spellcard->flags & SPELLCARD_TEXT_AT_BOTTOM) && g_Player->inner.pos.y > 288.0f))
             {
-                anm_vm_interrupt_4(vm_94);
-                anm_vm_interrupt_4(vm_98);
-                flags_1ac &= ~0x600;
+                anm_vm_interrupt_4(boss_timer_tens_vm);
+                anm_vm_interrupt_4(boss_timer_ones_vm);
+                hud_flags &= ~GUI_BOSS_TIMER_STATE_MASK;
             }
         }
         else
         {
+            // Coming back from hidden: restore the spell card look first.
             if (g_Spellcard->flags & SPELLCARD_ACTIVE)
             {
-                anm_vm_interrupt_2_run(vm_94);
-                anm_vm_interrupt_2_run(vm_98);
+                anm_vm_interrupt_2_run(boss_timer_tens_vm);
+                anm_vm_interrupt_2_run(boss_timer_ones_vm);
             }
             else
             {
-                anm_vm_interrupt_3_run(vm_94);
-                anm_vm_interrupt_3_run(vm_98);
+                anm_vm_interrupt_3_run(boss_timer_tens_vm);
+                anm_vm_interrupt_3_run(boss_timer_ones_vm);
             }
-            anm_vm_interrupt_4_run(vm_94);
-            anm_vm_interrupt_4_run(vm_98);
-            flags_1ac &= ~0x600;
+            anm_vm_interrupt_4_run(boss_timer_tens_vm);
+            anm_vm_interrupt_4_run(boss_timer_ones_vm);
+            hud_flags &= ~GUI_BOSS_TIMER_STATE_MASK;
         }
-        if (unk_1d0 < unk_1d8)
+        // Each second of the last 5 is announced (sound 0xb, then 0xc for
+        // the last 2) in the digits' warning colors.
+        if (boss_timer_seconds < boss_timer_shown_seconds)
         {
-            if (unk_1d0 < 2)
+            if (boss_timer_seconds < 2)
             {
-                vm_94->interrupt_out_of_line(9);
-                vm_98->interrupt_out_of_line(9);
+                boss_timer_tens_vm->interrupt_out_of_line(9);
+                boss_timer_ones_vm->interrupt_out_of_line(9);
                 g_SoundManager.play_sound_centered(0xc, 0);
             }
-            else if (unk_1d0 < 5)
+            else if (boss_timer_seconds < 5)
             {
-                vm_94->interrupt_out_of_line(8);
-                vm_98->interrupt_out_of_line(8);
+                boss_timer_tens_vm->interrupt_out_of_line(8);
+                boss_timer_ones_vm->interrupt_out_of_line(8);
                 g_SoundManager.play_sound_centered(0xb, 0);
             }
         }
-        else if (unk_1d0 > unk_1d8)
+        else if (boss_timer_seconds > boss_timer_shown_seconds)
         {
-            vm_94->interrupt_out_of_line(7);
-            vm_98->interrupt_out_of_line(7);
+            boss_timer_tens_vm->interrupt_out_of_line(7);
+            boss_timer_ones_vm->interrupt_out_of_line(7);
         }
-        if (unk_1d0 != unk_1d8)
+        if (boss_timer_seconds != boss_timer_shown_seconds)
         {
-            vm_94->set_sprite(unk_1d0 / 10 + 0xef);
-            vm_98->set_sprite(unk_1d0 % 10 + 0xef);
+            boss_timer_tens_vm->set_sprite(boss_timer_seconds / 10 + ASCII_ANM_SPRITE_DIGIT_0);
+            boss_timer_ones_vm->set_sprite(boss_timer_seconds % 10 + ASCII_ANM_SPRITE_DIGIT_0);
         }
-        unk_1d8 = unk_1d0;
+        boss_timer_shown_seconds = boss_timer_seconds;
     }
     else
     {
-        vm_94->hide_tree_inline();
-        vm_98->hide_tree_inline();
-        flags_1ac = flags_1ac & ~0x200 | 0x400;
+        boss_timer_tens_vm->hide_tree_inline();
+        boss_timer_ones_vm->hide_tree_inline();
+        hud_flags = hud_flags & ~GUI_BOSS_TIMER_AWAY | GUI_BOSS_TIMER_HIDDEN;
     }
 
-    // The life bars of the two bosses.
+    // The life bars of the two bosses: a ring around each that fills up
+    // (2.5% a frame) to the boss's life, with the life markers on it, faded
+    // while the player is close. No bar while the boss has 100000 life or
+    // more, any of enemy flags 0x31 or an invulnerability timer, or while
+    // dialogue runs.
     if (g_EnemyManager != NULL && !g_EnemyManager->inner.life_bar_hidden)
     {
         for (i32 i = 0; i < 2; i++)
@@ -1878,8 +1952,8 @@ i32 Gui::on_tick_body()
                 delete_boss_bar_vms(bar);
                 if (i == 0)
                 {
-                    g_AnmManager->delete_vm(boss_id_d8);
-                    boss_id_d8.id = 0;
+                    g_AnmManager->delete_vm(boss_marker_id);
+                    boss_marker_id.id = 0;
                 }
                 continue;
             }
@@ -1900,16 +1974,16 @@ i32 Gui::on_tick_body()
             {
                 bar->shown = fill;
             }
-            if (bar->unk_4c == 0)
+            if (bar->vms_created == 0)
             {
-                bar->ids[0] = front_anm->create_effect(0xf4, -1, NULL);
-                bar->ids[1] = front_anm->create_effect(0xf5, -1, NULL);
-                bar->ids[2] = front_anm->create_effect(0xf6, -1, NULL);
-                bar->ids[3] = front_anm->create_effect(0xf7, -1, NULL);
-                bar->ids[4] = front_anm->create_effect(0xf7, -1, NULL);
-                bar->ids[5] = front_anm->create_effect(0xf7, -1, NULL);
-                bar->ids[6] = front_anm->create_effect(0xf7, -1, NULL);
-                bar->unk_4c = 1;
+                bar->ids[0] = front_anm->create_effect(FRONT_ANM_BOSS_BAR, -1, NULL);
+                bar->ids[1] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_2, -1, NULL);
+                bar->ids[2] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_3, -1, NULL);
+                bar->ids[3] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
+                bar->ids[4] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
+                bar->ids[5] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
+                bar->ids[6] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
+                bar->vms_created = 1;
             }
             show_boss_marker();
             AnmVm *vm = get_vm_or_clear(bar->ids[0]);
@@ -1953,7 +2027,7 @@ i32 Gui::on_tick_body()
                     marker->hide_tree_inline();
                 }
             }
-            if (bar->unk_50 != 0)
+            if (bar->faded != 0)
             {
                 EnemyInf *b = g_EnemyManager->get_boss(i);
                 f32 dx = b->enemy.final_pos.pos.x - g_Player->inner.pos.x;
@@ -1964,7 +2038,7 @@ i32 Gui::on_tick_body()
                     {
                         AnmManager::interrupt_tree(bar->ids[j], 2);
                     }
-                    bar->unk_50 = 0;
+                    bar->faded = 0;
                 }
             }
             else
@@ -1978,14 +2052,14 @@ i32 Gui::on_tick_body()
                     {
                         AnmManager::interrupt_tree(bar->ids[j], 3);
                     }
-                    bar->unk_50 = 1;
+                    bar->faded = 1;
                 }
             }
         }
     }
 
     // The boss's remaining spell card stars (boss_star_ids runs into
-    // id_100).
+    // boss_star_id_9).
     AnmId *stars = boss_star_ids;
     for (u32 i = 0; i < 10; i++)
     {
@@ -1993,7 +2067,7 @@ i32 Gui::on_tick_body()
         {
             if (stars[i].id == 0)
             {
-                stars[i] = front_anm->create_effect(i + 0x46, -1, NULL);
+                stars[i] = front_anm->create_effect(i + FRONT_ANM_BOSS_STARS, -1, NULL);
             }
         }
         else if (stars[i].id != 0)
@@ -2012,20 +2086,21 @@ i32 Gui::on_tick_body()
         }
         else
         {
-            msg->timer_4.tick_in_place();
+            msg->time_alive.tick_in_place();
         }
     }
 
-    // The boss's position marker at the bottom of the screen, fading out
-    // near the player.
+    // The enemy marker below the game area follows the boss, fading out
+    // near the player and changing color (interrupts 7-10) as the boss's
+    // life in its attack runs low.
     if (g_EnemyManager != NULL)
     {
         EnemyInf *boss = get_boss_inline(g_EnemyManager, 0);
         if (boss != NULL && !((boss->enemy.flags_low >> 5) & 1) && !(boss->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX))
         {
-            AnmVm *vm = get_vm_or_clear(id_9c);
+            AnmVm *vm = get_vm_or_clear(enemy_marker_id);
             vm->show_tree_inline();
-            u32 level = flags_1ac & 6;
+            u32 level = hud_flags & GUI_ENEMY_MARKER_LEVEL_MASK;
             if (g_Spellcard->flags & SPELLCARD_ACTIVE)
             {
                 if (level == 0)
@@ -2033,7 +2108,7 @@ i32 Gui::on_tick_body()
                     if (boss->enemy.life.remaining_for_cur_attack < 2000)
                     {
                         vm->interrupt_out_of_line(7);
-                        flags_1ac = flags_1ac & ~4 | 2;
+                        hud_flags = hud_flags & ~4 | 2;
                     }
                 }
                 else if (level == 2)
@@ -2041,7 +2116,7 @@ i32 Gui::on_tick_body()
                     if (boss->enemy.life.remaining_for_cur_attack < 1000)
                     {
                         vm->interrupt_out_of_line(8);
-                        flags_1ac = flags_1ac & ~2 | 4;
+                        hud_flags = hud_flags & ~2 | 4;
                     }
                 }
                 else if (level == 4)
@@ -2049,7 +2124,7 @@ i32 Gui::on_tick_body()
                     if (boss->enemy.life.remaining_for_cur_attack < 400)
                     {
                         vm->interrupt_out_of_line(9);
-                        flags_1ac |= 6;
+                        hud_flags |= 6;
                     }
                 }
                 else if (level == 6)
@@ -2057,7 +2132,7 @@ i32 Gui::on_tick_body()
                     if (boss->enemy.life.remaining_for_cur_attack > 400)
                     {
                         vm->interrupt_out_of_line(10);
-                        flags_1ac &= ~6;
+                        hud_flags &= ~6;
                     }
                 }
             }
@@ -2066,7 +2141,7 @@ i32 Gui::on_tick_body()
                 if (boss->enemy.life.remaining_for_cur_attack < 700)
                 {
                     vm->interrupt_out_of_line(7);
-                    flags_1ac = flags_1ac & ~4 | 2;
+                    hud_flags = hud_flags & ~4 | 2;
                 }
             }
             else if (level == 2)
@@ -2074,7 +2149,7 @@ i32 Gui::on_tick_body()
                 if (boss->enemy.life.remaining_for_cur_attack < 400)
                 {
                     vm->interrupt_out_of_line(8);
-                    flags_1ac = flags_1ac & ~2 | 4;
+                    hud_flags = hud_flags & ~2 | 4;
                 }
             }
             else if (level == 4)
@@ -2082,7 +2157,7 @@ i32 Gui::on_tick_body()
                 if (boss->enemy.life.remaining_for_cur_attack < 200)
                 {
                     vm->interrupt_out_of_line(9);
-                    flags_1ac |= 6;
+                    hud_flags |= 6;
                 }
             }
             else if (level == 6)
@@ -2090,7 +2165,7 @@ i32 Gui::on_tick_body()
                 if (boss->enemy.life.remaining_for_cur_attack > 200)
                 {
                     vm->interrupt_out_of_line(10);
-                    flags_1ac &= ~6;
+                    hud_flags &= ~6;
                 }
             }
             vm->entity_pos.y = 960.0f;
@@ -2113,7 +2188,7 @@ i32 Gui::on_tick_body()
         }
         else
         {
-            AnmVm *vm = g_AnmManager->get_vm_with_id(id_9c);
+            AnmVm *vm = g_AnmManager->get_vm_with_id(enemy_marker_id);
             if (vm != NULL)
             {
                 vm->hide_tree_inline();
@@ -2124,22 +2199,24 @@ i32 Gui::on_tick_body()
     // The subseason gauge lights up while a release is possible.
     if (g_SubseasonBomb != NULL && g_SubseasonBomb->can_activate())
     {
-        if (unk_118 == 0)
+        if (release_ready == 0)
         {
-            AnmManager::interrupt_tree_and_run(find_child_id_of(g_AnmManager, season_gauge_id, 0x76), 2);
+            AnmManager::interrupt_tree_and_run(find_child_id_of(g_AnmManager, season_gauge_id, FRONT_ANM_SEASON_GAUGE_RELEASE),
+                                               2);
         }
-        unk_118 = 1;
+        release_ready = 1;
     }
     else
     {
-        if (unk_118 == 1)
+        if (release_ready == 1)
         {
-            AnmManager::interrupt_tree_and_run(find_child_id_of(g_AnmManager, season_gauge_id, 0x76), 3);
+            AnmManager::interrupt_tree_and_run(find_child_id_of(g_AnmManager, season_gauge_id, FRONT_ANM_SEASON_GAUGE_RELEASE),
+                                               3);
         }
-        unk_118 = 0;
+        release_ready = 0;
     }
     time_in_stage.tick();
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // The original formats the percentage inline. Written out in on_draw_2_body,
@@ -2151,23 +2228,24 @@ static inline void draw_percentage(Float3 *pos, f32 percentage)
     g_AsciiManager->create_stringf(pos, "%3.1f%%", (double)percentage);
 }
 
-// The HUD's text: the stage clear bonus, the spell card bonus count-down,
-// the spell card timers, the score, hiscore, next extend, bombs, power,
-// PIV and graze, the boss's spell counter and the season level.
+// The HUD's text: the stage clear bonus, the chapter result, the spell
+// card's capture time and record, the score, hiscore, next extend, bomb
+// fragments, power, point item value and graze, the boss timer's
+// hundredths and the season level.
 // TODO: written for behaviour; the original aligns its frame to 64 bytes, and register allocation and the text-setting store order are not matched yet.
 // FUNCTION: TH16 0x428e70
 i32 Gui::on_draw_2_body()
 {
     Float3 pos;
     AsciiInf *ascii;
-    if (g_AnmManager->get_vm_with_id(ids_11c[1]) == NULL)
+    if (g_AnmManager->get_vm_with_id(overlay_ids[GUI_OVERLAY_STAGE_CLEAR_BONUS]) == NULL)
     {
-        ids_11c[1].id = 0;
+        overlay_ids[GUI_OVERLAY_STAGE_CLEAR_BONUS].id = 0;
     }
     else
     {
         pos = Float3(224.0f, 200.0f, 0.0f);
-        AnmVm *vm = get_vm_or_clear(ids_11c[1]);
+        AnmVm *vm = get_vm_or_clear(overlay_ids[GUI_OVERLAY_STAGE_CLEAR_BONUS]);
         ascii = g_AsciiManager;
         ascii->color.a = vm->color_1.a;
         ascii->group = 2;
@@ -2182,36 +2260,36 @@ i32 Gui::on_draw_2_body()
         ascii->align_h = 1;
         ascii->align_v = 1;
     }
-    if (g_AnmManager->get_vm_with_id(ids_11c[4]) == NULL)
+    if (g_AnmManager->get_vm_with_id(overlay_ids[GUI_OVERLAY_CHAPTER_RESULT]) == NULL)
     {
-        ids_11c[4].id = 0;
+        overlay_ids[GUI_OVERLAY_CHAPTER_RESULT].id = 0;
     }
     else
     {
-        AnmVm *vm = g_AnmManager->get_vm_with_id(ids_11c[4]);
+        AnmVm *vm = g_AnmManager->get_vm_with_id(overlay_ids[GUI_OVERLAY_CHAPTER_RESULT]);
         if (vm != NULL && (vm->flags_lo >> 1) & 1)
         {
             pos = Float3(300.0f, 226.0f, 0.0f);
-            vm = get_vm_or_clear(ids_11c[4]);
+            vm = get_vm_or_clear(overlay_ids[GUI_OVERLAY_CHAPTER_RESULT]);
             ascii = g_AsciiManager;
             ascii->color.a = vm->color_1.a;
             ascii->group = 2;
             ascii->font_id = 2;
             ascii->align_h = 2;
             ascii->align_v = 0;
-            ascii->create_stringf(&pos, "%d", unk_130);
+            ascii->create_stringf(&pos, "%d", chapter_result_count);
             pos.x = 308.0f;
             pos.y = 246.0f;
-            draw_percentage(&pos, unk_134);
+            draw_percentage(&pos, chapter_percent);
             pos.x = 300.0f;
             pos.y = 266.0f;
-            g_AsciiManager->create_stringf(&pos, "%3d", unk_148);
+            g_AsciiManager->create_stringf(&pos, "%3d", chapter_result_count_2);
             pos.y = 286.0f;
-            g_AsciiManager->create_stringf(&pos, "%6d", unk_140);
+            g_AsciiManager->create_stringf(&pos, "%6d", chapter_bonus);
             pos.y = 296.0f;
             ascii = g_AsciiManager;
             ascii->color.d3d = 0xff8080ff;
-            ascii->create_stringf(&pos, "  +%d", unk_140 / 50000 * 10);
+            ascii->create_stringf(&pos, "  +%d", chapter_bonus / 50000 * 10);
             ascii = g_AsciiManager;
             ascii->color.a = 0xff;
             ascii->font_id = 0;
@@ -2221,24 +2299,26 @@ i32 Gui::on_draw_2_body()
             ascii->color.d3d = 0xffffffff;
         }
     }
+    // Under the spell card bonus notice: the card's time (Spellcard::unk_90
+    // frames) and, in grey, the time Spellcard::decode_time_code gives.
     ascii = g_AsciiManager;
-    if (unk_14c != 0)
+    if (spell_bonus_shown != 0)
     {
         pos = Float3(224.0f, 144.0f, 0.0f);
-        AnmVm *vm = g_AnmManager->get_vm_with_id(ids_11c[3]);
+        AnmVm *vm = g_AnmManager->get_vm_with_id(overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK]);
         if (vm == NULL)
         {
-            ids_11c[3].id = 0;
+            overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK].id = 0;
         }
         if (g_Spellcard == NULL)
         {
-            unk_14c = 0;
-            g_AnmManager->delete_vm(ids_11c[3]);
-            ids_11c[3].id = 0;
+            spell_bonus_shown = 0;
+            g_AnmManager->delete_vm(overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK]);
+            overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK].id = 0;
         }
         else if (vm == NULL)
         {
-            unk_14c = 0;
+            spell_bonus_shown = 0;
         }
         else
         {
@@ -2377,11 +2457,12 @@ i32 Gui::on_draw_2_body()
     ascii->font_id = 0;
     ascii->group = 0;
 
-    // The boss's spell card counter next to vm_94.
-    if (g_EnemyManager != NULL && unk_1d0 >= 0 && g_EnemyManager->get_boss(0) != NULL &&
-        !g_EnemyManager->inner.life_bar_hidden && msg == NULL && !(*(u32 *)&g_GameThread->flags & 0x10000))
+    // The boss timer's dot and hundredths, next to its digits.
+    if (g_EnemyManager != NULL && boss_timer_seconds >= 0 && g_EnemyManager->get_boss(0) != NULL &&
+        !g_EnemyManager->inner.life_bar_hidden && msg == NULL &&
+        !(*(u32 *)&g_GameThread->flags & GAME_THREAD_MUSIC_RESTART))
     {
-        AnmVm *vm = vm_94;
+        AnmVm *vm = boss_timer_tens_vm;
         f32 x = vm->pos.x + 16.0f;
         f32 y = vm->pos.y - 7.0f;
         pos = Float3(x, y, 0.0f);
@@ -2394,7 +2475,7 @@ i32 Gui::on_draw_2_body()
         pos.y = y + 6.0f;
         ascii->scale.x = 0.6f;
         ascii->scale.y = 0.6f;
-        ascii->create_stringf(&pos, "%.2d", unk_1d4);
+        ascii->create_stringf(&pos, "%.2d", boss_timer_hundredths);
         ascii = g_AsciiManager;
         ascii->scale.x = 1.0f;
         ascii->scale.y = 1.0f;
@@ -2403,11 +2484,11 @@ i32 Gui::on_draw_2_body()
         ascii->font_id = 0;
     }
 
-    // The season level.
+    // The season level, faint while the gauge is out of the player's way.
     D3DCOLOR level_colors[7] = {0x60606060, 0xa0b0b080, 0xb0b8b880, 0xc0c0c080, 0xd0d0d080, 0xe0e0e080, 0xffffff30};
     pos = Float3(-132.0f, 446.0f, 0.0f);
     ascii->color.d3d = level_colors[g_Globals.season_level()];
-    if (flags_1ac & 1)
+    if (hud_flags & GUI_SEASON_GAUGE_AWAY)
     {
         ascii->color.a = 0x40;
     }
@@ -2423,5 +2504,5 @@ i32 Gui::on_draw_2_body()
     ascii->group = 0;
     ascii->align_h = 1;
     ascii->align_v = 1;
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }

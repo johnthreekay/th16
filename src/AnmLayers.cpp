@@ -254,7 +254,7 @@ int __fastcall AnmManager::on_draw_53_layer_42(AnmManager *mgr)
 // FUNCTION: TH16 0x46ddd0
 int __fastcall AnmManager::on_draw_0a_layer_03(AnmManager *mgr)
 {
-    camera_update_43c780(&g_Supervisor.cameras[3]);
+    camera_update_2d(&g_Supervisor.cameras[3]);
     use_camera(3);
     g_Supervisor.disable_d3d_fog_inline();
     return mgr->render_layer(3);

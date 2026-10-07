@@ -16,7 +16,9 @@
 // script that moves the camera, and fog. Layouts from ExpHP (zStage,
 // zStageInner, zFog, zInterpCameraSky); the STD file format follows thtk.
 
-// Interpolated camera fog (ExpHP: zInterpCameraSky).
+// Interpolated camera fog (ExpHP: zInterpCameraSky). Methods are the
+// interpolation modes of InterpFloat3, with 7 (add goal each frame), 8
+// (Bezier) and 17 (accelerate) handled here.
 struct InterpCameraSky
 {
     CameraSky initial;
@@ -28,7 +30,7 @@ struct InterpCameraSky
     i32 end_time;
     i32 method;
 
-    // 0x40cd10
+    // 0x40cd10. Advances the interpolation and returns the current value.
     CameraSky step();
 };
 
@@ -47,6 +49,7 @@ struct StdQuad
     f32 height;
 };
 
+// An object of the STD file: a list of quads with a bounding box.
 struct StdObject
 {
     u8 unk_0[2];
@@ -64,11 +67,12 @@ struct StdObject
     HARNESS_CALLED i32 is_culled(D3DXVECTOR3 *pos, f32 max_distance_sq, Camera *camera);
 };
 
+// A placement of an object; a negative object_id ends the list.
 struct StdInstance
 {
     i16 object_id;
     // Bit 0: drawn this frame.
-    u16 unk_2;
+    u16 flags;
     D3DXVECTOR3 pos;
 };
 
@@ -82,6 +86,42 @@ struct StdInstr
     i32 args[1];
 };
 
+// STD instruction opcodes. Names from truth's TH14-TH17 stdmap where it has
+// one.
+enum StdOpcode
+{
+    // The script stops here for good.
+    STD_STOP = 0,
+    // Offset, new time.
+    STD_JMP = 1,
+    STD_POS = 2,
+    STD_POS_TIME = 3,
+    STD_FACING = 4,
+    STD_FACING_TIME = 5,
+    STD_UP = 6,
+    STD_FOV = 7,
+    // Color, begin and end distance.
+    STD_FOG = 8,
+    STD_FOG_TIME = 9,
+    STD_POS_BEZIER = 10,
+    STD_FACING_BEZIER = 11,
+    // StageInner::rocking_mode().
+    STD_ROCKING_MODE = 12,
+    STD_BG_COLOR = 13,
+    // Replaces one of the eight extra VMs (-1 stops it, -2 hides it).
+    STD_SPRITE = 14,
+    // A label for Stage::jump_to_label; a no-op when run.
+    STD_INTERRUPT_LABEL = 16,
+    // Replaces the distortion mesh at the bottom of the screen.
+    STD_DISTORTION = 17,
+    STD_UP_TIME = 18,
+    // Unnamed in truth: sends interrupt 7 + n to every VM of the stage.
+    STD_INTERRUPT = 19,
+    // Unnamed in truth: how far objects are drawn.
+    STD_DRAW_DISTANCE = 20,
+};
+
+// The STD file's header; the objects' offsets follow.
 struct StdHeader
 {
     i16 num_objects;
@@ -102,37 +142,43 @@ struct StageInner
     ZunTimer time_in_stage;
     // Offset of the next script instruction from the script start.
     i32 cur_instr_offset;
-    i32 unk_18;
-    ZunTimer timer_1c;
+    // Its low byte is the camera rocking pattern (rocking_mode()).
+    i32 rocking_mode_word;
+    // Time in the rocking pattern's cycle.
+    ZunTimer rocking_timer;
     InterpFloat3 camera_facing_i;
     InterpFloat3 camera_pos_i;
     InterpFloat3 camera_up_i;
     InterpCameraSky camera_sky_i;
     Camera camera;
     Stage *stage;
+    // The extra VMs of STD_SPRITE, and the layer each one draws on.
     AnmVm anm_vms[8];
-    // Set with the VM by instruction 14.
-    i32 unk_32f0[8];
-    // A squared distance (3100 squared at load time).
-    f32 unk_3310;
+    i32 anm_vm_layers[8];
+    // The squared distance beyond which objects are not drawn
+    // (STD_DRAW_DISTANCE; 3100 squared at load time).
+    f32 draw_distance_sq;
+    // The distortion mesh of STD_DISTORTION.
     Fog *fog;
-    // Reset by instruction 17 (112, 192, -1).
-    f32 unk_3318;
-    f32 unk_331c;
+    // STD_DISTORTION kind 2's radius shrinks from 192 to 112, 2 per frame.
+    f32 distortion_min_radius;
+    f32 distortion_radius;
+    // Set to -1 by STD_DISTORTION; not read.
     i32 unk_3320;
     ZunTimer fog_timer;
-    // Angles that step_fog advances.
-    f32 unk_3338;
-    f32 unk_333c;
-    // Instruction 17's argument: 1 picks the fog with 7 points per strip.
+    // Angles that step_fog advances to wave the mesh.
+    f32 wave_angle_a;
+    f32 wave_angle_b;
+    // STD_DISTORTION's argument: 1 waves the bottom of the screen (7 points
+    // per strip), 2 bulges a disc in the middle (17).
     i32 fog_kind;
     // Color passed to the ANM manager; the top byte flags a new value.
     union
     {
-        u32 color_3344;
+        u32 anm_color;
         struct
         {
-            u8 unk_3344[3];
+            u8 anm_color_rgb[3];
             u8 color_changed;
         };
     };
@@ -145,10 +191,10 @@ struct StageInner
     // 0x40b3b0. Runs the instructions whose time has come, advances the
     // time, steps the camera interpolators and rocks the camera.
     i32 run_std();
-    // unk_18's low byte: the camera rocking pattern (instruction 12).
+    // The camera rocking pattern (STD_ROCKING_MODE): 0 for none.
     u8 &rocking_mode()
     {
-        return *(u8 *)&unk_18;
+        return *(u8 *)&rocking_mode_word;
     }
     // 0x40c4a0
     void step_fog();
@@ -157,17 +203,23 @@ struct StageInner
     void draw_vms(i32 layer);
 };
 
+// Stage::stage_flags. When the game goes on to the next stage, the old
+// stage exits (the screen fades out over 30 frames, then it is disabled
+// and deleted) while the new one enters (hidden for 30 frames, then
+// fading in).
 enum StageFlags
 {
-    STAGE_FLAG_1 = 1 << 0,
-    // Fading in (timer_66c8 counts the fade).
-    STAGE_FADING_IN = 1 << 1,
-    // Fading out.
-    STAGE_FADING_OUT = 1 << 2,
+    // The objects are drawn (not while a spell card's background is up).
+    STAGE_VISIBLE = 1 << 0,
+    // Exiting (fade_timer counts down from 30).
+    STAGE_EXITING = 1 << 1,
+    // Entering (fade_timer counts down from 60).
+    STAGE_ENTERING = 1 << 2,
     // Stops ticking and drawing.
     STAGE_DISABLED = 1 << 3,
 };
 
+// The stage background and its script.
 struct Stage
 {
     u32 flags;
@@ -215,17 +267,17 @@ struct Stage
     // 0x40af70
     i32 draw_layer(i32 layer);
     // Makes camera 3 a copy of the stage's camera (keeping camera 3's
-    // unk_fc) and applies it.
+    // shake offset) and applies it.
     void use_camera();
     // 0x40b2f0. Sends interrupt n to every quad VM and the stage's own VMs
-    // and runs them (STD instruction 16).
+    // and runs them (STD_INTERRUPT).
     void interrupt_vms(i32 n);
 
     // These reach the stage through g_Stage.
     HARNESS_CALLED void start_std_vms();
     HARNESS_CALLED void jump_to_label(i32 label);
-    HARNESS_CALLED void start_fade_in();
-    HARNESS_CALLED void start_fade_out();
+    HARNESS_CALLED void start_exit();
+    HARNESS_CALLED void start_enter();
 
     static int __fastcall on_tick_callback(void *arg);
     static int __fastcall on_draw_03_callback(void *arg);
@@ -233,5 +285,5 @@ struct Stage
 };
 
 extern Stage *g_Stage;
-// Another stage that is destroyed the same way (ExpHP: "ANOTHER_STAGE_PTR").
+// The previous stage while the next one starts (ExpHP: "ANOTHER_STAGE_PTR").
 extern Stage *g_Stage2;

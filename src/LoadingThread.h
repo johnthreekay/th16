@@ -5,9 +5,10 @@
 #include "UpdateFunc.h"
 #include "types.h"
 
-// Loads the shared resources (sig.anm, text.anm, the BGM format table) on a
-// worker thread while the loading screen animates. Layout from ExpHP's
-// th-re-data (zLoadingThread).
+// Loads the shared resources at startup (sig.anm, the ASCII manager,
+// text.anm, the BGM, the shared anm files and the score file) on a worker
+// thread while the loading screen shows the logo, then goes to the title.
+// Layout from ExpHP's th-re-data (zLoadingThread).
 struct LoadingThread
 {
     u32 flags;
@@ -15,12 +16,18 @@ struct LoadingThread
     UpdateFunc *on_draw_func;
     ThreadInf thread;
     u8 unk_28[4];
+    // Not used.
     AnmVm vm;
+    // The sig.anm logo.
     AnmId anm_id;
     AnmLoaded *sig_anm;
-    i32 count_630;
-    i32 count_634;
-    i32 count_638;
+    // 1 once the thread has loaded sig.anm (on_draw then shows the logo
+    // and makes it 2), and likewise for the "now loading" text once the
+    // ASCII manager is up.
+    i32 logo_step;
+    i32 now_loading_step;
+    // Frames drawn; the title waits for 180 of them.
+    i32 draw_count;
 
     LoadingThread();
     ~LoadingThread();
@@ -28,7 +35,7 @@ struct LoadingThread
     static LoadingThread *create();
 
     // Started through ThreadInf::restart; like the other loaders a plain
-    // cdecl function.
+    // cdecl function. On failure the game quits (game mode 3).
     static int thread_start(void *arg);
     // Registered through jmp thunks (ExpHP's "__stub" functions).
     DECOMP_NOINLINE int on_tick();

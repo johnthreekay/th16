@@ -23,7 +23,7 @@ static_assert(offsetof(AnmVm, int_vars) == 0x4a0, "AnmVm layout");
 static_assert(offsetof(AnmVm, pos_2) == 0x4e0, "AnmVm layout");
 static_assert(offsetof(AnmVm, index_of_sprite_mapping_func) == 0x5dc, "AnmVm layout");
 static_assert(offsetof(AsciiInf, ascii_anm) == 0x19240, "AsciiInf layout");
-static_assert(offsetof(Supervisor, cameras) + 3 * sizeof(Camera) + offsetof(Camera, unk_104) == 0x6c0, "Supervisor layout");
+static_assert(offsetof(Supervisor, cameras) + 3 * sizeof(Camera) + offsetof(Camera, position_delta) == 0x6c0, "Supervisor layout");
 
 // FUNCTION: TH16 0x45f2d0
 HARNESS_CALLED f32 AnmVm::get_float_var(f32 value)
@@ -1367,7 +1367,7 @@ done:
     }
     if (flags_lo & ANM_VM_FOLLOW_CAMERA)
     {
-        entity_pos += g_Supervisor.cameras[3].unk_104;
+        entity_pos += g_Supervisor.cameras[3].position_delta;
     }
     if (flags_hi & ANM_VM_UV_QUAD_FROM_CORNERS)
     {

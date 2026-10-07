@@ -401,7 +401,7 @@ i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
     }
     D3DXVECTOR3 screen_2;
     camera = g_Supervisor.current_camera;
-    D3DXVec3Project(&screen_2, &camera->unk_30, &camera->viewport, (D3DXMATRIX *)&camera->projection_matrix, (D3DXMATRIX *)&camera->view_matrix,
+    D3DXVec3Project(&screen_2, &camera->right, &camera->viewport, (D3DXMATRIX *)&camera->projection_matrix, (D3DXMATRIX *)&camera->view_matrix,
                     &world);
     f32 x = screen.x;
     f32 y = screen.y;

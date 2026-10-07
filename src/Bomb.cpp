@@ -136,16 +136,16 @@ BombInf *BombInf::create()
         BombInf *release;
         switch (g_Globals.subseason)
         {
-        case SEASON_WINTER:
+        case SUBSEASON_WINTER:
             release = new BombMarisaSubInf;
             break;
-        case SEASON_SUMMER:
+        case SUBSEASON_SUMMER:
             release = new BombCirnoSubInf;
             break;
-        case SEASON_AUTUMN:
+        case SUBSEASON_AUTUMN:
             release = new BombAyaSubInf;
             break;
-        case SEASON_DOYOU:
+        case SUBSEASON_DOYOU:
             release = new BombAllSubInf;
             break;
         default:
@@ -206,16 +206,16 @@ void BombInf::destroy_all()
     default:
         delete (BombReimuSubInf *)release;
         break;
-    case SEASON_SUMMER:
+    case SUBSEASON_SUMMER:
         delete (BombCirnoSubInf *)release;
         break;
-    case SEASON_AUTUMN:
+    case SUBSEASON_AUTUMN:
         delete (BombAyaSubInf *)release;
         break;
-    case SEASON_WINTER:
+    case SUBSEASON_WINTER:
         delete (BombMarisaSubInf *)release;
         break;
-    case SEASON_DOYOU:
+    case SUBSEASON_DOYOU:
         delete (BombAllSubInf *)release;
         break;
     }
@@ -292,7 +292,7 @@ i32 BombInf::activate()
         }
         season_level = level;
         release_bonus = 0.0f;
-        if (g_Globals.subseason == SEASON_SUMMER || g_Globals.subseason == SEASON_DOYOU)
+        if (g_Globals.subseason == SUBSEASON_SUMMER || g_Globals.subseason == SUBSEASON_DOYOU)
         {
             i32 power = g_Globals.season_power - g_Globals.season_level_deltas[season_level];
             g_Globals.season_power = power < 0 ? 0 : power;

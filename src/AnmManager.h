@@ -366,7 +366,7 @@ struct AnmManager
     i32 unk_c4;
     i32 stat_render_state_setups;
     i32 stat_draw_calls;
-    // The active camera's 2D offset (Camera::unk_fc, the screen shake),
+    // The active camera's 2D offset (Camera::shake_offset),
     // added to every 2D sprite. Copied by Supervisor::swap_transform_matrices
     // and the stage's draw code.
     Float2 camera_2d_offset;

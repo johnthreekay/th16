@@ -20,7 +20,7 @@ void harness_posvel_set_ellipse_angle(PosVel *pv, f32 angle)
     }
 }
 
-// Like the stage restart code at 0x42d4d1.
+// Like GameThread's destructor going on to the next stage (0x42d4d1).
 void harness_gui_release_msg()
 {
     g_Gui->release_msg();
@@ -35,8 +35,8 @@ void harness_gui_msg_textbox(GuiMsgVm *msg, i32 kind, f32 x, f32 y, f32 width)
     msg->set_textbox_width(x, kind + 2);
 }
 
-// Like the HUD code at 0x42dc6c.
-void harness_gui_sub_42c1b0()
+// Like GameThread::begin_stage at 0x42dc6c.
+void harness_gui_hide_stage_clear_bonus()
 {
-    g_Gui->sub_42c1b0();
+    g_Gui->hide_stage_clear_bonus();
 }

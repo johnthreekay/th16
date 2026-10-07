@@ -64,7 +64,7 @@ int __fastcall ReplayManager::on_tick_22(void *arg)
     ReplayManager *replay = (ReplayManager *)arg;
 
     // Fast-forward: run the frame list again for 7 of every 8 frames.
-    if (g_GameThread != NULL && !g_GameThread->flags.paused && replay->mode == REPLAY_PLAYBACK &&
+    if (g_GameThread != NULL && !g_GameThread->flags.loading && replay->mode == REPLAY_PLAYBACK &&
         (g_hardware_input & 0x201) && replay->current_tick_num_in_stage % 8 != 0)
     {
         return UPDATE_FUNC_RESTART_FROM_FIRST;
@@ -75,7 +75,7 @@ int __fastcall ReplayManager::on_tick_22(void *arg)
 // FUNCTION: TH16 0x448e90
 int __fastcall ReplayManager::on_draw_47(void *arg)
 {
-    if (g_GameThread != NULL && g_GameThread->flags.paused)
+    if (g_GameThread != NULL && g_GameThread->flags.loading)
     {
         return UPDATE_FUNC_CONTINUE;
     }
@@ -85,7 +85,7 @@ int __fastcall ReplayManager::on_draw_47(void *arg)
 // FUNCTION: TH16 0x449190
 void Globals::set_game_mode(u32 mode)
 {
-    if (game_mode != 2)
+    if (game_mode != GAME_MODE_SPELL_PRACTICE)
     {
         spell_id = -1;
     }
@@ -302,7 +302,7 @@ int ReplayManager::read_replay_file(const char *filename)
     i32 size;
 
     strcpy(this->filename, filename);
-    if (!(g_Globals.flags_hi_45c & 1))
+    if (!(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY))
     {
         _chdir(g_GameWindow.save_dir);
         sprintf(path, "replay/%s", filename);
@@ -348,7 +348,7 @@ int ReplayManager::read_replay_file(const char *filename)
             (u8 *)(stages[gamestate->stage].input_begin + gamestate->num_frames);
         gamestate = (RpyGamestate *)((u8 *)(gamestate + 1) + gamestate->data_size);
     }
-    if (!(g_Globals.flags_hi_45c & 1) && data != NULL)
+    if (!(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY) && data != NULL)
     {
         free(data);
     }
@@ -552,7 +552,7 @@ int ReplayManager::initialize(i32 mode, const char *filename)
         info->subseason = g_Globals.subseason;
         info->difficulty = g_Globals.difficulty;
         info->flag_practice = g_Globals.game_mode;
-        info->flag_spell_practice = g_Globals.game_mode == 2 ? 1 : 0;
+        info->flag_spell_practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE ? 1 : 0;
         info->spell_id = g_Globals.spell_id;
         if (g_GameThread != NULL)
         {
@@ -607,11 +607,11 @@ int ReplayManager::initialize(i32 mode, const char *filename)
         memcpy(&g_Globals, gamestate->globals, sizeof(gamestate->globals));
         if (g_Globals.spell_id >= 0)
         {
-            g_Globals.set_game_mode(2);
+            g_Globals.set_game_mode(GAME_MODE_SPELL_PRACTICE);
         }
         else
         {
-            g_Globals.set_game_mode(0);
+            g_Globals.set_game_mode(GAME_MODE_NORMAL);
         }
         UpdateFunc *f = g_UpdateFuncRegistry->create_func(on_tick_playback_thunk);
         f->flags &= ~UPDATE_FUNC_ACTIVE;

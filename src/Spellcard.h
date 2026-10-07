@@ -30,7 +30,7 @@ enum SpellcardFlags
     // A non-survival card ran out of time (sound at the end).
     SPELLCARD_TIMED_OUT = 1 << 7,
     SPELLCARD_TEXT_AT_BOTTOM = 1 << 8,
-    // From StageBoss::spell_flag_200: keeps STAGE_FLAG_1 set after the
+    // From StageBoss::spell_flag_200: keeps STAGE_VISIBLE set after the
     // card's first second.
     SPELLCARD_FLAG_200 = 1 << 9,
 };

@@ -457,7 +457,7 @@ i32 TitleInf::do_difficulty_select()
         {
             AnmManager::interrupt_tree(anm_ids[0x68], 1);
             anm_ids[0x68].id = 0;
-            if (g_Globals.game_mode != 0)
+            if (g_Globals.game_mode != GAME_MODE_NORMAL)
             {
                 g_last_difficulty = menu.next_selection;
                 g_Globals.difficulty = g_last_difficulty;
@@ -667,12 +667,12 @@ extern const char *g_stage_names[10];
 // FUNCTION: TH16 0x450af0
 i32 TitleInf::do_subseason_select()
 {
-    i32 script = (g_Globals.difficulty == 4) * 2 + 0x97;
+    i32 script = (g_Globals.difficulty == DIFFICULTY_EXTRA) * 2 + 0x97;
     switch (substate)
     {
     case 0:
         menu.num_choices = 4;
-        if (g_Globals.difficulty == 4)
+        if (g_Globals.difficulty == DIFFICULTY_EXTRA)
         {
             menu.set_cursor(0);
             menu.num_choices = 1;
@@ -699,7 +699,7 @@ i32 TitleInf::do_subseason_select()
         break;
     case 2:
         menu.current_selection = menu.next_selection;
-        if (g_Globals.difficulty != 4)
+        if (g_Globals.difficulty != DIFFICULTY_EXTRA)
         {
             if (input_pressed_or_repeating(INPUT_LEFT))
             {
@@ -727,7 +727,7 @@ i32 TitleInf::do_subseason_select()
             g_SoundManager.play_sound_centered(7, 0);
             set_substate(3);
             g_SoundManager.play_sound_centered(50, 0);
-            if (g_Globals.game_mode == 0)
+            if (g_Globals.game_mode == GAME_MODE_NORMAL)
             {
                 g_Supervisor.fade_out_bgm(0.05f);
                 return 1;
@@ -737,7 +737,7 @@ i32 TitleInf::do_subseason_select()
     case 3:
         if (time_in_state.current == 10)
         {
-            if (g_Globals.game_mode != 0)
+            if (g_Globals.game_mode != GAME_MODE_NORMAL)
             {
                 goto confirm;
             }
@@ -759,18 +759,18 @@ i32 TitleInf::do_subseason_select()
     start:
         if (time_in_state.current >= 40)
         {
-            if (g_Globals.difficulty != 4)
+            if (g_Globals.difficulty != DIFFICULTY_EXTRA)
             {
                 g_Globals.subseason = menu.next_selection;
             }
             else
             {
-                g_Globals.subseason = SEASON_DOYOU;
+                g_Globals.subseason = SUBSEASON_DOYOU;
             }
             menu.push();
             g_Globals.spell_id = -1;
             set_state(2);
-            if (g_Globals.difficulty < 4)
+            if (g_Globals.difficulty < DIFFICULTY_EXTRA)
             {
                 g_stage_data = &g_stage_table[1];
                 g_Globals.stage_num = 1;
@@ -1609,12 +1609,12 @@ i32 TitleInf::do_replay_menu()
             g_Globals.difficulty = info->difficulty;
             if (info->flags_a & 2)
             {
-                g_Globals.set_game_mode(2);
+                g_Globals.set_game_mode(GAME_MODE_SPELL_PRACTICE);
                 g_Globals.spell_id = info->spell_id;
             }
             else
             {
-                g_Globals.set_game_mode(0);
+                g_Globals.set_game_mode(GAME_MODE_NORMAL);
                 g_Globals.spell_id = -1;
             }
             g_last_replay_slot = replay_slot;
@@ -2293,10 +2293,10 @@ i32 TitleInf::do_manual()
         HelpManual::create();
         substate = 1;
         time_in_state.reset();
-        g_HelpManual->unk_128 = 128.0f;
+        g_HelpManual->x_offset = 128.0f;
         break;
     case 1:
-        if (g_HelpManual->unk_124 != 0)
+        if (g_HelpManual->closed != 0)
         {
             AnmManager::interrupt_tree(anm_id_73c, 1);
             anm_id_73c.id = 0;
@@ -3095,7 +3095,7 @@ i32 TitleInf::do_spell_practice_difficulty()
                 g_Globals.character = menu_5cec.next_selection;
                 g_Globals.subshot = 0;
                 g_Globals.difficulty = g_spell_difficulty[spell_ids[menu.next_selection]];
-                g_Globals.subseason = SEASON_DOYOU;
+                g_Globals.subseason = SUBSEASON_DOYOU;
                 g_Supervisor.gamemode_to_switch_to = 7;
                 g_spell_practice_last_stage = spell_stage;
                 g_spell_practice_last_row = spell_row;

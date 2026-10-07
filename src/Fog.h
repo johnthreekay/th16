@@ -12,17 +12,24 @@ struct FogVertex
     D3DXVECTOR2 uv;
 };
 
-// The fog effect an enemy can carry: a ring of ANM VMs (ExpHP: zFog). Its
-// vertex buffers come from malloc.
+// A distortion mesh over part of the game area (ExpHP: zFog): a grid of
+// strip_count columns of strip_points points, drawn as strip_count - 1
+// triangle strip VMs that sample the screen behind them. Enemies carry one
+// (EnemyFog) and the stage's STD_DISTORTION makes one. Its buffers come
+// from malloc.
 struct Fog
 {
-    i32 vm_count;
-    i32 unk_4;
+    i32 strip_count;
+    i32 strip_points;
+    // The VM whose on_draw copies the mesh into the strip VMs.
     AnmId main_vm;
+    // The strip VMs.
     AnmId *vm_ids;
     AnmVm **vms;
-    void *buffer_14;
-    void *buffer_18;
+    // The grid's points as drawn (FogVertex), and their undistorted
+    // positions (D3DXVECTOR3).
+    void *vertices;
+    void *points;
 
     // 0x418c70 (ExpHP: Fog::initialize). Every caller passes the same
     // first and third arguments, which LTCG folded away.

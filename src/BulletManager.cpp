@@ -182,7 +182,7 @@ BulletManager *BulletManager::create()
 // FUNCTION: TH16 0x412c50
 i32 __fastcall BulletManager::on_tick_callback(BulletManager *self)
 {
-    if (g_GameThread != NULL && (g_GameThread->flags.flag_0 | g_GameThread->flags.paused))
+    if (g_GameThread != NULL && (g_GameThread->flags.flag_0 | g_GameThread->flags.loading))
     {
         return 1;
     }
@@ -194,7 +194,7 @@ i32 __fastcall BulletManager::on_tick_callback(BulletManager *self)
 // FUNCTION: TH16 0x412c80
 i32 __fastcall BulletManager::on_draw_callback(BulletManager *self)
 {
-    if (g_GameThread != NULL && g_GameThread->flags.paused)
+    if (g_GameThread != NULL && g_GameThread->flags.loading)
     {
         return 1;
     }

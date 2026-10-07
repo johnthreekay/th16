@@ -144,7 +144,7 @@ i32 Spellcard::on_draw_body()
     pos.x = 360.0f;
     pos.y = 35.0f;
     pos.z = 0.0f;
-    i32 practice = g_Globals.game_mode == 2;
+    i32 practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE;
     i32 captures = g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id].captures[practice];
     if (captures >= 100)
     {
@@ -196,7 +196,7 @@ void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_i
     if (g_ReplayManager->mode != 1)
     {
         strcpy(g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id].name, name);
-        i32 practice = g_Globals.game_mode == 2;
+        i32 practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE;
         ScorefileSpell *spell = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id];
         if (spell->attempts[practice] < 99999)
         {
@@ -209,7 +209,7 @@ void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_i
             spell->attempts[practice]++;
         }
     }
-    g_Gui->interrupt_spell_vms_2();
+    g_Gui->boss_timer_on_spell_start();
     flags &= ~SPELLCARD_EARLY_BOMB;
     ticks = 1;
     flags &= ~SPELLCARD_TIMING;
@@ -265,22 +265,22 @@ HARNESS_CALLED void Spellcard::end()
     {
         return;
     }
-    g_Stage->stage_flags |= STAGE_FLAG_1;
+    g_Stage->stage_flags |= STAGE_VISIBLE;
     AnmManager::interrupt_tree(text_anm_ids[0], 1);
     AnmManager::interrupt_tree(text_anm_ids[1], 1);
     AnmManager::interrupt_tree(text_anm_ids[2], 1);
     flags &= ~SPELLCARD_ACTIVE;
     delete_vm_and_clear(background_anm_id);
     flags &= ~SPELLCARD_EARLY_BOMB;
-    g_Gui->interrupt_spell_vms_3();
+    g_Gui->boss_timer_on_spell_end();
     delete_vm_and_clear(boss_anm_id);
     if (flags & SPELLCARD_CAPTURABLE)
     {
         g_Globals.add_to_score(bonus);
-        g_Gui->sub_42bcf0(bonus, 0);
+        g_Gui->show_notice(bonus, GUI_NOTICE_SPELL_BONUS);
         if (g_ReplayManager->mode != 1)
         {
-            i32 practice = g_Globals.game_mode == 2;
+            i32 practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE;
             ScorefileSpell *spell = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id];
             if (spell->captures[practice] < 99999)
             {
@@ -296,7 +296,7 @@ HARNESS_CALLED void Spellcard::end()
     }
     else
     {
-        g_Gui->sub_42bcf0(0, 1);
+        g_Gui->show_notice(0, GUI_NOTICE_BONUS_FAILED);
     }
     if (flags & SPELLCARD_TIMED_OUT)
     {
@@ -380,7 +380,7 @@ i32 Spellcard::on_tick_body()
     ticks++;
     if (time.current >= 60 && !(flags & SPELLCARD_FLAG_200))
     {
-        g_Stage->stage_flags &= ~STAGE_FLAG_1;
+        g_Stage->stage_flags &= ~STAGE_VISIBLE;
     }
     if (time.current >= 300 && !(flags & SPELLCARD_NO_BONUS_DECAY))
     {

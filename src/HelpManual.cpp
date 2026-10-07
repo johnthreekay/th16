@@ -11,6 +11,11 @@
 
 #include "Input.h"
 
+// The number of pages; help.anm scripts 0-8 are the list's entries, and
+// script 9 shows the page's picture.
+#define HELP_PAGE_COUNT 9
+#define HELP_ANM_PAGE_SCRIPT 9
+
 // GLOBAL: TH16 0x4a6dd8
 HelpManual *g_HelpManual;
 
@@ -22,7 +27,8 @@ HelpManual::HelpManual()
     g_HelpManual = this;
 }
 
-// Runs on the loading thread.
+// Runs on the Supervisor's worker thread; starts the manual once help.anm
+// is loaded.
 // FUNCTION: TH16 0x42e760
 void help_manual_load_anm()
 {
@@ -41,16 +47,18 @@ void help_manual_load_anm()
     g_HelpManual->on_draw->flags |= UPDATE_FUNC_ACTIVE;
 }
 
-// Runs on the loading thread.
+// Runs on the Supervisor's worker thread: reads the page's picture.
 // FUNCTION: TH16 0x42e7c0
 void help_manual_read_file()
 {
     g_HelpManual->file_data = file_read_all(g_HelpManual->file_name, &g_HelpManual->file_size, 0);
-    g_HelpManual->substate = 3;
+    g_HelpManual->substate = HELP_SUBSTATE_LOADED;
     g_Supervisor.thread.should_run = FALSE;
     g_Supervisor.thread.stop_requested = TRUE;
 }
 
+// Registers the update functions (inactive until help.anm is loaded) and
+// loads help.anm on the Supervisor's worker thread.
 // FUNCTION: TH16 0x42e810
 i32 HelpManual::initialize()
 {
@@ -71,7 +79,7 @@ i32 HelpManual::initialize()
     on_draw = f;
     g_Supervisor.start_thread((ThreadStart)help_manual_load_anm, NULL);
     timer.reset();
-    state = 0;
+    state = HELP_STATE_START;
     return 0;
 }
 
@@ -125,10 +133,11 @@ static __forceinline i32 help_pressed_or_repeating(u32 mask)
     return 0;
 }
 
-// Shows the page list with the cursor's page highlighted.
+// Shows the page list with the cursor's page highlighted (interrupt 2; the
+// others get 3).
 static __forceinline void help_highlight_pages(HelpManual *manual)
 {
-    for (i32 i = 0; i < 9; i++)
+    for (i32 i = 0; i < HELP_PAGE_COUNT; i++)
     {
         if (manual->menu.next_selection == i)
         {
@@ -144,7 +153,7 @@ static __forceinline void help_highlight_pages(HelpManual *manual)
 // Creates the page list.
 static __forceinline void help_create_pages(HelpManual *manual, D3DXVECTOR3 *pos)
 {
-    for (i32 i = 0; i < 9; i++)
+    for (i32 i = 0; i < HELP_PAGE_COUNT; i++)
     {
         manual->page_vms[i] = manual->help_anm->create_ui_vm(i, pos, 0);
         if (manual->menu.next_selection == i)
@@ -160,12 +169,16 @@ static __forceinline void help_create_pages(HelpManual *manual, D3DXVECTOR3 *pos
 
 static __forceinline void help_hide_pages(HelpManual *manual)
 {
-    for (i32 i = 0; i < 9; i++)
+    for (i32 i = 0; i < HELP_PAGE_COUNT; i++)
     {
         AnmManager::interrupt_tree(manual->page_vms[i], 1);
     }
 }
 
+// The manual's frame: choose a page from the list (up and down; shot or
+// enter opens it, bomb or menu closes the manual), read its picture on the
+// worker thread, then show it (up and down turn the page, cancel goes back
+// to the list). Sounds 10, 7 and 9 are the cursor, select and cancel ones.
 // TODO: ours gets a /GS cookie where the original realigns the frame, and
 // reads the input globals in a different order.
 // FUNCTION: TH16 0x42eab0
@@ -174,33 +187,33 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
     D3DXVECTOR3 pos;
     pos.y = 0.0f;
     pos.z = 0.0f;
-    pos.x = unk_128;
+    pos.x = x_offset;
     switch (state)
     {
-    case 0:
-        state = 1;
+    case HELP_STATE_START:
+        state = HELP_STATE_RUN;
         break;
-    case 1:
+    case HELP_STATE_RUN:
         switch (substate)
         {
-        case 0:
-            menu.num_choices = 9;
+        case HELP_SUBSTATE_SETUP:
+            menu.num_choices = HELP_PAGE_COUNT;
             menu.set_cursor(0);
             menu.wraps = 1;
             help_create_pages(this, &pos);
             help_anm->d3d[1].clear_texture();
-            substate = 1;
-        case 1:
+            substate = HELP_SUBSTATE_LIST;
+        case HELP_SUBSTATE_LIST:
             if (timer.current < 20)
             {
                 break;
             }
             menu.current_selection = menu.next_selection;
-            if (help_pressed_or_repeating(0x10))
+            if (help_pressed_or_repeating(INPUT_UP))
             {
                 menu.move_cursor(-1);
             }
-            if (help_pressed_or_repeating(0x20))
+            if (help_pressed_or_repeating(INPUT_DOWN))
             {
                 menu.move_cursor(1);
             }
@@ -209,23 +222,23 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
                 g_SoundManager.play_sound_centered(10, 0);
                 help_highlight_pages(this);
             }
-            if (g_hardware_input_pressed & 0x80001)
+            if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
             {
                 g_SoundManager.play_sound_centered(7, 0);
                 goto open_page;
             }
-            if (g_hardware_input_pressed & 0x102)
+            if (g_hardware_input_pressed & (INPUT_MENU | INPUT_BOMB))
             {
                 g_SoundManager.play_sound_centered(9, 0);
                 help_hide_pages(this);
-                state = 2;
-                substate = 0;
+                state = HELP_STATE_CLOSE;
+                substate = HELP_SUBSTATE_SETUP;
                 timer.reset();
             }
             break;
-        case 2:
+        case HELP_SUBSTATE_LOADING:
             break;
-        case 3:
+        case HELP_SUBSTATE_LOADED:
             g_AnmManager->reload_texture(&help_anm->d3d[1], file_data, file_size, 0, 0, 0);
             if (file_data != NULL)
             {
@@ -234,49 +247,49 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
             }
             file_data = NULL;
             help_anm->d3d[1].texture->PreLoad();
-            page_vms[9] = help_anm->create_ui_vm(9, &pos, 0);
-            substate = 4;
+            page_vms[HELP_PAGE_COUNT] = help_anm->create_ui_vm(HELP_ANM_PAGE_SCRIPT, &pos, 0);
+            substate = HELP_SUBSTATE_PAGE;
             timer.set_value(0);
-        case 4:
+        case HELP_SUBSTATE_PAGE:
             if (timer.current < 20)
             {
                 break;
             }
-            if ((g_hardware_input_pressed & 0x20) && menu.next_selection < 8)
+            if ((g_hardware_input_pressed & INPUT_DOWN) && menu.next_selection < HELP_PAGE_COUNT - 1)
             {
-                substate = 5;
+                substate = HELP_SUBSTATE_TURNING;
                 timer.set_value(0);
                 g_SoundManager.play_sound_centered(7, 0);
                 menu.move_cursor(1);
-                AnmManager::interrupt_tree_and_run(page_vms[9], 7);
+                AnmManager::interrupt_tree_and_run(page_vms[HELP_PAGE_COUNT], 7);
             }
-            else if ((g_hardware_input_pressed & 0x10) && menu.next_selection > 0)
+            else if ((g_hardware_input_pressed & INPUT_UP) && menu.next_selection > 0)
             {
-                substate = 5;
+                substate = HELP_SUBSTATE_TURNING;
                 timer.set_value(0);
                 g_SoundManager.play_sound_centered(7, 0);
                 menu.move_cursor(-1);
-                AnmManager::interrupt_tree_and_run(page_vms[9], 8);
+                AnmManager::interrupt_tree_and_run(page_vms[HELP_PAGE_COUNT], 8);
             }
             else
             {
-                if (g_hardware_input_pressed & 0x80103)
+                if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_MENU | INPUT_BOMB | INPUT_SHOT))
                 {
                     g_SoundManager.play_sound_centered(9, 0);
-                    substate = 1;
+                    substate = HELP_SUBSTATE_LIST;
                     timer.set_value(0);
-                    AnmManager::interrupt_tree(page_vms[9], 1);
+                    AnmManager::interrupt_tree(page_vms[HELP_PAGE_COUNT], 1);
                     help_create_pages(this, &pos);
                 }
                 break;
             }
-        case 5:
+        case HELP_SUBSTATE_TURNING:
             if (timer.current < 20)
             {
                 break;
             }
         open_page:
-            substate = 2;
+            substate = HELP_SUBSTATE_LOADING;
             timer.set_value(0);
             sprintf(file_name, "help_%.2d.png", menu.next_selection + 1);
             g_Supervisor.start_thread((ThreadStart)help_manual_read_file, NULL);
@@ -284,15 +297,15 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
             break;
         }
         break;
-    case 2:
+    case HELP_STATE_CLOSE:
         if (timer.current >= 30)
         {
-            unk_124 = 1;
+            closed = 1;
         }
         break;
     }
     timer.tick();
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // FUNCTION: TH16 0x42ef90
@@ -304,9 +317,11 @@ i32 __fastcall HelpManual::on_tick_callback(HelpManual *manual)
 // FUNCTION: TH16 0x42efa0
 i32 __fastcall HelpManual::on_draw_callback(HelpManual *manual)
 {
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
+// Creates a VM running script at pos in the UI list (like create_ui_effect,
+// with a position).
 // TODO: same frame difference as create_vm (4 more bytes, esi saved before the critical section).
 // FUNCTION: TH16 0x42efb0
 HARNESS_CALLED AnmId AnmLoaded::create_ui_vm(i32 script, D3DXVECTOR3 *pos, i32 unused)

@@ -66,7 +66,7 @@ void harness_replay(i32 mode, const char *filename)
     ReplayManager::destroy(ReplayManager::create_from_file(filename));
     ReplayManager::destroy(ReplayManager::create_from_file(g_current_replay_filename));
     g_Globals.set_game_mode(mode);
-    g_Globals.set_game_mode(0);
+    g_Globals.set_game_mode(GAME_MODE_NORMAL);
     g_ReplayManager->new_chunk(mode);
     g_ReplayManager->free_chunks(mode);
 }

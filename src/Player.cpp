@@ -516,8 +516,8 @@ Player::~Player()
     g_UpdateFuncRegistry->unregister_locked(on_tick);
     g_UpdateFuncRegistry->unregister_locked(on_draw);
     g_Player = NULL;
-    // Set while the game goes on to another stage: keep the files.
-    if (g_Globals.flags_lo_45c & 1)
+    // The same stage starts again (retry or continue): keep the files.
+    if (g_Globals.flags_lo_45c & GLOBALS_SAME_STAGE_AGAIN)
     {
         g_AnmManager->disable_vms_from_anm_file(anm_file);
         g_AnmManager->disable_vms_from_anm_file(subseason_anm_file);
@@ -1772,8 +1772,8 @@ i32 Player::on_tick_body()
     inner.shot_time_in_stage.tick();
     // Shooting: not during dialogue or before the stage's enemies run.
     if (g_Gui->msg == NULL && g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 &&
-        !(*(u32 *)&g_GameThread->flags & 0x4000) && inner.shot_time_in_stage.current >= 20 && !(inner.flags & PLAYER_FLAG_NO_SHOOTING) &&
-        !(inner.flags & PLAYER_FLAG_SCALED))
+        !(*(u32 *)&g_GameThread->flags & GAME_THREAD_GAME_CLEARED) && inner.shot_time_in_stage.current >= 20 &&
+        !(inner.flags & PLAYER_FLAG_NO_SHOOTING) && !(inner.flags & PLAYER_FLAG_SCALED))
     {
         tick_shooting_state();
     }

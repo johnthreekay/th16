@@ -189,7 +189,7 @@ enum EnemyFlags
     ENEMY_FLAG_OFFSCREEN_Y = 1 << 3,
     // Damage is counted (total_damage_including_ignored) but not taken.
     ENEMY_FLAG_INVINCIBLE = 1 << 4,
-    // Neither hurtbox nor hitbox; also hides the VMs (clear_flag_lo_2_tree).
+    // Neither hurtbox nor hitbox; also hides the VMs (hide_tree).
     ENEMY_FLAG_INTANGIBLE = 1 << 5,
     // Survives reaching zero life.
     ENEMY_FLAG_NO_DEATH = 1 << 7,

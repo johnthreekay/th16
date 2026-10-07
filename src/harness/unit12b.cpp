@@ -14,14 +14,14 @@ i32 harness_get_keyboard_state(u8 *keys)
     return get_keyboard_state(keys);
 }
 
-// The game thread destroys the stage (0x42d3bd, ...); ECL jumps the stage
-// script (0x422777) and starts the fog interpolation (0x42283f, with varying
-// values).
+// The game thread destroys the stage (0x42d3bd, ...) and starts the stage
+// transition (begin_stage); ECL jumps the stage script (0x422777) and
+// starts the fog interpolation (0x42283f, with varying values).
 void harness_stage(const char *path, i32 n, CameraSky *sky)
 {
     g_Stage->jump_to_label(n);
-    g_Stage->start_fade_out();
-    g_Stage2->start_fade_in();
+    g_Stage->start_enter();
+    g_Stage2->start_exit();
     g_Stage->inner.set_sky_interp(n, n + 1, sky);
     delete g_Stage;
 }

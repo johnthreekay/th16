@@ -27,6 +27,8 @@
 // GLOBAL: TH16 0x4a6dd4
 GameThread *g_GameThread;
 
+// The runtime (get_runtime) when play time was last added to the score
+// file.
 // GLOBAL: TH16 0x4a5c00
 double g_play_time_runtime;
 
@@ -34,12 +36,24 @@ double LTCG_VECTORCALL get_runtime();
 
 i32 unit5_placeholder(void *object);
 
-extern i32 g_unk_4c0f40;
+// While nonzero, the fade and pulse screen effects end at once. Set when a
+// game ends (so its effects do not carry over), counted down by the game's
+// frames and cleared when the next game, the title or an ending page
+// starts.
+// GLOBAL: TH16 0x4c0f40
+i32 g_cancel_screen_effects;
+// Credits left (the pause menu's continue counter).
 extern i32 g_continues_remaining;
+// The practice menu's starting lives choice: 0 for the default (9),
+// otherwise one more than the lives.
 extern i32 g_unk_4a5bf8;
 
-// g_Globals' flag word at 0x45c as a whole (flags_lo_45c, game_mode, ...).
+// g_Globals' flag word at 0x45c as a whole (flags_lo_45c, game_mode,
+// flags_hi_45c): GlobalsFlagsLo masks and GLOBALS_WORD_DEMO_PLAY.
 #define GLOBALS_FLAGS_45C (*(u32 *)((u8 *)&g_Globals + 0x45c))
+
+// GameThread::flags as one word, for the GameThreadFlagMask masks.
+#define GAME_THREAD_FLAG_WORD(thread) (*(u32 *)&(thread)->flags)
 
 // FUNCTION: TH16 0x42d1f0
 void GameThread::thread_start_callback()
@@ -61,7 +75,7 @@ HARNESS_CALLED GameThread *GameThread::create(i32 replay_mode)
     g_Supervisor.d3d_device->EvictManagedResources();
     g_GameThread = thread;
     thread->replay_mode = replay_mode;
-    thread->flags.paused = 1;
+    thread->flags.loading = 1;
     g_Supervisor.start_thread((ThreadStart)thread_start_callback, NULL);
     return thread;
 }
@@ -83,6 +97,7 @@ i32 __fastcall GameThread::on_tick_callback(GameThread *thread)
     return thread->on_tick_body();
 }
 
+// Resets four of the ANM manager's per-frame counters.
 // FUNCTION: TH16 0x42db80
 i32 __fastcall GameThread::on_draw_callback(GameThread *thread)
 {
@@ -91,7 +106,7 @@ i32 __fastcall GameThread::on_draw_callback(GameThread *thread)
     anm->stat_render_state_setups = 0;
     anm->stat_scripts_started = 0;
     anm->stat_draw_calls = 0;
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // The store order decides how MSVC combines the byte and word stores: the
@@ -102,7 +117,7 @@ void ConfigData::set_defaults()
     set_defaults_inline();
 }
 
-// Credits per difficulty.
+// Credits per difficulty (none for extra and the sixth entry).
 // GLOBAL: TH16 0x492278
 static const i32 g_continues_per_difficulty[6] = {5, 5, 5, 5, 0, 0};
 
@@ -134,8 +149,9 @@ static inline UpdateFuncCallback game_thread_on_tick_callback()
 i32 GameThread::thread_start()
 {
     GameThread *thread = g_GameThread;
-    *(u32 *)&thread->flags |= 4;
+    GAME_THREAD_FLAG_WORD(thread) |= GAME_THREAD_LOADING;
     __asm finit;
+    // Wait for the loading screen's screen copy to finish.
     while (g_AnmManager->screen_copies[0].anm_slot >= 0)
     {
         if (g_Supervisor.flags & 0x180)
@@ -151,7 +167,7 @@ i32 GameThread::thread_start()
     g_Supervisor.vm_1bc->interrupt(2);
     g_Supervisor.vm_1bc->run();
     g_game_speed = 1.0f;
-    *(u32 *)&g_GameThread->flags &= ~0x4000;
+    GAME_THREAD_FLAG_WORD(g_GameThread) &= ~GAME_THREAD_GAME_CLEARED;
     g_Globals.time_in_stage = 0;
     g_Globals.time_in_chapter = 0;
     if (g_GameThread->replay_mode == 0)
@@ -160,23 +176,25 @@ i32 GameThread::thread_start()
             .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
             .unlocked = 1;
     }
+    // A new game (not the next stage): the hiscore to beat, then score,
+    // lives, bombs, power and season power for the mode.
     if (g_Supervisor.unk_700 != 0)
     {
         if (g_Globals.stage_num == 7)
         {
-            if (g_Globals.difficulty < 4)
+            if (g_Globals.difficulty < DIFFICULTY_EXTRA)
             {
-                g_Globals.difficulty = 4;
+                g_Globals.difficulty = DIFFICULTY_EXTRA;
             }
         }
-        if (g_Globals.game_mode == 2)
+        if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE)
         {
             g_Globals.hiscore = g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
                                     .spells[g_Globals.spell_id]
                                     .practice_score;
             g_Globals.hiscore_continues = 0;
         }
-        else if (g_Globals.game_mode != 0)
+        else if (g_Globals.game_mode != GAME_MODE_NORMAL)
         {
             g_Globals.hiscore = g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
                                     .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
@@ -190,7 +208,7 @@ i32 GameThread::thread_start()
             g_Globals.hiscore = best->score;
             g_Globals.hiscore_continues = best->continues;
         }
-        if (!(g_Globals.flags_lo_45c & 8))
+        if (!(g_Globals.flags_lo_45c & GLOBALS_CONTINUED))
         {
             g_Globals.continues_used = 0;
         }
@@ -201,7 +219,7 @@ i32 GameThread::thread_start()
         g_Globals.max_piv = g_max_piv_per_difficulty[g_Globals.difficulty] * 100;
         g_Globals.piv = (f32)g_Globals.initial_piv / 100.0f * 100.0f;
         g_continues_remaining = g_continues_per_difficulty[g_Globals.difficulty];
-        if (g_Globals.game_mode == 2)
+        if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE)
         {
             g_Globals.lives = 0;
             g_Globals.bombs = 0;
@@ -210,7 +228,7 @@ i32 GameThread::thread_start()
                 g_Gui->update_bombs(0, g_Globals.bomb_fragments);
             }
         }
-        else if (g_Globals.game_mode == 0)
+        else if (g_Globals.game_mode == GAME_MODE_NORMAL)
         {
             g_Globals.lives = 2;
         }
@@ -226,7 +244,9 @@ i32 GameThread::thread_start()
         {
             goto fail;
         }
-        if (g_Globals.game_mode == 2)
+        // Spell practice, the extra stage and practice from stage 2 on
+        // start with 4.00 power; stage 1 with 1.00.
+        if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE)
         {
             i32 power = g_Globals.power_per_level * 4;
             if (power > g_Globals.max_power)
@@ -288,7 +308,7 @@ i32 GameThread::thread_start()
             }
         }
         g_Player->inner.repopulate_options();
-        GLOBALS_FLAGS_45C &= ~4;
+        GLOBALS_FLAGS_45C &= ~GLOBALS_HISCORE_BEATEN;
         if (thread->replay_mode == 0)
         {
             i32 *play_count = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].play_count;
@@ -316,8 +336,10 @@ i32 GameThread::thread_start()
         thread->on_draw = f;
     }
     memcpy(&thread->config, (u8 *)&g_Supervisor.config + 4, sizeof(ConfigData));
-    thread->unk_20 = g_stage_data->stage_num;
-    if (!(g_Globals.flags_lo_45c & 2))
+    thread->start_stage_num = g_stage_data->stage_num;
+    // The game objects; going on to the next stage keeps them and only
+    // loads the new stage's files.
+    if (!(g_Globals.flags_lo_45c & GLOBALS_NEXT_STAGE))
     {
         if (ReplayManager::create(thread->replay_mode) == NULL)
         {
@@ -361,7 +383,7 @@ i32 GameThread::thread_start()
             goto fail;
         }
     }
-    if (!(g_Globals.flags_lo_45c & 9))
+    if (!(g_Globals.flags_lo_45c & GLOBALS_STAGE_RESTART_MASK))
     {
         if (EnemyManager::create(g_stage_data->ecl_filename) == NULL)
         {
@@ -380,11 +402,13 @@ i32 GameThread::thread_start()
     {
         goto fail;
     }
-    if (!(GLOBALS_FLAGS_45C & 0x40))
+    // Outside the demo, load the stage and boss themes (stopping the old
+    // music unless in spell practice).
+    if (!(GLOBALS_FLAGS_45C & GLOBALS_WORD_DEMO_PLAY))
     {
         // The original tests the flag byte in memory and loads the word
         // again for game_mode; a plain read shares one load.
-        if (((volatile Globals *)&g_Globals)->game_mode != 2)
+        if (((volatile Globals *)&g_Globals)->game_mode != GAME_MODE_SPELL_PRACTICE)
         {
             g_Supervisor.stop_bgm();
         }
@@ -397,17 +421,18 @@ i32 GameThread::thread_start()
     thread->time_in_stage.set_value(0);
     (&g_Globals.unk_204)[g_Globals.stage_num] = 0;
     g_Globals.unk_224 = 0;
+    // Wait for the sound thread to take the music commands.
     while (g_SoundManager.bgm_commands[0].command != 0)
     {
         Sleep(16);
     }
-    thread->unk_90 = 60;
+    thread->music_restart_delay = 60;
     g_Supervisor.sub_43c630();
-    *(u32 *)&thread->flags &= ~4;
-    GLOBALS_FLAGS_45C &= ~0xb;
+    GAME_THREAD_FLAG_WORD(thread) &= ~GAME_THREAD_LOADING;
+    GLOBALS_FLAGS_45C &= ~(GLOBALS_SAME_STAGE_AGAIN | GLOBALS_NEXT_STAGE | GLOBALS_CONTINUED);
     g_Supervisor.thread.should_run = FALSE;
     g_Supervisor.thread.stop_requested = TRUE;
-    g_unk_4c0f40 = 0;
+    g_cancel_screen_effects = 0;
     g_draw_hook_4a6eec = NULL;
     g_draw_hook_4a6ee8 = NULL;
     anm_vm_interrupt_2(g_Supervisor.vm_1bc);
@@ -422,7 +447,7 @@ i32 GameThread::thread_start()
     return 0;
 
 fail:
-    *(u32 *)&thread->flags |= 8;
+    GAME_THREAD_FLAG_WORD(thread) |= GAME_THREAD_FAILED;
     g_Supervisor.sub_43c6a0();
     g_Supervisor.thread.should_run = FALSE;
     g_Supervisor.thread.stop_requested = TRUE;
@@ -440,13 +465,15 @@ fail:
 
 
 // Ends a game: saves the score file, shows "now loading" for what comes
-// next, and deletes the game objects (keeping the stage, GUI and player
-// across a stage transition, flag 2) and the update functions.
+// next (game modes 10 and 11 retry, 12 is the next stage, 14 continues),
+// sets the GlobalsFlagsLo bits that say what the next GameThread keeps, and
+// deletes the game objects (keeping the stage, GUI and player for the next
+// stage) and the update functions.
 // FUNCTION: TH16 0x42d200
 DECOMP_NOINLINE GameThread::~GameThread()
 {
     scorefile_save_449a00();
-    GLOBALS_FLAGS_45C &= ~3;
+    GLOBALS_FLAGS_45C &= ~(GLOBALS_SAME_STAGE_AGAIN | GLOBALS_NEXT_STAGE);
     g_game_speed = 1.0f;
     g_draw_hook_4a6eec = NULL;
     g_draw_hook_4a6ee8 = NULL;
@@ -455,13 +482,13 @@ DECOMP_NOINLINE GameThread::~GameThread()
         g_AsciiManager->show_now_loading_inline(480.0f, 392.0f);
         if (g_Globals.weird_stage_num == g_Globals.stage_num)
         {
-            GLOBALS_FLAGS_45C |= 1;
+            GLOBALS_FLAGS_45C |= GLOBALS_SAME_STAGE_AGAIN;
         }
     }
     else if (g_Supervisor.gamemode_to_switch_to == 12)
     {
         g_AsciiManager->show_now_loading(480.0f, 392.0f);
-        GLOBALS_FLAGS_45C |= 2;
+        GLOBALS_FLAGS_45C |= GLOBALS_NEXT_STAGE;
     }
     else if (g_Supervisor.gamemode_to_switch_to == 4)
     {
@@ -481,11 +508,11 @@ DECOMP_NOINLINE GameThread::~GameThread()
             {
                 g_Globals.continues_used = 9;
             }
-            GLOBALS_FLAGS_45C |= 8;
+            GLOBALS_FLAGS_45C |= GLOBALS_CONTINUED;
         }
-        GLOBALS_FLAGS_45C |= 1;
+        GLOBALS_FLAGS_45C |= GLOBALS_SAME_STAGE_AGAIN;
     }
-    if (!(GLOBALS_FLAGS_45C & 2))
+    if (!(GLOBALS_FLAGS_45C & GLOBALS_NEXT_STAGE))
     {
         if (g_Supervisor.gamemode_to_switch_to != 15 && g_Supervisor.gamemode_to_switch_to != 16)
         {
@@ -535,7 +562,7 @@ DECOMP_NOINLINE GameThread::~GameThread()
         }
         g_ItemManager->destroy_all();
     }
-    if (!(GLOBALS_FLAGS_45C & 9))
+    if (!(GLOBALS_FLAGS_45C & GLOBALS_STAGE_RESTART_MASK))
     {
         delete g_EnemyManager;
     }
@@ -550,7 +577,10 @@ DECOMP_NOINLINE GameThread::~GameThread()
     g_UpdateFuncRegistry->unregister_locked(on_tick);
     g_UpdateFuncRegistry->unregister_locked(on_draw);
     g_GameThread = NULL;
-    if (!(g_Globals.game_mode == 2 && (GLOBALS_FLAGS_45C & 1)) && !(GLOBALS_FLAGS_45C & 0x42))
+    // The music stops unless it goes on: a retry in spell practice, the
+    // next stage, or the demo.
+    if (!(g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE && (GLOBALS_FLAGS_45C & GLOBALS_SAME_STAGE_AGAIN)) &&
+        !(GLOBALS_FLAGS_45C & (GLOBALS_WORD_DEMO_PLAY | GLOBALS_NEXT_STAGE)))
     {
         if (g_Supervisor.config.flags_2c & 0x10)
         {
@@ -563,13 +593,13 @@ DECOMP_NOINLINE GameThread::~GameThread()
         g_SoundManager.bgm_name[0] = '\0';
     }
     SoundManager::pause_sounds();
-    g_unk_4c0f40 = 1;
-    g_Supervisor.background_color = (GLOBALS_FLAGS_45C & 1) ? 0 : 0xff000000;
+    g_cancel_screen_effects = 1;
+    g_Supervisor.background_color = (GLOBALS_FLAGS_45C & GLOBALS_SAME_STAGE_AGAIN) ? 0 : 0xff000000;
 }
 
 // The original seeks inline in on_tick_body. Written out there, the double
 // math makes LTCG realign on_tick_body early enough to hand the alignment
-// down to sub_42dc50's callees (Stage::start_std_vms, 0x40add0, loses its
+// down to begin_stage's callees (Stage::start_std_vms, 0x40add0, loses its
 // shrink-wrapped edi); in a plain inline helper the double belongs to the
 // helper's node, and on_tick_body realigns late like the original.
 static inline void seek_bgm_to_stage_time()
@@ -577,17 +607,21 @@ static inline void seek_bgm_to_stage_time()
     ((CStreamingSound *)g_SoundManager.bgm_stream)->seek(g_Globals.time_in_stage / 60.0);
 }
 
-// One frame of a game: the ending fade, the stage restart and intro
-// timing, the demo's end, the music restart after a pause and the timers.
+// One frame of a game: the ending fade, the stage start and transition,
+// the demo's end, the music restart and the timers. UPDATE_FUNC_BREAK
+// skips the rest of the frame's on_tick functions: that is how a menu or a
+// music restart stops the game.
 // TODO: the original keeps the return 3 epilogue at the top and a second null test around the inlined delete of g_Stage2.
 // FUNCTION: TH16 0x42d7b0
 HARNESS_CALLED i32 GameThread::on_tick_body()
 {
-    if (*(u32 *)&flags & 0x4000)
+    // After the last stage: fade out from frame 180, then the ending (15),
+    // or for the extra stage the staff roll's mode 16.
+    if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_GAME_CLEARED)
     {
-        if (*(u32 *)&flags & 0x10)
+        if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_IN_MENU)
         {
-            return 3;
+            return UPDATE_FUNC_BREAK;
         }
         fade_timer++;
         if (fade_timer == 180)
@@ -600,7 +634,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
             {
                 replay_ended_43f240();
             }
-            else if (g_Globals.difficulty != 4)
+            else if (g_Globals.difficulty != DIFFICULTY_EXTRA)
             {
                 g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 15;
             }
@@ -610,22 +644,24 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
             }
         }
     }
-    if ((g_Gui->flags_1ac & 0x100) && g_Gui->timer_1b0.current < 120 && !flags.flag_4)
+    // The game waits for the stage clear bonus's first 120 frames.
+    if ((g_Gui->hud_flags & GUI_STAGE_CLEAR_BONUS) && g_Gui->notice_timer.current < 120 && !flags.in_menu)
     {
-        return 1;
+        return UPDATE_FUNC_CONTINUE;
     }
     if (time_in_stage.current == 0)
     {
-        if (sub_42dc50())
+        if (begin_stage())
         {
-            return 1;
+            return UPDATE_FUNC_CONTINUE;
         }
     }
     else if (time_in_stage.current == 30)
     {
-        sub_42dee0();
+        finish_stage_transition();
     }
-    if (g_Stage2 != NULL && (g_Stage2->stage_flags & 8))
+    // The previous stage's background goes once it has faded out.
+    if (g_Stage2 != NULL && (g_Stage2->stage_flags & STAGE_DISABLED))
     {
         delete g_Stage2;
     }
@@ -633,14 +669,17 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
     {
         g_unk_4d9d90 = 2;
     }
-    if (*(u32 *)&flags & 4)
+    if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_LOADING)
     {
-        *(u32 *)&flags |= 0x80;
-        return 1;
+        GAME_THREAD_FLAG_WORD(this) |= GAME_THREAD_TICKED_WHILE_LOADING;
+        return UPDATE_FUNC_CONTINUE;
     }
-    if (g_Globals.flags_hi_45c & 1)
+    // The demo ends on a key press or a menu, or after 0xf3c frames (with a
+    // fade from 0xf00), back to the title.
+    if (g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY)
     {
-        if ((g_hardware_input & 0x80103) || (*(u32 *)&flags & 0x70))
+        if ((g_hardware_input & (INPUT_ENTER | INPUT_MENU | INPUT_BOMB | INPUT_SHOT)) ||
+            (GAME_THREAD_FLAG_WORD(this) & (GAME_THREAD_IN_MENU | GAME_THREAD_FLAG_5 | GAME_THREAD_FLAG_6)))
         {
             g_Supervisor.gamemode_to_switch_to = (g_Supervisor.flags & 0x2000) ? 2 : 4;
         }
@@ -654,13 +693,16 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         }
     }
     Gui::update_score();
-    if ((*(u32 *)&flags & 0x10) || (*(u32 *)&flags & 0x20) || (*(u32 *)&flags & 0x40))
+    if ((GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_IN_MENU) || (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_5) ||
+        (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_6))
     {
-        return 3;
+        return UPDATE_FUNC_BREAK;
     }
-    if (*(u32 *)&flags & 0x10000)
+    // Before chapter 0x2b the stage music restarts and seeks back to the
+    // stage time.
+    if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_MUSIC_RESTART)
     {
-        if (unk_8c == 0)
+        if (music_restart_time == 0)
         {
             if (g_Globals.chapter < 0x2b)
             {
@@ -668,12 +710,12 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
             }
             AnmManager::interrupt_tree(*(AnmId *)&g_Supervisor.config.unk_0, 1);
         }
-        unk_8c++;
-        if (unk_8c < unk_90 && unk_8c > 1)
+        music_restart_time++;
+        if (music_restart_time < music_restart_delay && music_restart_time > 1)
         {
-            return 3;
+            return UPDATE_FUNC_BREAK;
         }
-        if (unk_8c >= unk_90)
+        if (music_restart_time >= music_restart_delay)
         {
             if (g_Globals.chapter < 0x2b)
             {
@@ -686,8 +728,8 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
             {
                 seek_bgm_to_stage_time();
             }
-            *(u32 *)&flags &= ~0x10000;
-            unk_8c = 0;
+            GAME_THREAD_FLAG_WORD(this) &= ~GAME_THREAD_MUSIC_RESTART;
+            music_restart_time = 0;
         }
     }
     g_Supervisor.vm_1bc->run();
@@ -696,12 +738,12 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
     g_Supervisor.vm_1c8->run();
     g_Globals.time_in_stage++;
     g_Globals.time_in_chapter++;
-    if (g_unk_4c0f40 != 0)
+    if (g_cancel_screen_effects != 0)
     {
-        g_unk_4c0f40--;
+        g_cancel_screen_effects--;
     }
     time_in_stage++;
-    return 1;
+    return UPDATE_FUNC_CONTINUE;
 }
 
 // FUNCTION: TH16 0x418420
@@ -717,6 +759,8 @@ void GameThread::enable_update_funcs()
     }
 }
 
+// Not while watching a replay, nor when the game is quitting (-1) or
+// failed to start (3). The score file counts in hundredths of a second.
 // FUNCTION: TH16 0x42dbc0
 void GameThread::update_play_time()
 {
@@ -754,10 +798,11 @@ static __forceinline void restart_stage_objects()
     g_Globals.time_in_stage = 0;
     g_Globals.time_in_chapter = 0;
     g_ReplayManager->begin_stage();
+    // The stage's ECL starts in its "main" sub, run by an invisible enemy.
     EnemyCreateParams params;
     memset(&params, 0, sizeof(params));
     g_EnemyManager->allocate_new_enemy("main", &params, 0);
-    Gui::sub_426d70();
+    Gui::setup_stage_hud();
     PauseMenu *pause = g_PauseMenu;
     if (pause->on_tick_func != NULL)
     {
@@ -841,10 +886,10 @@ static __forceinline void restart_stage_objects()
 // more bytes of locals, and folds allocate_new_enemy's unused argument
 // (push ecx).
 // FUNCTION: TH16 0x42dc50
-HARNESS_CALLED i32 GameThread::sub_42dc50()
+HARNESS_CALLED i32 GameThread::begin_stage()
 {
-    g_Gui->sub_42c1b0();
-    if (flags.flag_3)
+    g_Gui->hide_stage_clear_bonus();
+    if (flags.failed)
     {
         g_Supervisor.thread.join_if_running();
         g_Supervisor.gamemode_to_switch_to = (~(g_Supervisor.flags >> 13) & 1) | 2;
@@ -853,15 +898,15 @@ HARNESS_CALLED i32 GameThread::sub_42dc50()
     g_Stage->start_std_vms();
     if (g_Stage2 != NULL)
     {
-        g_Stage2->start_fade_in();
-        g_Stage->start_fade_out();
-        flags.flag_11 = 1;
-        AnmManager::interrupt_tree(g_Gui->id_c8, 1);
+        g_Stage2->start_exit();
+        g_Stage->start_enter();
+        flags.stage_transition = 1;
+        AnmManager::interrupt_tree(g_Gui->spell_notice_id, 1);
         return 0;
     }
-    flags.flag_11 = 0;
+    flags.stage_transition = 0;
     restart_stage_objects();
-    if (g_Globals.game_mode != 2 && !(g_Globals.flags_hi_45c & 1))
+    if (g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE && !(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY))
     {
         g_Supervisor.play_bgm(0, g_stage_data->music_ids[0]);
     }
@@ -875,11 +920,11 @@ HARNESS_CALLED i32 GameThread::sub_42dc50()
 // leaves memset's last argument as allocate_new_enemy's unused one, and
 // indexes bgm_unlocked as [esi + eax].
 // FUNCTION: TH16 0x42dee0
-i32 GameThread::sub_42dee0()
+i32 GameThread::finish_stage_transition()
 {
-    if (flags.flag_11)
+    if (flags.stage_transition)
     {
-        flags.flag_11 = 0;
+        flags.stage_transition = 0;
         restart_stage_objects();
         if (g_Supervisor.config.flags_2c & 0x10)
         {
@@ -902,14 +947,16 @@ i32 GameThread::sub_42dee0()
     return 0;
 }
 
-// The end of a stage: the clear bonus, then the next stage, the ending (stage
-// 6 and the extra stage, with their clear counts) or, in practice, the end
-// of the game with the practice records updated. Always 0.
+// The end of a stage (MSG_STAGE_END, or ECL dialogRead -2): the clear
+// bonus, then the next stage (game mode 12), the ending (stage 6 and the
+// extra stage, with the play and clear counts and a bonus of 5 million per
+// life and 1 million per bomb) or, in practice, the end of the game with
+// the practice records updated. Always 0.
 // FUNCTION: TH16 0x42e150
-i32 stage_clear_42e150()
+i32 stage_clear()
 {
     GameThread *thread = g_GameThread;
-    if (g_Globals.game_mode != 2)
+    if (g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE)
     {
         Gui::show_stage_clear_bonus();
     }
@@ -918,14 +965,14 @@ i32 stage_clear_42e150()
     {
         g_MainBomb->end_at_stage_clear();
     }
-    if (g_Globals.game_mode != 0)
+    if (g_Globals.game_mode != GAME_MODE_NORMAL)
     {
         if (g_GameThread->replay_mode != 0)
         {
             replay_ended_43f240();
             return 0;
         }
-        if (g_Globals.game_mode == 2)
+        if (g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE)
         {
             ScorefileSpell *spell =
                 &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[g_Globals.spell_id];
@@ -934,7 +981,7 @@ i32 stage_clear_42e150()
                 spell->practice_score = g_Globals.score / 10 * 10;
             }
         }
-        if (g_GameThread->replay_mode == 0 && g_Globals.game_mode != 2)
+        if (g_GameThread->replay_mode == 0 && g_Globals.game_mode != GAME_MODE_SPELL_PRACTICE)
         {
             g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
                 .practices[g_Globals.difficulty][g_Globals.stage_num - 1]
@@ -945,23 +992,23 @@ i32 stage_clear_42e150()
     }
     if (g_Globals.stage_num == 6)
     {
-        *(u32 *)&thread->flags |= 0x4000;
+        GAME_THREAD_FLAG_WORD(thread) |= GAME_THREAD_GAME_CLEARED;
         thread->fade_timer = 0;
-        g_Gui->flags_1ac |= 0x10;
+        g_Gui->hud_flags |= GUI_FLAG_GAME_CLEARED;
         GameThread::update_play_time();
         i32 bonus = 0;
         switch (g_Globals.difficulty)
         {
-        case 0:
+        case DIFFICULTY_EASY:
             bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
             break;
-        case 1:
+        case DIFFICULTY_NORMAL:
             bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
             break;
-        case 2:
+        case DIFFICULTY_HARD:
             bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
             break;
-        case 3:
+        case DIFFICULTY_LUNATIC:
             bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
             break;
         }
@@ -985,7 +1032,7 @@ i32 stage_clear_42e150()
     }
     if (g_Globals.stage_num == 7)
     {
-        g_Gui->flags_1ac |= 0x10;
+        g_Gui->hud_flags |= GUI_FLAG_GAME_CLEARED;
         i32 bonus = (g_Globals.lives * 5 + g_Globals.bombs) * 1000000;
         g_Globals.add_to_score(bonus);
         g_Gui->stage_clear_bonus += bonus;
@@ -1008,7 +1055,7 @@ i32 stage_clear_42e150()
             }
         }
         GameThread::update_play_time();
-        *(u32 *)&thread->flags |= 0x4000;
+        GAME_THREAD_FLAG_WORD(thread) |= GAME_THREAD_GAME_CLEARED;
         thread->fade_timer = 0;
         return 0;
     }
