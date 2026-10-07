@@ -10,6 +10,26 @@
 
 #define EFFECT_COUNT 0x400
 
+// A row of the table EffectManager::create_effect reads (ExpHP:
+// zTableAnm508Data): which script to start and the callbacks the VM gets.
+struct EffectData
+{
+    // Index into the manager's ANM files (0: effect.anm, 1: bullet.anm).
+    i16 anm_index;
+    // Negative: no effect.
+    i16 script;
+    // Called with the new VM and the position passed to create_effect.
+    i32(__fastcall *init)(AnmVm *vm, D3DXVECTOR3 *pos);
+    i32 index_of_on_tick;
+    i32 index_of_on_draw;
+    i32 index_of_on_destroy;
+    i32 index_of_on_interrupt;
+    i32 index_of_on_copy_1;
+    i32 index_of_on_copy_2;
+};
+
+extern EffectData g_effect_table[4];
+
 // Fire-and-forget ANM effects (explosions, item sparkles, ...). Layout from
 // ExpHP (zEffectManager).
 struct EffectManager
@@ -33,8 +53,12 @@ struct EffectManager
     static i32 __fastcall on_tick_callback(EffectManager *self);
     static i32 __fastcall on_draw_callback(EffectManager *self);
 
-    // 0x418af0. Starts effect script `effect` at pos.
-    AnmId create_effect(i32 effect, D3DXVECTOR3 *pos, i32 unk);
+    // 0x418af0. Starts the effect (a g_effect_table row) at pos, or sets
+    // up the given VM as one instead.
+    AnmId create_effect(i32 effect, D3DXVECTOR3 *pos, AnmVm *vm);
+    // 0x418ba0. create_effect for the UI list. Every caller (the main menu)
+    // goes through g_EffectManager and passes (0, NULL, NULL).
+    HARNESS_CALLED AnmId create_ui_effect(i32 effect, D3DXVECTOR3 *pos, AnmVm *vm);
     // 0x40e6c0. Moves last_used_index on and returns the index before it,
     // clearing ids of finished effects on the way; -1 if all are taken.
     i32 next_index();

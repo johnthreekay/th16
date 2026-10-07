@@ -415,3 +415,23 @@ HARNESS_CALLED CameraSky::CameraSky(f32 begin_distance, f32 end_distance, f32 c0
         color[i] = color_components[i];
     }
 }
+
+// TODO: the original frame has 4 more (unused) bytes.
+// FUNCTION: TH16 0x40b2f0
+void Stage::interrupt_vms(i32 n)
+{
+    if (vms != NULL)
+    {
+        AnmVm *vm = vms;
+        for (i32 i = 0; i < std->num_quads; i++, vm++)
+        {
+            vm->interrupt(n);
+            vm->run();
+        }
+    }
+    for (i32 i = 0; i < 8; i++)
+    {
+        inner.anm_vms[i].interrupt(n);
+        inner.anm_vms[i].run();
+    }
+}

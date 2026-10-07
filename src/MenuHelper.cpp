@@ -69,6 +69,39 @@ void MenuHelper::pop()
     num_disabled = 0;
 }
 
+// FUNCTION: TH16 0x418720
+i32 MenuHelper::set_cursor(i32 selection)
+{
+    if (num_choices != 0)
+    {
+        if (selection >= num_choices)
+        {
+            selection = num_choices - 1;
+        }
+        else if (selection < 0)
+        {
+            selection = 0;
+        }
+        next_selection = selection;
+    again:
+        for (i32 i = 0; i < num_disabled; i++)
+        {
+            if (disabled[i] == next_selection)
+            {
+                next_selection++;
+                if (next_selection >= num_choices)
+                {
+                    next_selection = 0;
+                }
+                goto again;
+            }
+        }
+        return next_selection;
+    }
+    next_selection = selection;
+    return selection;
+}
+
 // FUNCTION: TH16 0x440c00
 void MenuHelper::disable(i32 choice)
 {

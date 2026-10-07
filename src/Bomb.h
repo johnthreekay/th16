@@ -85,14 +85,22 @@ struct BombReimuAOrb
 {
     AnmId anm_id;
     D3DXVECTOR3 pos;
-    u8 unk_10[0xa0 - 0x10];
+    u8 unk_10[0x38 - 0x10];
+    // Where the orb was launched from.
+    D3DXVECTOR3 start_pos;
+    u8 unk_44[0xa0 - 0x44];
     i32 active;
-    u8 unk_a4[0xd0 - 0xa4];
+    ZunTimer timer;
+    u8 unk_b8[0xcc - 0xb8];
+    // Which of the eight orbs this is.
+    i32 index;
     // Index plus one of the orb's damage source, 0 for none.
     i32 damage_source;
     // Set once the orb has exploded; it is then just deleted.
     i32 done;
 
+    // 0x4109d0. Launches the orb from pos.
+    void start(i32 index, D3DXVECTOR3 *pos);
     // 0x410ae0
     void finish();
 };

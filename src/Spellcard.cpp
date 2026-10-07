@@ -1,10 +1,17 @@
+#include <math.h>
+#include <stddef.h>
 #include <string.h>
 
 #include "AnmManager.h"
 #include "AsciiManager.h"
 #include "Globals.h"
+#include "GameThread.h"
+#include "Gui.h"
+#include "ReplayManager.h"
 #include "Scorefile.h"
+#include "SoundManager.h"
 #include "Spellcard.h"
+#include "Stage.h"
 #include "UpdateFunc.h"
 
 // GLOBAL: TH16 0x4a6db0
@@ -165,5 +172,113 @@ HARNESS_CALLED void Spellcard::decode_time_code(i32 *seconds, i32 *hundredths)
     {
         *seconds = (time_code / 100 % 1000 + 934) % 1000;
         *hundredths = (time_code % 100 + 67) % 100;
+    }
+}
+
+// FUNCTION: TH16 0x4182f0
+HARNESS_CALLED void Spellcard::end()
+{
+    if (!(flags & 1))
+    {
+        return;
+    }
+    g_Stage->stage_flags |= STAGE_FLAG_1;
+    AnmManager::interrupt_tree(text_anm_ids[0], 1);
+    AnmManager::interrupt_tree(text_anm_ids[1], 1);
+    AnmManager::interrupt_tree(text_anm_ids[2], 1);
+    flags &= ~1;
+    delete_vm_and_clear(background_anm_id);
+    flags &= ~0x20;
+    g_Gui->interrupt_spell_vms_3();
+    delete_vm_and_clear(boss_anm_id);
+    if (flags & 2)
+    {
+        g_Globals.add_to_score(bonus);
+        g_Gui->sub_42bcf0(bonus, 0);
+        if (g_ReplayManager->mode != 1)
+        {
+            i32 practice = g_Globals.game_mode == 2;
+            ScorefileSpell *spell = &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].spells[spell_id];
+            if (spell->captures[practice] < 99999)
+            {
+                spell->captures[practice]++;
+            }
+            spell = &g_Scorefile->characters[4].spells[spell_id];
+            if (spell->captures[practice] < 99999)
+            {
+                spell->captures[practice]++;
+            }
+        }
+        g_SoundManager.play_sound_centered(0x2e, 0);
+    }
+    else
+    {
+        g_Gui->sub_42bcf0(0, 1);
+    }
+    if (flags & 0x80)
+    {
+        g_SoundManager.play_sound_centered(0x45, 0);
+    }
+}
+
+double LTCG_VECTORCALL get_runtime();
+
+static_assert(offsetof(Spellcard, start_time) == 0x94, "Spellcard layout");
+static_assert(offsetof(Spellcard, time_code) == 0xa4, "Spellcard layout");
+static_assert(sizeof(Spellcard) == 0xbc, "Spellcard size");
+
+// TODO: ours aligns the frame to 64 bytes for the doubles (the original
+// does not), keeps the rounded time on the stack across floor instead of
+// reloading it, and increments unk_88 through a register.
+// FUNCTION: TH16 0x417bc0
+void Spellcard::measure_real_time()
+{
+    Spellcard *sc = g_Spellcard;
+    if (sc->flags & 1)
+    {
+        if (!(sc->flags & 0x40))
+        {
+            sc->start_time = get_runtime();
+            sc->flags |= 0x40;
+        }
+        return;
+    }
+    if (!(sc->flags & 0x40))
+    {
+        return;
+    }
+    sc->unk_90 = sc->ticks;
+    double elapsed = get_runtime() - sc->start_time;
+    double rest = fmod(elapsed, 0.0167);
+    sc->real_time_taken = elapsed - rest;
+    if (rest >= 0.00835)
+    {
+        sc->real_time_taken += 0.0167;
+    }
+    double whole = floor(sc->real_time_taken);
+    i32 seconds = (i32)whole;
+    double fraction = sc->real_time_taken - whole;
+    if (seconds >= 1000)
+    {
+        seconds = 999;
+    }
+    sc->real_time_taken = 0.0;
+    sc->flags &= ~0x40;
+    i32 hundredths = (i32)(fraction * 100.0);
+    sc->time_code = ((seconds + 22 + hundredths) * 1000 + (seconds + 66) % 1000) * 100 + (hundredths + 33) % 100;
+    if (g_GameThread->replay_mode == 0)
+    {
+        ((RpyGamestate *)g_ReplayManager->stage_gamestate_snapshots[g_Globals.stage_num])
+            ->spell_time_codes[sc->unk_88] = sc->time_code;
+        sc->unk_88++;
+    }
+    else
+    {
+        sc->time_code = g_ReplayManager->stages[g_Globals.stage_num].gamestate_at_stage_begin->spell_time_codes[sc->unk_88];
+        if (sc->is_time_code_bad())
+        {
+            sc->time_code = 0x6ad1584;
+        }
+        sc->unk_88++;
     }
 }

@@ -91,3 +91,9 @@ void PosVel::step_from_center()
     }
     step();
 }
+
+// FUNCTION: TH16 0x411410
+HARNESS_CALLED void PosVel::set_angle(f32 angle)
+{
+    this->angle.value = wrap_angle(angle);
+}

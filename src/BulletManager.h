@@ -77,7 +77,10 @@ struct Bullet
     // 1 while the bullet is active; ECL's funcset 1 cancels bullets near
     // the player by setting 2.
     i32 unk_c4c;
-    u8 unk_c50[0xc60 - 0xc50];
+    u8 unk_c50[0xc5c - 0xc50];
+    // Script of bullet.anm played where the bullet is cancelled (none if
+    // negative).
+    i32 cancel_script;
     i32 unk_c60;
     u8 unk_c64[0xc68 - 0xc64];
     u32 active_ex_flags;
@@ -108,7 +111,17 @@ struct Bullet
 
     i32 on_tick();
     i32 sub_4124b0(i32 arg);
+    // 0x414ec0. The first et_ex transform: a speed boost that fades over
+    // 16 frames; 1 once it is over.
+    i32 step_ex_00();
+    // 0x416840. Turns the bullet into its cancel animation, dropping items
+    // by mode.
+    i32 cancel(i32 mode);
 };
+
+// 0x417140. The sprite mapping callback of bullet VMs: picks the sprite for
+// the bullet's type and color.
+int __fastcall bullet_map_sprite(AnmVm *vm, i32 sprite);
 
 // Owns every enemy bullet. ExpHP: zBulletManager.
 struct BulletManager
@@ -145,9 +158,10 @@ struct BulletManager
     static BulletManager *create();
     i32 initialize();
     static void destroy_all();
-    // 0x416f40. Cancels every bullet without items. The argument is never
-    // read (LTCG folded it; callers push whatever is in ecx).
-    static void __stdcall clear_all(i32 unused);
+    // 0x416f40. Cancels every bullet without items. Works on
+    // g_BulletManager; LTCG dropped this. The argument is never read
+    // (callers push whatever is in ecx).
+    HARNESS_CALLED void clear_all(i32 unused);
     void reset_lists();
 
     // Walk the tick list with iter_current/iter_next, so that the bullet
@@ -165,17 +179,36 @@ struct BulletManager
         return iter_current != NULL ? iter_current->entry : NULL;
     }
 
+    // Whether the counter is a multiple of n. Written as members, these
+    // keep their idiv even when LTCG inlines them with a constant n.
+    i32 cancel_counter_multiple_of(i32 n)
+    {
+        return unk_cancel_counter % n == 0;
+    }
+    i32 bomb_cancel_count_multiple_of(i32 n)
+    {
+        return bullet_count_canceled_by_bombs % n == 0;
+    }
+
     static i32 __fastcall on_tick_callback(BulletManager *self);
     static i32 __fastcall on_draw_callback(BulletManager *self);
     i32 on_tick_body();
     i32 on_draw_body();
 
     // 0x416d20. Reaches the manager through its global, so LTCG drops the
-    // unused this; the radius arrives in xmm2.
-    HARNESS_CALLED void cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode);
+    // unused this; the radius arrives in xmm2. Spares bullets that are
+    // still invulnerable to cancels.
+    HARNESS_CALLED i32 cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode);
     // 0x416e20. The same for a rectangle of the given size, rotated by
     // angle (xmm3).
-    HARNESS_CALLED void cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3DXVECTOR3 *size, f32 angle, i32 mode);
+    HARNESS_CALLED i32 cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3DXVECTOR3 *size, f32 angle, i32 mode);
+    // 0x414da0. Fires every bullet of a shot (layers x count), aimed from
+    // the angle to the player. Only called through g_BulletManager.
+    HARNESS_CALLED i32 shoot_bullets(struct EnemyBulletShooter *props);
+    // 0x412cb0. Fires bullet i of the given layer; 1 stops the shot.
+    i32 shoot_one(struct EnemyBulletShooter *props, i32 i, i32 layer, f32 angle_to_player);
+    // 0x416c20. cancel_radius_as_bomb for every bullet (ECL).
+    HARNESS_CALLED i32 cancel_radius(D3DXVECTOR3 *pos, f32 radius, i32 mode);
 };
 
 extern BulletManager *g_BulletManager;
@@ -186,14 +219,21 @@ extern BulletManager *g_BulletManager;
 struct BulletTypeInfo
 {
     i32 script;
-    // [color][0] is the color's sprite. Types whose sprites[0][0] is
-    // negative keep the sprite their script sets.
+    // Sprite remaps of bullet.anm: [color][sprite] replaces a sprite the
+    // script sets ([color][0] is the color's main sprite). Types whose
+    // sprites[0][0] is negative keep the script's sprites.
     i32 sprites[16][4];
     f32 hitbox_radius;
     i32 unk_108;
     i32 unk_10c;
     i32 unk_110;
 };
+static_assert(offsetof(BulletTypeInfo, hitbox_radius) == 0x104, "BulletTypeInfo layout");
+static_assert(sizeof(BulletTypeInfo) == 0x114, "BulletTypeInfo layout");
 
 #define BULLET_TYPE_COUNT 44
 extern BulletTypeInfo g_bullet_types[BULLET_TYPE_COUNT];
+
+// 0x416a00. Drops the items a cancelled bullet or laser segment leaves at
+// pos, by cancel mode. LTCG passes pos in ecx and mode in edx.
+HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode);

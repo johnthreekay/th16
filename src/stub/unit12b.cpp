@@ -44,14 +44,3 @@ i32 BombReimuAInf::on_tick()
     return 0;
 }
 
-// STUB: TH16 0x410bb0
-void BombReimuAOrbs::finish_all()
-{
-}
-
-// STUB: TH16 0x418af0
-AnmId EffectManager::create_effect(i32 effect, D3DXVECTOR3 *pos, i32 unk)
-{
-    AnmId id;
-    return id;
-}

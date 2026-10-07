@@ -14,9 +14,4 @@
 void placeholder_sink(int a, float b);
 
 
-// STUB: TH16 0x416d20
-HARNESS_CALLED void BulletManager::cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode)
-{
-    placeholder_sink(mode, radius + pos->x);
-}
 

@@ -86,6 +86,8 @@ HARNESS_CALLED f32 zun_sinf(f32 x);
 HARNESS_CALLED f32 zun_cosf(f32 x);
 // The same for floorf (0x405260) and atan2f (0x4052a0).
 HARNESS_CALLED f32 zun_floorf(f32 x);
+// And fabsf (0x405240), which ECL and the HUD call.
+HARNESS_CALLED f32 zun_fabsf(f32 x);
 HARNESS_CALLED f32 zun_atan2f(f32 y, f32 x);
 // The same for tanf (0x43dc90), which the camera setup (0x43c858) calls.
 HARNESS_CALLED f32 zun_tanf(f32 x);

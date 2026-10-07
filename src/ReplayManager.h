@@ -36,7 +36,9 @@ struct RpyGamestate
     u8 globals[0x228];
     // Player::inner.is_focused.
     i32 player_is_focused;
-    i32 unk_240[0x14];
+    // Capture times (Spellcard::time_code) of the stage's spell cards, in
+    // the order they ended.
+    i32 spell_time_codes[0x14];
     // Supervisor::unk_700 when the stage began.
     u32 flag_290 : 1;
     u32 flags_290_hi : 31;

@@ -171,6 +171,9 @@ struct Stage
     i32 update_std_vms();
     // 0x40af70
     void draw_layer(i32 layer);
+    // 0x40b2f0. Sends interrupt n to every quad VM and the stage's own VMs
+    // and runs them (STD instruction 16).
+    void interrupt_vms(i32 n);
 
     // These reach the stage through g_Stage.
     HARNESS_CALLED void start_std_vms();

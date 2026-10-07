@@ -836,7 +836,7 @@ HARNESS_CALLED void AnmManager::save_vm_tree(AnmVm *dst, AnmVm *src, i32 *size)
 }
 
 // FUNCTION: TH16 0x46fc30
-AnmId AnmManager::load_vm_tree(AnmVm *src, AnmVm *parent, i32 *size)
+HARNESS_CALLED AnmId AnmManager::load_vm_tree(AnmVm *src, AnmVm *parent, i32 *size)
 {
     AnmVm *tree = src;
     if (src == NULL)
@@ -967,7 +967,7 @@ AnmVm *AnmManager::allocate_snapshot_vm(i32 *id)
 }
 
 // FUNCTION: TH16 0x46f810
-AnmId AnmManager::store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused)
+HARNESS_CALLED AnmId AnmManager::store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, i32 unused)
 {
     if (vm == NULL)
     {
