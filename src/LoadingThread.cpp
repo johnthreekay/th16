@@ -25,7 +25,7 @@ i32 load_shared_anms();
 int LoadingThread::thread_start(void *arg)
 {
     LoadingThread *t = g_LoadingThread;
-    t->sig_anm = AnmManager::preload_anm(1, "sig.anm");
+    t->sig_anm = AnmManager::preload_anm(ANM_SLOT_SIG, "sig.anm");
     if (t->sig_anm != NULL)
     {
         t->on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
@@ -44,7 +44,7 @@ int LoadingThread::thread_start(void *arg)
         else
         {
             t->count_634 = 1;
-            g_Supervisor.text_anm = AnmManager::preload_anm(0, "text.anm");
+            g_Supervisor.text_anm = AnmManager::preload_anm(ANM_SLOT_TEXT, "text.anm");
             if (g_Supervisor.text_anm != NULL)
             {
                 g_SoundManager.bgm_format = (ThBgmFormat *)file_read_all("../../bgm/thbgm.fmt", NULL, 0);
@@ -108,11 +108,11 @@ LoadingThread::~LoadingThread()
     g_UpdateFuncRegistry->unregister_locked(on_draw_func);
     unload_shared_anms();
     AnmManager *anm = g_AnmManager;
-    if (anm->loaded_anms[1] != NULL)
+    if (anm->loaded_anms[ANM_SLOT_SIG] != NULL)
     {
-        anm->loaded_anms[1]->release();
-        delete anm->loaded_anms[1];
-        anm->loaded_anms[1] = NULL;
+        anm->loaded_anms[ANM_SLOT_SIG]->release();
+        delete anm->loaded_anms[ANM_SLOT_SIG];
+        anm->loaded_anms[ANM_SLOT_SIG] = NULL;
     }
     g_LoadingThread = NULL;
     if (g_AsciiManager != NULL)
@@ -120,11 +120,11 @@ LoadingThread::~LoadingThread()
         delete g_AsciiManager;
     }
     anm = g_AnmManager;
-    if (anm->loaded_anms[0] != NULL)
+    if (anm->loaded_anms[ANM_SLOT_TEXT] != NULL)
     {
-        anm->loaded_anms[0]->release();
-        delete anm->loaded_anms[0];
-        anm->loaded_anms[0] = NULL;
+        anm->loaded_anms[ANM_SLOT_TEXT]->release();
+        delete anm->loaded_anms[ANM_SLOT_TEXT];
+        anm->loaded_anms[ANM_SLOT_TEXT] = NULL;
     }
     scorefile_save_449a00();
     if (g_Scorefile != NULL)

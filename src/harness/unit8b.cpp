@@ -47,11 +47,11 @@ void harness_unit8b_ins_316(AnmVm *vm, i32 set)
 {
     if (set)
     {
-        vm->set_flag_lo_2_tree();
+        vm->show_tree();
     }
     else
     {
-        vm->clear_flag_lo_2_tree();
+        vm->hide_tree();
     }
 }
 

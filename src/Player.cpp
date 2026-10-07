@@ -29,13 +29,6 @@
 #include "Laser.h"
 #include "ReplayManager.h"
 
-// The AnmManager slots of the player's ANM files.
-enum
-{
-    PLAYER_ANM_SLOT = 9,
-    SUBSEASON_ANM_SLOT = 0x1e,
-};
-
 // Where the player can move, in pixels (the playfield is 384x448 with x
 // centered on 0).
 enum
@@ -371,7 +364,7 @@ i32 __fastcall Player::on_draw_callback(Player *player)
     if (player->inner.state != PLAYER_STATE_DEAD)
     {
         player->vm.entity_pos = player->inner.pos;
-        player->vm.flags_hi = (player->vm.flags_hi & ~ANM_VM_LAYER_UI) | ANM_VM_LAYER_SET;
+        player->vm.flags_hi = (player->vm.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
         g_AnmManager->draw_vm(&player->vm);
     }
     return 1;
@@ -533,14 +526,14 @@ Player::~Player()
     }
     else
     {
-        g_AnmManager->unload_anm(PLAYER_ANM_SLOT);
+        g_AnmManager->unload_anm(ANM_SLOT_PLAYER);
         if (sht_file != NULL)
         {
             free(sht_file);
             sht_file = NULL;
         }
         g_cached_sht_file = NULL;
-        g_AnmManager->unload_anm(SUBSEASON_ANM_SLOT);
+        g_AnmManager->unload_anm(ANM_SLOT_SUBSEASON);
         if (sht_file_subseason != NULL)
         {
             free(sht_file_subseason);
@@ -1027,7 +1020,7 @@ const char *const g_subseason_anm_names[5] = {"pl00sub.anm", "pl02sub.anm", "pl0
 // FUNCTION: TH16 0x440fb0
 i32 Player::initialize()
 {
-    anm_file = AnmManager::preload_anm(PLAYER_ANM_SLOT, g_player_anm_names[g_Globals.character + g_Globals.subshot]);
+    anm_file = AnmManager::preload_anm(ANM_SLOT_PLAYER, g_player_anm_names[g_Globals.character + g_Globals.subshot]);
     // "Player data not found. The data is corrupted."
     if (anm_file == NULL)
     {
@@ -1035,7 +1028,7 @@ i32 Player::initialize()
                                "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
-    subseason_anm_file = AnmManager::preload_anm(SUBSEASON_ANM_SLOT, g_subseason_anm_names[g_Globals.subseason]);
+    subseason_anm_file = AnmManager::preload_anm(ANM_SLOT_SUBSEASON, g_subseason_anm_names[g_Globals.subseason]);
     if (subseason_anm_file == NULL)
     {
         g_GameErrorContext.log("\x8e\xa9\x8b@\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81"
@@ -1079,8 +1072,8 @@ i32 Player::initialize()
     {
         AnmVm *player_vm = &vm;
         anm_file->copy_vm(player_vm, 0);
-        player_vm->unk_5b0 = NULL;
-        player_vm->parent = NULL;
+        player_vm->parent_vm = NULL;
+        player_vm->root_vm = NULL;
         player_vm->run();
     }
     set_position(0.0f, 400.0f);
@@ -1153,8 +1146,8 @@ const Int2 g_player_directions[9] = {{0, 0}, {0, -1}, {0, 1}, {-1, 0}, {1, 0}, {
 static __forceinline void player_set_script(Player *player, i32 script)
 {
     player->anm_file->copy_vm(&player->vm, script);
-    player->vm.unk_5b0 = NULL;
-    player->vm.parent = NULL;
+    player->vm.parent_vm = NULL;
+    player->vm.root_vm = NULL;
     player->vm.run();
 }
 

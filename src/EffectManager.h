@@ -8,7 +8,35 @@
 #include "decomp.h"
 #include "types.h"
 
+// How many effects EffectManager can track at once.
 #define EFFECT_COUNT 0x400
+
+// Rows of g_effect_table: the effects create_effect can start.
+enum EffectId
+{
+    // The masked effect (anm_masked_effect_*): the main menu's transitions.
+    EFFECT_MASKED = 0,
+    // Children flying in to the VM (anm_gather_effect_*).
+    EFFECT_GATHER = 1,
+    // A jagged line growing from pos: blue and additive on layer 15, or gray
+    // on layer 19 (used by a bomb).
+    EFFECT_JAGGED_LINE_BLUE = 2,
+    EFFECT_JAGGED_LINE_GRAY = 3,
+};
+
+// Scripts of effect.anm the effect callbacks start.
+enum EffectAnmScript
+{
+    // The masked effect's four mask VMs (3-6), what interrupt 1 replaces
+    // them with (7-10) and the VM drawn through the mask.
+    EFFECT_SCRIPT_MASK_FIRST = 3,
+    EFFECT_SCRIPT_MASK_SECOND_FIRST = 7,
+    EFFECT_SCRIPT_MASK_OVERLAY = 0xc5,
+    // The gather effect's children: three of the first per frame, one of
+    // the second in the complementary color.
+    EFFECT_SCRIPT_GATHER_PARTICLE = 0x99,
+    EFFECT_SCRIPT_GATHER_PARTICLE_2 = 0x9a,
+};
 
 // A row of the table EffectManager::create_effect reads (ExpHP:
 // zTableAnm508Data): which script to start and the callbacks the VM gets.
@@ -24,8 +52,8 @@ struct EffectData
     i32 index_of_on_draw;
     i32 index_of_on_destroy;
     i32 index_of_on_interrupt;
-    i32 index_of_on_copy_1;
-    i32 index_of_on_copy_2;
+    i32 index_of_on_copy;
+    i32 index_of_on_serialize;
 };
 
 extern EffectData g_effect_table[4];

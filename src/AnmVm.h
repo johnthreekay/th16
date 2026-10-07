@@ -28,10 +28,11 @@ struct AnmId
     // 0x46f2e0 (ExpHP: anm_find_existing_or_clear_id). Looks the VM up and
     // forgets the id if it is gone.
     DECOMP_NOINLINE AnmVm *find_or_clear();
-    // 0x46f300 and 0x46f340. AnmVm::set/clear_flag_lo_2_tree.
-    void set_flag_lo_2_tree();
-    void clear_flag_lo_2_tree();
-    // 0x46f3e0
+    // 0x46f300 and 0x46f340. AnmVm::show_tree and hide_tree on the VM, if
+    // it still exists.
+    void show_tree();
+    void hide_tree();
+    // 0x46f3e0. Sets the entity_pos of the VM, if it still exists.
     void set_entity_pos(D3DXVECTOR3 *pos);
     // 0x46f440. Stops the VM and replaces it with a new effect VM running
     // the given script of the same file.
@@ -53,76 +54,417 @@ union ZunColor
     };
 };
 
+// Bits of AnmVm::flags_lo. AnmVmFlagsLoFields has the same layout as
+// bitfields, for the instructions that assign multi-bit values.
 enum AnmVmFlagsLo
 {
+    // Drawn at all (instructions 300, 301 and 310 set it; 4 and 1 clear it).
     ANM_VM_VISIBLE = 1 << 0,
-    // Set and cleared for a whole tree by ANM instruction 316 (ExpHP).
-    ANM_VM_FLAG_LO_2 = 1 << 1,
+    // Must also be set to draw. Set by default; instructions 316 and 317, and
+    // AnmVm::show_tree and hide_tree for a whole tree, let the game hide a VM
+    // (and its children) without touching its script's own visibility.
+    ANM_VM_SHOWN = 1 << 1,
     // Rotation or scale changed; the matrix needs a rebuild.
     ANM_VM_ROTATION_CHANGED = 1 << 2,
     ANM_VM_SCALE_CHANGED = 1 << 3,
     ANM_VM_UV_SCALE_CHANGED = 1 << 4,
-    // Four bits of blend mode (AnmManager::setup_render_state_for_vm).
+    // Four bits of blend mode (AnmBlendMode).
     ANM_VM_BLEND_MODE_SHIFT = 5,
     ANM_VM_BLEND_MODE_MASK = 0xf << 5,
     // pos_i moves pos_2 instead of pos.
     ANM_VM_POS_I_TO_POS_2 = 1 << 10,
-    ANM_VM_FLAG_LO_800 = 1 << 11,
-    ANM_VM_FLAG_LO_1000 = 1 << 12,
-    // Two bits: which of color_1/color_2 to draw with (set_rgb2_time and
-    // set_alpha2_time switch to 1, color_2).
-    ANM_VM_COLOR_MODE_MASK = 3 << 17,
-    ANM_VM_COLOR_MODE_1 = 1 << 17,
-    // Five bits of render mode (how the sprite is projected and drawn).
-    ANM_VM_RENDER_MODE_SHIFT = 25,
-    // Two bits of texture addressing along v: wrap, clamp, mirror.
-    ANM_VM_ADDRESS_V_SHIFT = 30,
+    // Toggled by instructions 308 and 309 (flipX, flipY) along with the
+    // sign of scale.x or scale.y.
+    ANM_VM_FLIP_X = 1 << 11,
+    ANM_VM_FLIP_Y = 1 << 12,
+    // Instruction 305: 3D sprites draw without writing the depth buffer.
+    ANM_VM_Z_WRITE_DISABLE = 1 << 13,
     // Stopped by ANM instruction 3 or 4 (cleared when an interrupt runs).
     ANM_VM_STOPPED = 1 << 14,
     // AnmVmFlagsLoFields::follow_camera.
     ANM_VM_FOLLOW_CAMERA = 1 << 15,
-    // AnmVm::run does nothing.
-    ANM_VM_FLAG_LO_100000 = 1 << 20,
+    // The world matrix is kept as it is instead of being rebuilt from scale
+    // and rotation when the VM is drawn. Nothing in TH16 sets it.
+    ANM_VM_KEEP_WORLD_MATRIX = 1 << 16,
+    // Two bits of color mode: color_1 (0), color_2 (1), or a horizontal (2)
+    // or vertical (3) gradient from color_1 to color_2. set_rgb2_time and
+    // set_alpha2_time switch to 1.
+    ANM_VM_COLOR_MODE_SHIFT = 17,
+    ANM_VM_COLOR_MODE_MASK = 3 << 17,
+    ANM_VM_COLOR_MODE_1 = 1 << 17,
+    ANM_VM_COLOR_MODE_2 = 2 << 17,
+    // AnmVm::run_script returns at once. Nothing in TH16 sets it.
+    ANM_VM_SCRIPT_DISABLED = 1 << 20,
+    // Two bits each of horizontal and vertical anchoring (instruction 421):
+    // 0 center, 1 left/top, 2 right/bottom.
+    ANM_VM_ANCHOR_X_SHIFT = 21,
+    ANM_VM_ANCHOR_Y_SHIFT = 23,
+    // Five bits of render mode (AnmRenderMode).
+    ANM_VM_RENDER_MODE_SHIFT = 25,
+    // Two bits of texture addressing along v: wrap, clamp, mirror.
+    ANM_VM_ADDRESS_V_SHIFT = 30,
 };
 
+// Bits of AnmVm::flags_hi (bitfield view: AnmVmFlagsHiFields).
 enum AnmVmFlagsHi
 {
     // Two bits of texture addressing along u: wrap, clamp, mirror.
     ANM_VM_ADDRESS_U_MASK = 3 << 0,
-    // Point instead of linear filtering.
-    ANM_VM_FILTER_POINT_SHIFT = 11,
+    // Three bits of rotation order for 3D sprites (instruction 437):
+    // xyz, xzy, yxz, yzx, zxy, zyx.
+    ANM_VM_ROTATION_MODE_SHIFT = 2,
+    // Marked for deletion: the manager frees it on its next pass.
+    ANM_VM_DELETE_PENDING = 1 << 5,
+    // Already moved to the manager's delete list (AnmManager::remove_tree);
+    // neither run nor drawn again.
+    ANM_VM_IN_DELETE_LIST = 1 << 6,
     // Rotate the sprite to the owner's movement angle.
     ANM_VM_AUTO_ROTATE = 1 << 7,
+    // AnmVmFlagsHiFields::ignore_game_speed.
+    ANM_VM_IGNORE_GAME_SPEED = 1 << 9,
+    // Set by every function that creates a VM for game code. The same bit
+    // as instruction 307's rand_mode; nothing in TH16 reads it.
     ANM_VM_CREATED_BY_GAME = 1 << 10,
-    ANM_VM_FLAG_HI_4000 = 1 << 14,
-    ANM_VM_FLAG_HI_8000 = 1 << 15,
+    // Point instead of linear filtering.
+    ANM_VM_FILTER_POINT_SHIFT = 11,
+    ANM_VM_FILTER_POINT = 1 << 11,
+    // AnmManager::draw_text and its variants draw without the outline.
+    ANM_VM_TEXT_NO_OUTLINE = 1 << 12,
+    // AnmVmFlagsHiFields::uv_quad_from_corners.
+    ANM_VM_UV_QUAD_FROM_CORNERS = 1 << 13,
+    // Two bits for GameThread's world freeze (GameThreadFlags::flag_1).
+    // A VM with only FREEZES_WITH_WORLD set does not run while it is on.
+    // Starting a script sets FREEZES_AFTER_FIRST_RUN instead, which
+    // AnmLoaded::set_vm_script turns into FREEZES_WITH_WORLD after the
+    // first run. VMs with neither (those created into the UI list, the help
+    // manual's and some of the HUD's) keep running.
+    ANM_VM_FREEZES_WITH_WORLD = 1 << 14,
+    ANM_VM_FREEZES_AFTER_FIRST_RUN = 1 << 15,
     // world_pos and get_slowdown_factor stop walking up the parents at a VM
     // with this.
     ANM_VM_NO_PARENT_POS = 1 << 16,
-    // Two bits of layer kind: LAYER_SET for layers 3-19, LAYER_UI for
-    // layers 20-23, neither for the rest.
-    ANM_VM_LAYER_SET = 1 << 18,
-    ANM_VM_LAYER_UI = 1 << 19,
-    ANM_VM_LAYER_KIND_MASK = ANM_VM_LAYER_SET | ANM_VM_LAYER_UI,
-    // Three bits; set_layer sets it to 1 for layers 20-31 and 36-42.
-    ANM_VM_COORD_MODE_MASK = 7 << 20,
-    ANM_VM_COORD_MODE_1 = 1 << 20,
+    // Two bits of origin mode (instruction 438), what transform_coords adds
+    // to the position of a VM without a parent: nothing (0), the game
+    // area's origin (1, set_layer's choice for layers 3-19) or the arcade
+    // HUD origin (2, layers 20-23).
+    ANM_VM_ORIGIN_GAME = 1 << 18,
+    ANM_VM_ORIGIN_HUD = 1 << 19,
+    ANM_VM_ORIGIN_MODE_MASK = ANM_VM_ORIGIN_GAME | ANM_VM_ORIGIN_HUD,
+    // Three bits of resolution mode (instruction 313): 1 and 3 scale
+    // positions and sizes by g_screen_coord_scale, 2 and 4 by half of it.
+    // set_layer picks 1 for layers 20-31 and 36-42.
+    ANM_VM_RESOLUTION_MODE_MASK = 7 << 20,
+    ANM_VM_RESOLUTION_SCALED = 1 << 20,
+    ANM_VM_RESOLUTION_HALF_SCALED = 2 << 20,
+    ANM_VM_RESOLUTION_SCALED_3 = 3 << 20,
+    ANM_VM_RESOLUTION_HALF_SCALED_4 = 4 << 20,
     ANM_VM_ROTATE_WITH_PARENT = 1 << 23,
-    // Marked for deletion: the manager frees it on its next pass.
-    ANM_VM_DELETE_PENDING = 1 << 5,
-    ANM_VM_FLAG_HI_40 = 1 << 6,
-    // Inherited from the parent by managed children.
-    ANM_VM_FLAG_HI_2000000 = 1 << 25,
-    // A copy kept by AnmManager::store_snapshot_of_vm, not a live VM;
-    // deleting it does nothing.
-    ANM_VM_FLAG_HI_4000000 = 1 << 26,
-    // AnmVmFlagsHiFields::ignore_game_speed.
-    ANM_VM_IGNORE_GAME_SPEED = 1 << 9,
-    // AnmVmFlagsHiFields::uv_quad_from_corners.
-    ANM_VM_UV_QUAD_FROM_CORNERS = 1 << 13,
     // Set by the instructions that start angular velocity, scale growth or
     // UV scrolling: AnmVm::run calls step_velocities.
     ANM_VM_HAS_VELOCITY = 1 << 24,
+    // Instruction 315 (colorizeChildren). Managed children inherit it from
+    // their parent; a VM with it is drawn tinted by its parent's
+    // mixed_inherited_color.
+    ANM_VM_COLORIZE_CHILDREN = 1 << 25,
+    // A copy kept by AnmManager::store_snapshot_of_vm, not a live VM;
+    // deleting it does nothing.
+    ANM_VM_IS_SNAPSHOT = 1 << 26,
+};
+
+// ANM blend modes (flags_lo bits 5-8, instruction 303), as
+// AnmManager::setup_render_state_for_vm sets them up.
+enum AnmBlendMode
+{
+    // src * alpha + dst * (1 - alpha)
+    ANM_BLEND_ALPHA = 0,
+    // src * alpha + dst
+    ANM_BLEND_ADD = 1,
+    // dst - src * alpha
+    ANM_BLEND_SUBTRACT = 2,
+    // src, alpha test off
+    ANM_BLEND_REPLACE = 3,
+    // src * (1 - dst) + dst * (1 - src)
+    ANM_BLEND_SCREEN = 4,
+    // src * dst
+    ANM_BLEND_MULTIPLY = 5,
+    // src * (1 - src) + dst * (1 - alpha)
+    ANM_BLEND_6 = 6,
+    // src * dst alpha + dst * (1 - dst alpha)
+    ANM_BLEND_DEST_ALPHA = 7,
+    // min(src, dst)
+    ANM_BLEND_MIN = 8,
+    // max(src, dst)
+    ANM_BLEND_MAX = 9,
+    // Not a blend mode: stored by code that changes the blend state itself,
+    // so that the next sprite sets its own again.
+    ANM_BLEND_FORCE_RESET = 10,
+};
+
+// Anchoring along one axis (flags_lo bits 21-22 and 23-24, instruction 421,
+// and the anchor arguments of AnmManager's shape functions).
+enum AnmAnchor
+{
+    ANM_ANCHOR_CENTER = 0,
+    // The position is the left or top edge.
+    ANM_ANCHOR_START = 1,
+    // The position is the right or bottom edge.
+    ANM_ANCHOR_END = 2,
+};
+
+// ANM render modes (flags_lo bits 25-29, instruction 302 and the drawing
+// instructions 600-613): how AnmManager::draw_vm draws the VM.
+enum AnmRenderMode
+{
+    // A 2D sprite, unrotated, snapped to pixel centers.
+    ANM_RENDER_SPRITE = 0,
+    // A 2D sprite rotated by the total z rotation.
+    ANM_RENDER_SPRITE_ROTATED = 1,
+    // ANM_RENDER_SPRITE without the pixel snapping.
+    ANM_RENDER_SPRITE_UNSNAPPED = 2,
+    // Drawn like ANM_RENDER_SPRITE_ROTATED, but write_sprite_corners treats
+    // it as unrotated.
+    ANM_RENDER_SPRITE_ROTATED_3 = 3,
+    // A camera-facing quad at the projected 3D position.
+    ANM_RENDER_BILLBOARD = 4,
+    // The world matrix is rebuilt and the quad drawn as a 2D sprite.
+    ANM_RENDER_MODE_5 = 5,
+    // ANM_RENDER_BILLBOARD with distance fog.
+    ANM_RENDER_BILLBOARD_FOG = 6,
+    // A 2D sprite with distance fog worked out per corner.
+    ANM_RENDER_SPRITE_FOG = 7,
+    // A 3D sprite drawn from the vertex buffer with the world and texture
+    // matrices.
+    ANM_RENDER_3D = 8,
+    // texCircle (600): a textured ring strip from the VM's extra data.
+    ANM_RENDER_TEX_CIRCLE = 9,
+    // A fan of random radii around the VM (anm_fan_init).
+    ANM_RENDER_FAN = 10,
+    // A triangle fan from the VM's extra data.
+    ANM_RENDER_TRIANGLE_FAN = 11,
+    // Drawn like ANM_RENDER_TEX_CIRCLE.
+    ANM_RENDER_MODE_12 = 12,
+    // texArcEven (601) and texArc (602): an arc of the ring strip.
+    ANM_RENDER_TEX_ARC_EVEN = 13,
+    ANM_RENDER_TEX_ARC = 14,
+    // ANM_RENDER_3D with Direct3D fog.
+    ANM_RENDER_3D_FOG = 15,
+    // The untextured shapes of instructions 603-608 and 611-613.
+    ANM_RENDER_RECT = 16,
+    ANM_RENDER_POLY = 17,
+    ANM_RENDER_POLY_BORDER = 18,
+    ANM_RENDER_RING = 19,
+    ANM_RENDER_RECT_GRAD = 20,
+    ANM_RENDER_RECT_ROT = 21,
+    ANM_RENDER_RECT_ROT_GRAD = 22,
+    // texCylinder3D (609) and texRing3D (610): 3D bands from the VM's
+    // extra data.
+    ANM_RENDER_TEX_CYLINDER_3D = 24,
+    ANM_RENDER_TEX_RING_3D = 25,
+    ANM_RENDER_LINE = 26,
+    ANM_RENDER_RECT_BORDER = 27,
+};
+
+// ANM opcodes (names after ExpHP's truth, map/v8.anmm; the ones truth leaves
+// unnamed are named after what AnmVm::run_script does with them).
+enum AnmOpcode
+{
+    // The end of a script: deletes the VM like delete.
+    ANM_OP_END = -1,
+    ANM_OP_NOP = 0,
+    ANM_OP_DELETE = 1,
+    ANM_OP_STATIC = 2,
+    ANM_OP_STOP = 3,
+    ANM_OP_STOP_HIDE = 4,
+    ANM_OP_INTERRUPT_LABEL = 5,
+    ANM_OP_WAIT = 6,
+    ANM_OP_CASE_RETURN = 7,
+
+    ANM_OP_ISET = 100,
+    ANM_OP_FSET = 101,
+    ANM_OP_IADD = 102,
+    ANM_OP_FADD = 103,
+    ANM_OP_ISUB = 104,
+    ANM_OP_FSUB = 105,
+    ANM_OP_IMUL = 106,
+    ANM_OP_FMUL = 107,
+    ANM_OP_IDIV = 108,
+    ANM_OP_FDIV = 109,
+    ANM_OP_IMOD = 110,
+    ANM_OP_FMOD = 111,
+    ANM_OP_ISET_ADD = 112,
+    ANM_OP_FSET_ADD = 113,
+    ANM_OP_ISET_SUB = 114,
+    ANM_OP_FSET_SUB = 115,
+    ANM_OP_ISET_MUL = 116,
+    ANM_OP_FSET_MUL = 117,
+    ANM_OP_ISET_DIV = 118,
+    ANM_OP_FSET_DIV = 119,
+    ANM_OP_ISET_MOD = 120,
+    ANM_OP_FSET_MOD = 121,
+    ANM_OP_ISET_RAND = 122,
+    ANM_OP_FSET_RAND = 123,
+    ANM_OP_FSIN = 124,
+    ANM_OP_FCOS = 125,
+    ANM_OP_FTAN = 126,
+    ANM_OP_FACOS = 127,
+    ANM_OP_FATAN = 128,
+    ANM_OP_VALID_RAD = 129,
+    ANM_OP_CIRCLE_POS = 130,
+    ANM_OP_CIRCLE_POS_RAND = 131,
+
+    ANM_OP_JMP = 200,
+    ANM_OP_JMP_DEC = 201,
+    ANM_OP_IJE = 202,
+    ANM_OP_FJE = 203,
+    ANM_OP_IJNE = 204,
+    ANM_OP_FJNE = 205,
+    ANM_OP_IJL = 206,
+    ANM_OP_FJL = 207,
+    ANM_OP_IJLE = 208,
+    ANM_OP_FJLE = 209,
+    ANM_OP_IJG = 210,
+    ANM_OP_FJG = 211,
+    ANM_OP_IJGE = 212,
+    ANM_OP_FJGE = 213,
+
+    ANM_OP_SPRITE = 300,
+    ANM_OP_SPRITE_RAND = 301,
+    ANM_OP_TYPE = 302,
+    ANM_OP_BLEND_MODE = 303,
+    ANM_OP_LAYER = 304,
+    ANM_OP_Z_WRITE_DISABLE = 305,
+    // Unnamed in truth ("camera related"): ANM_VM_FOLLOW_CAMERA.
+    ANM_OP_FOLLOW_CAMERA = 306,
+    ANM_OP_RAND_MODE = 307,
+    ANM_OP_FLIP_X = 308,
+    ANM_OP_FLIP_Y = 309,
+    ANM_OP_VISIBLE = 310,
+    ANM_OP_RESAMPLE_MODE = 311,
+    ANM_OP_SCROLL_MODE = 312,
+    ANM_OP_RESOLUTION_MODE = 313,
+    // Unnamed in truth: ANM_VM_ROTATE_WITH_PARENT.
+    ANM_OP_ROTATE_WITH_PARENT = 314,
+    ANM_OP_COLORIZE_CHILDREN = 315,
+    // Unnamed in truth: set and clear ANM_VM_SHOWN.
+    ANM_OP_SHOW = 316,
+    ANM_OP_HIDE = 317,
+
+    ANM_OP_POS = 400,
+    ANM_OP_ROTATE = 401,
+    ANM_OP_SCALE = 402,
+    ANM_OP_ALPHA = 403,
+    ANM_OP_COLOR = 404,
+    ANM_OP_ALPHA2 = 405,
+    ANM_OP_COLOR2 = 406,
+    ANM_OP_POS_TIME = 407,
+    ANM_OP_COLOR_TIME = 408,
+    ANM_OP_ALPHA_TIME = 409,
+    ANM_OP_ROTATE_TIME = 410,
+    ANM_OP_ROTATE_TIME_2D = 411,
+    ANM_OP_SCALE_TIME = 412,
+    ANM_OP_COLOR2_TIME = 413,
+    ANM_OP_ALPHA2_TIME = 414,
+    ANM_OP_ANGLE_VEL = 415,
+    ANM_OP_SCALE_GROWTH = 416,
+    ANM_OP_ALPHA_TIME_LINEAR = 417,
+    // Unnamed in truth: UVs from the sprite's corners, once (418) or every
+    // frame (419, ANM_VM_UV_QUAD_FROM_CORNERS).
+    ANM_OP_UV_FROM_CORNERS = 418,
+    ANM_OP_UV_FROM_CORNERS_ALWAYS = 419,
+    ANM_OP_MOVE_BEZIER = 420,
+    ANM_OP_ANCHOR = 421,
+    // Unnamed in truth: moves entity_pos into pos.
+    ANM_OP_POS_FROM_ENTITY = 422,
+    ANM_OP_COLOR_MODE = 423,
+    ANM_OP_ROTATE_AUTO = 424,
+    ANM_OP_SCROLL_X = 425,
+    ANM_OP_SCROLL_Y = 426,
+    ANM_OP_SCROLL_X_TIME = 427,
+    ANM_OP_SCROLL_Y_TIME = 428,
+    ANM_OP_ZOOM_OUT = 429,
+    ANM_OP_ZOOM_OUT_TIME = 430,
+    // Unnamed in truth: sets a flag nothing reads (AnmVmFlagsHiFields).
+    ANM_OP_431 = 431,
+    // Unnamed in truth: ANM_VM_IGNORE_GAME_SPEED.
+    ANM_OP_IGNORE_GAME_SPEED = 432,
+    // Unnamed in truth: posTime to a point given by angle and distance.
+    ANM_OP_POS_TIME_POLAR = 433,
+    ANM_OP_SCALE2 = 434,
+    ANM_OP_SCALE2_TIME = 435,
+    ANM_OP_ANCHOR_OFFSET = 436,
+    ANM_OP_ROTATION_MODE = 437,
+    ANM_OP_ORIGIN_MODE = 438,
+
+    ANM_OP_SCRIPT_NEW = 500,
+    ANM_OP_SCRIPT_NEW_UI = 501,
+    ANM_OP_SCRIPT_NEW_FRONT = 502,
+    ANM_OP_SCRIPT_NEW_UI_FRONT = 503,
+    ANM_OP_SCRIPT_NEW_ROOT = 504,
+    ANM_OP_SCRIPT_NEW_POS = 505,
+    ANM_OP_SCRIPT_NEW_ROOT_POS = 506,
+    // Unnamed in truth: ANM_VM_NO_PARENT_POS.
+    ANM_OP_NO_PARENT_POS = 507,
+    ANM_OP_EFFECT_NEW = 508,
+    ANM_OP_COPY_VARS = 509,
+
+    ANM_OP_TEX_CIRCLE = 600,
+    ANM_OP_TEX_ARC_EVEN = 601,
+    ANM_OP_TEX_ARC = 602,
+    ANM_OP_DRAW_RECT = 603,
+    ANM_OP_DRAW_POLY = 604,
+    ANM_OP_DRAW_POLY_BORDER = 605,
+    ANM_OP_DRAW_RECT_GRAD = 606,
+    ANM_OP_DRAW_RECT_ROT = 607,
+    ANM_OP_DRAW_RECT_ROT_GRAD = 608,
+    ANM_OP_TEX_CYLINDER_3D = 609,
+    ANM_OP_TEX_RING_3D = 610,
+    ANM_OP_DRAW_RING = 611,
+    ANM_OP_DRAW_RECT_BORDER = 612,
+    ANM_OP_DRAW_LINE = 613,
+};
+
+// Draw layers (AnmVm::layer). Each has an AnmManager::on_draw_* callback;
+// AnmLayers.cpp lists the draw order and the camera each group uses.
+enum AnmLayer
+{
+    // 0-2: drawn before the stage camera is set up.
+    // 3-19: the game area, drawn with the stage camera (camera 3);
+    // set_layer gives them ANM_VM_ORIGIN_GAME.
+    ANM_LAYER_GAME_FIRST = 3,
+    ANM_LAYER_GAME_LAST = 19,
+    // 20-23: in front of the game area with the game area's 2D camera
+    // (camera 1), placed from the arcade HUD origin (ANM_VM_ORIGIN_HUD).
+    ANM_LAYER_HUD_FIRST = 20,
+    ANM_LAYER_HUD_LAST = 23,
+    // 24-31: the interface, with the full screen camera (camera 2), except
+    // 28 which uses camera 0. 20-31 are scaled with the resolution
+    // (ANM_VM_RESOLUTION_SCALED).
+    ANM_LAYER_UI_FIRST = 24,
+    ANM_LAYER_UI_LAST = 31,
+    // 36-42: layers 24-30 for VMs in the manager's UI list, each drawn
+    // right after its world list twin. 32-35 are never drawn.
+    ANM_LAYER_UI_LIST_FIRST = 36,
+    ANM_LAYER_UI_LIST_LAST = 42,
+    ANM_LAYER_UI_LIST_COUNT = ANM_LAYER_UI_LIST_LAST - ANM_LAYER_UI_LIST_FIRST + 1,
+    // What tick_ui adds to a UI list VM's layer 24-31 (and tick_world
+    // takes off a world VM's 36-42).
+    ANM_LAYER_UI_LIST_OFFSET = ANM_LAYER_UI_LIST_FIRST - ANM_LAYER_UI_FIRST,
+    // Where tick_ui puts UI list VMs on any other layer.
+    ANM_LAYER_UI_LIST_DEFAULT = 38,
+    ANM_LAYER_COUNT = 43,
+};
+
+// AnmVm::mode_of_create_child: where AnmLoaded::create_managed_child and
+// AnmManager::restore_snapshot_vm insert a VM. Neither bit: the back of
+// the world list.
+enum AnmCreateMode
+{
+    ANM_CREATE_WORLD_BACK = 0,
+    // At the front of the list (drawn first).
+    ANM_CREATE_FRONT = 2,
+    // In the UI list.
+    ANM_CREATE_UI = 4,
+    ANM_CREATE_UI_FRONT = ANM_CREATE_UI | ANM_CREATE_FRONT,
 };
 
 // The bitfields of AnmVm::flags_lo that code assigns (ECL's anmBlendMode);
@@ -139,18 +481,25 @@ struct AnmVmFlagsLoBits
 struct AnmVmFlagsLoFields
 {
     u32 visible : 1;
-    u32 unk_1 : 4;
+    u32 shown : 1;
+    u32 rotation_changed : 1;
+    u32 scale_changed : 1;
+    u32 uv_scale_changed : 1;
     u32 blend_mode : 4;
-    u32 unk_9 : 4;
+    u32 unk_9 : 1;
+    u32 pos_i_to_pos_2 : 1;
+    u32 flip_x : 1;
+    u32 flip_y : 1;
     // Instruction 305.
     u32 z_write_disable : 1;
-    u32 unk_14 : 1;
+    u32 stopped : 1;
     // Instruction 306: entity_pos follows the stage camera's unk_104.
     u32 follow_camera : 1;
-    u32 unk_16 : 1;
+    u32 keep_world_matrix : 1;
     // Which of color_1/color_2 to draw with (ANM_VM_COLOR_MODE_MASK).
     u32 color_mode : 2;
-    u32 unk_19 : 2;
+    u32 unk_19 : 1;
+    u32 script_disabled : 1;
     // Instruction 421: horizontal and vertical anchoring.
     u32 anchor_x : 2;
     u32 anchor_y : 2;
@@ -164,20 +513,22 @@ struct AnmVmFlagsHiFields
     u32 address_u : 2;
     // Instruction 437.
     u32 rotation_mode : 3;
-    u32 unk_5 : 2;
+    u32 delete_pending : 1;
+    u32 in_delete_list : 1;
     u32 auto_rotate : 1;
-    // Instruction 431.
-    u32 flag_8 : 1;
+    // Instruction 431; nothing reads it.
+    u32 ins_431_flag : 1;
     // Instruction 432: AnmVm::run steps the VM at full game speed.
     u32 ignore_game_speed : 1;
     // Instruction 307 (truth: randMode).
     u32 rand_mode : 1;
     u32 filter_point : 1;
-    u32 unk_12 : 1;
+    u32 text_no_outline : 1;
     // Instruction 419: refresh uv_quad_of_sprite from the sprite's
     // corners every frame.
     u32 uv_quad_from_corners : 1;
-    u32 unk_14 : 2;
+    u32 freezes_with_world : 1;
+    u32 freezes_after_first_run : 1;
     u32 no_parent_pos : 1;
     u32 unk_17 : 1;
     // Instruction 438 (truth: originMode).
@@ -185,9 +536,10 @@ struct AnmVmFlagsHiFields
     // Instruction 313 (truth: resolutionMode).
     u32 resolution_mode : 3;
     u32 rotate_with_parent : 1;
-    u32 unk_24 : 1;
+    u32 has_velocity : 1;
     u32 colorize_children : 1;
-    u32 unk_26 : 6;
+    u32 is_snapshot : 1;
+    u32 unk_27 : 5;
 };
 
 // One ANM instruction (ExpHP: zAnmRawInstr). Bit n of var_mask: argument n
@@ -251,6 +603,39 @@ enum AnmVar
 
 struct AnmVm;
 
+// Indices into the callback tables below (AnmVm::index_of_*), 0 for none.
+// The three EffectManager effect kinds use the same index in every table.
+enum AnmCallbackIndex
+{
+    ANM_CALLBACK_NONE = 0,
+    // Effect 0: anm_masked_effect_* and anm_on_draw_masked.
+    ANM_CALLBACK_MASKED_EFFECT = 1,
+    // Effect 1: anm_gather_effect_*.
+    ANM_CALLBACK_GATHER_EFFECT = 2,
+    // Effects 2 and 3: anm_jagged_line_*.
+    ANM_CALLBACK_JAGGED_LINE = 3,
+    // on_tick: render mode 10's fan (anm_on_tick_fan).
+    ANM_ON_TICK_FAN = 4,
+    // on_draw: the stage fog's main VM (Fog.cpp).
+    ANM_ON_DRAW_FOG = 4,
+    // on_draw: dialogue text boxes (Gui::textbox_on_draw).
+    ANM_ON_DRAW_TEXTBOX = 5,
+    // on_draw: render mode 10's fan (anm_on_draw_fan).
+    ANM_ON_DRAW_FAN = 6,
+};
+
+// g_anm_sprite_mapping_funcs entries (AnmVm::index_of_sprite_mapping_func).
+enum AnmSpriteMapping
+{
+    ANM_SPRITE_MAPPING_NONE = 0,
+    // bullet_map_sprite: the bullet's type and color.
+    ANM_SPRITE_MAPPING_BULLET = 1,
+    // LaserLineInf::on_sprite_set.
+    ANM_SPRITE_MAPPING_LASER_LINE = 2,
+    // LaserCurveInf::on_sprite_set.
+    ANM_SPRITE_MAPPING_LASER_CURVE = 3,
+};
+
 // Script callbacks, selected per VM by the index_of_* fields.
 typedef i32(__fastcall *AnmVmSwitchFunc)(AnmVm *vm, i32 interrupt);
 extern AnmVmSwitchFunc g_anm_on_switch_funcs[4];
@@ -273,25 +658,34 @@ extern AnmVmSpriteFunc g_anm_sprite_mapping_funcs[4];
 typedef i32(__fastcall *AnmVmCopyFunc)(AnmVm *vm, const AnmVm *other, i32 arg);
 extern AnmVmCopyFunc g_anm_on_copy_funcs[2];
 // Write (load 0) or read back (load 1) a VM's extra data in a save buffer,
-// adding the bytes used to *size; selected by index_of_on_copy_2 (ExpHP:
+// adding the bytes used to *size; selected by index_of_on_serialize (ExpHP:
 // ANM_ON_COPY_FUNC_1).
 typedef i32(__fastcall *AnmVmSerializeFunc)(AnmVm *vm, void *data, i32 *size, i32 load);
 extern AnmVmSerializeFunc g_anm_serialize_funcs[2];
 
-// One running ANM script (layout: ExpHP's zAnmVm, flattened, 0x5fc bytes).
+// One running ANM script: a sprite (or shape) with its position, rotation,
+// scale and colors, the interpolators that animate them, and the script
+// that drives it all. Layout: ExpHP's zAnmVm, flattened, 0x5fc bytes. The
+// prefix (up to flags_hi) is the part copied from a file's prototype VM
+// when a script starts.
 struct AnmVm
 {
+    // Where caseReturn (instruction 7) goes back to after an interrupt.
     ZunTimer interrupt_return_time;
     i32 interrupt_return_offset;
+    // Draw layer (0-42): which AnmManager::on_draw_* callback draws it.
     i32 layer;
+    // The AnmLoaded slot the script and sprites come from.
     i32 anm_loaded_index;
     i32 sprite_id;
     i32 script_id;
+    // Byte offset of the next instruction in the script; -1 once it ended.
     i32 instr_offset;
     Float3 pos;
     Float3 rotation;
     Float3 angular_velocity;
     Float2 scale;
+    // A second scale multiplied with scale (instruction 434, scale2).
     Float2 scale_2;
     Float2 scale_growth;
     Float2 uv_scale;
@@ -299,77 +693,113 @@ struct AnmVm
     Float2 uv_scroll_pos;
     Float2 anchor_offset;
     u8 unk_88[4];
+    // Interpolators started by the *Time instructions; each runs while its
+    // end_time is nonzero (step_interpolators).
     InterpFloat3 pos_i;
     InterpInt3 rgb1_i;
     InterpInt alpha1_i;
     InterpFloat3 rotate_i;
     InterpAngle rotate_2d_i;
     InterpFloat2 scale_i;
-    InterpFloat2 op_434_i;
+    InterpFloat2 scale_2_i;
     InterpFloat2 uv_scale_i;
     InterpInt3 rgb2_i;
     InterpInt alpha2_i;
     InterpFloat u_vel_i;
     InterpFloat v_vel_i;
+    // The sprite's texture coordinates, one per corner.
     Float2 uv_quad_of_sprite[4];
     Float2 uv_scroll_vel;
-    D3DXMATRIX matrix_3d0;
-    D3DXMATRIX matrix_410;
-    D3DXMATRIX matrix_450;
+    // The sprite's size as a scale of the 256-unit quad in the vertex
+    // buffer (AnmLoaded::set_sprite).
+    D3DXMATRIX sprite_matrix;
+    // sprite_matrix scaled and rotated, rebuilt when the VM is drawn in 3D.
+    D3DXMATRIX world_matrix;
+    // Maps the unit quad's UVs onto the sprite in its texture.
+    D3DXMATRIX texture_matrix;
+    // Interrupt to jump to on the next run (AnmVm::interrupt), 0 for none.
     i32 pending_interrupt;
+    // script_time when instruction 300 or 301 last set a sprite.
     i32 time_of_last_sprite_set;
+    // Looks unused (ExpHP).
     i32 unk_498;
-    i16 unk_49c;
+    // The script the VM was started with, like script_id but 16 bits:
+    // what search_children and ECL variable -9961 read.
+    i16 script_id_short;
     u8 unk_49e[2];
-    // ANM script variables (ExpHP: int_script_vars, float_script_vars).
+    // ANM script variables (ExpHP: int_script_vars, float_script_vars):
+    // I0-I3, F0-F3, then F4-F6 and I4-I5 (AnmVar).
     i32 int_vars[4];
     f32 float_vars[4];
-    Float3 script_vars_33_34_35;
-    i32 script_var_8;
-    i32 script_var_9;
+    Float3 float_vars_4_to_6;
+    i32 int_var_4;
+    i32 int_var_5;
+    // The scales of the RAND_SCALE_ONE and RAND_SCALE_PI variables.
     f32 rand_scale_one;
     f32 rand_scale_pi;
     i32 num_cycles_in_texture;
+    // A second position added to pos (instruction 505's offset, and pos_i's
+    // target with ANM_VM_POS_I_TO_POS_2).
     Float3 pos_2;
+    // The quad as last drawn by render_sprite_2d, in screen space.
     Float3 last_rendered_quad_in_surface_space[4];
+    // Which list the VM went into (AnmCreateMode bits), so that a restored
+    // snapshot goes back to the same one.
     i32 mode_of_create_child;
     ZunColor color_1;
     ZunColor color_2;
+    // The drawn color, tinted by the parent's with ANM_VM_COLORIZE_CHILDREN;
+    // children read it.
     ZunColor mixed_inherited_color;
+    // Glyph width and height for text drawn into the sprite.
     u8 font_dims[2];
     u8 unk_52e[2];
+    // AnmVmFlagsLo, AnmVmFlagsHi.
     u32 flags_lo;
     u32 flags_hi;
     // Suffix (ExpHP: zAnmVmSuffix).
     AnmId id;
+    // Index in AnmManager's pool, 0x1fff for VMs allocated outside it.
     u32 fast_id;
+    // Script time: what instruction times compare against. wait and the
+    // jumps move it.
     ZunTimer script_time;
-    ZunTimer timer_1c;
+    // Frames run since the script started, never rewound.
+    ZunTimer time_in_script;
+    // Links in the manager's world or UI list, in the parent's
+    // list_of_children, and in the manager's delete list.
     ZunList<AnmVm> node_in_global_list;
     ZunList<AnmVm> node_as_child;
     ZunList<AnmVm> list_of_children;
-    ZunList<AnmVm> unk_list_598;
+    ZunList<AnmVm> node_in_delete_list;
+    // The next VM of the same layer, for the draw pass.
     AnmVm *next_in_layer;
-    // ExpHP: __root_vm__or_maybe_not.
-    AnmVm *parent;
-    // ExpHP: parent_vm.
-    AnmVm *unk_5b0;
+    // The top of the VM's tree (ExpHP: __root_vm__or_maybe_not), NULL for
+    // a root: position, rotation and slowdown are relative to it.
+    AnmVm *root_vm;
+    // The VM that created it (ExpHP: parent_vm), NULL for a root.
+    AnmVm *parent_vm;
+    // 0 to 1: how much of the game speed the tree loses (AnmVm::run).
     f32 slowdown;
-    // Allocated by ANM instruction 508.
-    void *ins_508_extra_data;
-    u32 ins_508_extra_data_size;
+    // Vertices of the special render modes (instructions 600-610) or a
+    // callback's state, freed with the VM (ExpHP: ins_508_extra_data).
+    void *extra_data;
+    u32 extra_data_size;
+    // Indices into the g_anm_on_*_funcs callback tables, 0 for none.
     i32 index_of_on_wait;
     i32 index_of_on_tick;
     i32 index_of_on_draw;
     i32 index_of_on_destroy;
     i32 index_of_on_interrupt;
-    i32 index_of_on_copy_1;
-    i32 index_of_on_copy_2;
+    i32 index_of_on_copy;
+    i32 index_of_on_serialize;
     i32 index_of_sprite_mapping_func;
     // Position of the game object the VM belongs to.
     Float3 entity_pos;
+    // The game object itself (a Bullet, a laser...), for the callbacks.
     void *associated_game_entity;
-    Float3 rotation_related;
+    // Written by get_total_rotation.
+    Float3 total_rotation;
 
     // Callers compile with EH cleanup for this, which LTCG then removes
     // because it sees the body cannot throw.
@@ -392,38 +822,38 @@ struct AnmVm
         result.x = pos.x + entity_pos.x + pos_2.x;
         result.y = pos.y + entity_pos.y + pos_2.y;
         result.z = pos.z + entity_pos.z + pos_2.z;
-        if (parent != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+        if (root_vm != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
         {
             if (flags_hi & ANM_VM_ROTATE_WITH_PARENT)
             {
-                f32 s = zun_sinf(parent->rotation.z);
-                f32 c = zun_cosf(parent->rotation.z);
+                f32 s = zun_sinf(root_vm->rotation.z);
+                f32 c = zun_cosf(root_vm->rotation.z);
                 f32 x = result.x;
                 f32 y = result.y;
                 result.x = x * c - y * s;
                 result.y = y * c + x * s;
             }
-            Float3 parent_pos = parent->world_pos();
+            Float3 parent_pos = root_vm->world_pos();
             result += parent_pos;
         }
         return result;
     }
-    // 0x45f980. Nonzero once the script has ended (anm_effect_1_on_tick
+    // 0x45f980. Nonzero once the script has ended (anm_masked_effect_on_tick
     // counts on it).
     i32 run();
     // run without the game speed handling around it; inlined into run.
     i32 run_script();
     // 0x4632f0. Rebuilds the vertex data that the special render modes
     // (9 to 25: textured circles and arcs, rings, cylinders) keep in
-    // ins_508_extra_data.
+    // extra_data.
     void update_special_vertices();
     HARNESS_CALLED f32 get_slowdown_factor();
     // Its first level inlined, as in AnmVm::run.
     f32 get_slowdown_factor_inline()
     {
-        if (parent != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+        if (root_vm != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
         {
-            return parent->get_slowdown_factor();
+            return root_vm->get_slowdown_factor();
         }
         return slowdown;
     }
@@ -470,29 +900,30 @@ struct AnmVm
     // transform_coords; returns out.
     Float3 *get_own_transformed_pos(Float3 *out);
     // 0x46f510. The nth descendant (depth first) running the given script
-    // (unk_49c; -1 for any).
+    // (script_id_short; -1 for any).
     HARNESS_CALLED AnmVm *search_children(i32 script, i32 nth);
     // 0x46f380 and 0x46f3b0 (ExpHP: set/clear_ins_316_flag_recursively).
-    HARNESS_CALLED void set_flag_lo_2_tree();
-    HARNESS_CALLED void clear_flag_lo_2_tree();
+    // Set or clear ANM_VM_SHOWN on the VM and all its descendants.
+    HARNESS_CALLED void show_tree();
+    HARNESS_CALLED void hide_tree();
 
     // The two above with their first level inlined, as LTCG did in some
     // callers.
-    void set_flag_lo_2_tree_inline()
+    void show_tree_inline()
     {
-        flags_lo |= ANM_VM_FLAG_LO_2;
+        flags_lo |= ANM_VM_SHOWN;
         for (ZunList<AnmVm> *node = list_of_children.next; node != NULL; node = node->next)
         {
-            node->entry->set_flag_lo_2_tree();
+            node->entry->show_tree();
         }
     }
 
-    void clear_flag_lo_2_tree_inline()
+    void hide_tree_inline()
     {
-        flags_lo &= ~ANM_VM_FLAG_LO_2;
+        flags_lo &= ~ANM_VM_SHOWN;
         for (ZunList<AnmVm> *node = list_of_children.next; node != NULL; node = node->next)
         {
-            node->entry->clear_flag_lo_2_tree();
+            node->entry->hide_tree();
         }
     }
 
@@ -508,12 +939,12 @@ struct AnmVm
     HARNESS_CALLED i32 get_int_var(i32 value);
     HARNESS_CALLED f32 *get_float_var_ptr(f32 *value);
     HARNESS_CALLED i32 *get_int_var_ptr(i32 *value);
-    // Rotation plus every parent's, in rotation_related. Wraps this VM's
+    // Rotation plus every parent's, in total_rotation. Wraps this VM's
     // own rotation into [-pi, pi] on the way.
     Float3 *get_total_rotation();
     // Start interpolators (ExpHP's names; rgb1/rgb2 are swapped there).
     void set_uv_scale_time(i32 end_time, i32 method, Float2 *initial, Float2 *goal);
-    void set_434_time(i32 end_time, i32 method, Float2 *initial, Float2 *goal);
+    void set_scale_2_time(i32 end_time, i32 method, Float2 *initial, Float2 *goal);
     void set_alpha2_time(i32 end_time, i32 method, u8 initial, u8 goal);
     void set_rgb2_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
     void set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal);
@@ -545,7 +976,7 @@ struct AnmVm
 
     void mark_for_deletion()
     {
-        flags_hi &= ~ANM_VM_FLAG_HI_40;
+        flags_hi &= ~ANM_VM_IN_DELETE_LIST;
         flags_hi |= ANM_VM_DELETE_PENDING;
     }
 

@@ -127,7 +127,7 @@ i32 Spellcard::on_draw_body()
     AsciiInf *ascii = g_AsciiManager;
     pos.y = 35.0f;
     pos.z = 0.0f;
-    ascii->font_id = 2;
+    ascii->font_id = ASCII_FONT_SMALL;
     ascii->group = 2;
     ascii->color.a = vm->color_1.a;
     if (flags & SPELLCARD_CAPTURABLE)
@@ -162,7 +162,7 @@ i32 Spellcard::on_draw_body()
             g_AsciiManager->create_stringf(&pos, "%.2d/%.2d", captures, attempts);
         }
     }
-    g_AsciiManager->font_id = 0;
+    g_AsciiManager->font_id = ASCII_FONT_DEFAULT;
     g_AsciiManager->group = 0;
     g_AsciiManager->color.a = 0xff;
     return 1;

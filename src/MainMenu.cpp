@@ -128,7 +128,7 @@ unsigned __stdcall TitleInf::thread_start()
         {
             Sleep(16);
         }
-        g_AnmManager->unload_anm(1);
+        g_AnmManager->unload_anm(ANM_SLOT_SIG);
     }
     g_MainMenu->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
     g_unk_4d9d90 = 1;
@@ -152,14 +152,14 @@ HARNESS_CALLED i32 TitleInf::initialize()
     g_UpdateFuncRegistry->register_on_draw(f, 0x45);
     on_draw_func = f;
 
-    title_anm = AnmManager::preload_anm(0x10, "title.anm");
+    title_anm = AnmManager::preload_anm(ANM_SLOT_TITLE, "title.anm");
     if (title_anm == NULL)
     {
         // データが壊れています ("The data is corrupted")
         g_GameErrorContext.log("\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
-    title_v_anm = AnmManager::preload_anm(0x11, "title_v.anm");
+    title_v_anm = AnmManager::preload_anm(ANM_SLOT_TITLE_V, "title_v.anm");
     if (title_v_anm == NULL)
     {
         g_GameErrorContext.log("\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
@@ -176,8 +176,8 @@ TitleInf::~TitleInf()
     thread.join_if_running();
     g_UpdateFuncRegistry->unregister_locked(on_tick_func);
     g_UpdateFuncRegistry->unregister_locked(on_draw_func);
-    g_AnmManager->unload_anm(0x10);
-    g_AnmManager->unload_anm(0x11);
+    g_AnmManager->unload_anm(ANM_SLOT_TITLE);
+    g_AnmManager->unload_anm(ANM_SLOT_TITLE_V);
     for (i32 i = 0; i < 100; i++)
     {
         delete replays[i];
@@ -491,45 +491,45 @@ void TitleInf::update_options_sprites()
     set_child_sprite(get_child_vm(anm_ids[1], 0x2f), g_Supervisor.config.se_volume % 10 + 0x35);
     if (g_Supervisor.config.bgm_volume < 10)
     {
-        get_child_vm(anm_ids[1], 0x21)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x22)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x25)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x26)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x21)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x22)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x25)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x26)->flags_lo &= ~ANM_VM_SHOWN;
     }
     else if (g_Supervisor.config.bgm_volume < 100)
     {
-        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo &= ~ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo &= ~ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_SHOWN;
     }
     else
     {
-        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x21))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x22))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x25))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x26))->flags_lo |= ANM_VM_SHOWN;
     }
     if (g_Supervisor.config.se_volume < 10)
     {
-        get_child_vm(anm_ids[1], 0x29)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x2a)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x2d)->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_child_vm(anm_ids[1], 0x2e)->flags_lo &= ~ANM_VM_FLAG_LO_2;
+        get_child_vm(anm_ids[1], 0x29)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x2a)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x2d)->flags_lo &= ~ANM_VM_SHOWN;
+        get_child_vm(anm_ids[1], 0x2e)->flags_lo &= ~ANM_VM_SHOWN;
     }
     else if (g_Supervisor.config.se_volume < 100)
     {
-        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo &= ~ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo &= ~ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo &= ~ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_SHOWN;
     }
     else
     {
-        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo |= ANM_VM_FLAG_LO_2;
-        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_FLAG_LO_2;
+        get_vm_or_clear(find_child_id(1, 0x29))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2a))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2d))->flags_lo |= ANM_VM_SHOWN;
+        get_vm_or_clear(find_child_id(1, 0x2e))->flags_lo |= ANM_VM_SHOWN;
     }
 }
 
@@ -1006,10 +1006,10 @@ i32 TitleInf::on_tick()
     case 0:
     {
         AnmManager *anm = g_AnmManager;
-        anm->disable_vms_from_anm_file(anm->loaded_anms[5]);
-        anm->disable_vms_from_anm_file(anm->loaded_anms[7]);
-        anm->disable_vms_from_anm_file(anm->loaded_anms[2]);
-        anm->disable_vms_from_anm_file(anm->loaded_anms[0]);
+        anm->disable_vms_from_anm_file(anm->loaded_anms[ANM_SLOT_FRONT]);
+        anm->disable_vms_from_anm_file(anm->loaded_anms[ANM_SLOT_BULLET]);
+        anm->disable_vms_from_anm_file(anm->loaded_anms[ANM_SLOT_ASCII]);
+        anm->disable_vms_from_anm_file(anm->loaded_anms[ANM_SLOT_TEXT]);
         g_AsciiManager->hide_now_loading();
         if (g_unk_4a6f1c == 3)
         {
@@ -1068,7 +1068,7 @@ i32 TitleInf::on_tick()
         }
         else if (g_unk_4a6f1c == 5)
         {
-            ScreenEffect::create(9, 30, 0, 0, 0, 0x54);
+            ScreenEffect::create(SCREEN_EFFECT_HOLD, 30, 0, 0, 0, 0x54);
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             set_state(17);
@@ -1078,7 +1078,7 @@ i32 TitleInf::on_tick()
         }
         else if (g_unk_4a6f1c == 4)
         {
-            ScreenEffect::create(9, 30, 0, 0, 0, 0x54);
+            ScreenEffect::create(SCREEN_EFFECT_HOLD, 30, 0, 0, 0, 0x54);
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             set_state(5);

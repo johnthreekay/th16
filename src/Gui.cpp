@@ -74,7 +74,7 @@ static inline UpdateFuncCallback gui_on_draw_2_callback()
 // FUNCTION: TH16 0x426b00
 i32 Gui::initialize()
 {
-    front_anm = AnmManager::preload_anm(5, "front.anm");
+    front_anm = AnmManager::preload_anm(ANM_SLOT_FRONT, "front.anm");
     if (front_anm == NULL)
     {
         // "The data is corrupt."
@@ -115,7 +115,7 @@ i32 Gui::initialize()
 // FUNCTION: TH16 0x426c10
 i32 Gui::load_stage_files()
 {
-    stage_logo_anm = AnmManager::preload_anm(6, g_stage_data->logo_anm_filename);
+    stage_logo_anm = AnmManager::preload_anm(ANM_SLOT_STAGE_LOGO, g_stage_data->logo_anm_filename);
     if (stage_logo_anm == NULL)
     {
         // "The data is corrupt."
@@ -151,7 +151,7 @@ void Gui::release_stage_files()
 {
     if (!(g_Globals.flags_lo_45c & 9))
     {
-        g_AnmManager->unload_anm(6);
+        g_AnmManager->unload_anm(ANM_SLOT_STAGE_LOGO);
     }
     else
     {
@@ -213,7 +213,7 @@ HARNESS_CALLED void Gui::release_msg()
     }
     if (!(g_Globals.flags_lo_45c & 9))
     {
-        g_AnmManager->unload_anm(6);
+        g_AnmManager->unload_anm(ANM_SLOT_STAGE_LOGO);
         stage_logo_anm = NULL;
         if (msg_file != NULL)
         {
@@ -821,55 +821,55 @@ void GuiMsgVm::hide()
     AnmVm *vm = anm->get_vm_with_id(player_face);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
     for (i32 i = 0; i < 4; i++)
     {
         vm = anm->get_vm_with_id(enemy_faces[i]);
         if (vm != NULL)
         {
-            vm->clear_flag_lo_2_tree_inline();
+            vm->hide_tree_inline();
         }
     }
     vm = anm->get_vm_with_id(id_54);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
     vm = anm->get_vm_with_id(text_line_1);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
     vm = anm->get_vm_with_id(text_line_2);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
     vm = anm->get_vm_with_id(furigana_1);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
     vm = anm->get_vm_with_id(furigana_2);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
     vm = anm->get_vm_with_id(intro);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
     vm = anm->get_vm_with_id(id_70);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
     vm = anm->get_vm_with_id(textbox);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
 }
 
@@ -880,55 +880,55 @@ void GuiMsgVm::show()
     AnmVm *vm = anm->get_vm_with_id(player_face);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
     for (i32 i = 0; i < 4; i++)
     {
         vm = anm->get_vm_with_id(enemy_faces[i]);
         if (vm != NULL)
         {
-            vm->set_flag_lo_2_tree_inline();
+            vm->show_tree_inline();
         }
     }
     vm = anm->get_vm_with_id(id_54);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
     vm = anm->get_vm_with_id(text_line_1);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
     vm = anm->get_vm_with_id(text_line_2);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
     vm = anm->get_vm_with_id(furigana_1);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
     vm = anm->get_vm_with_id(furigana_2);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
     vm = anm->get_vm_with_id(intro);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
     vm = anm->get_vm_with_id(id_70);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
     vm = anm->get_vm_with_id(textbox);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
 }
 
@@ -1034,7 +1034,7 @@ HARNESS_CALLED void Gui::sub_42bcf0(i32 unk, i32 kind)
                 vm = anm->get_vm_with_id(ids_a0[i]);
                 if (vm != NULL)
                 {
-                    vm->clear_flag_lo_2_tree_inline();
+                    vm->hide_tree_inline();
                 }
             }
             else
@@ -1042,7 +1042,7 @@ HARNESS_CALLED void Gui::sub_42bcf0(i32 unk, i32 kind)
                 vm = anm->get_vm_with_id(ids_a0[i]);
                 if (vm != NULL)
                 {
-                    vm->set_flag_lo_2_tree_inline();
+                    vm->show_tree_inline();
                 }
             }
             divisor /= 10;
@@ -1113,8 +1113,8 @@ static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECT
         vm->layer = layer;
         if (layer <= 23)
         {
-            vm->flags_hi &= ~ANM_VM_LAYER_UI;
-            vm->flags_hi |= ANM_VM_LAYER_SET;
+            vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
+            vm->flags_hi |= ANM_VM_ORIGIN_GAME;
         }
     }
     if (pos == NULL)
@@ -1250,7 +1250,7 @@ void Gui::sub_42c580()
     AnmVm *vm = g_AnmManager->get_vm_with_id(g_Gui->ids_11c[4]);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
 }
 
@@ -1260,7 +1260,7 @@ void Gui::sub_42c5c0()
     AnmVm *vm = g_AnmManager->get_vm_with_id(g_Gui->ids_11c[4]);
     if (vm != NULL)
     {
-        vm->set_flag_lo_2_tree_inline();
+        vm->show_tree_inline();
     }
 }
 
@@ -1303,7 +1303,7 @@ void Gui::update_season_gauge()
     {
         gauge->sprite_size.x = get_season_gauge_fill_ratio() * 100.0f;
         gauge->flags_lo |= ANM_VM_SCALE_CHANGED;
-        level_vm->clear_flag_lo_2_tree_inline();
+        level_vm->hide_tree_inline();
         if (gui->season_gauge_has_level == 1)
         {
             gauge->interrupt(3);
@@ -1322,7 +1322,7 @@ void Gui::update_season_gauge()
             gauge->sprite_size.x = 100.0f;
         }
         gauge->flags_lo |= ANM_VM_SCALE_CHANGED;
-        level_vm->set_flag_lo_2_tree_inline();
+        level_vm->show_tree_inline();
         level_vm->interrupt(level + 7);
         if (gui->season_gauge_has_level == 0)
         {
@@ -1400,7 +1400,7 @@ HARNESS_CALLED AnmId AnmLoaded::create_ui_effect(i32 script, i32 unused, AnmVm *
     vm->mode_of_create_child = 4;
     AnmId id;
     id = g_AnmManager->insert_in_ui_list_back(vm);
-    vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
+    vm->flags_hi &= ~(ANM_VM_FREEZES_WITH_WORLD | ANM_VM_FREEZES_AFTER_FIRST_RUN);
     LEAVE_CS(CS_ANM_MANAGER);
     return id;
 }
@@ -1448,10 +1448,10 @@ GuiMsgVm::GuiMsgVm(void *script)
     get_vm_or_clear(text_line_2)->flags_hi |= 0x1000;
     get_vm_or_clear(furigana_1)->flags_hi |= 0x1000;
     get_vm_or_clear(furigana_2)->flags_hi |= 0x1000;
-    get_vm_or_clear(text_line_1)->index_of_on_draw = 5;
-    get_vm_or_clear(text_line_2)->index_of_on_draw = 5;
-    get_vm_or_clear(furigana_1)->index_of_on_draw = 5;
-    get_vm_or_clear(furigana_2)->index_of_on_draw = 5;
+    get_vm_or_clear(text_line_1)->index_of_on_draw = ANM_ON_DRAW_TEXTBOX;
+    get_vm_or_clear(text_line_2)->index_of_on_draw = ANM_ON_DRAW_TEXTBOX;
+    get_vm_or_clear(furigana_1)->index_of_on_draw = ANM_ON_DRAW_TEXTBOX;
+    get_vm_or_clear(furigana_2)->index_of_on_draw = ANM_ON_DRAW_TEXTBOX;
     next_text_line = 0;
     unk_198 = 0;
     unk_1a0 = 0;
@@ -1550,8 +1550,8 @@ static __forceinline AnmId create_effect_inline(AnmLoaded *anm, i32 script, i32 
         vm->layer = layer;
         if (layer <= 23)
         {
-            vm->flags_hi &= ~ANM_VM_LAYER_UI;
-            vm->flags_hi |= ANM_VM_LAYER_SET;
+            vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
+            vm->flags_hi |= ANM_VM_ORIGIN_GAME;
         }
     }
     vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
@@ -1615,8 +1615,8 @@ void Gui::sub_426d70()
         for (i32 i = 0; i < 2; i++)
         {
             (&gui->id_4c)[i] = create_effect_inline(g_AsciiManager->ascii_anm, i + 2, -1, &(&gui->vm_94)[i]);
-            (&gui->vm_94)[i]->clear_flag_lo_2_tree_inline();
-            (&gui->vm_94)[i]->flags_hi &= ~ANM_VM_LAYER_KIND_MASK;
+            (&gui->vm_94)[i]->hide_tree_inline();
+            (&gui->vm_94)[i]->flags_hi &= ~ANM_VM_ORIGIN_MODE_MASK;
         }
     }
     gui->update_lives(g_Globals.lives, g_Globals.life_fragments);
@@ -1788,8 +1788,8 @@ i32 Gui::on_tick_body()
     if (enemies != NULL && unk_1d0 >= 0 && enemies->get_boss(0) != NULL && !enemies->inner.life_bar_hidden && msg == NULL &&
         !(*(u32 *)&g_GameThread->flags & 0x10000))
     {
-        vm_94->set_flag_lo_2_tree();
-        vm_98->set_flag_lo_2_tree();
+        vm_94->show_tree();
+        vm_98->show_tree();
         u32 shown = flags_1ac & 0x600;
         if (shown == 0)
         {
@@ -1856,8 +1856,8 @@ i32 Gui::on_tick_body()
     }
     else
     {
-        vm_94->clear_flag_lo_2_tree_inline();
-        vm_98->clear_flag_lo_2_tree_inline();
+        vm_94->hide_tree_inline();
+        vm_98->hide_tree_inline();
         flags_1ac = flags_1ac & ~0x200 | 0x400;
     }
 
@@ -1937,7 +1937,7 @@ i32 Gui::on_tick_body()
                 AnmVm *marker = get_vm_or_clear(bar->ids[3 + j]);
                 if (bar->life_markers[j].position != 0.0f && bar->life_markers[j].position < bar->shown)
                 {
-                    marker->set_flag_lo_2_tree_inline();
+                    marker->show_tree_inline();
                     f32 angle = normalize_angle(-ZUN_PI - bar->life_markers[j].position * ZUN_2PI);
                     marker->flags_lo |= ANM_VM_ROTATION_CHANGED;
                     marker->rotation.z = angle;
@@ -1950,7 +1950,7 @@ i32 Gui::on_tick_body()
                 }
                 else
                 {
-                    marker->clear_flag_lo_2_tree_inline();
+                    marker->hide_tree_inline();
                 }
             }
             if (bar->unk_50 != 0)
@@ -2024,7 +2024,7 @@ i32 Gui::on_tick_body()
         if (boss != NULL && !((boss->enemy.flags_low >> 5) & 1) && !(boss->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX))
         {
             AnmVm *vm = get_vm_or_clear(id_9c);
-            vm->set_flag_lo_2_tree_inline();
+            vm->show_tree_inline();
             u32 level = flags_1ac & 6;
             if (g_Spellcard->flags & SPELLCARD_ACTIVE)
             {
@@ -2116,7 +2116,7 @@ i32 Gui::on_tick_body()
             AnmVm *vm = g_AnmManager->get_vm_with_id(id_9c);
             if (vm != NULL)
             {
-                vm->clear_flag_lo_2_tree_inline();
+                vm->hide_tree_inline();
             }
         }
     }

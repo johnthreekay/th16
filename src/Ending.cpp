@@ -46,10 +46,10 @@ Ending::~Ending()
     g_UpdateFuncRegistry->unregister_locked(on_draw);
     delete child;
     child = NULL;
-    g_AnmManager->unload_anm(20);
-    g_AnmManager->unload_anm(21);
-    g_AnmManager->unload_anm(22);
-    g_AnmManager->unload_anm(23);
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST);
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST + 1);
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST + 2);
+    g_AnmManager->unload_anm(ANM_SLOT_ENDING_FIRST + 3);
     if (script_file != NULL)
     {
         free(script_file);
@@ -234,7 +234,7 @@ EndingChildF0::EndingChildF0(void *script)
         anm_ids[i] = g_Supervisor.text_anm->create_effect(i + 0x2e, -1, NULL);
         get_vm_or_clear(anm_ids[i])->font_dims[0] = 16;
         get_vm_or_clear(anm_ids[i])->font_dims[1] = 16;
-        get_vm_or_clear(anm_ids[i])->flags_hi &= ~0x1000;
+        get_vm_or_clear(anm_ids[i])->flags_hi &= ~ANM_VM_TEXT_NO_OUTLINE;
     }
     instr = (EndingInstr *)script;
     timer_4.reset();
@@ -249,7 +249,8 @@ EndingChildF0::EndingChildF0(void *script)
 i32 ending_load_anm()
 {
     EndingChildF0 *child = g_Ending->child;
-    child->anms[child->anm_index] = AnmManager::preload_anm(child->anm_index + 20, child->anm_filename);
+    child->anms[child->anm_index] =
+        AnmManager::preload_anm(child->anm_index + ANM_SLOT_ENDING_FIRST, child->anm_filename);
     child->flags &= ~ENDING_CHILD_WAITING;
     g_AsciiManager->hide_now_loading_inline();
     return 0;
@@ -478,10 +479,10 @@ i32 EndingChildF0::run()
             continue;
         }
         case 13:
-            ScreenEffect::create_inline(0, instr->args[0], 0, 0, 0, 0x54);
+            ScreenEffect::create_inline(SCREEN_EFFECT_FADE_IN_VIEWPORT, instr->args[0], 0, 0, 0, 0x54);
             break;
         case 14:
-            ScreenEffect::create_inline(5, instr->args[0], 0, 0, 0, 0x54);
+            ScreenEffect::create_inline(SCREEN_EFFECT_FADE_OUT_VIEWPORT, instr->args[0], 0, 0, 0, 0x54);
             break;
         }
         instr = ENDING_NEXT_INSTR(instr);

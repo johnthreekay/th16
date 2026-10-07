@@ -56,6 +56,7 @@ i32 AnmLoaded::load(const char *path)
     {
         if (entry == NULL)
         {
+            // "Cannot load the animation. The data is missing or corrupt."
             g_GameErrorContext.fatal("\x83" "A\x83j\x83\x81\x82\xaa\x93\xc7\x82\xdd\x8d\x9e\x82\xdf\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x8e\xb8\x82\xed\x82\xea\x82\xc4\x82\xe9\x82\xa9\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
             break;
         }
@@ -80,6 +81,7 @@ AnmLoaded *AnmManager::do_preload_anm(i32 slot, const char *path)
     anm_log("::preloadAnim : %s\n", path);
     if (slot >= 0x1f)
     {
+        // "Out of texture slots."
         g_GameErrorContext.fatal("\x83" "e\x83N\x83X\x83`\x83\x83\x8ai\x94[\x90\xe6\x82\xaa\x91\xab\x82\xe8\x82\xdc\x82\xb9\x82\xf1\r\n");
         return NULL;
     }
@@ -132,6 +134,7 @@ i32 AnmLoaded::load_entry(i32 index, AnmRawEntry *entry)
     i32 size;
     if (entry->version != 8)
     {
+        // "Wrong animation version."
         g_GameErrorContext.fatal("\x83" "A\x83j\x83\x81\x82\xcc\x83o\x81[\x83W\x83\x87\x83\x93\x82\xaa\x88\xe1\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
@@ -145,6 +148,7 @@ i32 AnmLoaded::load_entry(i32 index, AnmRawEntry *entry)
             void *image = file_read_all(buf, &size, 1);
             if (image == NULL)
             {
+                // "Cannot load texture %s. The data is missing or corrupt."
                 g_GameErrorContext.fatal("\x83" "e\x83N\x83X\x83`\x83\x83 %s \x82\xaa\x93\xc7\x82\xdd\x8d\x9e\x82\xdf\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x8e\xb8\x82\xed\x82\xea\x82\xc4\x82\xe9\x82\xa9\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n", image_path);
                 return -1;
             }
@@ -187,7 +191,7 @@ HARNESS_CALLED i32 AnmManager::load_texture_from_file(AnmLoadedD3D *d3d, i32 for
     IDirect3DSurface9 *dst_surface;
     D3DSURFACE_DESC desc;
 
-    d3d->flags &= ~1;
+    d3d->flags &= ~ANM_D3D_RENDER_TARGET;
     if (D3DXCreateTextureFromFileInMemoryEx(g_Supervisor.d3d_device, d3d->src_data, d3d->src_data_size, 0, 0, 0, 0,
                                             g_anm_d3d_formats[format], D3DPOOL_MANAGED, D3DX_FILTER_NONE,
                                             D3DX_DEFAULT, 0, NULL, NULL, &texture) != D3D_OK)
@@ -259,12 +263,12 @@ HARNESS_CALLED i32 AnmManager::load_texture_from_file(AnmLoadedD3D *d3d, i32 for
 
 // TODO: the original keeps d3d, data and size in ebx/edi/esi and loads the texture before the stores.
 // FUNCTION: TH16 0x46c8b0
-HARNESS_CALLED i32 AnmManager::reload_texture(AnmLoadedD3D *d3d, void *data, u32 size, i32 unk_3, i32 unk_4,
-                                              i32 unk_5)
+HARNESS_CALLED i32 AnmManager::reload_texture(AnmLoadedD3D *d3d, void *data, u32 size, i32 unused_3,
+                                              i32 unused_4, i32 unused_5)
 {
     IDirect3DSurface9 *surface = NULL;
 
-    d3d->flags &= ~1;
+    d3d->flags &= ~ANM_D3D_RENDER_TARGET;
     d3d->src_data_size = size;
     d3d->texture->GetSurfaceLevel(0, &surface);
     D3DXLoadSurfaceFromFileInMemory(surface, NULL, NULL, data, size, NULL, D3DX_FILTER_NONE, 0, NULL);
@@ -281,7 +285,7 @@ i32 __stdcall AnmManager::load_texture_from_data(AnmLoadedD3D *d3d, AnmRawTextur
 {
     IDirect3DSurface9 *surface = NULL;
 
-    d3d->flags &= ~1;
+    d3d->flags &= ~ANM_D3D_RENDER_TARGET;
     RECT src_rect = {0, 0, raw->width, raw->height};
     RECT dst_rect = {0, 0, raw->width, raw->height};
     if (ANM_TEXTURE_DOWNSCALED((AnmRawEntry *)d3d->entry))
@@ -318,7 +322,7 @@ i32 __stdcall AnmManager::load_texture_from_data(AnmLoadedD3D *d3d, AnmRawTextur
 // FUNCTION: TH16 0x46cd30
 i32 __stdcall AnmManager::create_empty_texture(AnmLoadedD3D *d3d, i32 width, i32 height, i32 format)
 {
-    d3d->flags &= ~1;
+    d3d->flags &= ~ANM_D3D_RENDER_TARGET;
     D3DXCreateTexture(g_Supervisor.d3d_device, width, height, 1, 0, g_anm_d3d_formats[format], D3DPOOL_MANAGED,
                       &d3d->texture);
     d3d->bytes_per_pixel = g_anm_format_bpp[format];
@@ -328,7 +332,7 @@ i32 __stdcall AnmManager::create_empty_texture(AnmLoadedD3D *d3d, i32 width, i32
 // FUNCTION: TH16 0x46cd80
 i32 __stdcall AnmManager::create_render_target(AnmLoadedD3D *d3d, i32 width, i32 height)
 {
-    d3d->flags |= 1;
+    d3d->flags |= ANM_D3D_RENDER_TARGET;
     g_Supervisor.d3d_device->CreateTexture(width, height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT,
                                            &d3d->texture, NULL);
     d3d->bytes_per_pixel = g_Supervisor.present_params.BackBufferFormat == D3DFMT_A8R8G8B8 ? 4 : 2;
@@ -345,11 +349,13 @@ HARNESS_CALLED i32 AnmManager::setup_entry(AnmLoaded *anm, i32 index, i32 first_
 
     if (entry == NULL)
     {
+        // "Cannot load the animation. The data is missing or corrupt."
         g_GameErrorContext.fatal("\x83" "A\x83j\x83\x81\x82\xaa\x93\xc7\x82\xdd\x8d\x9e\x82\xdf\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x8e\xb8\x82\xed\x82\xea\x82\xc4\x82\xe9\x82\xa9\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
     if (entry->version != 8)
     {
+        // "Wrong animation version."
         g_GameErrorContext.fatal("\x83" "A\x83j\x83\x81\x82\xcc\x83o\x81[\x83W\x83\x87\x83\x93\x82\xaa\x88\xe1\x82\xa2\x82\xdc\x82\xb7\r\n");
         return -1;
     }
@@ -377,6 +383,7 @@ HARNESS_CALLED i32 AnmManager::setup_entry(AnmLoaded *anm, i32 index, i32 first_
                                                             entry->height, (i16)entry->offset_x, (i16)entry->offset_y);
             if (size < 0)
             {
+                // "Cannot create texture %s. The data is missing or corrupt."
                 g_GameErrorContext.fatal("\x83" "e\x83N\x83X\x83`\x83\x83 %s \x82\xaa\x8d\xec\x90\xac\x82\xc5\x82\xab\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x8e\xb8\x82\xed\x82\xea\x82\xc4\x82\xe9\x82\xa9\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n", image_path);
                 return -1;
             }
@@ -389,6 +396,7 @@ HARNESS_CALLED i32 AnmManager::setup_entry(AnmLoaded *anm, i32 index, i32 first_
                                           entry->format, entry->width, entry->height);
         if (size < 0)
         {
+            // "Cannot create the texture. The data is missing or corrupt."
             g_GameErrorContext.fatal("\x83" "e\x83N\x83X\x83`\x83\x83\x82\xaa\x8d\xec\x90\xac\x82\xc5\x82\xab\x82\xdc\x82\xb9\x82\xf1\x81" "B\x83" "f\x81[\x83^\x82\xaa\x8e\xb8\x82\xed\x82\xea\x82\xc4\x82\xe9\x82\xa9\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
             return -1;
         }
@@ -400,17 +408,17 @@ HARNESS_CALLED i32 AnmManager::setup_entry(AnmLoaded *anm, i32 index, i32 first_
     for (i32 i = 0; i < entry->num_sprites; i++, offsets++)
     {
         AnmRawSprite *raw = (AnmRawSprite *)((u8 *)entry + *offsets);
-        sprite.unk_0 = anm->slot_num;
+        sprite.anm_slot = anm->slot_num;
         sprite.image_file_num_in_all = anm->slot_num << 8 | index;
         sprite.image_file_num_in_anm = index;
         sprite.bitmap_width = desc.Width;
-        sprite.unk_3c.x = sprite.bitmap_width / entry->width;
+        sprite.pixel_scale.x = sprite.bitmap_width / entry->width;
         sprite.bitmap_height = desc.Height;
-        sprite.unk_3c.y = sprite.bitmap_height / entry->height;
-        sprite.start_pixel_inclusive.x = raw->x * sprite.unk_3c.x;
-        sprite.start_pixel_inclusive.y = raw->y * sprite.unk_3c.y;
-        sprite.end_pixel_exclusive.x = (raw->width + raw->x) * sprite.unk_3c.x;
-        sprite.end_pixel_exclusive.y = (raw->height + raw->y) * sprite.unk_3c.y;
+        sprite.pixel_scale.y = sprite.bitmap_height / entry->height;
+        sprite.start_pixel_inclusive.x = raw->x * sprite.pixel_scale.x;
+        sprite.start_pixel_inclusive.y = raw->y * sprite.pixel_scale.y;
+        sprite.end_pixel_exclusive.x = (raw->width + raw->x) * sprite.pixel_scale.x;
+        sprite.end_pixel_exclusive.y = (raw->height + raw->y) * sprite.pixel_scale.y;
         anm->load_sprite(first_sprite++, &sprite);
     }
     for (i32 i = 0; i < entry->num_scripts; i++, offsets += 2)
@@ -461,7 +469,7 @@ AnmLoaded *__stdcall AnmManager::load_next_entry(AnmLoaded *anm)
         (anm->vms + j)->wipe();
         anm->init_script_vm(anm->vms + j, j);
         (anm->vms + j)->script_time = -1;
-        (anm->vms + j)->timer_1c = -1;
+        (anm->vms + j)->time_in_script = -1;
         (anm->vms + j)->run();
     }
     anm->load_wait = 0;
@@ -478,13 +486,13 @@ void AnmLoaded::load_sprite(i32 index, AnmLoadedSprite *sprite)
     sprites[index].uv_start.y = sprites[index].start_pixel_inclusive.y / sprites[index].bitmap_height;
     sprites[index].uv_end.y = sprites[index].end_pixel_exclusive.y / sprites[index].bitmap_height;
     sprites[index].sprite_width =
-        (sprites[index].end_pixel_exclusive.x - sprites[index].start_pixel_inclusive.x) / sprite->unk_3c.x;
+        (sprites[index].end_pixel_exclusive.x - sprites[index].start_pixel_inclusive.x) / sprite->pixel_scale.x;
     sprites[index].sprite_height =
-        (sprites[index].end_pixel_exclusive.y - sprites[index].start_pixel_inclusive.y) / sprite->unk_3c.y;
+        (sprites[index].end_pixel_exclusive.y - sprites[index].start_pixel_inclusive.y) / sprite->pixel_scale.y;
 }
 
 // FUNCTION: TH16 0x46d690
-HARNESS_CALLED i32 AnmManager::sub_46d690()
+HARNESS_CALLED i32 AnmManager::service_pending_loads()
 {
     for (u32 i = 0; i < 0x1f; i++)
     {
@@ -569,7 +577,7 @@ struct AnmQuadXyzTex
 void AnmManager::setup_vertex_buffer()
 {
     AnmManager *mgr = g_AnmManager;
-    RenderVertexXyzTex *quad = mgr->quad_184fbc8;
+    RenderVertexXyzTex *quad = mgr->fog_unit_quad;
     quad[0].pos.x = quad[2].pos.x = -128.0f;
     quad[1].pos.x = quad[3].pos.x = 128.0f;
     quad[0].pos.y = quad[1].pos.y = -128.0f;
@@ -580,20 +588,20 @@ void AnmManager::setup_vertex_buffer()
     quad[1].uv.x = quad[3].uv.x = 1.0f;
     quad[0].uv.y = quad[1].uv.y = 0.0f;
     quad[2].uv.y = quad[3].uv.y = 1.0f;
-    g_quad_vertices_4df8a0[0].pos = quad[0].pos;
-    g_quad_vertices_4df8a0[1].pos = quad[1].pos;
-    g_quad_vertices_4df8a0[2].pos = quad[2].pos;
-    g_quad_vertices_4df8a0[3].pos = quad[3].pos;
-    g_quad_vertices_4df8a0[0].uv.x = quad[0].uv.x;
-    g_quad_vertices_4df8a0[0].uv.y = quad[0].uv.y;
-    g_quad_vertices_4df8a0[1].uv.x = quad[1].uv.x;
-    g_quad_vertices_4df8a0[1].uv.y = quad[1].uv.y;
-    g_quad_vertices_4df8a0[2].uv.x = quad[2].uv.x;
-    g_quad_vertices_4df8a0[2].uv.y = quad[2].uv.y;
-    g_quad_vertices_4df8a0[3].uv.x = quad[3].uv.x;
-    g_quad_vertices_4df8a0[3].uv.y = quad[3].uv.y;
+    g_unit_quad_xyz[0].pos = quad[0].pos;
+    g_unit_quad_xyz[1].pos = quad[1].pos;
+    g_unit_quad_xyz[2].pos = quad[2].pos;
+    g_unit_quad_xyz[3].pos = quad[3].pos;
+    g_unit_quad_xyz[0].uv.x = quad[0].uv.x;
+    g_unit_quad_xyz[0].uv.y = quad[0].uv.y;
+    g_unit_quad_xyz[1].uv.x = quad[1].uv.x;
+    g_unit_quad_xyz[1].uv.y = quad[1].uv.y;
+    g_unit_quad_xyz[2].uv.x = quad[2].uv.x;
+    g_unit_quad_xyz[2].uv.y = quad[2].uv.y;
+    g_unit_quad_xyz[3].uv.x = quad[3].uv.x;
+    g_unit_quad_xyz[3].uv.y = quad[3].uv.y;
     IDirect3DDevice9 *device = g_Supervisor.d3d_device;
-    device->CreateVertexBuffer(sizeof(mgr->quad_184fbc8) * 9, 0, D3DFVF_XYZ | D3DFVF_TEX1, D3DPOOL_MANAGED,
+    device->CreateVertexBuffer(sizeof(mgr->fog_unit_quad) * 9, 0, D3DFVF_XYZ | D3DFVF_TEX1, D3DPOOL_MANAGED,
                                &mgr->vertex_buffer, NULL);
     AnmQuadXyzTex *buffer;
     mgr->vertex_buffer->Lock(0, 0, (void **)&buffer, 0);

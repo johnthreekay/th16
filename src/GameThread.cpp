@@ -88,9 +88,9 @@ i32 __fastcall GameThread::on_draw_callback(GameThread *thread)
 {
     AnmManager *anm = g_AnmManager;
     anm->unk_c4 = 0;
-    anm->unk_c8 = 0;
-    anm->unk_c0 = 0;
-    anm->unk_cc = 0;
+    anm->stat_render_state_setups = 0;
+    anm->stat_scripts_started = 0;
+    anm->stat_draw_calls = 0;
     return 1;
 }
 
@@ -592,7 +592,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         fade_timer++;
         if (fade_timer == 180)
         {
-            ScreenEffect::create_inline(5, 200, 0, 0, 0, 0x54);
+            ScreenEffect::create_inline(SCREEN_EFFECT_FADE_OUT_VIEWPORT, 200, 0, 0, 0, 0x54);
         }
         if (fade_timer >= 380)
         {
@@ -646,7 +646,7 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         }
         if (time_in_stage.current == 0xf00)
         {
-            ScreenEffect::create(5, 60, 0, 0, 0, 0x33);
+            ScreenEffect::create(SCREEN_EFFECT_FADE_OUT_VIEWPORT, 60, 0, 0, 0, 0x33);
         }
         else if (time_in_stage.current == 0xf3c)
         {

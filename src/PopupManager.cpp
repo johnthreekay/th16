@@ -36,8 +36,9 @@ int PopupManager::initialize()
     g_UpdateFuncRegistry->register_on_draw(f, 0x2f);
     on_draw_func = f;
 
-    ascii_anm->init_vm_with_sprite(&vm, 0x103);
-    vm.flags_hi = (vm.flags_hi & ~0x440000) | 0x380000;
+    ascii_anm->init_vm_with_sprite(&vm, ASCII_SPRITE_POPUP_DIGITS);
+    vm.flags_hi = (vm.flags_hi & ~(ANM_VM_ORIGIN_GAME | ANM_VM_RESOLUTION_HALF_SCALED_4)) | ANM_VM_ORIGIN_HUD |
+                  ANM_VM_RESOLUTION_SCALED_3;
     return 0;
 }
 
@@ -210,7 +211,7 @@ int PopupManager::on_draw()
             i32 sprite;
             if (s->time.current < 0x34 - j * 2 || *digit == 10)
             {
-                sprite = *digit + 0x103;
+                sprite = *digit + ASCII_SPRITE_POPUP_DIGITS;
             }
             else if (s->time.current < 0x38 - j * 2)
             {

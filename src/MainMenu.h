@@ -195,7 +195,7 @@ __forceinline AnmVm *search_children_inline(AnmVm *vm, i32 script, i32 n)
         {
             continue;
         }
-        if (child->unk_49c == script || script == -1)
+        if (child->script_id_short == script || script == -1)
         {
             if (n == 0)
             {
@@ -211,7 +211,7 @@ __forceinline AnmVm *search_children_inline(AnmVm *vm, i32 script, i32 n)
                 return found;
             }
         }
-        if (vm->unk_49c == -2 && node->next == NULL)
+        if (vm->script_id_short == -2 && node->next == NULL)
         {
             return node->entry;
         }

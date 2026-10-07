@@ -26,7 +26,7 @@ HelpManual::HelpManual()
 // FUNCTION: TH16 0x42e760
 void help_manual_load_anm()
 {
-    g_HelpManual->help_anm = AnmManager::preload_anm(0x13, "help.anm");
+    g_HelpManual->help_anm = AnmManager::preload_anm(ANM_SLOT_HELP, "help.anm");
     if (g_HelpManual->help_anm == NULL)
     {
         // "Screen layout data not found. The data is corrupted."
@@ -81,11 +81,11 @@ HelpManual::~HelpManual()
     g_UpdateFuncRegistry->unregister_locked(on_tick);
     g_UpdateFuncRegistry->unregister_locked(on_draw);
     AnmManager *anm = g_AnmManager;
-    if (anm->loaded_anms[0x13] != NULL)
+    if (anm->loaded_anms[ANM_SLOT_HELP] != NULL)
     {
-        anm->loaded_anms[0x13]->release();
-        delete anm->loaded_anms[0x13];
-        anm->loaded_anms[0x13] = NULL;
+        anm->loaded_anms[ANM_SLOT_HELP]->release();
+        delete anm->loaded_anms[ANM_SLOT_HELP];
+        anm->loaded_anms[ANM_SLOT_HELP] = NULL;
     }
     g_HelpManual = NULL;
 }
@@ -326,10 +326,10 @@ HARNESS_CALLED AnmId AnmLoaded::create_ui_vm(i32 script, D3DXVECTOR3 *pos, i32 u
     }
     vm->rotation.z = 0.0f;
     vm->run();
-    vm->mode_of_create_child = 4;
+    vm->mode_of_create_child = ANM_CREATE_UI;
     AnmId id;
     id = g_AnmManager->insert_in_ui_list_back(vm);
-    vm->flags_hi &= ~(ANM_VM_FLAG_HI_4000 | ANM_VM_FLAG_HI_8000);
+    vm->flags_hi &= ~(ANM_VM_FREEZES_WITH_WORLD | ANM_VM_FREEZES_AFTER_FIRST_RUN);
     LEAVE_CS(CS_ANM_MANAGER);
     return id;
 }

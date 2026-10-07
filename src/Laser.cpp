@@ -272,7 +272,7 @@ void LaserBeamInf::method_8(i32 arg)
 // FUNCTION: TH16 0x431330
 i32 LaserManager::initialize()
 {
-    bullet_anm = AnmManager::preload_anm(7, "bullet.anm");
+    bullet_anm = AnmManager::preload_anm(ANM_SLOT_BULLET, "bullet.anm");
     if (bullet_anm == NULL)
     {
         // "Enemy bullet data not found. The data is corrupted."
@@ -1956,7 +1956,7 @@ i32 LaserInfiniteInf::initialize(void *params)
     bullet_color = inner.color;
     AnmVm *vm = &vm_950;
     vm->wipe();
-    vm_950.index_of_sprite_mapping_func = 2;
+    vm_950.index_of_sprite_mapping_func = ANM_SPRITE_MAPPING_LASER_LINE;
     vm_950.associated_game_entity = this;
     g_LaserManager->bullet_anm->set_vm_script(vm, g_bullet_types[bullet_type].script);
     vm->interrupt(2);
@@ -1969,8 +1969,8 @@ i32 LaserInfiniteInf::initialize(void *params)
     vm_950.flags_hi = vm_950.flags_hi & ~0x80000 | 0x40000;
     vm = &vm_f4c;
     g_LaserManager->bullet_anm->copy_vm(vm, inner.color + 0x38);
-    vm->unk_5b0 = NULL;
-    vm->parent = NULL;
+    vm->parent_vm = NULL;
+    vm->root_vm = NULL;
     vm->run();
     vm->interrupt(2);
     vm->run();
@@ -2047,7 +2047,7 @@ i32 LaserCurveInf::initialize(void *params)
     }
     else
     {
-        vm_92c.index_of_sprite_mapping_func = 3;
+        vm_92c.index_of_sprite_mapping_func = ANM_SPRITE_MAPPING_LASER_CURVE;
         vm_92c.associated_game_entity = this;
         g_LaserManager->bullet_anm->set_vm_script(vm, bullet_type + 0x8e);
     }
@@ -2061,8 +2061,8 @@ i32 LaserCurveInf::initialize(void *params)
     vm_92c.flags_hi = vm_92c.flags_hi & ~0x80000 | 0x40000;
     vm = &vm_f28;
     g_LaserManager->bullet_anm->copy_vm(vm, inner.color + 0x38);
-    vm->unk_5b0 = NULL;
-    vm->parent = NULL;
+    vm->parent_vm = NULL;
+    vm->root_vm = NULL;
     vm->run();
     vm->interrupt(2);
     vm->run();
@@ -2235,7 +2235,7 @@ i32 LaserCurveInf::on_draw()
         vertex->pos.z = 0.0f;
         u += 1.0f / (f32)(inner.segment_count - 1);
     }
-    g_AnmManager->draw_vm__mode_9(&vm_92c, (RenderVertex144 *)vertices, inner.segment_count * 2);
+    g_AnmManager->draw_vertex_strip(&vm_92c, (RenderVertex144 *)vertices, inner.segment_count * 2);
     if (inner.segment_count >= segment_timer.current)
     {
         vm_f28.pos = ((LaserCurveSegment *)segments)[inner.segment_count - 1].pos;
@@ -2369,8 +2369,8 @@ void LaserCurveInf::run_ex()
         {
             AnmVm *vm = &vm_92c;
             g_BulletManager->bullet_anm->copy_vm(vm, g_bullet_types[ex->a].script + ex->b);
-            vm->unk_5b0 = NULL;
-            vm->parent = NULL;
+            vm->parent_vm = NULL;
+            vm->root_vm = NULL;
             vm->run();
             break;
         }
@@ -2955,8 +2955,8 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
         {
             AnmVm *vm = &vm_92c;
             g_BulletManager->bullet_anm->copy_vm(vm, g_bullet_types[ex->a].script + ex->b);
-            vm->unk_5b0 = NULL;
-            vm->parent = NULL;
+            vm->parent_vm = NULL;
+            vm->root_vm = NULL;
             vm->run();
             break;
         }
@@ -3044,7 +3044,7 @@ i32 LaserLineInf::initialize(void *params)
     bullet_color = inner.bullet_color;
     AnmVm *vm = &vm_92c;
     vm->wipe();
-    vm_92c.index_of_sprite_mapping_func = 2;
+    vm_92c.index_of_sprite_mapping_func = ANM_SPRITE_MAPPING_LASER_LINE;
     vm_92c.associated_game_entity = this;
     g_LaserManager->bullet_anm->set_vm_script(vm, g_bullet_types[bullet_type].script);
     vm->interrupt(2);
@@ -3057,8 +3057,8 @@ i32 LaserLineInf::initialize(void *params)
     vm_92c.flags_hi = vm_92c.flags_hi & ~0x80000 | 0x40000;
     vm = &vm_f28;
     g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x38);
-    vm->unk_5b0 = NULL;
-    vm->parent = NULL;
+    vm->parent_vm = NULL;
+    vm->root_vm = NULL;
     vm->run();
     vm->interrupt(2);
     vm->run();
@@ -3069,16 +3069,16 @@ i32 LaserLineInf::initialize(void *params)
     {
         vm = &vm_1524;
         g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x53);
-        vm->unk_5b0 = NULL;
-        vm->parent = NULL;
+        vm->parent_vm = NULL;
+        vm->root_vm = NULL;
         vm->run();
     }
     else
     {
         vm = &vm_1524;
         g_LaserManager->bullet_anm->copy_vm(vm, inner.bullet_color + 0x5b);
-        vm->unk_5b0 = NULL;
-        vm->parent = NULL;
+        vm->parent_vm = NULL;
+        vm->root_vm = NULL;
         vm->run();
         vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
     }

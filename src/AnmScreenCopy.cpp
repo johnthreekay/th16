@@ -5,7 +5,7 @@
 #include "AnmManager.h"
 
 static_assert(offsetof(AnmManager, screen_copies) == 0x20, "AnmManager::screen_copies");
-static_assert(offsetof(AnmManager, unk_c0) == 0xc0, "AnmManager::unk_c0");
+static_assert(offsetof(AnmManager, stat_scripts_started) == 0xc0, "AnmManager::stat_scripts_started");
 
 // FUNCTION: TH16 0x440c60
 i32 AnmManager::queue_screen_copy(i32 anm_slot, i32 entry, i32 src_x, i32 src_y, i32 src_width, i32 src_height,

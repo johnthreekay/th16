@@ -48,10 +48,14 @@ struct TextHelper
         release_buffer();
     }
 
+    // Frees the DIB section and its device context.
     HARNESS_CALLED bool release_buffer();
+    // Creates a DIB section of the given size and format to draw text into;
+    // false if the format is not one of g_format_info's.
     HARNESS_CALLED bool try_allocate_buffer(i32 width, i32 height, D3DFORMAT format);
     FormatInfo *get_format_info(D3DFORMAT format);
-    // Every caller passes 0 for y.
+    // Flips the alpha bits of the rows from y on (GDI clears alpha where it
+    // draws). Every caller passes 0 for y.
     HARNESS_CALLED bool invert_alpha(i32 rows, i32 y);
     // Spreads alpha into transparent A4R4G4B4 pixels next to opaque ones.
     HARNESS_CALLED bool blur_alpha(i32 rows);
@@ -73,18 +77,28 @@ class D3DThreadInf : public ThreadInf
 // Creates the GDI fonts draw_text uses and fills g_text_random_bytes.
 void create_fonts();
 
+// 0x459240. Renders text into the DIB section with a GDI font (font_id
+// picks one of the fonts below), outlined in shadow_color if outline is
+// set, and copies the result into dst_rect of the texture. A nonzero
+// spacing draws the text two bytes (one Shift-JIS character) at a time,
+// spacing pixels apart.
 HARNESS_CALLED void __stdcall draw_text(RECT *dst_rect, i32 x, i32 font_height, D3DCOLOR color,
                                          D3DCOLOR shadow_color, const char *text,
                                          IDirect3DTexture9 *texture, i32 font_id, i32 spacing,
                                          i32 outline);
 
-extern HFONT g_font_904;
-extern HFONT g_font_908;
-extern HFONT g_font_90c;
-extern HFONT g_font_910;
-extern HFONT g_font_914;
-extern HFONT g_font_918;
-extern HFONT g_font_91c;
-extern HFONT g_font_920;
-extern HFONT g_font_924;
-extern HFONT g_font_928;
+// draw_text's fonts by font id, as create_fonts makes them (size without
+// Meiryo, with it): 0 MS Gothic 32 (Meiryo 48), 1 MS Mincho 32 semibold,
+// 2 MS Gothic 15 bold (Meiryo 16), 3 MS Mincho 15 bold, 4 MS Gothic 40
+// (Meiryo 60), 5 MS Mincho 40 semibold, 6 like 2, 7 like 3, 8 MS Gothic 28
+// (Meiryo 42), any other MS Gothic 24 (Meiryo 36).
+extern HFONT g_text_font_default;
+extern HFONT g_text_font_8;
+extern HFONT g_text_font_0;
+extern HFONT g_text_font_1;
+extern HFONT g_text_font_2;
+extern HFONT g_text_font_3;
+extern HFONT g_text_font_4;
+extern HFONT g_text_font_5;
+extern HFONT g_text_font_6;
+extern HFONT g_text_font_7;

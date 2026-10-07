@@ -449,7 +449,7 @@ int EnemyData::ecl_run_over_300()
         }
         if (flags_low & ENEMY_FLAG_INTANGIBLE)
         {
-            anm_ids[slot].clear_flag_lo_2_tree();
+            anm_ids[slot].hide_tree();
         }
         if (slot == 0)
         {
@@ -485,7 +485,7 @@ int EnemyData::ecl_run_over_300()
         }
         if (flags_low & ENEMY_FLAG_INTANGIBLE)
         {
-            anm_ids[slot].clear_flag_lo_2_tree();
+            anm_ids[slot].hide_tree();
         }
         break;
     }
@@ -506,7 +506,7 @@ int EnemyData::ecl_run_over_300()
         }
         if (flags_low & ENEMY_FLAG_INTANGIBLE)
         {
-            anm_ids[slot].clear_flag_lo_2_tree();
+            anm_ids[slot].hide_tree();
         }
         break;
     }
@@ -1242,7 +1242,7 @@ int EnemyData::ecl_run_over_300()
         {
             for (i32 i = 0; i < 16; i++)
             {
-                anm_ids[i].clear_flag_lo_2_tree();
+                anm_ids[i].hide_tree();
             }
         }
         break;
@@ -1253,7 +1253,7 @@ int EnemyData::ecl_run_over_300()
         {
             for (i32 i = 0; i < 16; i++)
             {
-                anm_ids[i].set_flag_lo_2_tree();
+                anm_ids[i].show_tree();
             }
         }
         break;
@@ -1847,7 +1847,7 @@ int EnemyData::ecl_run_over_300()
         break;
     // setScreenShake(a, b, c).
     case ECL_OP_SET_SCREEN_SHAKE:
-        ScreenEffect::create(1, get_int_arg(0), get_int_arg(1), get_int_arg(2), 0, 0x54);
+        ScreenEffect::create(SCREEN_EFFECT_SHAKE, get_int_arg(0), get_int_arg(1), get_int_arg(2), 0, 0x54);
         break;
     // dialogRead(script): also clears every bullet, laser and enemy.
     case ECL_OP_DIALOG_READ:

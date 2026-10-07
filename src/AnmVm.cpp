@@ -17,12 +17,12 @@ AnmVm::AnmVm()
 // FUNCTION: TH16 0x4093b0
 AnmVm::~AnmVm()
 {
-    if (ins_508_extra_data != NULL)
+    if (extra_data != NULL)
     {
-        free(ins_508_extra_data);
+        free(extra_data);
     }
-    ins_508_extra_data = NULL;
-    ins_508_extra_data_size = 0;
+    extra_data = NULL;
+    extra_data_size = 0;
     id.id = 0;
     instr_offset = -1;
 }
@@ -58,29 +58,29 @@ void AnmVm::wipe()
     uv_scale.x = 1.0f;
     uv_scale.y = 1.0f;
     color_1.d3d = 0xffffffff;
-    D3DXMatrixIdentity(&matrix_3d0);
-    // A 16-bit store in the original.
-    *(u16 *)&flags_lo = 7;
+    D3DXMatrixIdentity(&sprite_matrix);
+    // Visible, shown, rotation changed. A 16-bit store in the original.
+    *(u16 *)&flags_lo = ANM_VM_VISIBLE | ANM_VM_SHOWN | ANM_VM_ROTATION_CHANGED;
     script_time.clear();
-    timer_1c.clear();
+    time_in_script.clear();
     pos_i.end_time = 0;
     rgb1_i.end_time = 0;
     alpha1_i.end_time = 0;
     rotate_i.end_time = 0;
     scale_i.end_time = 0;
-    op_434_i.end_time = 0;
+    scale_2_i.end_time = 0;
     uv_scale_i.end_time = 0;
     rgb2_i.end_time = 0;
     alpha2_i.end_time = 0;
     u_vel_i.end_time = 0;
     v_vel_i.end_time = 0;
-    flags_hi &= ~ANM_VM_FLAG_HI_8000;
-    flags_hi |= ANM_VM_FLAG_HI_4000;
+    flags_hi &= ~ANM_VM_FREEZES_AFTER_FIRST_RUN;
+    flags_hi |= ANM_VM_FREEZES_WITH_WORLD;
     rand_scale_one = 1.0f;
     rand_scale_pi = ZUN_PI;
     num_cycles_in_texture = 0x10000;
-    parent = NULL;
-    unk_5b0 = NULL;
+    root_vm = NULL;
+    parent_vm = NULL;
     node_in_global_list.entry = this;
     node_in_global_list.next = NULL;
     node_in_global_list.prev = NULL;
@@ -93,18 +93,18 @@ void AnmVm::wipe()
     list_of_children.next = NULL;
     list_of_children.prev = NULL;
     list_of_children.unk_c = NULL;
-    unk_list_598.entry = this;
-    unk_list_598.next = NULL;
-    unk_list_598.prev = NULL;
-    unk_list_598.unk_c = NULL;
+    node_in_delete_list.entry = this;
+    node_in_delete_list.next = NULL;
+    node_in_delete_list.prev = NULL;
+    node_in_delete_list.unk_c = NULL;
 }
 
 // FUNCTION: TH16 0x406340
 HARNESS_CALLED f32 AnmVm::get_slowdown_factor()
 {
-    if (parent != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+    if (root_vm != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
     {
-        return parent->get_slowdown_factor();
+        return root_vm->get_slowdown_factor();
     }
     return slowdown;
 }
@@ -112,29 +112,30 @@ HARNESS_CALLED f32 AnmVm::get_slowdown_factor()
 // FUNCTION: TH16 0x4064e0
 void AnmVm::alloc_extra_data(u32 size)
 {
-    ins_508_extra_data_size = size;
-    ins_508_extra_data = malloc(size);
+    extra_data_size = size;
+    extra_data = malloc(size);
 }
 
 // FUNCTION: TH16 0x406d80
 void AnmVm::set_layer(i32 layer)
 {
     this->layer = layer;
-    if (this->layer >= 3 && this->layer <= 19)
+    if (this->layer >= ANM_LAYER_GAME_FIRST && this->layer <= ANM_LAYER_GAME_LAST)
     {
-        flags_hi = flags_hi & ~ANM_VM_LAYER_KIND_MASK | ANM_VM_LAYER_SET;
+        flags_hi = flags_hi & ~ANM_VM_ORIGIN_MODE_MASK | ANM_VM_ORIGIN_GAME;
     }
-    else if (this->layer >= 20 && this->layer <= 23)
+    else if (this->layer >= ANM_LAYER_HUD_FIRST && this->layer <= ANM_LAYER_HUD_LAST)
     {
-        flags_hi = flags_hi & ~ANM_VM_LAYER_KIND_MASK | ANM_VM_LAYER_UI;
+        flags_hi = flags_hi & ~ANM_VM_ORIGIN_MODE_MASK | ANM_VM_ORIGIN_HUD;
     }
     else
     {
-        flags_hi &= ~ANM_VM_LAYER_KIND_MASK;
+        flags_hi &= ~ANM_VM_ORIGIN_MODE_MASK;
     }
-    if (this->layer >= 20 && this->layer <= 31 || this->layer >= 36 && this->layer <= 42)
+    if (this->layer >= ANM_LAYER_HUD_FIRST && this->layer <= ANM_LAYER_UI_LAST ||
+        this->layer >= ANM_LAYER_UI_LIST_FIRST && this->layer <= ANM_LAYER_UI_LIST_LAST)
     {
-        flags_hi = flags_hi & ~ANM_VM_COORD_MODE_MASK | ANM_VM_COORD_MODE_1;
+        flags_hi = flags_hi & ~ANM_VM_RESOLUTION_MODE_MASK | ANM_VM_RESOLUTION_SCALED;
     }
 }
 
@@ -180,7 +181,7 @@ void AnmLoaded::copy_vm(AnmVm *dst, i32 script)
 {
     dst->wipe_suffix();
     memcpy(dst, &vms[script], offsetof(AnmVm, id));
-    dst->timer_1c = 0;
+    dst->time_in_script = 0;
     dst->script_time = 0;
 }
 
@@ -232,12 +233,12 @@ HARNESS_CALLED void AnmVm::set_pos_time(i32 end_time, i32 method, Float3 *initia
 HARNESS_CALLED Float3 *AnmVm::transform_coords(Float3 *pos)
 {
     f32 scale;
-    u32 mode = flags_hi & ANM_VM_COORD_MODE_MASK;
-    if (mode == 1 << 20 || mode == 3 << 20)
+    u32 mode = flags_hi & ANM_VM_RESOLUTION_MODE_MASK;
+    if (mode == ANM_VM_RESOLUTION_SCALED || mode == ANM_VM_RESOLUTION_SCALED_3)
     {
         scale = g_screen_coord_scale;
     }
-    else if (mode == 2 << 20 || mode == 4 << 20)
+    else if (mode == ANM_VM_RESOLUTION_HALF_SCALED || mode == ANM_VM_RESOLUTION_HALF_SCALED_4)
     {
         scale = g_screen_coord_scale * 0.5f;
     }
@@ -249,28 +250,28 @@ HARNESS_CALLED Float3 *AnmVm::transform_coords(Float3 *pos)
     pos->y *= scale;
     pos->z *= scale;
 scaled:
-    if (parent != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
+    if (root_vm != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
     {
         if (flags_hi & ANM_VM_ROTATE_WITH_PARENT)
         {
-            f32 s = zun_sinf(parent->rotation.z);
-            f32 c = zun_cosf(parent->rotation.z);
+            f32 s = zun_sinf(root_vm->rotation.z);
+            f32 c = zun_cosf(root_vm->rotation.z);
             f32 x = pos->x;
             f32 y = pos->y;
             pos->x = x * c - y * s;
             pos->y = y * c + x * s;
         }
         Float3 offset;
-        parent->get_own_transformed_pos(&offset);
+        root_vm->get_own_transformed_pos(&offset);
         pos->x += offset.x;
         pos->y += offset.y;
         pos->z += offset.z;
         return pos;
     }
-    u32 kind = flags_hi & ANM_VM_LAYER_KIND_MASK;
+    u32 kind = flags_hi & ANM_VM_ORIGIN_MODE_MASK;
     if (kind != 0)
     {
-        if (kind == ANM_VM_LAYER_SET)
+        if (kind == ANM_VM_ORIGIN_GAME)
         {
             pos->x += g_game_2d_origin_x;
             pos->y += g_game_2d_origin_y;

@@ -114,7 +114,7 @@ static inline UpdateFuncCallback bullet_on_tick_callback()
 // FUNCTION: TH16 0x411a30
 i32 BulletManager::initialize()
 {
-    bullet_anm = AnmManager::preload_anm(7, "bullet.anm");
+    bullet_anm = AnmManager::preload_anm(ANM_SLOT_BULLET, "bullet.anm");
     if (bullet_anm == NULL)
     {
         // "Enemy bullet data not found. The data is corrupt."
@@ -628,18 +628,18 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
     bullet->timer_1434.reset();
     AnmVm *vm = &bullet->vm0;
     vm->wipe();
-    bullet->vm0.index_of_sprite_mapping_func = 1;
+    bullet->vm0.index_of_sprite_mapping_func = ANM_SPRITE_MAPPING_BULLET;
     bullet->vm0.associated_game_entity = bullet;
     bullet_anm->set_vm_script(&bullet->vm0, g_bullet_types[props->type].script);
     bullet->flags |= BULLET_FLAG_ROUND_HITBOX;
-    bullet->vm0.flags_hi = (bullet->vm0.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+    bullet->vm0.flags_hi = (bullet->vm0.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
     bullet->vm1.wipe();
     bullet->vm1.flags_lo &= ~1;
     if (g_bullet_types[props->type].overlay_script != 0)
     {
         bullet->vm1.flags_lo |= 1;
         g_BulletManager->bullet_anm->set_vm_script(&bullet->vm1, g_bullet_types[props->type].overlay_script);
-        bullet->vm1.flags_hi = (bullet->vm1.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+        bullet->vm1.flags_hi = (bullet->vm1.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
     }
     switch (g_bullet_types[props->type].cancel_kind)
     {
@@ -868,18 +868,18 @@ void Bullet::run_ex()
             hitbox_diameter = hitbox_height = g_bullet_types[ex->a].hitbox_radius;
             layer = g_bullet_types[sprite].layer;
             vm0.wipe();
-            vm0.index_of_sprite_mapping_func = 1;
+            vm0.index_of_sprite_mapping_func = ANM_SPRITE_MAPPING_BULLET;
             vm0.associated_game_entity = this;
             g_BulletManager->bullet_anm->set_vm_script(&vm0, g_bullet_types[ex->a].script);
             flags |= BULLET_FLAG_ROUND_HITBOX;
-            vm0.flags_hi = (vm0.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+            vm0.flags_hi = (vm0.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
             vm1.wipe();
             vm1.flags_lo &= ~1;
             if (g_bullet_types[ex->a].overlay_script != 0)
             {
                 vm1.flags_lo |= 1;
                 g_BulletManager->bullet_anm->set_vm_script(&vm1, g_bullet_types[ex->a].overlay_script);
-                vm1.flags_hi = (vm1.flags_hi & ~0x80000) | ANM_VM_LAYER_SET;
+                vm1.flags_hi = (vm1.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
             }
             switch (g_bullet_types[sprite].cancel_kind)
             {
@@ -1658,7 +1658,7 @@ i32 Bullet::step_ex_17()
 // FUNCTION: TH16 0x4124b0
 i32 Bullet::check_player_collision(i32 graze_only)
 {
-    vm0.flags_lo &= ~0x60000;
+    vm0.flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
     vm0.pos = g_zero_vec;
     if ((flags & BULLET_FLAG_HITBOX) && hitbox_diameter > 0.0f)
     {

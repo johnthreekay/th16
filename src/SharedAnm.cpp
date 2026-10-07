@@ -9,7 +9,7 @@
 // FUNCTION: TH16 0x43ad20
 i32 load_shared_anms()
 {
-    if (AnmManager::preload_anm(5, "front.anm") == NULL)
+    if (AnmManager::preload_anm(ANM_SLOT_FRONT, "front.anm") == NULL)
     {
         // "The data is corrupted."
         g_GameErrorContext.log("\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
@@ -30,11 +30,11 @@ i32 load_shared_anms()
 DECOMP_NOINLINE i32 unload_shared_anms()
 {
     AnmManager *anm = g_AnmManager;
-    if (anm->loaded_anms[5] != NULL)
+    if (anm->loaded_anms[ANM_SLOT_FRONT] != NULL)
     {
-        anm->loaded_anms[5]->release();
-        delete anm->loaded_anms[5];
-        anm->loaded_anms[5] = NULL;
+        anm->loaded_anms[ANM_SLOT_FRONT]->release();
+        delete anm->loaded_anms[ANM_SLOT_FRONT];
+        anm->loaded_anms[ANM_SLOT_FRONT] = NULL;
     }
     if (g_EffectManager != NULL)
     {

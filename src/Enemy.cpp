@@ -793,17 +793,17 @@ int EnemyData::step_logic()
             if (time_in_ecl.current % 4 == 0)
             {
                 vm->color_2.d3d = 0xffff00ff;
-                vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
+                vm->flags_lo = (vm->flags_lo & ~ANM_VM_COLOR_MODE_2) | ANM_VM_COLOR_MODE_1;
             }
             else
             {
-                vm->flags_lo &= ~0x60000;
+                vm->flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
             }
         }
         if ((flags_low & ENEMY_FLAG_DAMAGED) && !(flags_low & ENEMY_FLAG_NO_HIT_EFFECT))
         {
             vm->color_2.d3d = 0xff0000ff;
-            vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
+            vm->flags_lo = (vm->flags_lo & ~ANM_VM_COLOR_MODE_2) | ANM_VM_COLOR_MODE_1;
             hit_flash_timer = 4;
             if (hit_sound < 0)
             {
@@ -822,17 +822,17 @@ int EnemyData::step_logic()
                  (!(spell_flags & SPELLCARD_ACTIVE) && full->enemy.life.remaining_for_cur_attack < 500)))
             {
                 vm->color_2.d3d = 0xff0000ff;
-                vm->flags_lo = (vm->flags_lo & ~0x40000) | 0x20000;
+                vm->flags_lo = (vm->flags_lo & ~ANM_VM_COLOR_MODE_2) | ANM_VM_COLOR_MODE_1;
             }
         }
         else
         {
-            vm->flags_lo &= ~0x60000;
+            vm->flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
         }
     }
     else
     {
-        vm->flags_lo &= ~0x60000;
+        vm->flags_lo &= ~ANM_VM_COLOR_MODE_MASK;
         hit_flash_timer--;
     }
     if (damaged_timer.current > 0)
@@ -1376,7 +1376,7 @@ int EnemyData::ecl_anm_set_sprite()
         vm = get_vm(anm_ids[slot]);
         if (vm != NULL)
         {
-            vm->clear_flag_lo_2_tree_inline();
+            vm->hide_tree_inline();
         }
     }
     return 0;
@@ -1709,7 +1709,7 @@ int EnemyInf::get_int_global(int var)
     case ECL_VAR_BOSS_Y:
         return (i32)g_EnemyManager->get_boss(0)->enemy.final_pos.pos.y;
     case ECL_VAR_MAIN_ANM_SCRIPT:
-        return enemy.anm_ids[0].find_or_clear()->unk_49c;
+        return enemy.anm_ids[0].find_or_clear()->script_id_short;
     case ECL_VAR_RANK:
         return g_Globals.rank;
     case ECL_VAR_DIFF:
@@ -2316,8 +2316,8 @@ int EnemyData::step_interpolators()
                 new_vm->layer = layer;
                 if (layer <= 23)
                 {
-                    new_vm->flags_hi &= ~ANM_VM_LAYER_UI;
-                    new_vm->flags_hi |= ANM_VM_LAYER_SET;
+                    new_vm->flags_hi &= ~ANM_VM_ORIGIN_HUD;
+                    new_vm->flags_hi |= ANM_VM_ORIGIN_GAME;
                 }
             }
             new_vm->entity_pos = pos;

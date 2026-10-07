@@ -364,24 +364,24 @@ i32 TitleInf::do_difficulty_select()
         {
             if (!g_Scorefile->all_cleared(DIFFICULTY_EASY))
             {
-                find_child_id(script, 0x9e).clear_flag_lo_2_tree();
+                find_child_id(script, 0x9e).hide_tree();
             }
             if (!g_Scorefile->all_cleared(DIFFICULTY_NORMAL))
             {
-                find_child_id(script, 0x9f).clear_flag_lo_2_tree();
+                find_child_id(script, 0x9f).hide_tree();
             }
             if (!g_Scorefile->all_cleared(DIFFICULTY_HARD))
             {
-                find_child_id(script, 0xa0).clear_flag_lo_2_tree();
+                find_child_id(script, 0xa0).hide_tree();
             }
             if (!g_Scorefile->all_cleared(DIFFICULTY_LUNATIC))
             {
-                find_child_id(script, 0xa1).clear_flag_lo_2_tree();
+                find_child_id(script, 0xa1).hide_tree();
             }
         }
         else if (!g_Scorefile->all_cleared(DIFFICULTY_EXTRA))
         {
-            find_child_id(script, 0xa2).clear_flag_lo_2_tree();
+            find_child_id(script, 0xa2).hide_tree();
         }
     case 1:
         if (time_in_state.current > 6)
@@ -485,13 +485,13 @@ i32 TitleInf::do_difficulty_select()
     return 1;
 }
 
-// AnmId::clear_flag_lo_2_tree as LTCG inlined it here.
-static __forceinline void clear_flag_lo_2_tree_inline(AnmId id)
+// AnmId::hide_tree as LTCG inlined it here.
+static __forceinline void hide_tree_inline(AnmId id)
 {
     AnmVm *vm = g_AnmManager->get_vm_with_id(id);
     if (vm != NULL)
     {
-        vm->clear_flag_lo_2_tree_inline();
+        vm->hide_tree_inline();
     }
 }
 
@@ -547,19 +547,19 @@ i32 TitleInf::do_character_select()
         set_substate(1);
         if (g_Scorefile->characters[0].clears[g_Globals.difficulty] == 0)
         {
-            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9a));
+            hide_tree_inline(find_child_id_inline(anm_ids[script], 0x9a));
         }
         if (g_Scorefile->characters[1].clears[g_Globals.difficulty] == 0)
         {
-            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9b));
+            hide_tree_inline(find_child_id_inline(anm_ids[script], 0x9b));
         }
         if (g_Scorefile->characters[2].clears[g_Globals.difficulty] == 0)
         {
-            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9c));
+            hide_tree_inline(find_child_id_inline(anm_ids[script], 0x9c));
         }
         if (g_Scorefile->characters[3].clears[g_Globals.difficulty] == 0)
         {
-            clear_flag_lo_2_tree_inline(find_child_id_inline(anm_ids[script], 0x9d));
+            hide_tree_inline(find_child_id_inline(anm_ids[script], 0x9d));
         }
         if (g_unk_4a6f1c == 4)
         {
@@ -743,7 +743,7 @@ i32 TitleInf::do_subseason_select()
             }
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
             AnmId id;
-            id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+            id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
             g_Supervisor.config.unk_0 = id.id;
             AnmManager::interrupt_tree(id, 7);
         }
@@ -953,7 +953,7 @@ i32 TitleInf::do_practice_stage_select()
         {
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
             AnmId id;
-            id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+            id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
             g_Supervisor.config.unk_0 = id.id;
             AnmManager::interrupt_tree(id, 7);
         }
@@ -1588,7 +1588,7 @@ i32 TitleInf::do_replay_menu()
         if (time_in_state.current == 2)
         {
             AnmId id;
-            id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+            id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
             g_Supervisor.config.unk_0 = id.id;
             AnmManager::interrupt_tree(id, 7);
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
@@ -2447,11 +2447,11 @@ i32 TitleInf::do_music_room()
                 }
                 if (i >= music_scroll && i < music_scroll + 10)
                 {
-                    vm->set_flag_lo_2_tree_inline();
+                    vm->show_tree_inline();
                 }
                 else
                 {
-                    vm->clear_flag_lo_2_tree_inline();
+                    vm->hide_tree_inline();
                 }
                 if (i == menu.next_selection)
                 {
@@ -2511,11 +2511,11 @@ i32 TitleInf::do_music_room()
                 AnmVm *vm = get_vm_or_clear(anm_ids_740[0x10 + i]);
                 if (i >= music_scroll && i < music_scroll + 10)
                 {
-                    vm->set_flag_lo_2_tree();
+                    vm->show_tree();
                 }
                 else
                 {
-                    vm->clear_flag_lo_2_tree_inline();
+                    vm->hide_tree_inline();
                 }
                 if (i == menu.next_selection)
                 {
@@ -2964,7 +2964,7 @@ i32 TitleInf::do_spell_practice_subseason()
         {
             g_AsciiManager->show_now_loading(480.0f, 392.0f);
             AnmId id;
-            id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+            id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
             g_Supervisor.config.unk_0 = id.id;
             AnmManager::interrupt_tree(id, 7);
         }
@@ -3078,7 +3078,7 @@ i32 TitleInf::do_spell_practice_difficulty()
             {
                 g_AsciiManager->show_now_loading(480.0f, 392.0f);
                 AnmId id;
-                id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+                id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
                 g_Supervisor.config.unk_0 = id.id;
                 AnmManager::interrupt_tree(id, 7);
             }

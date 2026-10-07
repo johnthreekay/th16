@@ -18,7 +18,7 @@ void w4b_opaque_double(double *value);
 // effect this way.
 i32 harness_menu_ui_effect()
 {
-    return g_EffectManager->create_ui_effect(0, NULL, NULL).id + g_EffectManager->create_ui_effect(0, NULL, NULL).id;
+    return g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL).id + g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL).id;
 }
 
 // Like the pause menu (0x43ef5b, 0x43f159, ...) and the HUD (0x426dc0).

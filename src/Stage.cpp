@@ -277,8 +277,8 @@ __forceinline void Stage::use_camera()
 // Passes a color change on to the ANM manager.
 static __forceinline void stage_set_anm_color(u32 color)
 {
-    g_AnmManager->unk_1c7fd8c = 1;
-    g_AnmManager->unk_1c7fd88.d3d = color;
+    g_AnmManager->global_tint_enabled = 1;
+    g_AnmManager->global_tint.d3d = color;
 }
 
 static __forceinline void stage_set_render_state(D3DRENDERSTATETYPE state, DWORD value)
@@ -329,7 +329,7 @@ i32 Stage::on_draw_03()
     {
         if (fade_timer.current < 30)
         {
-            ScreenEffect::create_inline(3, 30, 0, 0, 0, 10);
+            ScreenEffect::create_inline(SCREEN_EFFECT_FADE_IN, 30, 0, 0, 0, 10);
             stage_flags |= STAGE_FLAG_1;
             fade_timer.set_value(1);
         }
@@ -360,8 +360,8 @@ i32 Stage::on_draw_03()
         draw_layer(7);
         g_AnmManager->flush_sprites();
     }
-    g_AnmManager->unk_1c7fd8c = 0;
-    g_AnmManager->unk_1c7fd88.d3d = 0x80808080;
+    g_AnmManager->global_tint_enabled = 0;
+    g_AnmManager->global_tint.d3d = 0x80808080;
     g_Supervisor.disable_zwrite_inline();
     stage_set_render_state(D3DRS_ZFUNC, D3DCMP_ALWAYS);
     return 1;
@@ -404,8 +404,8 @@ i32 Stage::on_draw_06()
         draw_layer(11);
         g_AnmManager->flush_sprites();
     }
-    g_AnmManager->unk_1c7fd8c = 0;
-    g_AnmManager->unk_1c7fd88.d3d = 0x80808080;
+    g_AnmManager->global_tint_enabled = 0;
+    g_AnmManager->global_tint.d3d = 0x80808080;
     if (fade_timer.current > 0)
     {
         fade_timer--;
@@ -622,8 +622,8 @@ void StageInner::draw_vms(i32 layer)
         g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &g_Supervisor.cameras[3].projection_matrix);
         if (g_AnmManager != NULL)
         {
-            g_AnmManager->camera_unk_fc.x = g_Supervisor.cameras[3].unk_fc.x;
-            g_AnmManager->camera_unk_fc.y = g_Supervisor.cameras[3].unk_fc.y;
+            g_AnmManager->camera_2d_offset.x = g_Supervisor.cameras[3].unk_fc.x;
+            g_AnmManager->camera_2d_offset.y = g_Supervisor.cameras[3].unk_fc.y;
         }
         g_Supervisor.d3d_device->SetViewport(&g_Supervisor.current_camera->viewport);
         g_Supervisor.current_camera_index = 3;
@@ -773,7 +773,7 @@ i32 Stage::load_std(const char *path)
     }
     std = (StdHeader *)malloc(std_file_size);
     memcpy(std, std_file, std_file_size);
-    stage_anm = AnmManager::preload_anm(3 + (stage_num & 1), std->anm_path);
+    stage_anm = AnmManager::preload_anm(ANM_SLOT_STAGE + (stage_num & 1), std->anm_path);
     if (stage_anm == NULL)
     {
         // ステージデータが見つかりません。データが壊れています
@@ -1157,8 +1157,8 @@ i32 StageInner::run_std()
             {
                 AnmVm *vm = &anm_vms[ins->args[0]];
                 stage->stage_anm->copy_vm(vm, script);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
             else if (script == -2)

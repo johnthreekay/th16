@@ -311,7 +311,7 @@ HARNESS_CALLED void Supervisor::swap_transform_matrices(Camera *camera)
     g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &camera->projection_matrix);
     if (g_AnmManager != NULL)
     {
-        g_AnmManager->camera_unk_fc = camera->unk_fc;
+        g_AnmManager->camera_2d_offset = camera->unk_fc;
     }
 }
 
@@ -355,7 +355,7 @@ void __stdcall camera_apply_43c940(Camera *camera)
     D3DXVec3Normalize(&camera->unk_30, &camera->unk_30);
     if (g_AnmManager != NULL)
     {
-        g_AnmManager->camera_unk_fc = camera->unk_fc;
+        g_AnmManager->camera_2d_offset = camera->unk_fc;
     }
 }
 
@@ -582,19 +582,19 @@ int __fastcall Supervisor::on_draw_01(void *arg)
                                        1.0f, 0);
     }
     AnmManager *anm = g_AnmManager;
-    anm->render_cache_184fbc0 = 0;
-    anm->render_cache_184fbb0 = -1;
-    anm->last_blend_mode = 10;
+    anm->last_texture_matrix_sprite = 0;
+    anm->last_texture_id = -1;
+    anm->last_blend_mode = ANM_BLEND_FORCE_RESET;
     anm->render_cache_184fbb5 = 0xff;
     anm->render_cache_184fbb7 = 0xff;
     anm->render_cache_184fbb8 = 0xff;
-    anm->unk_1c7fd8c = 0;
-    anm->unk_1c7fd88.d3d = 0x80808080;
+    anm->global_tint_enabled = 0;
+    anm->global_tint.d3d = 0x80808080;
     anm->last_filter_point = 0xff;
-    anm->last_color_op = 0xff;
-    anm->camera_unk_fc.y = 0.0f;
-    anm->camera_unk_fc.x = 0.0f;
-    anm->render_cache_184fbb6 = 0xff;
+    anm->last_color_op = ANM_COLOR_OP_NONE;
+    anm->camera_2d_offset.y = 0.0f;
+    anm->camera_2d_offset.x = 0.0f;
+    anm->last_vertex_setup = ANM_VERTEX_SETUP_NONE;
     s->current_camera = &s->cameras[2];
     s->swap_transform_matrices(&s->cameras[2]);
     s->d3d_device->SetViewport(&s->current_camera->viewport);
@@ -771,7 +771,7 @@ HARNESS_CALLED AnmId Supervisor::create_fog_vm(i32 count, i32 script)
     vm->alloc_extra_data(count * 2 * sizeof(RenderVertex144));
     if (count > 2)
     {
-        RenderVertex144 *vertices = (RenderVertex144 *)vm->ins_508_extra_data;
+        RenderVertex144 *vertices = (RenderVertex144 *)vm->extra_data;
         vm->flags_lo = (vm->flags_lo & ~(0x1f << ANM_VM_RENDER_MODE_SHIFT)) | (12 << ANM_VM_RENDER_MODE_SHIFT);
         vm->int_vars[0] = count;
         for (i32 i = 0; i < count * 2; i++)
@@ -809,73 +809,73 @@ void Supervisor::setup_special_anms()
             if (g_resolution_x == 640)
             {
                 text_anm->copy_vm(vm, 0x3b);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c0;
                 text_anm->copy_vm(vm, 0x41);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c4;
                 text_anm->copy_vm(vm, 0x3e);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c8;
                 text_anm->copy_vm(vm, 0x44);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
             else if (g_resolution_x == 960)
             {
                 text_anm->copy_vm(vm, 0x3c);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c0;
                 text_anm->copy_vm(vm, 0x42);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c4;
                 text_anm->copy_vm(vm, 0x3f);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c8;
                 text_anm->copy_vm(vm, 0x45);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
             else if (g_resolution_x == 1280)
             {
                 text_anm->copy_vm(vm, 0x3d);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c0;
                 text_anm->copy_vm(vm, 0x43);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c4;
                 text_anm->copy_vm(vm, 0x40);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
                 vm = vm_1c8;
                 text_anm->copy_vm(vm, 0x46);
-                vm->unk_5b0 = NULL;
-                vm->parent = NULL;
+                vm->parent_vm = NULL;
+                vm->root_vm = NULL;
                 vm->run();
             }
         }
         if (g_screen_coord_scale == 1.5f)
         {
-            vm_1c4->flags_hi &= ~0x800;
+            vm_1c4->flags_hi &= ~ANM_VM_FILTER_POINT;
         }
     }
     else
@@ -934,7 +934,7 @@ int __fastcall Supervisor::on_tick(void *arg)
     SoundManager::update_sound_thread();
     SoundManager::tick_bgm_fade();
     read_keyboard_input();
-    if (g_AnmManager->sub_46d690())
+    if (g_AnmManager->service_pending_loads())
     {
         return UPDATE_FUNC_EXIT_SUCCESS;
     }
@@ -1037,15 +1037,15 @@ int Supervisor::teardown_everything()
     }
     g_SoundManager.modify_bgm(4, 0, "dummy");
     g_TextHelper.release_buffer();
-    DeleteObject(g_font_904);
-    DeleteObject(g_font_90c);
-    DeleteObject(g_font_914);
-    DeleteObject(g_font_91c);
-    DeleteObject(g_font_924);
-    DeleteObject(g_font_910);
-    DeleteObject(g_font_918);
-    DeleteObject(g_font_920);
-    DeleteObject(g_font_928);
+    DeleteObject(g_text_font_default);
+    DeleteObject(g_text_font_0);
+    DeleteObject(g_text_font_2);
+    DeleteObject(g_text_font_4);
+    DeleteObject(g_text_font_6);
+    DeleteObject(g_text_font_1);
+    DeleteObject(g_text_font_3);
+    DeleteObject(g_text_font_5);
+    DeleteObject(g_text_font_7);
     if (keyboard != NULL)
     {
         keyboard->Unacquire();
