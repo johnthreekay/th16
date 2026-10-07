@@ -98,6 +98,8 @@ i32 __fastcall sht_on_tick_homing(PlayerBullet *bullet)
     {
         return 0;
     }
+    // Stored through an EnemyRef but tested as an int, which gives the
+    // original's reload (see README).
     EnemyRef *target = (EnemyRef *)&bullet->target_enemy_id;
     if (g_EnemyManager == NULL)
     {
