@@ -121,7 +121,7 @@ struct ItemManager
     // Takes an item from the free list for its kind (bullet cancel items
     // have their own) and launches it. Works on g_ItemManager; LTCG dropped
     // this. unk_3 and unk_6 are never read.
-    Item *spawn_item(i32 type, Float3 *pos, i32 unk_3, f32 angle, f32 speed, i32 unk_6, i32 force_autocollect);
+    HARNESS_CALLED Item *spawn_item(i32 type, Float3 *pos, i32 unk_3, f32 angle, f32 speed, i32 unk_6, i32 force_autocollect);
 };
 
 extern ItemManager *g_ItemManager;

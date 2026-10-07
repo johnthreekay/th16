@@ -183,6 +183,17 @@ struct BulletManager
         return iter_current != NULL ? iter_current->entry : NULL;
     }
 
+    // Whether the counter is a multiple of n. Written as members, these
+    // keep their idiv even when LTCG inlines them with a constant n.
+    i32 cancel_counter_multiple_of(i32 n)
+    {
+        return unk_cancel_counter % n == 0;
+    }
+    i32 bomb_cancel_count_multiple_of(i32 n)
+    {
+        return bullet_count_canceled_by_bombs % n == 0;
+    }
+
     static i32 __fastcall on_tick_callback(BulletManager *self);
     static i32 __fastcall on_draw_callback(BulletManager *self);
     i32 on_tick_body();
@@ -200,3 +211,7 @@ struct BulletManager
 };
 
 extern BulletManager *g_BulletManager;
+
+// 0x416a00. Drops the items a cancelled bullet or laser segment leaves at
+// pos, by cancel mode. LTCG passes pos in ecx and mode in edx.
+HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode);

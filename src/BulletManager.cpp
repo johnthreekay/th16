@@ -2,7 +2,11 @@
 
 #include "AnmManager.h"
 #include "BulletManager.h"
+#include "Bomb.h"
 #include "Collision.h"
+#include "Item.h"
+#include "Rng.h"
+#include "Spellcard.h"
 #include "GameErrorContext.h"
 #include "GameThread.h"
 #include "UpdateFunc.h"
@@ -317,4 +321,56 @@ HARNESS_CALLED i32 BulletManager::cancel_rectangle_as_bomb(D3DXVECTOR3 *pos, D3D
         }
     }
     return 0;
+}
+
+// TODO: the original frame has 4 more (unused) bytes and saves edi up
+// front instead of around the mode 5 branch.
+// FUNCTION: TH16 0x416a00
+HARNESS_CALLED void gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
+{
+    if (mode == 0)
+    {
+        return;
+    }
+    if (pos->x + 32.0f <= -192.0f || pos->x - 32.0f >= 192.0f || pos->y + 32.0f <= 0.0f || pos->y - 32.0f >= 448.0f)
+    {
+        return;
+    }
+    BulletManager *mgr = g_BulletManager;
+    mgr->unk_cancel_counter++;
+    if (mode == 1 || mode == 3)
+    {
+        return;
+    }
+    if (mode == 2)
+    {
+        if (mgr->cancel_counter_multiple_of(5) && !(g_Spellcard->flags & 1))
+        {
+            g_ItemManager->spawn_item(1, pos, 0, -ZUN_PI / 2.0f, 2.2f, 0, 0);
+        }
+        if (!(g_Spellcard->flags & 1))
+        {
+            g_ItemManager->spawn_item(10, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f,
+                                      2.2f, 0, 0);
+        }
+    }
+    else if (mode == 5)
+    {
+        if (mgr->bomb_cancel_count_multiple_of(3))
+        {
+            g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f,
+                                      2.2f, 0, 1);
+        }
+        g_BulletManager->bullet_count_canceled_by_bombs++;
+    }
+    else if (mode == 4)
+    {
+        g_ItemManager->spawn_item(16, pos, 0, g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f, 2.2f,
+                                  0, 1);
+        if (g_SubseasonBomb->in_use == 1)
+        {
+            g_ItemManager->spawn_item(g_SubseasonBomb->season_level + 8, pos, 0,
+                                      g_replay_safe_rng.randf_neg_to(ZUN_PI / 18.0f) - ZUN_PI / 2.0f, 2.2f, 0, 0);
+        }
+    }
 }

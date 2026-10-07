@@ -100,3 +100,11 @@ void harness_cancel_radius(D3DXVECTOR3 *pos, f32 radius, i32 mode)
     g_BulletManager->cancel_radius(pos, radius, mode);
     g_BulletManager->cancel_radius(pos, radius * 2.0f, mode + 1);
 }
+
+// Like Bullet::cancel (0x41690c), BulletManager::clear_all (0x41703e) and
+// the lasers' cancels (0x433b43, ...).
+void harness_gen_items_from_cancel(D3DXVECTOR3 *pos, i32 mode)
+{
+    gen_items_from_cancel(pos, mode);
+    gen_items_from_cancel(pos + 1, mode + 1);
+}
