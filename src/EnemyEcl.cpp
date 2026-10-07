@@ -147,6 +147,13 @@ static DECOMP_NOINLINE Fog *new_enemy_fog()
     return new Fog(0, 0x11, 0);
 }
 
+// TODO: the original has an EH frame (from the fog instruction's new Fog)
+// and no frame realignment. Ours has neither EH (see new_enemy_fog) and so
+// realigns its frame for the 8-byte-sized laser parameter locals (laserOn,
+// laserStOn, laserCuOn), which shifts every local. With the EH frame back
+// the function reaches about 64% in quickdiff. The early argument getters
+// are spelled out because LTCG inlined only those (its inline budget ran
+// out in moveVelTime), plus the three in the spell case.
 // FUNCTION: TH16 0x41dcb0
 int EnemyData::ecl_run_over_300()
 {
