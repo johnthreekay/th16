@@ -3,10 +3,11 @@
 #include "decomp.h"
 #include "types.h"
 
-// TH06's generator, now guarded by a critical section.
+// TH06's 16-bit generator, now guarded by a critical section (CS_RNG).
 struct Rng
 {
     u16 seed;
+    // Steps taken since the seed was set.
     u32 generation_count;
 
     // TH06 equivalent: Rng::GetRandomU16
@@ -20,7 +21,9 @@ struct Rng
     u32 rand_u32();
     // TH06 equivalent: Rng::GetRandomF32ZeroToOne
     f32 randf_0_to_1();
+    // A float in [-1, 1].
     f32 randf_neg_1_to_1();
+    // An angle in [-pi, pi].
     f32 randf_neg_pi_to_pi();
     // TH06 equivalent: Rng::GetRandomF32InRange
     f32 randf_0_to(f32 range)

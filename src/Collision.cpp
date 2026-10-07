@@ -7,7 +7,7 @@
 // original keeps 0.5 and the two offsets in registers).
 // FUNCTION: TH16 0x403d30
 HARNESS_CALLED i32 __stdcall collision_test_circle_rect(f32 rect_x, f32 rect_y, f32 w, f32 h, f32 angle, f32 circle_x,
-                                              f32 circle_y, f32 radius)
+                                                        f32 circle_y, f32 radius)
 {
     // Move the circle into the rectangle's frame.
     circle_x -= rect_x;
