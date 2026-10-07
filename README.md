@@ -325,6 +325,23 @@ decompiled code the surroundings it had in the original:
   original inlined. Some constants are compared unsigned (`jae`), e.g. MSG
   hold-time checks; ZUN's MSG VM flags are real bitfields.
 
+- AnmVm::run is a wrapper that saves and restores g_game_speed around an
+  interpreter LTCG inlined: a `__forceinline` run_script gives the single
+  epilogue.
+- For `*p = f(x)`, `*p = a * call()` and `*p op= v`, MSVC evaluates the
+  arguments, then the destination pointer, then the call: compute the
+  value into a temporary to get it first.
+- `p = cond ? f(&x) : &x;` followed by a load through p gets tail
+  duplicated; `p = &x; if (cond) p = f(p);` does not. A ternary between two
+  struct lvalues becomes a branchless address select; if/else branches.
+- Locals with 1-byte alignment are laid out first in the frame (3-byte RGB
+  structs, not ZunColor).
+- An x87 call result passed as an inline function's f32 parameter goes
+  through a float slot into SSE (`fstp; movss`); used directly in
+  arithmetic it stays on x87.
+- /INCLUDE'd accessors make callers spill xmm0 around them; HARNESS_CALLED
+  restores the interprocedural register use (get_int_var and friends).
+
 ### Compiler-generated and CRT functions
 
 Name-based annotations: the marker, then a comment line naming the function.
