@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#include "AnmManager.h"
+#include "CriticalSections.h"
 #include "Laser.h"
 
 // Placeholder (not decompiled yet).
@@ -74,11 +76,60 @@ i32 LaserCurveInf::cancel_as_bomb_circle(Float3 *pos, f32 radius, i32 c, i32 d)
     return unit5_placeholder(this);
 }
 
-// Placeholder (not decompiled yet).
-// STUB: TH16 0x43a620
+// AnmLoaded::create_vm as LTCG inlined it into some callers.
+static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECTOR3 *pos, f32 rotation, i32 layer)
+{
+    ENTER_CS(CS_ANM_MANAGER);
+    anm->vm_count++;
+    AnmVm *vm = g_AnmManager->allocate_vm();
+    anm->copy_vm(vm, script);
+    vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+    if (layer >= 0)
+    {
+        vm->layer = layer;
+        if (layer <= 23)
+        {
+            vm->flags_hi &= ~ANM_VM_LAYER_UI;
+            vm->flags_hi |= ANM_VM_LAYER_SET;
+        }
+    }
+    if (pos == NULL)
+    {
+        vm->entity_pos = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    }
+    else
+    {
+        vm->entity_pos = *pos;
+    }
+    vm->rotation.z = rotation;
+    vm->run();
+    vm->mode_of_create_child = 0;
+    AnmId id;
+    id = g_AnmManager->insert_in_world_list_back(vm);
+    LEAVE_CS(CS_ANM_MANAGER);
+    return id;
+}
+
+// Cancels the laser, leaving a cancel effect on every third segment.
+// FUNCTION: TH16 0x43a620
 i32 LaserCurveInf::cancel(i32 mode, i32 b)
 {
-    return unit5_placeholder(this);
+    if (b != 0 && countdown_5c8 != 0)
+    {
+        return 0;
+    }
+    LaserCurveSegment *segment = (LaserCurveSegment *)unk_1524;
+    for (i32 i = 0; i < inner.segment_count; i++, segment++)
+    {
+        D3DXVECTOR3 pos = segment->pos;
+        if (i % 3 == 0)
+        {
+            AnmLoaded *anm = g_BulletManager->bullet_anm;
+            create_vm_inline(anm, inner.color * 2 + 0xd1, &pos, 0.0f, -1);
+        }
+    }
+    state = 1;
+    return 0;
 }
 
 // 2 if a circle at pos touches the laser's rectangle, else 0.

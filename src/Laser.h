@@ -212,14 +212,38 @@ struct LaserCurveNode
     }
 };
 
+// Parameters of a curvy laser. Layout from ExpHP (zLaserCurveInner); his
+// field names say which BulletManager shooter field each one comes from.
 struct LaserCurveInner
 {
-    u8 data[0x358];
+    D3DXVECTOR3 start_pos;
+    f32 ang_aim;
+    f32 laser_new_arg_4;
+    // ExpHP: spd1.
+    f32 speed;
+    i32 type;
+    i32 color;
+    // Number of segments (ExpHP: __bmgr_350).
+    i32 segment_count;
+    f32 distance;
+    i32 unk_28;
+    BulletEx ex[0x12];
+    i32 shot_sfx;
+    i32 shot_transform_sfx;
+    u8 unk_34c[0x358 - 0x34c];
 
     LaserCurveInner()
     {
         memset(this, 0, sizeof(*this));
     }
+};
+
+// One point of a curvy laser's body (LaserCurveInf::unk_1524 holds
+// segment_count of them).
+struct LaserCurveSegment
+{
+    Float3 pos;
+    u8 unk_c[0x20 - 0xc];
 };
 
 // VTABLE: TH16 0x4922e0
