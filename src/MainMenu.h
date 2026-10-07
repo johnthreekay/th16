@@ -107,6 +107,7 @@ class TitleInf : public TaskInf
     i32 do_manual();
     i32 do_spell_practice_stage_select();
     i32 do_spell_practice_character();
+    i32 do_spell_practice_row();
     i32 do_spell_practice_subseason();
     i32 do_spell_practice_difficulty();
     // 0x4560b0. Fills spell_ids (and their VMs) with the spell cards of a
