@@ -107,6 +107,9 @@ struct Bullet
 
     i32 on_tick();
     i32 sub_4124b0(i32 arg);
+    // 0x414ec0. The first et_ex transform: a speed boost that fades over
+    // 16 frames; 1 once it is over.
+    i32 step_ex_00();
     // 0x416840. Turns the bullet into its cancel animation, dropping items
     // by mode.
     i32 cancel(i32 mode);

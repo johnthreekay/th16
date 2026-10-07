@@ -466,3 +466,20 @@ done:
     }
     return 0;
 }
+
+static_assert(offsetof(Bullet, ex_state) == 0xfa0, "Bullet layout");
+
+// TODO: in the inlined timer tick the original adds the speed to
+// current_f in xmm0 (ours adds current_f to the speed in xmm1).
+// FUNCTION: TH16 0x414ec0
+i32 Bullet::step_ex_00()
+{
+    if (ex_state[0].timer.current <= 16)
+    {
+        sincosmul(&velocity, angle, 5.0f - ex_state[0].timer.current_f * 5.0f / 16.0f + speed);
+        ex_state[0].timer.tick();
+        return 0;
+    }
+    active_ex_flags ^= 1;
+    return 1;
+}
