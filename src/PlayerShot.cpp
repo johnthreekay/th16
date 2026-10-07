@@ -93,11 +93,10 @@ ShtBulletFunc g_sht_func_3_table[1];
 // PlayerDamageSource::hit_func: 1 for player bullets (their shooter's
 // on_hit), 2 for piercing ones.
 // GLOBAL: TH16 0x4919dc
-DamageSourceHitFunc const g_damage_source_hit_funcs[4] = {
+DamageSourceHitFunc const g_damage_source_hit_funcs[3] = {
     NULL,
     damage_source_on_hit_bullet,
     damage_source_on_hit_piercing,
-    NULL,
 };
 
 // Homing: turns toward the nearest enemy, slowing down while the turn is

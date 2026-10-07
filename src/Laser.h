@@ -12,9 +12,6 @@
 
 struct AnmLoaded;
 
-// Base of every laser kind. The name is ZUN's, from RTTI. The base methods
-// are almost all empty; the slot names follow ExpHP's zVTableLaser.
-// VTABLE: TH16 0x492490
 // LaserDataInf::state.
 enum LaserState
 {
@@ -28,6 +25,9 @@ enum LaserState
     LASER_STATE_SHRINKING = 5,
 };
 
+// Base of every laser kind. The name is ZUN's, from RTTI. The base methods
+// are almost all empty; the slot names follow ExpHP's zVTableLaser.
+// VTABLE: TH16 0x492490
 class LaserDataInf
 {
   public:

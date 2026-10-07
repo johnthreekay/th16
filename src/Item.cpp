@@ -99,8 +99,8 @@ ItemManager *ItemManager::create()
     return mgr;
 }
 
-// GLOBAL: TH16 0x4917e0
 // The PIV value of the bullet cancel items (types 9 to 14).
+// GLOBAL: TH16 0x4917e0
 static const f32 g_cancel_item_piv[6] = {5.0f, 10.0f, 20.0f, 30.0f, 40.0f, 50.0f};
 
 // Player::angle_to_player as LTCG inlined it into on_tick_body's state 4.
