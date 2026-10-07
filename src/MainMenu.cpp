@@ -56,9 +56,15 @@ void TitleInf::set_state(i32 state)
     time_in_state.reset();
 }
 
+// The dead double is not ZUN's code but stands in for whatever double math
+// the optimizer removed from his body: LTCG's double stack alignment pass
+// sees it at the IL level, so every caller (exactly the menu states that
+// call set_substate) realigns its frame (and esp, -8) as in the original.
 // FUNCTION: TH16 0x44a5e0
-void TitleInf::set_substate(i32 substate)
+HARNESS_CALLED void TitleInf::set_substate(i32 substate)
 {
+    double unused = substate;
+    (void)unused;
     this->substate = substate;
     time_in_state.reset();
 }
@@ -251,7 +257,7 @@ i32 __fastcall TitleInf::on_draw_thunk(void *arg)
 
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 
-// TODO: the original realigns its frame to 8 bytes; the volume clamps use al/ecx where ours uses cl/eax.
+// TODO: the volume clamps use al/ecx where ours uses cl/eax (also with an if instead of the ternary).
 // FUNCTION: TH16 0x44c570
 i32 TitleInf::do_options()
 {
@@ -527,7 +533,7 @@ void TitleInf::update_options_sprites()
     }
 }
 
-// TODO: the original realigns its frame to 8 bytes, and does not merge the two input tests into (pressed | repeat) & mask.
+// TODO: for the up/down tests the original loads the pressed and repeat words as bytes (mov cl/al); ours loads dwords (byte casts only narrow the repeat load).
 // FUNCTION: TH16 0x44e930
 i32 TitleInf::do_key_config()
 {
@@ -686,7 +692,6 @@ void TitleInf::set_key(i32 action, i32 key)
 
 // Rows above the cursor get interrupt 30, rows below it 31; the five
 // remappable actions have two more pairs of sprites each.
-// TODO: the original keeps g_AnmManager in edi across the lookups (get_vm_with_id is an opaque stub here) and reserves a 12-byte frame.
 // FUNCTION: TH16 0x44f810
 void TitleInf::update_key_config_cursor()
 {
@@ -929,7 +934,7 @@ i32 g_demo_replay_index;
 // GLOBAL: TH16 0x49371c
 const char *const g_demo_replay_names[3] = {"demo/demo1.rpy", "demo/demo2.rpy", "demo/demo3.rpy"};
 
-// TODO: the original computes the demo index with a multiply (ours idiv), calls the Supervisor members without this and keeps the replay info in ecx.
+// TODO: the original computes the demo index as x % -3 would (imul 0x55555555; sub; sar 1); ours uses idiv, or the /3 magic through a local (also with % -3); it also calls the Supervisor members without this and keeps the replay info in ecx.
 // FUNCTION: TH16 0x44af80
 i32 TitleInf::on_tick()
 {

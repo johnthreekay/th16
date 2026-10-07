@@ -607,7 +607,6 @@ void SoundManager::stop_bgm()
     }
 }
 
-// TODO: the inlined stop_threads keeps Sleep in ebx; the original calls it through the import each time.
 // FUNCTION: TH16 0x45e000
 i32 SoundManager::reset()
 {
@@ -768,7 +767,6 @@ void SoundBufferEntry::play(i32 pan)
     buffer->Play(0, 0, data->play_flags);
 }
 
-// TODO: PeekMessageA and MsgWaitForMultipleObjects are cached in registers differently.
 // FUNCTION: TH16 0x45ec50
 DWORD WINAPI SoundManager::bgm_thread_proc(void *arg)
 {

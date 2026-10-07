@@ -120,7 +120,7 @@ void TitleInf::load_replay_list()
 }
 
 // Saving the replay after a game: picking a slot, then entering the name.
-// TODO: the original realigns its frame (and esp, -8), keeps this in edi (spilled), and computes the % 13 column tests with a multiply.
+// TODO: this lives in esi (the original edi, spilled), the ascii create_effect pattern (see README), and g_stage_table[8] lands on another global here.
 // FUNCTION: TH16 0x453c10
 i32 TitleInf::do_replay_save()
 {
@@ -139,7 +139,7 @@ i32 TitleInf::do_replay_save()
             sprintf(path, "th16_%.2d.rpy", i);
             replays[i - 1] = ReplayManager::create_from_file(path);
         }
-        if (get_vm_or_clear(anm_ids[0x61]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x61]) == NULL)
         {
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
@@ -205,7 +205,8 @@ i32 TitleInf::do_replay_save()
         }
         if (pressed_or_repeating_inline(INPUT_LEFT))
         {
-            if (menu_5a5c.next_selection % 13 != 0)
+            i32 selection = menu_5a5c.next_selection;
+            if (selection % 13 != 0)
             {
                 menu_5a5c.move_cursor(-1);
             }
@@ -216,7 +217,8 @@ i32 TitleInf::do_replay_save()
         }
         if (pressed_or_repeating_inline(INPUT_RIGHT))
         {
-            if (menu_5a5c.next_selection % 13 != 12)
+            i32 selection = menu_5a5c.next_selection;
+            if (selection % 13 != 12)
             {
                 menu_5a5c.move_cursor(1);
             }
@@ -328,7 +330,7 @@ i32 g_last_difficulty = DIFFICULTY_NORMAL;
 i32 g_last_character;
 
 // Picking the difficulty, or confirming Extra.
-// TODO: the original realigns its frame (and esp, -8) and keeps g_Globals.difficulty in ecx from the entry for the num_choices test.
+// TODO: the original reuses g_Globals.difficulty from the entry in ecx for num_choices (reloading it after the ascii create_effect); ours compares memory; plus the ascii create_effect pattern (see README).
 // FUNCTION: TH16 0x44fe20
 i32 TitleInf::do_difficulty_select()
 {
@@ -495,7 +497,7 @@ static __forceinline void clear_flag_lo_2_tree_inline(AnmId id)
 
 // Picking the character. Extra only offers the characters that cleared the
 // main game; characters marked as cleared on this difficulty get a badge.
-// TODO: the original realigns its frame (and esp, -8) and loads g_Scorefile before the difficulty for the clear badges.
+// TODO: the original loads g_Scorefile before the difficulty for the clear badges.
 // FUNCTION: TH16 0x4502c0
 i32 TitleInf::do_character_select()
 {
@@ -661,7 +663,7 @@ extern const char *g_stage_names[10];
 
 // Picking the subseason before a game (Extra has only one). In stage
 // practice this goes on to the stage select instead of starting.
-// TODO: the original realigns its frame (and esp, -8).
+// TODO: the original spills script to the create_effect result slot and reloads it (ours keeps it in esi), and inverts the branch on g_Globals.flags_hi_45c in case 3.
 // FUNCTION: TH16 0x450af0
 i32 TitleInf::do_subseason_select()
 {
@@ -807,7 +809,7 @@ u8 g_practice_keys[0x100];
 i32 g_unk_4a5bf8;
 
 // Stage practice: picking the stage.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// TODO: the original keeps both input words in registers for the cursor tests.
 // FUNCTION: TH16 0x450ef0
 i32 TitleInf::do_practice_stage_select()
 {
@@ -1004,7 +1006,7 @@ u8 g_cheat_prev_keys[0x100];
 // The player data screen: difficulty (menu_fc) and character (menu)
 // records, and pages of spell cards (menu_1d4, 0 for none). On Extra with
 // the fourth character selected it also reads the unlock cheat.
-// TODO: the original realigns its frame (and esp, -8), tests the up input after the three selection copies, and ORs the first 16 key bytes into the second.
+// TODO: the ascii create_effect call loads g_AsciiManager into ecx (the original eax, with the result slot in ecx), and the vectorized OR loads the second 16 key bytes first (the original the first; not the operand order, the accumulator type or a reversed loop).
 // FUNCTION: TH16 0x452330
 i32 TitleInf::do_player_data()
 {
@@ -1445,7 +1447,7 @@ i32 g_last_replay_slot;
 
 // The replay menu: picking a replay (pages of 25) while the list loads on
 // the menu's thread, then the stage to start from.
-// TODO: the original realigns its frame (and esp, -8) and keeps the repeat input word in eax for the cursor tests.
+// TODO: register allocation: this moves through eax around the first slot % 25, the ascii create_effect loads g_AsciiManager into ecx, and stage + 1 stays in eax (as in do_spell_practice_difficulty).
 // FUNCTION: TH16 0x451750
 i32 TitleInf::do_replay_menu()
 {
@@ -1470,7 +1472,7 @@ i32 TitleInf::do_replay_menu()
         flags_5ce8 &= ~0xc;
         unk_5b44 = 0;
         thread.restart((ThreadStart)replay_list_thread, this);
-        if (get_vm_or_clear(anm_ids[0x61]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x61]) == NULL)
         {
             anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
@@ -1484,7 +1486,7 @@ i32 TitleInf::do_replay_menu()
         }
         break;
     case 2:
-        menu.current_selection = menu.next_selection;
+        menu_save_selection(&menu);
         menu_1d4.current_selection = menu_1d4.next_selection;
         if (pressed_or_repeating_inline(INPUT_UP))
         {
@@ -1502,11 +1504,11 @@ i32 TitleInf::do_replay_menu()
         {
             menu_1d4.move_cursor(1);
         }
-        if (menu_1d4.current_selection != menu_1d4.next_selection)
+        if (menu_selection_moved(&menu_1d4))
         {
             g_SoundManager.play_sound_centered(10, 0);
         }
-        if (menu.current_selection != menu.next_selection)
+        if (menu_selection_moved(&menu))
         {
             g_SoundManager.play_sound_centered(10, 0);
         }
@@ -1548,7 +1550,7 @@ i32 TitleInf::do_replay_menu()
     case 4:
         if (time_in_state.current >= 15)
         {
-            menu.current_selection = menu.next_selection;
+            menu_save_selection(&menu);
             if (input_pressed_or_repeating(INPUT_UP))
             {
                 menu.move_cursor(-1);
@@ -1557,7 +1559,7 @@ i32 TitleInf::do_replay_menu()
             {
                 menu.move_cursor(1);
             }
-            if (menu.current_selection != menu.next_selection)
+            if (menu_selection_moved(&menu))
             {
                 g_SoundManager.play_sound_centered(10, 0);
             }
@@ -1859,7 +1861,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
 // The high score name entry after a game (unk_5a58 is set when the score
 // did not make the top ten), then on to saving the replay unless the game
 // was continued.
-// TODO: the original realigns its frame (and esp, -8) and computes the % 13 column tests with a multiply; ours keeps 13 in ebx for idiv.
+// TODO: the original saves ebx (push ecx; push ebx) and keeps &replay_name in it for the score copy, tests the pressed word in memory before the name entry, and has the ascii create_effect pattern (see README).
 // FUNCTION: TH16 0x4532f0
 i32 TitleInf::do_score_name_entry()
 {
@@ -1935,7 +1937,8 @@ i32 TitleInf::do_score_name_entry()
             }
             if (input_pressed_or_repeating(INPUT_LEFT))
             {
-                if (menu_5a5c.next_selection % 13 != 0)
+                i32 selection = menu_5a5c.next_selection;
+                if (selection % 13 != 0)
                 {
                     menu_5a5c.move_cursor(-1);
                 }
@@ -1946,7 +1949,8 @@ i32 TitleInf::do_score_name_entry()
             }
             if (input_pressed_or_repeating(INPUT_RIGHT))
             {
-                if (menu_5a5c.next_selection % 13 != 12)
+                i32 selection = menu_5a5c.next_selection;
+                if (selection % 13 != 12)
                 {
                     menu_5a5c.move_cursor(1);
                 }
@@ -2610,7 +2614,7 @@ i32 TitleInf::do_music_room()
 
 // Spell practice: picking the stage. Coming back from a game goes straight
 // on to the spell card list of the last stage.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// TODO: the original keeps both input words in registers for the cursor tests.
 // FUNCTION: TH16 0x4553d0
 i32 TitleInf::do_spell_practice_stage_select()
 {
@@ -2622,11 +2626,11 @@ i32 TitleInf::do_spell_practice_stage_select()
             anm_id_73c = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
         }
         menu.num_choices = 7;
-        if (get_vm_or_clear(anm_ids[0x11c]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x11c]) == NULL)
         {
             anm_ids[0x11c] = title_anm->create_effect(0x11c, -1, NULL);
         }
-        if (get_vm_or_clear(anm_ids[0xd7]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0xd7]) == NULL)
         {
             anm_ids[0xd7] = title_anm->create_effect(0xd7, -1, NULL);
         }
@@ -2728,7 +2732,6 @@ i32 TitleInf::do_spell_practice_stage_select()
 }
 
 // Spell practice: picking the character, which reloads the spell list.
-// TODO: the original reserves a dead 4-byte local (push ecx) and tests the input after the store.
 // FUNCTION: TH16 0x455790
 i32 TitleInf::do_spell_practice_character()
 {
@@ -2773,7 +2776,7 @@ i32 TitleInf::do_spell_practice_character()
 
 // Spell practice: picking the boss attack (the row of spell cards) of the
 // stage.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// TODO: the two cleanup loops in case 4 address [esi + edi + disp] where the original has [edi + esi + disp] (this as the base register); not i[array] or (array + n)[i].
 // FUNCTION: TH16 0x455900
 i32 TitleInf::do_spell_practice_row()
 {
@@ -2782,11 +2785,11 @@ i32 TitleInf::do_spell_practice_row()
     {
     case 0:
         menu.num_choices = row_counts[spell_stage];
-        if (get_vm_or_clear(anm_ids[0x6b]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0x6b]) == NULL)
         {
             anm_ids[0x6b] = title_anm->create_effect(0x6b, -1, NULL);
         }
-        if (get_vm_or_clear(anm_ids[0xd8]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0xd8]) == NULL)
         {
             anm_ids[0xd8] = title_anm->create_effect(0xd8, -1, NULL);
         }
@@ -2900,7 +2903,7 @@ i32 g_spell_practice_last_stage = -1;
 i32 g_practice_last_stage = -1;
 
 // Spell practice: picking the subseason, then starting the game.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// TODO: as do_spell_practice_difficulty, the original keeps stage + 1 in ecx and computes the stage table pointer before the two stage number stores.
 // FUNCTION: TH16 0x455d50
 i32 TitleInf::do_spell_practice_subseason()
 {
@@ -2909,7 +2912,7 @@ i32 TitleInf::do_spell_practice_subseason()
     case 0:
         menu.num_choices = 4;
         menu.set_cursor(0);
-        if (get_vm_or_clear(anm_ids[0xd9]) == NULL)
+        if (g_AnmManager->get_vm_with_id(anm_ids[0xd9]) == NULL)
         {
             anm_ids[0xd9] = title_anm->create_effect(0xd9, -1, NULL);
         }
@@ -2978,8 +2981,8 @@ i32 TitleInf::do_spell_practice_subseason()
             g_Globals.character = menu_5cec.next_selection;
             g_Globals.subshot = 0;
             g_Globals.subseason = menu.next_selection;
-            g_Supervisor.gamemode_to_switch_to = 7;
             g_Globals.difficulty = g_spell_difficulty[spell_ids[spell_index]];
+            g_Supervisor.gamemode_to_switch_to = 7;
             g_spell_practice_last_stage = spell_stage;
             g_spell_practice_last_row = spell_row;
             g_spell_practice_last_index = spell_index;
@@ -3003,7 +3006,7 @@ i32 TitleInf::do_spell_practice_subseason()
 
 // Spell practice: picking the spell card (the difficulty row). Extra stage
 // cards start the game right away; the others go on to the subseason.
-// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// TODO: the original keeps stage + 1 in ecx and computes the stage table pointer before the two stage number stores (ours eax, after; not with a pointer local or reading g_Globals.stage_num back).
 // FUNCTION: TH16 0x456a20
 i32 TitleInf::do_spell_practice_difficulty()
 {
@@ -3091,9 +3094,9 @@ i32 TitleInf::do_spell_practice_difficulty()
                 g_Globals.spell_id = spell_ids[menu.next_selection];
                 g_Globals.character = menu_5cec.next_selection;
                 g_Globals.subshot = 0;
+                g_Globals.difficulty = g_spell_difficulty[spell_ids[menu.next_selection]];
                 g_Globals.subseason = 4;
                 g_Supervisor.gamemode_to_switch_to = 7;
-                g_Globals.difficulty = g_spell_difficulty[spell_ids[menu.next_selection]];
                 g_spell_practice_last_stage = spell_stage;
                 g_spell_practice_last_row = spell_row;
                 g_spell_practice_last_index = menu.next_selection;

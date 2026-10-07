@@ -58,8 +58,10 @@ extern "C" const GUID IID_IDirectSoundNotify = {0xb0210783, 0x89cd, 0x11d0, {0xa
 #define CS_BGM_STREAM 12
 
 // Debug output, empty in the release build (TH06: utils::DebugPrint2).
+// Declared with no named parameter: as `(const char *fmt, ...)`, LTCG drops
+// the one-argument call in CWaveFile::open_file, which the original keeps.
 // FUNCTION: TH16 0x471d90
-void dsutil_debug_log(const char *fmt, ...)
+void dsutil_debug_log(...)
 {
 }
 
@@ -664,7 +666,7 @@ HRESULT CSound::Play(DWORD dwPriority, DWORD dwFlags, DWORD offset)
     return pDSB->Play(0, dwPriority, dwFlags);
 }
 
-// TODO: the original has a call in each branch with the buffer loaded late; ours shares one call.
+// TODO: the original has a call in each branch, pushing -10000 directly and loading the buffer early in the first; written that way ours hoists the buffer load above the test.
 // FUNCTION: TH16 0x4711f0
 HRESULT CSound::SetVolume(i32 volume)
 {
@@ -952,7 +954,7 @@ HRESULT CStreamingSound::Reset(DWORD offset)
     return m_apDSBuffer[0]->SetCurrentPosition(0L);
 }
 
-// get_play_time's body, which LTCG also inlined into switch_track.
+// get_play_time's body as LTCG inlined it into switch_track.
 static __forceinline double play_time(CStreamingSound *sound)
 {
     double time = get_runtime() - (sound->m_start_time + sound->m_paused_total);
@@ -1027,14 +1029,25 @@ HRESULT CStreamingSound::switch_track(ThBgmFormat *track)
     return S_OK;
 }
 
-// TODO: the original aligns its frame to 8 bytes (whole-program double spill threshold, see README).
+// The body is spelled out: through the inline play_time helper its double
+// math belongs to the helper's call graph node, and the frame loses the
+// original's realignment (and esp, -8).
 // FUNCTION: TH16 0x471bd0
 HARNESS_CALLED double CStreamingSound::get_play_time()
 {
-    return play_time(this);
+    double time = get_runtime() - (m_start_time + m_paused_total);
+    ThBgmFormat *track = m_pWaveFile->m_track;
+    double end = track->total_size / (track->format.nSamplesPerSec / 8.0) / track->format.wBitsPerSample /
+                 track->format.nChannels;
+    double loop = (track->total_size - track->intro_size) / (double)track->format.nSamplesPerSec /
+                  (track->format.wBitsPerSample / 8.0) / track->format.nChannels;
+    while (time >= end)
+    {
+        time -= loop;
+    }
+    return time;
 }
 
-// TODO: the original restores esi and edi after the critical section, ours before.
 // FUNCTION: TH16 0x471c90
 HARNESS_CALLED void CStreamingSound::seek(double seconds)
 {
@@ -1057,7 +1070,6 @@ HARNESS_CALLED void CStreamingSound::seek(double seconds)
     LEAVE_CS(CS_BGM_STREAM);
 }
 
-// TODO: our build drops the log call with the error message; the original keeps it.
 // FUNCTION: TH16 0x4717e0
 HRESULT CWaveFile::open_file(const char *filename, ThBgmFormat *track)
 {

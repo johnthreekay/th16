@@ -15,12 +15,6 @@ i32 harness_w3f_reload_texture(AnmLoaded *anm, void *data, u32 size)
     return g_AnmManager->reload_texture(&anm->d3d[1], data, size, 0, 0, 0);
 }
 
-// Like the music room code around 0x43f463, which shows the play time.
-double harness_w3f_bgm_play_time()
-{
-    return ((CStreamingSound *)g_SoundManager.bgm_stream)->get_play_time();
-}
-
 // Like the callers around 0x42daec and 0x440b17, which seek the BGM.
 void harness_w3f_bgm_seek(double seconds)
 {
