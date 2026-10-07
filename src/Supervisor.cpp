@@ -190,30 +190,6 @@ HARNESS_CALLED u32 Supervisor::read_joypad(u32 input)
            ((js.lY > g_Supervisor.config.deadzone_y) ? INPUT_DOWN : 0);
 }
 
-// GLOBAL: TH16 0x4d9d2c
-i32 g_resolution_x;
-// GLOBAL: TH16 0x4d9d30
-i32 g_resolution_y;
-// GLOBAL: TH16 0x4d9d34
-f32 g_screen_coord_scale;
-// GLOBAL: TH16 0x4d9d38
-i32 g_early_arcade_offset_x;
-// GLOBAL: TH16 0x4d9d3c
-i32 g_early_arcade_offset_y;
-// GLOBAL: TH16 0x4d9d40
-i32 g_arcade_height;
-// GLOBAL: TH16 0x4d9d44
-i32 g_arcade_width;
-// GLOBAL: TH16 0x4d9d1c
-u32 g_window_flags;
-// GLOBAL: TH16 0x4d9d48
-i32 g_arcade_hud_origin_x;
-// GLOBAL: TH16 0x4d9d4c
-i32 g_arcade_hud_origin_y;
-// GLOBAL: TH16 0x4d9d50
-i32 g_game_2d_origin_x;
-// GLOBAL: TH16 0x4d9d54
-i32 g_game_2d_origin_y;
 // GLOBAL: TH16 0x4c0f4c
 AnmId g_stage_load_anm_ids[3];
 // GLOBAL: TH16 0x4a6ef0
@@ -922,10 +898,6 @@ void Supervisor::release_dinput()
     }
 }
 
-// GLOBAL: TH16 0x4d9d20
-i32 g_device_reset_frames;
-// GLOBAL: TH16 0x4d9d90
-DECOMP_ALIGN16 FramePacingTable g_frame_pacing;
 // GLOBAL: TH16 0x4a5788
 f32 g_game_speed = 1.0f;
 

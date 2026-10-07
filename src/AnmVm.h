@@ -8,6 +8,7 @@
 #include "Interp.h"
 #include "ZunList.h"
 #include "ZunMath.h"
+#include "GameWindow.h"
 #include "ZunTimer.h"
 #include "decomp.h"
 #include "types.h"
@@ -994,8 +995,6 @@ struct AnmVm
 // Where HUD elements drawn at full resolution inside the arcade region are
 // placed: half the window width and the arcade's top edge, scaled (ExpHP:
 // ARCADE_HUD_ORIGIN_X/Y).
-extern i32 g_arcade_hud_origin_x;
-extern i32 g_arcade_hud_origin_y;
 
 // A zero vector that is never written (ExpHP:
 // SEEMINGLY_CONST_ZERO_VEC_4d9dc4); interpolators take their unused bezier

@@ -9,6 +9,7 @@
 
 #include "AnmManager.h"
 #include "Camera.h"
+#include "GameWindow.h"
 #include "Thread.h"
 #include "types.h"
 
@@ -524,28 +525,16 @@ extern i16 g_pad_mapping[10];
 
 // Screen geometry, rescaled for the chosen window size. Names and notes from
 // ExpHP's th-re-data.
-extern i32 g_resolution_x;
-extern i32 g_resolution_y;
 // 1.0, 1.5 or 2.0 depending on the window size.
-extern f32 g_screen_coord_scale;
 // Size of the arcade region (384x448 unscaled).
-extern i32 g_arcade_height;
-extern i32 g_arcade_width;
 // Half the window width and the scaled top of the arcade region, for HUD
 // elements drawn at full resolution (ExpHP: ARCADE_HUD_ORIGIN_X/Y).
-extern i32 g_arcade_hud_origin_x;
-extern i32 g_arcade_hud_origin_y;
 // GameWindow::flags (WindowFlags), which code outside the window methods
 // addresses as a global.
-extern u32 g_window_flags;
 // Where game coordinate (0, 0) is on the arcade surface.
-extern i32 g_game_2d_origin_x;
-extern i32 g_game_2d_origin_y;
 // Where the arcade region sits on the window-sized "@R" surfaces it is
 // drawn to before upscaling: half the scaled window size minus the unscaled
 // arcade size (ExpHP: EARLY_RENDERING_ARCADE_OFFSET_X/Y).
-extern i32 g_early_arcade_offset_x;
-extern i32 g_early_arcade_offset_y;
 
 // The effects Supervisor::end_stage_load_anms/abort_stage_load_anms
 // remove. Nothing in TH16 creates them.
@@ -580,17 +569,7 @@ extern i32 g_title_return_point;
 // the window methods addresses them: as a global of their own, like the
 // other GameWindow fields from 0x4d9d1c on. The mode is set once the
 // loading screen is done.
-struct FramePacingTable
-{
-    i32 mode;
-    struct
-    {
-        i32 max_sleep_ms;
-        i32 sleep_ms;
-        i32 late_frames;
-    } pacing[4];
-};
-extern DECOMP_ALIGN16 FramePacingTable g_frame_pacing;
+// FramePacingTable and g_frame_pacing are in GameWindow.h.
 // FramePacingTable::mode: which set of sleep statistics the frame loop
 // uses, by what is running.
 enum FramePacingMode
@@ -605,7 +584,6 @@ enum FramePacingMode
 };
 // GameWindow::device_reset_frames: set to 10 when the device is reset,
 // counted down once per frame by Supervisor::on_tick, never read.
-extern i32 g_device_reset_frames;
 // The game speed multiplier. ECL changes it (slowing down final boss
 // deaths), and much code changes it temporarily so that different objects
 // see time pass differently.

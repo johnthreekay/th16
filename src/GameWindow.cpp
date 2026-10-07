@@ -25,7 +25,7 @@ static_assert(offsetof(GameWindow, sleep_ms) == 0x20ac, "GameWindow layout");
 static_assert(offsetof(GameWindow, pacing) == 0x20b4, "GameWindow layout");
 
 // GLOBAL: TH16 0x4d7ce0
-GameWindow g_GameWindow;
+DECOMP_ALIGN16 GameWindow g_GameWindow;
 
 // Debug logging, compiled out of the release build. The window setup logs
 // the save directories through it.
