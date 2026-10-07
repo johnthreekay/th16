@@ -9,7 +9,7 @@
 // its alpha bits cleared. The game sets alpha everywhere first, draws, then
 // inverts alpha: drawn pixels become opaque, the rest transparent. Glyphs
 // are antialiased by blending the text colour over the pixel's colour by
-// coverage, as GDI's grayscale smoothing does.
+// coverage in 17 levels, as GDI's grayscale smoothing does.
 //
 // Fonts: the game asks for MS Gothic and MS Mincho (Shift-JIS face names,
 // SHIFTJIS_CHARSET), or Meiryo when EnumFontFamiliesExA finds it.
@@ -609,7 +609,10 @@ void draw_glyph(GdiDC *dc, GdiFont *font, uint32_t c, int cell_x, int cell_width
             }
             else if (bitmap.pixel_mode == FT_PIXEL_MODE_GRAY)
             {
-                coverage = src[col];
+                // GDI's grayscale smoothing has 17 levels (GGO_GRAY4): the
+                // faintest edges round to nothing rather than to opaque
+                // pixels after the game's alpha trick.
+                coverage = (src[col] * 16 + 127) / 255 * 255 / 16;
             }
             else
             {

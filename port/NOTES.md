@@ -362,8 +362,8 @@ GetDC on a D3D surface). `CreateDIBSection` handles 16/24/32-bit BI_RGB and
 BI_BITFIELDS DIBs, top-down or bottom-up; `TextOutA` writes whole pixels
 through the colour masks, so every pixel text touches loses its alpha
 bits, which the game's invert-alpha trick turns into opaque text. Glyphs
-are antialiased (FreeType grayscale coverage blended over the pixel, like
-GDI's standard smoothing) in the COLORREF text colour; `SetBkMode(OPAQUE)`
+are antialiased (FreeType grayscale coverage in GDI's 17 levels blended
+over the pixel, like GDI's standard smoothing) in the COLORREF text colour; `SetBkMode(OPAQUE)`
 fills the cell. Strings are split into Shift-JIS characters (lead bytes
 0x81-0x9f, 0xe0-0xfc) and converted with iconv (CP932).
 
@@ -421,8 +421,8 @@ through the namespace, the loading, sound and BGM threads, a new th16.cfg
 and scoreth16.dat in the save folder, keyboard input through DirectInput,
 quitting from the menu and on SIGINT/SIGTERM, screenshots (P/Home:
 `_beginthread`, `_mkdir`, a 1280x960 BMP in snapshot/), Alt+Enter both
-ways, Japanese text, and starting a game (Z through the menus) and playing
-on for 90 s to the game over screen. SDL's HIDAPI controller probing (libusb) can take a
+ways, Japanese text, and starting a game (Z through the menus) and letting
+it run for 90 s without input. SDL's HIDAPI controller probing (libusb) can take a
 second or more at startup, much longer under gdb; `SDL_JOYSTICK_HIDAPI=0`
 skips it for tests.
 
