@@ -1900,3 +1900,158 @@ void EnemyData::ecl_anm_vm_instr()
         break;
     }
 }
+
+// TODO: frame layout (the original keeps the zero vector higher up), &rel_pos stays in esi, and
+// ours combines the two flag tests of the vertical off-screen check.
+// FUNCTION: TH16 0x41bb50
+int EnemyData::step_interpolators()
+{
+    prev_final_pos = final_pos;
+    if (abs_angle_i.end_time != 0 && (abs_pos.flags & 0xf) != POSVEL_MODE_CIRCLE &&
+        (abs_pos.flags & 0xf) != POSVEL_MODE_ELLIPSE)
+    {
+        abs_pos.angle.value = wrap_angle(wrap_angle(abs_angle_i.step()));
+    }
+    if (abs_speed_i.end_time != 0)
+    {
+        abs_pos.speed = abs_speed_i.step();
+    }
+    if (rel_angle_i.end_time != 0 && (rel_pos.flags & 0xf) != POSVEL_MODE_CIRCLE &&
+        (rel_pos.flags & 0xf) != POSVEL_MODE_ELLIPSE)
+    {
+        rel_pos.angle.value = wrap_angle(wrap_angle(rel_angle_i.step()));
+    }
+    if (rel_speed_i.end_time != 0)
+    {
+        rel_pos.speed = rel_speed_i.step();
+    }
+    if (abs_radial_dist_i.end_time != 0)
+    {
+        D3DXVECTOR2 v = abs_radial_dist_i.step_radial_dist();
+        abs_pos.radial_dist = v.x;
+        abs_pos.radial_speed = v.y;
+    }
+    if (rel_radial_dist_i.end_time != 0)
+    {
+        D3DXVECTOR2 v = rel_radial_dist_i.step_radial_dist();
+        rel_pos.radial_dist = v.x;
+        rel_pos.radial_speed = v.y;
+    }
+    if (abs_pos_i.end_time != 0)
+    {
+        abs_pos.velocity = abs_pos_i.step() - abs_pos.pos;
+    }
+    else
+    {
+        abs_pos.update_secondary_fields();
+    }
+    if (rel_pos_i.end_time != 0)
+    {
+        rel_pos.velocity = rel_pos_i.step() - rel_pos.pos;
+    }
+    else
+    {
+        rel_pos.update_secondary_fields();
+    }
+    abs_pos.step();
+    if (flags_low & 0x4000000)
+    {
+        rel_pos.pos.x += g_Supervisor.cameras[0].unk_104.x;
+        rel_pos.pos.y += g_Supervisor.cameras[0].unk_104.y;
+        rel_pos.pos.z += g_Supervisor.cameras[0].unk_104.z;
+    }
+    rel_pos.step();
+    update_final_pos();
+    if (((EnemyFlagsLow *)&flags_low)->directional_anm)
+    {
+        i32 dir = -0.03f > final_pos.velocity.x ? -1 : final_pos.velocity.x > 0.03f;
+        if (unk_274 != dir)
+        {
+            i32 script_offset = 0;
+            switch (unk_274)
+            {
+            case -1:
+                script_offset = dir != 0 ? 2 : 3;
+                break;
+            case 0:
+                script_offset = (dir != -1) + 1;
+                break;
+            case 1:
+                script_offset = dir == 0 ? 4 : 1;
+                break;
+            }
+            AnmVm *vm = get_vm_or_clear(anm_ids[0]);
+            AnmLoaded *file = g_EnemyManager->anim_statement_anms[anm_slot_0_anm_index];
+            Float3 zero(0.0f, 0.0f, 0.0f);
+            Float3 pos;
+            if (vm != NULL)
+            {
+                pos = vm->pos;
+                delete_vm_and_clear(anm_ids[0]);
+            }
+            else
+            {
+                pos = zero;
+            }
+            i32 layer = anm_layers + 7;
+            i32 script = anm_set_main + script_offset;
+            ENTER_CS(CS_ANM_MANAGER);
+            file->vm_count++;
+            AnmVm *new_vm = g_AnmManager->allocate_vm();
+            file->copy_vm(new_vm, script);
+            new_vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
+            if (layer >= 0)
+            {
+                new_vm->layer = layer;
+                if (layer <= 23)
+                {
+                    new_vm->flags_hi &= ~ANM_VM_LAYER_UI;
+                    new_vm->flags_hi |= ANM_VM_LAYER_SET;
+                }
+            }
+            new_vm->entity_pos = pos;
+            new_vm->rotation.z = 0.0f;
+            new_vm->run();
+            new_vm->mode_of_create_child = 8;
+            AnmId id;
+            id = g_AnmManager->insert_in_world_list_back(new_vm);
+            LEAVE_CS(CS_ANM_MANAGER);
+            anm_ids[0] = id;
+            unk_274 = dir;
+        }
+    }
+    AnmVm *vm = get_vm_or_clear(anm_ids[0]);
+    if (vm != NULL)
+    {
+        final_sprite_size.x = fabsf(vm->scale.y * vm->sprite_size.y);
+        final_sprite_size.y = fabsf(vm->scale.x * vm->sprite_size.x);
+    }
+    EnemyFlagsLow *flags = (EnemyFlagsLow *)&flags_low;
+    f32 half = final_sprite_size.x * 0.5f;
+    if (-192.0f > final_pos.pos.x + half || final_pos.pos.x - half > 192.0f)
+    {
+        if (flags->was_on_screen && !flags->no_offscreen_delete_x)
+        {
+            return -1;
+        }
+    }
+    else
+    {
+        half = final_sprite_size.y * 0.5f;
+        if (0.0f > final_pos.pos.y + half || final_pos.pos.y - half > 448.0f)
+        {
+            if (flags->was_on_screen)
+            {
+                if (!flags->no_offscreen_delete_y)
+                {
+                    return -1;
+                }
+            }
+        }
+        else
+        {
+            flags->was_on_screen = 1;
+        }
+    }
+    return 0;
+}

@@ -109,9 +109,18 @@ struct EnemyInterrupt
 // sets or clears); the assignments compile to xor/and/xor.
 struct EnemyFlagsLow
 {
-    u32 unk_0 : 19;
+    u32 unk_0 : 2;
+    // Stays alive off screen horizontally / vertically.
+    u32 no_offscreen_delete_x : 1;
+    u32 no_offscreen_delete_y : 1;
+    u32 unk_4 : 12;
+    // Has been on screen; leaving it then deletes the enemy.
+    u32 was_on_screen : 1;
+    u32 unk_17 : 2;
     u32 mirrored : 1;
-    u32 unk_20 : 4;
+    // Switches anm_ids[0] between the left, right and still scripts.
+    u32 directional_anm : 1;
+    u32 unk_21 : 3;
     // Set while a time interrupt is running (check_time_interrupts).
     u32 flag_1000000 : 1;
     u32 unk_25 : 1;
