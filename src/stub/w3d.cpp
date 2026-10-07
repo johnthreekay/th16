@@ -4,9 +4,4 @@
 #include "../Player.h"
 
 
-// STUB: TH16 0x440fb0
-i32 Player::initialize()
-{
-    return 0;
-}
 

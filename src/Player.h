@@ -161,7 +161,9 @@ struct PlayerInner
     ZunTimer iframes;
     // 0x20: damage is multiplied this frame (EnemyManager::update).
     u32 flags;
-    u8 unk_16040[0x16050 - 0x16040];
+    // The .sht file's four move speeds (unfocused, focused, and both
+    // diagonally) in 1/128 pixels.
+    i32 speeds_subpixel[4];
     // Scaled by 1/128; aims and sizes Aya's bomb.
     f32 unk_16050;
     u8 unk_16054[0x16070 - 0x16054];
@@ -299,7 +301,10 @@ struct Player
     i32 unk_2c7d0;
     i32 unk_2c7d4;
     i32 unk_2c7d8;
-    u8 unk_2c7dc[0x2c828 - 0x2c7dc];
+    BoundingBox3 item_collect_box;
+    BoundingBox3 item_attract_box_focused;
+    BoundingBox3 item_attract_box_unfocused;
+    u8 unk_2c824[0x2c828 - 0x2c824];
 
     Player()
     {
@@ -339,7 +344,7 @@ struct Player
     HARNESS_CALLED void set_position_subpixel(Int2 *pos);
     // Loads a .sht file and resolves its offsets and callbacks. Does not
     // use this.
-    i32 read_sht_file(ShtFile **out, const char *path);
+    HARNESS_CALLED i32 read_sht_file(ShtFile **out, const char *path);
 
     // The option a shooter's option number (minus one) names: 100 and up
     // are season options.

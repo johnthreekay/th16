@@ -101,7 +101,7 @@ struct Globals
     void collect_bomb(i32 unused);
     void collect_bomb_fragment(i32 unused);
     i32 collect_season_item(i32 unused);
-    void init_season_level_delta(i32 level, i32 delta);
+    HARNESS_CALLED void init_season_level_delta(i32 level, i32 delta);
 
     // Returns whether the power level changed.
     i32 add_power(i32 amount);

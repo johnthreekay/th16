@@ -7,6 +7,7 @@
 
 #include "Bomb.h"
 #include "Collision.h"
+#include "GameErrorContext.h"
 #include "FileSystem.h"
 #include "EffectManager.h"
 #include "EnemyManager.h"
@@ -339,7 +340,7 @@ void Player::start_respawn()
 }
 
 // FUNCTION: TH16 0x443790
-i32 Player::read_sht_file(ShtFile **out, const char *path)
+HARNESS_CALLED i32 Player::read_sht_file(ShtFile **out, const char *path)
 {
     *out = (ShtFile *)file_read_all(path, NULL, 0);
     if (*out == NULL)
@@ -924,6 +925,141 @@ i32 Player::tick_bullets()
             vm->rotation.z = bullet->pos.angle.value;
         }
         bullet->timer_c.tick();
+    }
+    return 0;
+}
+
+// GLOBAL: TH16 0x492c68
+const f32 g_player_attract_radii[4] = {100.0f, 100.0f, 100.0f, 100.0f};
+// GLOBAL: TH16 0x492c78
+const f32 g_player_graze_radii[4] = {5.0f, 5.0f, 5.0f, 5.0f};
+// GLOBAL: TH16 0x492c88
+const f32 g_player_item_radii[4] = {60.0f, 60.0f, 60.0f, 60.0f};
+// GLOBAL: TH16 0x492c98
+const f32 g_player_hitbox_radii[4] = {3.0f, 3.0f, 3.0f, 3.0f};
+// GLOBAL: TH16 0x492ca8
+const char *const g_player_sht_names[4] = {"pl00.sht", "pl02.sht", "pl03.sht", "pl01.sht"};
+// GLOBAL: TH16 0x492cb8
+const char *const g_subseason_sht_names[5] = {"pl00sub.sht", "pl02sub.sht", "pl03sub.sht", "pl01sub.sht",
+                                              "pl04sub.sht"};
+// GLOBAL: TH16 0x492ccc
+const char *const g_player_anm_names[4] = {"pl00.anm", "pl02.anm", "pl03.anm", "pl01.anm"};
+// GLOBAL: TH16 0x492cdc
+const char *const g_subseason_anm_names[5] = {"pl00sub.anm", "pl02sub.anm", "pl03sub.anm", "pl01sub.anm",
+                                              "pl04sub.anm"};
+
+// FUNCTION: TH16 0x440fb0
+i32 Player::initialize()
+{
+    anm_file = AnmManager::preload_anm(9, g_player_anm_names[g_Globals.character + g_Globals.subshot]);
+    if (anm_file == NULL)
+    {
+        g_GameErrorContext.log("\x8e\xa9\x8b@\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81"
+                               "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
+        return -1;
+    }
+    subseason_anm_file = AnmManager::preload_anm(0x1e, g_subseason_anm_names[g_Globals.subseason]);
+    if (subseason_anm_file == NULL)
+    {
+        g_GameErrorContext.log("\x8e\xa9\x8b@\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81"
+                               "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
+        return -1;
+    }
+    if (g_cached_sht_file != NULL)
+    {
+        sht_file = g_cached_sht_file;
+        sht_file_subseason = g_cached_sht_file_subseason;
+        g_cached_sht_file = NULL;
+        g_cached_sht_file_subseason = NULL;
+    }
+    else
+    {
+        if (read_sht_file(&sht_file, g_player_sht_names[g_Globals.character + g_Globals.subshot]) != 0)
+        {
+            g_GameErrorContext.log("\x8e\xa9\x8b@\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81"
+                                   "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
+            return -1;
+        }
+        if (read_sht_file(&sht_file_subseason, g_subseason_sht_names[g_Globals.subseason]) != 0)
+        {
+            g_GameErrorContext.log("\x8e\xa9\x8b@\x83" "f\x81[\x83^\x82\xaa\x8c\xa9\x82\xc2\x82\xa9\x82\xe8\x82\xdc\x82\xb9\x82\xf1\x81"
+                                   "B\x83" "f\x81[\x83^\x82\xaa\x89\xf3\x82\xea\x82\xc4\x82\xa2\x82\xdc\x82\xb7\r\n");
+            return -1;
+        }
+    }
+    {
+        UpdateFunc *f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_tick_callback);
+        f->flags &= ~UPDATE_FUNC_ACTIVE;
+        f->arg = this;
+        g_UpdateFuncRegistry->register_on_tick(f, 0x16);
+        on_tick = f;
+        f = g_UpdateFuncRegistry->create_func((UpdateFuncCallback)on_draw_callback);
+        f->flags &= ~UPDATE_FUNC_ACTIVE;
+        f->arg = this;
+        g_UpdateFuncRegistry->register_on_draw(f, 0x1d);
+        on_draw = f;
+    }
+    anm_file->copy_vm(&vm, 0);
+    vm.unk_5b0 = NULL;
+    vm.parent = NULL;
+    vm.run();
+    set_position(0.0f, 400.0f);
+    for (i32 i = 0; i < 4; i++)
+    {
+        inner.speeds_subpixel[i] = (i32)((&sht_file->move_speed)[i] * 128.0f);
+    }
+    {
+        i32 season_deltas[8] = {0, 100, 130, 160, 200, 250, 300, 0};
+        sht_file->power_per_level = 100;
+        g_Globals.max_power = sht_file->power_per_level * sht_file->num_power_levels;
+        g_Globals.power_per_level = sht_file->power_per_level;
+        for (i32 i = 0; i < 8; i++)
+        {
+            g_Globals.init_season_level_delta(i, season_deltas[i]);
+        }
+    }
+    g_Globals.max_season_power = g_Globals.season_level_thresholds[7];
+    inner.shoot_key_short_timer = -1;
+    inner.shoot_key_long_timer = -1;
+    sht_file->hitbox_radius = g_player_hitbox_radii[g_Globals.character];
+    sht_file->itembox_radius = g_player_item_radii[g_Globals.character];
+    sht_file->grazebox_radius = g_player_graze_radii[g_Globals.character];
+    hurtbox_halfsize.x = hurtbox_halfsize.y = sht_file->hitbox_radius * 0.5f;
+    hurtbox_halfsize.z = 5.0f;
+    item_attract_box_unfocused_halfsize.x = item_attract_box_unfocused_halfsize.y =
+        g_player_item_radii[g_Globals.character] * 0.5f;
+    item_attract_box_unfocused_halfsize.z = 5.0f;
+    item_attract_box_focused_halfsize.x = item_attract_box_focused_halfsize.y =
+        g_player_attract_radii[g_Globals.character] * 0.5f;
+    item_attract_box_focused_halfsize.z = 5.0f;
+    hurtbox.min_pos = inner.pos - hurtbox_halfsize;
+    hurtbox.max_pos = inner.pos + hurtbox_halfsize;
+    item_collect_box.min_pos = inner.pos - item_attract_box_unfocused_halfsize;
+    item_collect_box.max_pos = inner.pos + item_attract_box_unfocused_halfsize;
+    item_attract_box_focused.min_pos = inner.pos - item_attract_box_focused_halfsize;
+    item_attract_box_focused.max_pos = inner.pos + item_attract_box_focused_halfsize;
+    item_attract_box_unfocused.min_pos = inner.pos - item_attract_box_focused_halfsize;
+    item_attract_box_unfocused.max_pos = inner.pos + item_attract_box_focused_halfsize;
+    inner.time_in_state.reset_inline();
+    inner.timer_3c.reset_inline();
+    inner.iframes.reset_inline();
+    inner.percent_moved_by_options = 30;
+    inner.num_main_options = 0;
+    inner.speed_multiplier = 1.0f;
+    for (i32 i = 0; i < 4; i++)
+    {
+        inner.main_options[i].scaled_cur_pos.y = -400 * 128;
+    }
+    for (i32 i = 0; i < 8; i++)
+    {
+        inner.subseason_options[i].scaled_cur_pos.y = -400 * 128;
+    }
+    inner.flags &= ~4;
+    player_scale_i.end_time = 0;
+    player_scale = 1.0f;
+    for (i32 i = 0; i < 0x100; i++)
+    {
+        inner.bullets[i].index_of_self = i;
     }
     return 0;
 }
