@@ -30,7 +30,13 @@ static void __fastcall effect3_sincosmul(Float3 *dst, f32 angle, f32 radius)
 struct AnmEffect2Data
 {
     AnmId vm_ids[200];
-    u8 unk_320[0x1900 - 0x320];
+    // Per child: where its first curve ended and the bezier term it ended
+    // with, and how far along it is (0 new, 1 on the way out, 2 back).
+    Float3 unk_320[200];
+    Float3 unk_c80[200];
+    i32 states[200];
+    // The points the curves run between: near the VM, circling it at 150
+    // and at 300 pixels.
     Float3 unk_1900;
     Float3 unk_190c;
     Float3 unk_1918;
@@ -45,6 +51,130 @@ int __fastcall anm_effect_2_init(AnmVm *vm, i32 arg)
     AnmEffect2Data *data = (AnmEffect2Data *)vm->ins_508_extra_data;
     memset(data, 0, sizeof(AnmEffect2Data));
     data->timer = 0;
+    return 0;
+}
+
+// The copy of ZunMath.h's sincosmul that effect kind 2's object file has.
+// FUNCTION: TH16 0x406470
+static void __fastcall effect2_sincosmul(Float3 *dst, f32 angle, f32 radius)
+{
+    __asm {
+        mov eax, dst
+        fld angle
+        fsincos
+        fmul radius
+        fstp [eax]
+        fmul radius
+        fstp [eax+4]
+    }
+}
+
+// Gives a new child VM its color and flight time.
+static __forceinline void effect2_setup_child(AnmId *id, ZunColor color, AnmVm *vm)
+{
+    AnmVm *child = g_AnmManager->get_vm_with_id(*id);
+    if (child == NULL)
+    {
+        id->id = 0;
+    }
+    child->color_1 = color;
+    child->int_vars[0] = vm->int_vars[0];
+}
+
+// TODO: same operations, different stack slot layout and scheduling (the original's frame is 0x90 bytes, ours 0xa4).
+// Spawns four child VMs per frame for 50 frames and flies each along two
+// bezier curves: out from a point that circles the VM to one that circles
+// it closer, then back to the VM.
+// FUNCTION: TH16 0x405700
+int __fastcall anm_effect_2_on_tick(AnmVm *vm)
+{
+    i32 alive = 0;
+    AnmEffect2Data *data = (AnmEffect2Data *)vm->ins_508_extra_data;
+    Float3 offset;
+    Float3 pos = vm->entity_pos;
+    data->unk_1900 = data->unk_190c = data->unk_1918 = pos;
+    effect2_sincosmul(&offset, vm->rotation.z, 300.0f);
+    offset.z = 0.0f;
+    data->unk_190c += offset;
+    effect2_sincosmul(&offset, vm->script_vars_33_34_35.z + vm->rotation.z, 150.0f);
+    offset.z = 0.0f;
+    data->unk_1900 += offset;
+    if (data->timer.current != data->timer.previous && data->timer.current < 50)
+    {
+        i32 n = data->timer.current * 4;
+        data->vm_ids[n] = g_EffectManager->effect_anm->create_effect(0x99, -1, NULL);
+        data->vm_ids[n + 1] = g_EffectManager->effect_anm->create_effect(0x99, -1, NULL);
+        data->vm_ids[n + 2] = g_EffectManager->effect_anm->create_effect(0x99, -1, NULL);
+        data->vm_ids[n + 3] = g_EffectManager->effect_anm->create_effect(0x9a, -1, NULL);
+        ZunColor color = vm->color_1;
+        effect2_setup_child(&data->vm_ids[n], color, vm);
+        effect2_setup_child(&data->vm_ids[n + 1], color, vm);
+        effect2_setup_child(&data->vm_ids[n + 2], color, vm);
+        // The last one in the complementary color.
+        color.r = 0x2c - color.r;
+        color.g = 0x2c - color.g;
+        color.b = 0x2c - color.b;
+        effect2_setup_child(&data->vm_ids[n + 3], color, vm);
+    }
+    for (i32 i = 0; i < 200; i++)
+    {
+        AnmVm *child = g_AnmManager->get_vm_with_id(data->vm_ids[i]);
+        if (child == NULL)
+        {
+            data->vm_ids[i].id = 0;
+            continue;
+        }
+        child->slowdown = vm->get_slowdown_factor();
+        if (data->states[i] == 0)
+        {
+            Float3 start = data->unk_190c;
+            f32 angle = g_replay_safe_rng.randf_neg_1_to_1() * ZUN_PI;
+            effect2_sincosmul(&offset, angle, g_replay_safe_rng.randf_0_to_1() * 150.0f);
+            offset.z = 0.0f;
+            start += offset;
+            Float3 mid = data->unk_1900;
+            angle = g_replay_safe_rng.randf_neg_1_to_1() * ZUN_PI;
+            effect2_sincosmul(&offset, angle, g_replay_safe_rng.randf_0_to_1() * 50.0f);
+            offset.z = 0.0f;
+            mid += offset;
+            Float3 bezier_2;
+            Float3 bezier_1;
+            // Out of the start towards the middle and on to the end.
+            D3DXVec3Normalize(&bezier_2, &(mid - start));
+            D3DXVec3Normalize(&bezier_1, &(data->unk_1918 - mid));
+            bezier_2 += bezier_1;
+            f32 speed = g_replay_safe_rng.randf_0_to_1() * 200.0f + 200.0f;
+            D3DXVec3Normalize(&bezier_2, &bezier_2);
+            bezier_2 *= speed;
+            speed = g_replay_safe_rng.randf_0_to_1() * 100.0f + 100.0f;
+            D3DXVec3Normalize(&bezier_1, &(mid - start));
+            bezier_1 *= speed;
+            child->set_pos_bezier(vm->int_vars[0], &start, &bezier_1, &mid, &bezier_2);
+            data->unk_320[i] = mid;
+            data->unk_c80[i] = bezier_2;
+            data->states[i] = 1;
+        }
+        else if (child->timer_1c.current >= vm->int_vars[0] + 1 && data->states[i] == 1)
+        {
+            Float3 end = vm->entity_pos;
+            f32 angle = g_replay_safe_rng.randf_neg_1_to_1() * ZUN_PI;
+            effect2_sincosmul(&offset, angle, g_replay_safe_rng.randf_0_to_1() * 20.0f);
+            offset.z = 0.0f;
+            end += offset;
+            Float3 bezier_2;
+            angle = g_replay_safe_rng.randf_neg_1_to_1() * ZUN_PI;
+            effect2_sincosmul(&bezier_2, angle, g_replay_safe_rng.randf_0_to_1() * 20.0f);
+            bezier_2.z = 0.0f;
+            child->set_pos_bezier(vm->int_vars[0], &data->unk_320[i], &data->unk_c80[i], &end, &bezier_2);
+            data->states[i] = 2;
+        }
+        alive++;
+    }
+    if (alive == 0)
+    {
+        return -1;
+    }
+    data->timer.tick_in_place();
     return 0;
 }
 
