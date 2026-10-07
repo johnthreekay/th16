@@ -76,7 +76,7 @@ void __fastcall from_polar(Float3 *dst, f32 angle, f32 radius);
 // body out of line there; the helper itself is then inlined into every
 // caller, which is left calling the copy, as in the original. A large
 // function that calls sinf directly inlines it and realigns its frame
-// instead (README).
+// instead (docs/findings.md).
 inline f32 zun_sinf(f32 x)
 {
     return sinf(x);

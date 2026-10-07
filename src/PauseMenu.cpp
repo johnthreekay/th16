@@ -394,7 +394,7 @@ int PauseMenu::on_draw()
     return 1;
 }
 
-// TODO: the original realigns its frame to 8 bytes (whole-program, see README) and keeps vm in a stack slot, not ebx.
+// TODO: the original realigns its frame to 8 bytes (whole-program, see docs/findings.md) and keeps vm in a stack slot, not ebx.
 // FUNCTION: TH16 0x43ef20
 void PauseMenu::take_snapshot()
 {
