@@ -14,11 +14,6 @@
 // GLOBAL: TH16 0x4a6ef8
 Player *g_Player;
 
-// STUB: TH16 0x42c600
-void Gui::update_season_gauge()
-{
-}
-
 // STUB: TH16 0x4440e0
 void PlayerInner::repopulate_options()
 {

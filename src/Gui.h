@@ -122,7 +122,9 @@ struct Gui
     AnmId difficulty_id;
     AnmId season_gauge_id;
     AnmId id_110;
-    u8 unk_114[0x11c - 0x114];
+    // Whether the season gauge shows a level (update_season_gauge).
+    i32 season_gauge_has_level;
+    u8 unk_118[0x11c - 0x118];
     AnmId ids_11c[5];
     u8 unk_130[0x14c - 0x130];
     // Set by sub_42bcf0's notices.

@@ -781,6 +781,75 @@ void Gui::sub_42c5c0()
     }
 }
 
+// The id of the first descendant of the VM running the script (0 if there
+// is none, forgetting the id if the VM is gone). LTCG knows get_vm_with_id
+// leaves g_AnmManager alone and loads it once; with the opaque stub we have
+// to pass it in.
+static inline AnmId find_child_id_of(AnmManager *anm, AnmId &id, i32 script)
+{
+    AnmVm *child = NULL;
+    AnmVm *vm = anm->get_vm_with_id(id);
+    if (vm == NULL)
+    {
+        id.id = 0;
+    }
+    else
+    {
+        vm = anm->get_vm_with_id(id);
+        if (vm == NULL)
+        {
+            id.id = 0;
+        }
+        child = vm->search_children(script, 0);
+    }
+    AnmId result;
+    result.id = child != NULL ? child->id.id : 0;
+    return result;
+}
+
+// TODO: the original keeps g_AnmManager and then the level in ebx; ours spills both (get_vm_with_id is an opaque stub here).
+// FUNCTION: TH16 0x42c600
+void Gui::update_season_gauge()
+{
+    AnmManager *anm = g_AnmManager;
+    Gui *gui = g_Gui;
+    AnmVm *gauge = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, 0x73));
+    AnmVm *level_vm = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, 0x74));
+    i32 level = g_Globals.season_level();
+    if (level == 0)
+    {
+        gauge->sprite_size.x = get_season_gauge_fill_ratio() * 100.0f;
+        gauge->flags_lo |= ANM_VM_SCALE_CHANGED;
+        level_vm->clear_flag_lo_2_tree_inline();
+        if (gui->season_gauge_has_level == 1)
+        {
+            gauge->interrupt(3);
+            gauge->run();
+        }
+        gui->season_gauge_has_level = 0;
+    }
+    else
+    {
+        if (g_Globals.season_power < g_Globals.max_season_power)
+        {
+            gauge->sprite_size.x = get_season_gauge_fill_ratio() * 100.0f;
+        }
+        else
+        {
+            gauge->sprite_size.x = 100.0f;
+        }
+        gauge->flags_lo |= ANM_VM_SCALE_CHANGED;
+        level_vm->set_flag_lo_2_tree_inline();
+        level_vm->interrupt(level + 7);
+        if (gui->season_gauge_has_level == 0)
+        {
+            gauge->interrupt(2);
+            gauge->run();
+        }
+        gui->season_gauge_has_level = 1;
+    }
+}
+
 // FUNCTION: TH16 0x42c890
 void __fastcall anm_vm_interrupt_4_run(AnmVm *vm)
 {
