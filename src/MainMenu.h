@@ -105,6 +105,7 @@ class TitleInf : public TaskInf
 
     // States of on_tick (ExpHP: do_*).
     i32 do_subseason_select();
+    i32 do_practice_stage_select();
     i32 do_manual();
     i32 do_spell_practice_stage_select();
     i32 do_spell_practice_character();

@@ -235,6 +235,190 @@ i32 TitleInf::do_subseason_select()
     return 1;
 }
 
+// The keyboard state the practice menu reads when a stage is picked.
+// GLOBAL: TH16 0x4dfa48
+u8 g_practice_keys[0x100];
+// Set from the number key held when a practice stage is picked (0 if
+// none).
+// GLOBAL: TH16 0x4a5bf8
+i32 g_unk_4a5bf8;
+
+// Stage practice: picking the stage.
+// TODO: the original realigns its frame (and esp, -8) and keeps both input words in registers for the cursor tests.
+// FUNCTION: TH16 0x450ef0
+i32 TitleInf::do_practice_stage_select()
+{
+    switch (substate)
+    {
+    case 0:
+        menu.num_choices = 6;
+        menu.set_cursor(g_practice_last_stage);
+        anm_ids[0x71] = title_anm->create_effect(0x71, -1, NULL);
+        set_substate(1);
+        if (g_unk_4a6f1c == 4)
+        {
+            g_unk_4a6f1c = 1;
+        }
+    case 1:
+        if (time_in_state.current > 10)
+        {
+            set_substate(2);
+            return 1;
+        }
+        break;
+    case 2:
+        menu.current_selection = menu.next_selection;
+        if ((g_hardware_input_pressed & INPUT_UP) || (g_hardware_input_repeat & INPUT_UP))
+        {
+            menu.move_cursor(-1);
+        }
+        if ((g_hardware_input_pressed & INPUT_DOWN) || (g_hardware_input_repeat & INPUT_DOWN))
+        {
+            menu.move_cursor(1);
+        }
+        if (menu.current_selection != menu.next_selection)
+        {
+            g_SoundManager.play_sound_centered(10, 0);
+        }
+        if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
+        {
+            set_substate(4);
+            g_SoundManager.play_sound_centered(9, 0);
+            g_practice_last_stage = menu.next_selection;
+            return 1;
+        }
+        if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
+        {
+            if (!g_Scorefile->characters[g_Globals.subshot + g_Globals.character]
+                     .practice[g_Globals.difficulty][menu.next_selection + 1]
+                     .unlocked)
+            {
+                g_SoundManager.play_sound_centered(16, 0);
+                return 1;
+            }
+            set_substate(3);
+            g_SoundManager.play_sound_centered(7, 0);
+            g_SoundManager.play_sound_centered(50, 0);
+            g_practice_last_stage = menu.next_selection;
+            g_unk_4a5bf8 = 0;
+            if (get_keyboard_state(g_practice_keys) == 0)
+            {
+                if (g_practice_keys['1'] & 0x80)
+                {
+                    g_unk_4a5bf8 = 1;
+                }
+                else if (g_practice_keys['2'] & 0x80)
+                {
+                    g_unk_4a5bf8 = 2;
+                }
+                else if (g_practice_keys['3'] & 0x80)
+                {
+                    g_unk_4a5bf8 = 3;
+                }
+                else if (g_practice_keys['4'] & 0x80)
+                {
+                    g_unk_4a5bf8 = 4;
+                }
+                else if (g_practice_keys['5'] & 0x80)
+                {
+                    g_unk_4a5bf8 = 5;
+                }
+                else if (g_practice_keys['6'] & 0x80)
+                {
+                    g_unk_4a5bf8 = 6;
+                }
+                else if (g_practice_keys['7'] & 0x80)
+                {
+                    g_unk_4a5bf8 = 7;
+                }
+                else if (g_practice_keys['8'] & 0x80)
+                {
+                    g_unk_4a5bf8 = 8;
+                }
+                else if (g_practice_keys['9'] & 0x80)
+                {
+                    g_unk_4a5bf8 = 9;
+                }
+            }
+            else
+            {
+                if (g_practice_keys[DIK_1] & 0x80)
+                {
+                    g_unk_4a5bf8 = 1;
+                }
+                else if (g_practice_keys[DIK_2] & 0x80)
+                {
+                    g_unk_4a5bf8 = 2;
+                }
+                else if (g_practice_keys[DIK_3] & 0x80)
+                {
+                    g_unk_4a5bf8 = 3;
+                }
+                else if (g_practice_keys[DIK_4] & 0x80)
+                {
+                    g_unk_4a5bf8 = 4;
+                }
+                else if (g_practice_keys[DIK_5] & 0x80)
+                {
+                    g_unk_4a5bf8 = 5;
+                }
+                else if (g_practice_keys[DIK_6] & 0x80)
+                {
+                    g_unk_4a5bf8 = 6;
+                }
+                else if (g_practice_keys[DIK_7] & 0x80)
+                {
+                    g_unk_4a5bf8 = 7;
+                }
+                else if (g_practice_keys[DIK_8] & 0x80)
+                {
+                    g_unk_4a5bf8 = 8;
+                }
+                else if (g_practice_keys[DIK_9] & 0x80)
+                {
+                    g_unk_4a5bf8 = 9;
+                }
+            }
+            g_Supervisor.fade_out_bgm(0.05f);
+            return 1;
+        }
+        break;
+    case 3:
+        if (time_in_state.current == 10)
+        {
+            g_AsciiManager->show_now_loading(480.0f, 392.0f);
+            AnmId id;
+            id = g_EffectManager->create_ui_effect(0, NULL, NULL);
+            g_Supervisor.config.unk_0 = id.id;
+            AnmManager::interrupt_tree(id, 7);
+        }
+        if (time_in_state.current >= 40)
+        {
+            menu.push();
+            set_state(2);
+            i32 stage = menu.next_selection + 1;
+            g_Supervisor.gamemode_to_switch_to = 7;
+            g_Globals.stage_num = stage;
+            g_Globals.weird_stage_num = stage;
+            g_unk_4a6f1c = 4;
+            g_stage_data = &g_stage_table[stage];
+            g_practice_last_stage = menu.next_selection;
+            return 1;
+        }
+        break;
+    case 4:
+        if (time_in_state.current >= 6)
+        {
+            AnmManager::interrupt_tree(anm_ids[0x71], 1);
+            anm_ids[0x71].id = 0;
+            set_state(7);
+            menu.pop();
+        }
+        break;
+    }
+    return 1;
+}
+
 // The stages and practice high scores of stage practice.
 // FUNCTION: TH16 0x4513c0
 HARNESS_CALLED i32 TitleInf::on_draw__practice_stage_select()
