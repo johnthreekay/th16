@@ -98,6 +98,42 @@ int LoadingThread::initialize()
     return 0;
 }
 
+i32 unload_shared_anms();
+
+// FUNCTION: TH16 0x43afe0
+LoadingThread::~LoadingThread()
+{
+    thread.join_if_running();
+    g_UpdateFuncRegistry->unregister_locked(on_tick_func);
+    g_UpdateFuncRegistry->unregister_locked(on_draw_func);
+    unload_shared_anms();
+    AnmManager *anm = g_AnmManager;
+    if (anm->loaded_anms[1] != NULL)
+    {
+        anm->loaded_anms[1]->release();
+        delete anm->loaded_anms[1];
+        anm->loaded_anms[1] = NULL;
+    }
+    g_LoadingThread = NULL;
+    if (g_AsciiManager != NULL)
+    {
+        delete g_AsciiManager;
+    }
+    anm = g_AnmManager;
+    if (anm->loaded_anms[0] != NULL)
+    {
+        anm->loaded_anms[0]->release();
+        delete anm->loaded_anms[0];
+        anm->loaded_anms[0] = NULL;
+    }
+    scorefile_save_449a00();
+    if (g_Scorefile != NULL)
+    {
+        delete g_Scorefile;
+    }
+    g_Scorefile = NULL;
+}
+
 // FUNCTION: TH16 0x43b1f0
 LoadingThread *LoadingThread::create()
 {

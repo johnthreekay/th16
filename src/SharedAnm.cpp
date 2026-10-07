@@ -27,7 +27,7 @@ i32 load_shared_anms()
 }
 
 // FUNCTION: TH16 0x43ad60
-i32 unload_shared_anms()
+DECOMP_NOINLINE i32 unload_shared_anms()
 {
     AnmManager *anm = g_AnmManager;
     if (anm->loaded_anms[5] != NULL)

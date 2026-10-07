@@ -79,11 +79,6 @@ void Supervisor::setup_special_anms()
 {
 }
 
-// STUB: TH16 0x43afe0
-LoadingThread::~LoadingThread()
-{
-}
-
 // STUB: TH16 0x447760
 int ReplayManager::initialize(i32 mode, const char *filename)
 {

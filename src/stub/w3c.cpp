@@ -28,3 +28,8 @@ void supervisor_458db0()
 Scorefile::Scorefile()
 {
 }
+
+// STUB: TH16 0x449a00
+void scorefile_save_449a00()
+{
+}

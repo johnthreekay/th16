@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdlib.h>
+
 #include "types.h"
 
 // Capture history of one spell card. Index 0 is the main game, 1 spell
@@ -41,8 +43,27 @@ struct Scorefile
 
     // 0x4497e0 (ExpHP: sub_4497e0__reads_scorefile). Loads scoreth16.dat.
     Scorefile();
+    // Inlined into LoadingThread's destructor. Frees the two buffers kept
+    // in the first 8 bytes (inside characters[0] as laid out here).
+    ~Scorefile()
+    {
+        void **buffers = (void **)this;
+        if (buffers[0] != NULL)
+        {
+            free(buffers[0]);
+            buffers[0] = NULL;
+        }
+        if (buffers[1] != NULL)
+        {
+            free(buffers[1]);
+            buffers[1] = NULL;
+        }
+    }
 };
 #pragma pack(pop)
+
+// 0x449a00 (ExpHP: sub_449a00_writes_score_file). Saves g_Scorefile.
+void scorefile_save_449a00();
 static_assert(sizeof(Scorefile) == 0x1a3ac, "Scorefile size");
 
 extern Scorefile *g_Scorefile;
