@@ -185,7 +185,7 @@ HARNESS_CALLED void Spellcard::decode_time_code(i32 *seconds, i32 *hundredths)
 
 // TODO: this and name trade esi/edi, and later code differs in register allocation.
 // FUNCTION: TH16 0x417f00
-void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
+void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_index)
 {
     __asm finit;
     time = 0;
@@ -239,9 +239,9 @@ void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
     {
         vm->entity_pos = boss->enemy.final_pos.pos;
     }
-    find_child_of(boss_anm_id, 0xb)->int_vars[2] = arg_2;
-    find_child_of(boss_anm_id, 0xc)->int_vars[2] = arg_2;
-    timeout = arg_2;
+    find_child_of(boss_anm_id, 0xb)->int_vars[2] = time_limit;
+    find_child_of(boss_anm_id, 0xc)->int_vars[2] = time_limit;
+    timeout = time_limit;
     i32 bonuses[5] = {500000, 1000000, 1500000, 2000000, 1000000};
     bonus = bonuses[g_Globals.difficulty] * g_Globals.stage_num;
     bonus_max = bonus >= 1000000000 ? 999999999 : bonus;
@@ -250,7 +250,7 @@ void Spellcard::start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3)
     background_anm_id = g_EnemyManager->anim_statement_anms[stage_boss->spell_bg_anm_slot]->create_effect(
         stage_boss->spell_bg_script, -1, NULL);
     flags = (flags & ~SPELLCARD_FLAG_200) | ((stage_boss->spell_flag_200 << 9) & SPELLCARD_FLAG_200);
-    stage_boss = &g_stage_data->bosses[arg_3];
+    stage_boss = &g_stage_data->bosses[boss_index];
     if (stage_boss->spell_anm_slot != -1)
     {
         g_EnemyManager->anim_statement_anms[stage_boss->spell_anm_slot]->create_effect(stage_boss->spell_script, -1,

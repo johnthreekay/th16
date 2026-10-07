@@ -89,10 +89,10 @@ struct Spellcard
     // out the bonus if it was captured and counts the capture. Only called
     // through g_Spellcard.
     HARNESS_CALLED void end();
-    // 0x417f00. Starts the spell card: id, decoded name, then two ECL
-    // arguments (the first ends up in a VM variable, the second indexes a
-    // per-boss table).
-    void start(i32 spell_id, const char *name, i32 arg_2, i32 arg_3);
+    // 0x417f00. Starts the spell card: id, decoded name, the time limit in
+    // frames (timeout, also shown by the boss effect's timer) and the
+    // StageData boss whose spell effect plays.
+    void start(i32 spell_id, const char *name, i32 time_limit, i32 boss_index);
     // 0x417bc0. Measures the card's real duration: starts the clock while
     // the card runs, then turns the time into the tamper-checked
     // time_code and records it in (or, during playback, reads it from) the
