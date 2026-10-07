@@ -29,12 +29,14 @@ endif()
 
 set(TH16_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-# Every game source except the matching build's scaffolding, which only
-# exists to shape MSVC's output: src/stub/ (Opaque.cpp, values kept out of
-# LTCG's sight and sinks for the harness) and src/harness/ (stand-in
-# callers). The non-recursive glob leaves both directories out; the one game
-# global in src/stub/, g_zero_vec2, is defined in src/game_tables.cpp.
+# Every game source except the stand-in callers of src/harness/, which only
+# exist to shape MSVC's output (the non-recursive glob leaves src/harness/
+# and src/stub/ out). src/stub/Opaque.cpp is added by name: the matching
+# build compiles it without /GL to keep game data out of LTCG's sight, and
+# it defines real game globals (g_stage_table, g_zero_vec2) besides two
+# empty sink functions for the harness, which are harmless here.
 file(GLOB TH16_GAME_SOURCES CONFIGURE_DEPENDS ${TH16_ROOT}/src/*.cpp)
+list(APPEND TH16_GAME_SOURCES ${TH16_ROOT}/src/stub/Opaque.cpp)
 file(GLOB TH16_PORT_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
 # TH16_NULL_RENDERER builds d3d9_null.cpp (a Direct3D 9 that draws nothing,

@@ -99,8 +99,10 @@ Supervisor g_Supervisor;
 // ??__Fg_Supervisor@@YAXXZ
 
 
+// The default joypad buttons (th16.cfg starts with a copy): shot on button
+// 0, bomb 1, focus 2, pause 5, season release 3; -1 for the unused slots.
 // GLOBAL: TH16 0x4a52e4
-i16 g_pad_mapping[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+i16 g_pad_mapping[10] = {0, 1, 2, 5, -1, -1, -1, -1, -1, 3};
 
 // FUNCTION: TH16 0x4018e0
 HARNESS_CALLED u32 Supervisor::read_joypad(u32 input)
@@ -925,7 +927,7 @@ i32 g_device_reset_frames;
 // GLOBAL: TH16 0x4d9d90
 DECOMP_ALIGN16 FramePacingTable g_frame_pacing;
 // GLOBAL: TH16 0x4a5788
-f32 g_game_speed;
+f32 g_game_speed = 1.0f;
 
 // FUNCTION: TH16 0x43b3d0
 int __fastcall Supervisor::on_tick(void *arg)

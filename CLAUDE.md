@@ -43,8 +43,8 @@ Matching decomp of TH16 1.00a. See README.md for the toolchain evidence and work
 - Matching scaffolding (README.md, "Placeholders and stand-in callers"):
   every function is decompiled, so there are no placeholder bodies any
   more. `src/stub/` (built without /GL, opaque to LTCG) holds only
-  `Opaque.cpp`: values LTCG must not see into (`g_zero_vec2`) and two sinks
-  for the harness. A function whose shape depends on a call our build does
+  `Opaque.cpp`: values LTCG must not see into (`g_zero_vec2`,
+  `g_stage_table`) and two sinks for the harness. A function whose shape depends on a call our build does
   not reproduce (a constant argument LTCG would fold, an address the
   original lets escape, an 8-byte aligned caller frame) gets a documented
   stand-in caller in `src/harness/`.
@@ -114,8 +114,8 @@ unchanged (save the baseline with `--save` before starting), and
   computes.
 - Matching scaffolding: src/harness/ holds only the stand-in callers that
   are still needed, each with a comment saying which original call it stands
-  for and why. src/stub/ is only Opaque.cpp (the opaque g_zero_vec2 and the
-  harness sinks); src/placeholder/ is gone. Real GLOBALs belong in their
+  for and why. src/stub/ is only Opaque.cpp (the opaque g_zero_vec2 and
+  g_stage_table, and the harness sinks); src/placeholder/ is gone. Real GLOBALs belong in their
   modules, not in scaffolding files.
 - Parallel work: each agent owns a set of headers and .cpp files. Rename the
   fields and functions it owns and update their uses everywhere (small edits

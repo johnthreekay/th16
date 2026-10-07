@@ -918,7 +918,7 @@ HARNESS_CALLED void AnmVm::load_from(const AnmVm *src, i32 *size)
         if (src->index_of_on_serialize != 0)
         {
             i32 read = 0;
-            g_anm_serialize_funcs[src->index_of_on_serialize](this, (void *)extra, &read, 1);
+            g_anm_serialize_funcs[src->index_of_on_serialize](this, (u8 *)extra, &read, 1);
             *size += read;
         }
         else

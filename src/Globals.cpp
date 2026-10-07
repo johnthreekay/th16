@@ -2,8 +2,10 @@
 #include "Gui.h"
 #include "SoundManager.h"
 
+// Statically zero except for the difficulty, which starts at Normal (the
+// fields before it, stage_num to score, are listed as 0).
 // GLOBAL: TH16 0x4a5790
-Globals g_Globals;
+Globals g_Globals = {0, 0, 0, 0, 0, 0, 0, 0, 0, DIFFICULTY_NORMAL};
 
 // The scores (divided by 10) of the score extends, for the extra stage and
 // for the main game.

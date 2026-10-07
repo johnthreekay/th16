@@ -8,7 +8,11 @@
 
 #include "AnmManager.h"
 #include "AnmVm.h"
+#include "BulletManager.h"
 #include "EffectManager.h"
+#include "Fog.h"
+#include "Gui.h"
+#include "Laser.h"
 #include "Rng.h"
 #include "ZunAsm.h"
 #include "ZunMath.h"
@@ -41,8 +45,9 @@ struct AnmGatherEffectData
     ZunTimer timer;
 };
 
+// The position create_effect passes is not used.
 // FUNCTION: TH16 0x405670
-int __fastcall anm_gather_effect_init(AnmVm *vm, i32 arg)
+int __fastcall anm_gather_effect_init(AnmVm *vm, D3DXVECTOR3 *pos)
 {
     vm->alloc_extra_data(sizeof(AnmGatherEffectData));
     AnmGatherEffectData *data = (AnmGatherEffectData *)vm->extra_data;
@@ -522,44 +527,75 @@ int __fastcall anm_masked_effect_on_destroy(AnmVm *vm)
     return 0;
 }
 
+// The callbacks of other files that the tables below point at
+// (AnmRender.cpp).
+i32 __fastcall anm_on_draw_masked(AnmVm *vm);
+i32 __fastcall anm_on_tick_fan(AnmVm *vm);
+i32 __fastcall anm_on_draw_fan(AnmVm *vm);
+
 // The callback tables AnmVm's index_of_* fields select from (declared in
-// AnmVm.h). In the original they are constant tables whose entry 0 is NULL
-// and whose other entries point at the callbacks named below; here they
-// are left zero.
+// AnmVm.h), indexed by AnmCallbackIndex (AnmSpriteMapping for the sprite
+// mapping table). Entry 0 is NULL: no callback. All but the on_wait table
+// are constant (.rdata in the original).
 
-// anm_masked_effect_on_switch, anm_gather_effect_on_switch,
-// anm_jagged_line_on_switch.
 // GLOBAL: TH16 0x491b0c
-AnmVmSwitchFunc g_anm_on_switch_funcs[4];
+AnmVmSwitchFunc const g_anm_on_switch_funcs[4] = {
+    NULL,
+    anm_masked_effect_on_switch, // ANM_CALLBACK_MASKED_EFFECT
+    anm_gather_effect_on_switch, // ANM_CALLBACK_GATHER_EFFECT
+    anm_jagged_line_on_switch,   // ANM_CALLBACK_JAGGED_LINE
+};
 
-// anm_masked_effect_on_destroy, anm_gather_effect_on_destroy,
-// anm_jagged_line_on_destroy.
 // GLOBAL: TH16 0x491b58
-AnmVmFunc g_anm_on_destroy_funcs[4];
+AnmVmFunc const g_anm_on_destroy_funcs[4] = {
+    NULL,
+    anm_masked_effect_on_destroy, // ANM_CALLBACK_MASKED_EFFECT
+    anm_gather_effect_on_destroy, // ANM_CALLBACK_GATHER_EFFECT
+    anm_jagged_line_on_destroy,   // ANM_CALLBACK_JAGGED_LINE
+};
 
-// anm_masked_effect_on_tick, anm_gather_effect_on_tick,
-// anm_jagged_line_on_tick, anm_on_tick_fan.
 // GLOBAL: TH16 0x4919e8
-AnmVmFunc g_anm_on_tick_funcs[5];
+AnmVmFunc const g_anm_on_tick_funcs[5] = {
+    NULL,
+    anm_masked_effect_on_tick, // ANM_CALLBACK_MASKED_EFFECT
+    anm_gather_effect_on_tick, // ANM_CALLBACK_GATHER_EFFECT
+    anm_jagged_line_on_tick,   // ANM_CALLBACK_JAGGED_LINE
+    anm_on_tick_fan,           // ANM_ON_TICK_FAN
+};
 
-// bullet_map_sprite, LaserLineInf::on_sprite_set,
-// LaserCurveInf::on_sprite_set.
 // GLOBAL: TH16 0x491b1c
-AnmVmSpriteFunc g_anm_sprite_mapping_funcs[4];
+AnmVmSpriteFunc const g_anm_sprite_mapping_funcs[4] = {
+    NULL,
+    bullet_map_sprite,            // ANM_SPRITE_MAPPING_BULLET
+    LaserLineInf::on_sprite_set,  // ANM_SPRITE_MAPPING_LASER_LINE
+    LaserCurveInf::on_sprite_set, // ANM_SPRITE_MAPPING_LASER_CURVE
+};
 
 // Only the NULL entry (in .data, not .rdata, in the original).
 // GLOBAL: TH16 0x4c0f44
 AnmVmFunc g_anm_on_wait_funcs[1];
 
-// anm_on_draw_masked, anm_gather_effect_on_draw, anm_jagged_line_on_draw,
-// anm_effect_4_on_draw (Fog.cpp), Gui::textbox_on_draw, anm_on_draw_fan.
 // GLOBAL: TH16 0x491b2c
-AnmVmFunc g_anm_on_draw_funcs[7];
+AnmVmFunc const g_anm_on_draw_funcs[7] = {
+    NULL,
+    anm_on_draw_masked,        // ANM_CALLBACK_MASKED_EFFECT
+    anm_gather_effect_on_draw, // ANM_CALLBACK_GATHER_EFFECT
+    anm_jagged_line_on_draw,   // ANM_CALLBACK_JAGGED_LINE
+    anm_effect_4_on_draw,      // ANM_ON_DRAW_FOG
+    Gui::textbox_on_draw,      // ANM_ON_DRAW_TEXTBOX
+    anm_on_draw_fan,           // ANM_ON_DRAW_FAN
+};
 
-// anm_gather_effect_on_copy.
+// The copy and serialize tables have one callback each, the gather
+// effect's, at index 1 (not ANM_CALLBACK_GATHER_EFFECT, see g_effect_table).
 // GLOBAL: TH16 0x491b50
-AnmVmCopyFunc g_anm_on_copy_funcs[2];
+AnmVmCopyFunc const g_anm_on_copy_funcs[2] = {
+    NULL,
+    anm_gather_effect_on_copy,
+};
 
-// anm_gather_effect_on_serialize.
 // GLOBAL: TH16 0x491b48
-AnmVmSerializeFunc g_anm_serialize_funcs[2];
+AnmVmSerializeFunc const g_anm_serialize_funcs[2] = {
+    NULL,
+    anm_gather_effect_on_serialize,
+};
