@@ -284,13 +284,11 @@ static inline void anm_set_float2(Float2 *v, f32 x, f32 y)
 
 // The color arguments of instructions 408 and 413 (and the current color),
 // as set_rgb1_time and set_rgb2_time take them. Alpha is left unset.
-static inline ZunColor anm_rgb(i32 r, i32 g, i32 b)
+static inline void anm_rgb(ZunColor *c, i32 r, i32 g, i32 b)
 {
-    ZunColor c;
-    c.b = b;
-    c.g = g;
-    c.r = r;
-    return c;
+    c->b = b;
+    c->g = g;
+    c->r = r;
 }
 
 // 0x469e20. Sets up render mode 10 (ANM instruction 302): extra data and
@@ -903,8 +901,10 @@ __forceinline i32 AnmVm::run_script()
         // colorTime, alphaTime, color2Time, alpha2Time
         case 408:
         {
-            ZunColor initial = anm_rgb(color_1.r, color_1.g, color_1.b);
-            ZunColor goal = anm_rgb(ANM_INT(2), ANM_INT(3), ANM_INT(4));
+            ZunColor initial;
+            anm_rgb(&initial, color_1.r, color_1.g, color_1.b);
+            ZunColor goal;
+            anm_rgb(&goal, ANM_INT(2), ANM_INT(3), ANM_INT(4));
             set_rgb1_time(ANM_INT(0), (u8)ins->args[1].i, &initial, &goal);
             break;
         }
@@ -913,8 +913,10 @@ __forceinline i32 AnmVm::run_script()
             break;
         case 413:
         {
-            ZunColor initial = anm_rgb(color_2.r, color_2.g, color_2.b);
-            ZunColor goal = anm_rgb(ANM_INT(2), ANM_INT(3), ANM_INT(4));
+            ZunColor initial;
+            anm_rgb(&initial, color_2.r, color_2.g, color_2.b);
+            ZunColor goal;
+            anm_rgb(&goal, ANM_INT(2), ANM_INT(3), ANM_INT(4));
             set_rgb2_time(ANM_INT(0), (u8)ins->args[1].i, &initial, &goal);
             break;
         }
