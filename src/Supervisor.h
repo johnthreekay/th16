@@ -61,7 +61,8 @@ struct Supervisor
     u8 unk_10[0x10];
     IDirectInputDevice8A *keyboard;
     IDirectInputDevice8A *joystick;
-    u8 unk_28[0x58 - 0x28];
+    u8 unk_28[0x2c - 0x28];
+    DIDEVCAPS joystick_caps;
     // Passed to the BGM streaming thread, which ignores it.
     void *unk_58;
     u8 unk_5c[0xdc - 0x5c];
@@ -108,7 +109,9 @@ struct Supervisor
     u8 unk_9bc[0xa0c - 0x9bc];
     i32 fog_enabled;
     i32 zwrite_enabled;
-    u8 unk_a14[0xa1c - 0xa14];
+    // Sum of the executable's dwords and its size, from compute_exe_checksum.
+    i32 exe_checksum;
+    i32 exe_size;
     // th16_<version>.ver, read in on_registration.
     i32 ver_file_size;
     void *ver_file_data;
@@ -144,6 +147,14 @@ struct Supervisor
     // 0x43bbd0. Writes the back buffer to a .bmp file.
     static void __stdcall save_screenshot(const char *path);
     int initialize();
+    // 0x43dcc0
+    void release_dinput();
+    // Creates the DirectInput keyboard and the first game controller.
+    i32 dx_direct_input_initialize();
+    // Sets up DirectInput and picks the input paths it made available.
+    static void init_input();
+    // Checksums th16.exe into exe_checksum; -1 if it cannot be read.
+    static i32 compute_exe_checksum();
     // Runs a loader function on `thread`. Every caller passes NULL for arg,
     // which LTCG folds; the loaders themselves are plain void functions.
     HARNESS_CALLED i32 start_thread(ThreadStart start, void *arg);

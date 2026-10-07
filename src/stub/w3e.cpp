@@ -19,6 +19,11 @@ void __stdcall Supervisor::save_screenshot(const char *path)
 {
 }
 
+// STUB: TH16 0x43dcc0
+void Supervisor::release_dinput()
+{
+}
+
 // STUB: TH16 0x45ba80
 void Supervisor::reset_render_state()
 {

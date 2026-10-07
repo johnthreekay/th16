@@ -1,6 +1,7 @@
 #include <direct.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "AnmManager.h"
 #include "CriticalSections.h"
@@ -59,6 +60,53 @@ double LTCG_VECTORCALL get_runtime()
     double result = (t - g_GameWindow.runtime_base * 1000.0) / 1000.0;
     LEAVE_CS(CS_TIMER);
     return result;
+}
+
+void window_debug_log(const char *fmt, ...);
+
+// FUNCTION: TH16 0x45a700
+void GameWindow::make_dirs_and_disable_screensaver()
+{
+    SystemParametersInfoA(SPI_GETSCREENSAVEACTIVE, 0, &g_GameWindow.screen_save_active, 0);
+    SystemParametersInfoA(SPI_GETLOWPOWERACTIVE, 0, &g_GameWindow.low_power_active, 0);
+    SystemParametersInfoA(SPI_GETPOWEROFFACTIVE, 0, &g_GameWindow.power_off_active, 0);
+    SystemParametersInfoA(SPI_SETSCREENSAVEACTIVE, 0, NULL, SPIF_SENDCHANGE);
+    SystemParametersInfoA(SPI_SETLOWPOWERACTIVE, 0, NULL, SPIF_SENDCHANGE);
+    SystemParametersInfoA(SPI_SETPOWEROFFACTIVE, 0, NULL, SPIF_SENDCHANGE);
+    QueryPerformanceFrequency(&g_GameWindow.performance_frequency);
+    QueryPerformanceCounter(&g_GameWindow.initial_performance_counter);
+    GetEnvironmentVariableA("APPDATA", save_dir, sizeof(save_dir));
+    if (save_dir[0] != '\0')
+    {
+        strcat(save_dir, "\\ShanghaiAlice");
+        _mkdir(g_GameWindow.save_dir);
+        strcat(save_dir, "\\th16");
+        _mkdir(g_GameWindow.save_dir);
+        strcat(save_dir, "\\");
+        window_debug_log("%d\n", save_dir);
+    }
+    if (GetModuleFileNameA(NULL, exe_dir, sizeof(exe_dir)))
+    {
+        char *slash = strrchr(exe_dir, '\\');
+        if (slash != NULL)
+        {
+            *slash = '\0';
+        }
+        window_debug_log("%d\n", exe_dir);
+    }
+    _chdir(save_dir);
+    _mkdir("replay");
+    _chdir(exe_dir);
+    HMODULE dwmapi = LoadLibraryA("dwmapi.dll");
+    if (dwmapi != NULL)
+    {
+        HRESULT(WINAPI * enable_composition)(UINT) =
+            (HRESULT(WINAPI *)(UINT))GetProcAddress(dwmapi, "DwmEnableComposition");
+        if (enable_composition != NULL)
+        {
+            enable_composition(0);
+        }
+    }
 }
 
 // FUNCTION: TH16 0x45a8a0

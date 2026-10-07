@@ -87,6 +87,9 @@ struct GameWindow
     HARNESS_CALLED void update_window_sleeping();
     HARNESS_CALLED void update_window();
     HARNESS_CALLED void present();
+    // Turns off the screen saver and power saving, starts the timers and
+    // creates the save directories.
+    void make_dirs_and_disable_screensaver();
     // Saves a screenshot when the key is pressed, after serving the ANM
     // screenshot requests.
     HARNESS_CALLED void take_screenshot();
