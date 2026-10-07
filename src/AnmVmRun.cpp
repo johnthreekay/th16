@@ -281,19 +281,6 @@ static inline f32 anm_lerp(f32 t, f32 a, f32 b)
     return t * (b - a) + a;
 }
 
-// Vector stores that take their components as separate values.
-static inline void anm_set_float3(Float3 *v, f32 x, f32 y, f32 z)
-{
-    v->x = x;
-    v->y = y;
-    v->z = z;
-}
-
-static inline void anm_set_float2(Float2 *v, f32 x, f32 y)
-{
-    v->x = x;
-    v->y = y;
-}
 
 // The color arguments of instructions 408 and 413 (and the current color),
 // as set_rgb1_time and set_rgb2_time take them. Alpha is left unset.
@@ -845,12 +832,10 @@ __forceinline i32 AnmVm::run_script()
             break;
         // angleVel, scaleGrowth
         case 415:
-            anm_set_float3(&angular_velocity, ANM_FLOAT(0), ANM_FLOAT(1), ANM_FLOAT(2));
-            flags_hi |= ANM_VM_HAS_VELOCITY;
+            set_angular_velocity(ANM_FLOAT(0), ANM_FLOAT(1), ANM_FLOAT(2));
             break;
         case 416:
-            anm_set_float2(&scale_growth, ANM_FLOAT(0), ANM_FLOAT(1));
-            flags_hi |= ANM_VM_HAS_VELOCITY;
+            set_scale_growth(ANM_FLOAT(0), ANM_FLOAT(1));
             break;
         // alphaTimeLinear
         case 417:

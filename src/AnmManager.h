@@ -139,7 +139,8 @@ struct AnmLoaded
     // AnmVm::mode_of_create_child).
     AnmId create_managed_child(i32 script, AnmVm *parent, i32 mode);
     // 0x46eea0. A root VM placed like the given one.
-    AnmId create_managed_root(i32 script, AnmVm *like, i32 unused);
+    // AnmVm::run is the only caller, which LTCG folds unused into.
+    HARNESS_CALLED AnmId create_managed_root(i32 script, AnmVm *like, i32 unused);
 
     void init_vm_with_sprite(AnmVm *vm, i32 sprite)
     {

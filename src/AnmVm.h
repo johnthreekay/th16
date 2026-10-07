@@ -401,6 +401,21 @@ struct AnmVm
     }
     void alloc_extra_data(u32 size);
     void set_layer(i32 layer);
+    // ANM instructions 415 and 416: set a velocity and turn on
+    // step_velocities.
+    void set_angular_velocity(f32 x, f32 y, f32 z)
+    {
+        flags_hi |= ANM_VM_HAS_VELOCITY;
+        angular_velocity.x = x;
+        angular_velocity.y = y;
+        angular_velocity.z = z;
+    }
+    void set_scale_growth(f32 x, f32 y)
+    {
+        flags_hi |= ANM_VM_HAS_VELOCITY;
+        scale_growth.x = x;
+        scale_growth.y = y;
+    }
     DECOMP_NOINLINE void set_alpha1_time(i32 end_time, i32 method, u8 initial, u8 goal);
     // Clears the suffix except for the fields that identify the VM.
     void wipe_suffix();
