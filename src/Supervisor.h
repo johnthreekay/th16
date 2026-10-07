@@ -112,8 +112,8 @@ struct Config
     Config();
 };
 
-// A screenshot being saved: Supervisor's 0x43bbd0 copies the back buffer
-// and starts write_screenshot (0x43be40) on a thread to save it as a BMP.
+// A screenshot being saved: Supervisor::take_screenshot copies the back
+// buffer and starts write_screenshot on a thread to save it as a BMP.
 struct Screenshot
 {
     // Nonzero while the writer thread runs.
@@ -257,9 +257,9 @@ struct Supervisor
     HRESULT enable_zwrite();
     HRESULT disable_zwrite();
     void swap_transform_matrices(Camera *camera);
-    // Reaches the object through g_Supervisor; LTCG dropped this.
     // 0x43dc30. Releases the "@R" surfaces and the back buffer before a
-    // device reset.
+    // device reset. Reaches the object through g_Supervisor; LTCG dropped
+    // this.
     HARNESS_CALLED void release_surfaces();
     // 0x43c630 and 0x43c6a0. Called when the game thread's stage loading
     // finishes or fails: removes the g_stage_load_anm_ids effects
@@ -334,12 +334,13 @@ struct Supervisor
     // 0x43b520. Opens th16.dat, sets up the cameras, timers, RNG seeds,
     // fonts and the arcade blit VMs, and starts loading the sound files.
     static int __fastcall on_registration(void *arg);
-    // The frame's render target steps, by draw priority: 0x01 clears and
-    // targets arcade_surface_0; 0x0e and 0x19 switch between the two "@R"
-    // surfaces; 0x0f, 0x1a and 0x2c draw the blit VMs (the arcade picture
-    // from one surface onto the other); 0x2b switches to the scaled
-    // viewport; 0x38 targets the back buffer and 0x39 draws the final
-    // picture onto it; 0x55 clears cameras 1 and 3's unk_fc.
+    // The frame's render target steps, by draw priority (the surface steps
+    // do nothing without the "@R" surfaces): 0x01 clears the frame and
+    // targets arcade_surface_0; 0x0e, 0x19 and 0x2b target surface 1, 0 and 1
+    // again (0x2b with the arcade region scaled up); 0x0f, 0x1a and 0x2c
+    // draw the blit VMs, copying the arcade picture across; 0x38 targets
+    // the back buffer and 0x39 draws the final picture onto it; 0x55
+    // clears cameras 1 and 3's unk_fc.
     static int __fastcall on_draw_01(void *arg);
     static int __fastcall on_draw_0e(void *arg);
     static int __fastcall on_draw_0f(void *arg);
