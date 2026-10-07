@@ -1666,7 +1666,7 @@ static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
 
 // Sets the HUD up for a stage: the life and bomb counters, the boss timer,
 // the stage logo, the demo and difficulty markers and the season gauge.
-// TODO: ours gets a /GS cookie for pos (see README) and realigns through ebx; the original realigns plainly.
+// TODO: ours gets a /GS cookie for pos (see docs/findings.md) and realigns through ebx; the original realigns plainly.
 // FUNCTION: TH16 0x426d70
 void Gui::setup_stage_hud()
 {
@@ -2018,7 +2018,7 @@ i32 Gui::on_tick_body()
             vm->rotation.x = bar->shown * -ZUN_2PI;
             vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
             // Separate floats: a Float3 local gets a /GS cookie in our
-            // build (see README).
+            // build (see docs/findings.md).
             f32 pos_x = boss->enemy.final_pos.pos.x * 2.0f;
             f32 pos_y = boss->enemy.final_pos.pos.y * 2.0f;
             f32 pos_z = boss->enemy.final_pos.pos.z;

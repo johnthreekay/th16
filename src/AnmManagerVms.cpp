@@ -118,7 +118,7 @@ HARNESS_CALLED AnmId AnmManager::insert_in_ui_list_front(AnmVm *vm)
 // Callers reach this through inline helpers (get_vm_or_clear, get_vm,
 // find_child_of) as a rule: a function that calls it directly and passes a
 // local's address elsewhere gets a /GS cookie the original does not have
-// (README).
+// (docs/findings.md).
 // FUNCTION: TH16 0x46efa0
 HARNESS_CALLED AnmVm *AnmManager::get_vm_with_id(AnmId id)
 {

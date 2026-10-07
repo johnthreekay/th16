@@ -1,8 +1,8 @@
 #pragma once
 
 // Macros for reproducing what ZUN's whole-program build (/GL + /LTCG) did to
-// individual functions. None of them is ZUN's; see README.md, "Whole-program
-// optimization".
+// individual functions. None of them is ZUN's; see docs/workflow.md,
+// "Whole-program optimization".
 
 #ifdef TH16_PORT
 // The portable build (port/CMakeLists.txt) compiles with GCC or Clang. The

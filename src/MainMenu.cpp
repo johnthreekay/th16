@@ -85,7 +85,7 @@ HARNESS_CALLED void TitleInf::interrupt_child(i32 index, i32 script, i32 interru
     vm->interrupt(interrupt);
 }
 
-// TODO: the original pads its frame (push ecx): AnmVm::run needs 8-byte alignment there at IL level and do_title_screen provides it (see README, AnmVm::run's alignment); not when HARNESS_CALLED alone.
+// TODO: the original pads its frame (push ecx): AnmVm::run needs 8-byte alignment there at IL level and do_title_screen provides it (see docs/findings.md, AnmVm::run's alignment); not when HARNESS_CALLED alone.
 // FUNCTION: TH16 0x44a700
 void TitleInf::interrupt_child_and_run(i32 index, i32 script, i32 interrupt)
 {

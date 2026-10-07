@@ -2,7 +2,7 @@
 //
 // Not ZUN's code and never run: it gives link-time code generation calls
 // or address uses the decompiled code does not have, so that it compiles
-// the real functions as in the original (see README.md, "Placeholders and
+// the real functions as in the original (see docs/workflow.md, "Placeholders and
 // stand-in callers"). The harness files are split the way the work was;
 // regrouping them changes LTCG's choices for unrelated functions.
 #include "../Supervisor.h"

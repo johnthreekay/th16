@@ -128,7 +128,7 @@ void TitleInf::load_replay_list()
 }
 
 // Saving the replay after a game: picking a slot, then entering the name.
-// TODO: this lives in esi (the original edi, spilled), the ascii create_effect pattern (see README), and g_stage_table[8] lands on another global here.
+// TODO: this lives in esi (the original edi, spilled), the ascii create_effect pattern (see docs/findings.md), and g_stage_table[8] lands on another global here.
 // FUNCTION: TH16 0x453c10
 i32 TitleInf::do_replay_save()
 {
@@ -346,7 +346,7 @@ i32 g_last_difficulty = DIFFICULTY_NORMAL;
 i32 g_last_character;
 
 // Picking the difficulty, or confirming Extra.
-// TODO: the original reuses g_Globals.difficulty from the entry in ecx for num_choices (reloading it after the ascii create_effect); ours compares memory; plus the ascii create_effect pattern (see README).
+// TODO: the original reuses g_Globals.difficulty from the entry in ecx for num_choices (reloading it after the ascii create_effect); ours compares memory; plus the ascii create_effect pattern (see docs/findings.md).
 // FUNCTION: TH16 0x44fe20
 i32 TitleInf::do_difficulty_select()
 {
@@ -1892,7 +1892,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
 // The high score name entry after a game (score_not_ranked is set when the score
 // did not make the top ten), then on to saving the replay unless the game
 // was continued.
-// TODO: the original saves ebx (push ecx; push ebx) and keeps &replay_name in it for the score copy, tests the pressed word in memory before the name entry, and has the ascii create_effect pattern (see README).
+// TODO: the original saves ebx (push ecx; push ebx) and keeps &replay_name in it for the score copy, tests the pressed word in memory before the name entry, and has the ascii create_effect pattern (see docs/findings.md).
 // FUNCTION: TH16 0x4532f0
 i32 TitleInf::do_score_name_entry()
 {
@@ -2401,7 +2401,7 @@ static __forceinline void music_room_comment_step(TitleInf *menu)
 // The music room: the track list (ten rows shown, sliding in two at a time
 // at first) and the comment of the track last picked. Tracks not heard in
 // the game yet show as numbers, and playing one asks for a second press.
-// TODO: ours adds a /GS cookie for pos (a D3DXVECTOR3 in memory, see README) and keeps pos.x in memory in the scroll loop where the original uses xmm2.
+// TODO: ours adds a /GS cookie for pos (a D3DXVECTOR3 in memory, see docs/findings.md) and keeps pos.x in memory in the scroll loop where the original uses xmm2.
 // FUNCTION: TH16 0x4546f0
 i32 TitleInf::do_music_room()
 {
