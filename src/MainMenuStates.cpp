@@ -1271,7 +1271,7 @@ static inline void spell_page_unseen(AnmVm *vm, const char *hundreds, const char
 // once seen and the chosen character's captures.
 // The text goes through the inline spell_page_* nodes above so that the
 // frame is not realigned.
-// TODO: ours computes id % 10 with a multiply (the original divides by 10 in a register for both digits) and builds the spell pointer where the original indexes the score file per access.
+// TODO: ours builds the spell pointer (the original keeps the character's base in a stack slot and indexes it with id * 0x9c per access) and looks up the ones digit before the call (the original keeps id % 10 and indexes at the push).
 // FUNCTION: TH16 0x452c30
 i32 TitleInf::draw_spell_card_page()
 {
@@ -1287,6 +1287,10 @@ i32 TitleInf::draw_spell_card_page()
     const char *digits[10] = {"\x82\x4f", "\x82\x50", "\x82\x51", "\x82\x52", "\x82\x53",
                               "\x82\x54", "\x82\x55", "\x82\x56", "\x82\x57", "\x82\x58"};
     char name[0xa5];
+    // A variable, not the literal: the original divides by 10 in a
+    // register (one idiv for id % 10 and id / 10), where a constant
+    // divisor gets the reciprocal multiply.
+    i32 ten = 10;
     AnmId *row_id = text_row_ids;
     for (i32 row = 0; row < 10; row++, row_id++)
     {
@@ -1315,23 +1319,26 @@ i32 TitleInf::draw_spell_card_page()
                 len += 2;
             }
             name[len] = '\0';
-            id++;
-            const char *ones = digits[id % 10];
-            const char *tens = id / 10 % 10 == 0 && id / 100 == 0 ? "\x81\x40" : digits[id / 10 % 10];
-            const char *hundreds = id / 100 != 0 ? digits[id / 100] : "\x81\x40";
-            ScorefileSpell *spell = &g_Scorefile->characters[menu.next_selection].spells[id - 1];
+            i32 number = id + 1;
+            const char *ones = digits[number % ten];
+            const char *tens =
+                number / ten % ten == 0 && number / 100 == 0 ? "\x81\x40" : digits[number / ten % ten];
+            const char *hundreds = number / 100 != 0 ? digits[number / 100] : "\x81\x40";
+            ScorefileSpell *spell = &g_Scorefile->characters[menu.next_selection].spells[id];
             spell_page_seen(get_vm_or_clear(*row_id), spell->captures[0] != 0 ? 0xffff80 : 0xefefef, hundreds, tens, ones,
                             name, spell->captures[0], spell->attempts[0]);
         }
         else
         {
-            id++;
-            const char *ones = digits[id % 10];
-            const char *tens = id / 10 % 10 == 0 && id / 100 == 0 ? "\x81\x40" : digits[id / 10 % 10];
-            const char *hundreds = id / 100 != 0 ? digits[id / 100] : "\x81\x40";
-            ScorefileSpell *spell = &g_Scorefile->characters[menu.next_selection].spells[id - 1];
+            i32 number = id + 1;
+            const char *ones = digits[number % ten];
+            const char *tens =
+                number / ten % ten == 0 && number / 100 == 0 ? "\x81\x40" : digits[number / ten % ten];
+            const char *hundreds = number / 100 != 0 ? digits[number / 100] : "\x81\x40";
+            ScorefileSpell *spell = &g_Scorefile->characters[menu.next_selection].spells[id];
             spell_page_unseen(get_vm_or_clear(*row_id), hundreds, tens, ones, spell->captures[0], spell->attempts[0]);
         }
+        id++;
     }
     return 0;
 }
