@@ -665,7 +665,7 @@ extern const char *g_stage_names[10];
 
 // Picking the subseason before a game (Extra has only one). In stage
 // practice this goes on to the stage select instead of starting.
-// TODO: the original spills script to the create_effect result slot and reloads it (ours keeps it in esi), and inverts the branch on g_Globals.flags_hi_45c in case 3.
+// TODO: the original spills script to the create_effect result slot and reloads it (ours keeps it in esi), and in case 3 lays out the now loading block before confirm (ours after).
 // FUNCTION: TH16 0x450af0
 i32 TitleInf::do_subseason_select()
 {
@@ -772,17 +772,21 @@ i32 TitleInf::do_subseason_select()
             menu.push();
             g_Globals.spell_id = -1;
             set_state(TITLE_STATE_EXIT);
+            // The shared tail after the if/else is duplicated into both
+            // branches; written in each, its stores were hoisted above the
+            // test instead.
             if (g_Globals.difficulty < DIFFICULTY_EXTRA)
             {
                 g_stage_data = &g_stage_table[1];
                 g_Globals.stage_num = 1;
                 g_Globals.weird_stage_num = 1;
-                g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
-                return 1;
             }
-            g_stage_data = &g_stage_table[7];
-            g_Globals.stage_num = 7;
-            g_Globals.weird_stage_num = 7;
+            else
+            {
+                g_stage_data = &g_stage_table[7];
+                g_Globals.stage_num = 7;
+                g_Globals.weird_stage_num = 7;
+            }
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
             return 1;
         }
