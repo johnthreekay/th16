@@ -2931,7 +2931,7 @@ void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
 // Nonzero once the laser is done.
 // The dead double is not ZUN's code: as in LaserLineInf::initialize, it
 // makes LTCG realign the frame (and esp, -8) like the original.
-// TODO: the original keeps the * 1.0f of the inlined timer decrement and loads g_game_speed once for the three position components.
+// TODO: the original keeps the * 1.0f of the inlined timer decrements, adds the tip offset's x component into its own register, and keeps the zero constant in xmm5 (ours xmm6).
 // FUNCTION: TH16 0x432f40
 i32 LaserLineInf::on_tick()
 {
@@ -2998,10 +2998,9 @@ i32 LaserLineInf::on_tick()
             ex_invuln_remaining_frames--;
         }
     } while (again != 0);
-    f32 step = length * g_game_speed;
     if (hit_length < inner.laser_new_arg_2)
     {
-        hit_length = step + hit_length;
+        hit_length += length * g_game_speed;
         if (hit_length > inner.laser_new_arg_2)
         {
             hit_length = inner.laser_new_arg_2;
@@ -3009,10 +3008,9 @@ i32 LaserLineInf::on_tick()
     }
     else
     {
-        unk_7c = step + unk_7c;
-        position.x = tip_offset.x * g_game_speed + position.x;
-        position.y = position.y + tip_offset.y * g_game_speed;
-        position.z = position.z + tip_offset.z * g_game_speed;
+        unk_7c += length * g_game_speed;
+        Float3 v = tip_offset * g_game_speed;
+        D3DXVec3Add(&position, &v, &position);
         if (inner.laser_new_arg_3 > 0.0f && hit_length + unk_7c > inner.laser_new_arg_3)
         {
             hit_length = inner.laser_new_arg_3 - unk_7c;
@@ -3048,12 +3046,12 @@ i32 LaserLineInf::on_tick()
         }
     }
     check_graze_or_kill(0);
-    AnmVm *vm = &vm_92c;
-    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
-    vm->scale.x = width / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_width;
-    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
-    vm->scale.y = hit_length / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_height;
-    vm->run();
+    vm_92c.flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm_92c.scale.x = width / g_AnmManager->loaded_anms[vm_92c.anm_loaded_index]->sprites[vm_92c.sprite_id].sprite_width;
+    vm_92c.flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm_92c.scale.y =
+        hit_length / g_AnmManager->loaded_anms[vm_92c.anm_loaded_index]->sprites[vm_92c.sprite_id].sprite_height;
+    vm_92c.run();
     if (unk_7c == 0.0f)
     {
         vm_f28.run();
