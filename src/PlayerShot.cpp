@@ -583,8 +583,10 @@ i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet)
 
 // Marisa's laser hitting an enemy: cut it short at the enemy (pos, and
 // size for rectangles, else radius) and spray sparks along it.
-// TODO: the original looks the damage source up in each branch (hoisting
-// only g_Player) and spills more locals; frame and registers differ.
+// The damage source is looked up in each branch, as the original does.
+// TODO: the rotation products take c and s as their destinations where the
+// original multiplies into dx and dy (which also makes it convert ry with
+// cvtps2pd), and enemy_pos is reloaded later.
 // FUNCTION: TH16 0x446870
 i32 __fastcall sht_on_hit_laser(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius)
 {
@@ -596,9 +598,9 @@ i32 __fastcall sht_on_hit_laser(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_s
         AnmManager::interrupt_tree(bullet->anm_id, 2);
         bullet->laser_hit_anim = 1;
     }
-    PlayerDamageSource *source = bullet->damage_source();
     if (size == NULL)
     {
+        PlayerDamageSource *source = bullet->damage_source();
         f32 reach = source->height * 0.5f + radius;
         f32 dx = pos->x - bullet->pos.pos.x;
         f32 dy = pos->y - bullet->pos.pos.y;
@@ -626,6 +628,7 @@ i32 __fastcall sht_on_hit_laser(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_s
     }
     else
     {
+        PlayerDamageSource *source = bullet->damage_source();
         Float3 *start = &bullet->pos.pos;
         Float3 hit;
         Float3 exit;
