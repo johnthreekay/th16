@@ -13,7 +13,6 @@
 static_assert(sizeof(EclRunContext) == 0x11e8, "EclRunContext size");
 
 // The current instruction's integer argument index, resolving variables.
-// TODO: the original checks the stack range with two compares and loads the entry value before its type.
 // FUNCTION: TH16 0x473c90
 i32 EclRunContext::get_int_arg(int index)
 {
@@ -25,20 +24,29 @@ i32 EclRunContext::get_int_arg(int index)
         {
             return *(i32 *)((u8 *)stack.data + stack.base_offset + value);
         }
-        if (value <= -1 && value >= -100)
+        // The first bound reads the argument again: on the same variable
+        // both bounds merge into one unsigned range check, while the
+        // original compares twice. The result variable, assigned on every
+        // path, keeps the type in a register as in the original.
+        if (ins->args[index].i <= -1 && value >= -100)
         {
             EclStackEntry *entry = (EclStackEntry *)((u8 *)stack.data + stack.stack_offset) + value;
             EclStackItem item = entry->value;
             char type = entry->type;
+            i32 result;
             if (type == 'f')
             {
-                return (i32)item.f;
+                result = (i32)item.f;
             }
             else if (type == 'i')
             {
-                return item.i;
+                result = item.i;
             }
-            return item.i;
+            else
+            {
+                result = item.i;
+            }
+            return result;
         }
         return vm->get_int_global(value);
     }
