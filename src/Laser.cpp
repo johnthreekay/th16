@@ -1077,7 +1077,7 @@ i32 LaserLineInf::step_ex_bounce()
 }
 
 // The same et_ex step for straight lasers.
-// TODO: as LaserCurveInf::step_ex_angle: ints[2] incremented later, current_f added into the speed register.
+// Effective match: as in LaserCurveInf::step_ex_angle, only the ints[2] increment is scheduled differently.
 // FUNCTION: TH16 0x432c20
 i32 LaserLineInf::step_ex_angle()
 {
@@ -1106,7 +1106,7 @@ i32 LaserLineInf::step_ex_angle()
         len = length - ex_state[3].timer.current_f * length / ex_state[3].ints[0];
     }
     laser_sincosmul(&tip_offset, angle, len);
-    ex_state[3].timer.tick();
+    ex_state[3].timer.tick_goto();
     return 0;
 }
 
@@ -1114,7 +1114,9 @@ i32 LaserLineInf::step_ex_angle()
 // and gives it a new length; after ints[1] rounds the step ends.
 // The final turn's tip reads angle back from the member (not the local a):
 // that keeps a in xmm0 like the original.
-// TODO: the original increments ints[2] later and adds current_f into the speed register in the timer tick (no tick variant does that here).
+// tick_goto gives the timer tick's add of current_f into the speed register.
+// Effective match: the original increments ints[2] after loading floats[0]
+// (statement order does not move it).
 // FUNCTION: TH16 0x4392c0
 i32 LaserCurveInf::step_ex_angle()
 {
@@ -1143,7 +1145,7 @@ i32 LaserCurveInf::step_ex_angle()
         len = length - ex_state[3].timer.current_f * length / ex_state[3].ints[0];
     }
     laser_sincosmul(&tip_offset, angle, len);
-    ex_state[3].timer.tick();
+    ex_state[3].timer.tick_goto();
     return 0;
 }
 
