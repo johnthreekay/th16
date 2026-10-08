@@ -331,9 +331,11 @@ int SptResourceInf::load_ecl_data(void *data)
     }
     u32 *offsets = (u32 *)((u8 *)file + sizeof(EclRawFile) + file->include_length);
     char *name = (char *)(offsets + file->sub_count);
-    subroutine_count += file->sub_count;
+    // The new count is computed in a register and also gives the size.
+    i32 total = subroutine_count + file->sub_count;
+    subroutine_count = total;
     EclSubroutinePtrs *old = subroutines;
-    subroutines = (EclSubroutinePtrs *)malloc(subroutine_count * sizeof(EclSubroutinePtrs));
+    subroutines = (EclSubroutinePtrs *)malloc(total * sizeof(EclSubroutinePtrs));
     if (old == NULL)
     {
         for (i32 i = 0; i < subroutine_count; i++)
