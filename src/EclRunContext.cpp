@@ -208,7 +208,6 @@ HARNESS_CALLED f32 EclRunContext::pop_float_arg(int index)
     return ins->args[index].f;
 }
 
-// TODO: the original adds the frame base to the stack address first; registers differ around the pops.
 // FUNCTION: TH16 0x474180
 i32 EclRunContext::pop_int_arg_given_value(int index, i32 value)
 {
@@ -217,7 +216,7 @@ i32 EclRunContext::pop_int_arg_given_value(int index, i32 value)
     {
         if (value >= 0)
         {
-            return *(i32 *)((u8 *)stack.data + stack.base_offset + value);
+            return *stack.local_ptr(value);
         }
         if (value <= -1 && value >= -100)
         {
@@ -225,15 +224,20 @@ i32 EclRunContext::pop_int_arg_given_value(int index, i32 value)
             EclStackItem item = *(EclStackItem *)((u8 *)stack.data + stack.stack_offset);
             stack.stack_offset -= 4;
             char type = *((char *)stack.data + stack.stack_offset);
+            i32 result;
             if (type == 'f')
             {
-                return (i32)item.f;
+                result = (i32)item.f;
             }
             else if (type == 'i')
             {
-                return item.i;
+                result = item.i;
             }
-            return item.i;
+            else
+            {
+                result = item.i;
+            }
+            return result;
         }
         return vm->get_int_global(value);
     }
