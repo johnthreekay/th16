@@ -2115,7 +2115,6 @@ i32 TitleInf::do_score_name_entry()
 // The high score name entry after a game: the top ten of the character and
 // difficulty played, and while a name is entered, the name and the
 // character grid.
-// TODO: register allocation: the original keeps the index in esi and g_AsciiManager in edx (swapped).
 // FUNCTION: TH16 0x4538b0
 HARNESS_CALLED i32 TitleInf::on_draw__score_name_entry()
 {
@@ -2134,8 +2133,16 @@ HARNESS_CALLED i32 TitleInf::on_draw__score_name_entry()
     g_AsciiManager->draw_shadows = 1;
     for (i32 i = 0; i < 10; i++)
     {
-        g_AsciiManager->color.d3d =
-            score_not_ranked != 0 ? ~(i * 16) | 0xffffff00 : (menu.next_selection != i ? 0xff808040 : 0xffffffff);
+        // An if/else, not a ternary: gives the original's registers (the
+        // ASCII manager in edx, i in esi).
+        if (score_not_ranked != 0)
+        {
+            g_AsciiManager->color.d3d = ~(i * 16) | 0xffffff00;
+        }
+        else
+        {
+            g_AsciiManager->color.d3d = menu.next_selection != i ? 0xff808040 : 0xffffffff;
+        }
         ScorefileScore *score =
             &g_Scorefile->characters[g_Globals.subshot + g_Globals.character].scores[difficulty][i];
         if (score->date != 0)
@@ -2404,7 +2411,7 @@ static __forceinline void music_room_comment_step(TitleInf *menu)
 // The music room: the track list (ten rows shown, sliding in two at a time
 // at first) and the comment of the track last picked. Tracks not heard in
 // the game yet show as numbers, and playing one asks for a second press.
-// TODO: in case 2 ours keeps &menu in a register (spilled) for the menu accesses; the original addresses [edi + 0x24] each time.
+// TODO: case 0 stores pos.x = 0 after pos.y and pos.z (the original first).
 // Declared __declspec(safebuffers) (MainMenu.h): without it ours adds a /GS
 // cookie for pos (a D3DXVECTOR3 in memory) that the original lacks.
 // FUNCTION: TH16 0x4546f0
@@ -2527,7 +2534,9 @@ i32 TitleInf::do_music_room()
         break;
     case 2:
         music_room_comment_step(this);
-        menu.current_selection = menu.next_selection;
+        // Through the MenuHelper helpers: on the member, MSVC kept &menu in
+        // a register for the rest of the case.
+        menu_save_selection(&menu);
         if (pressed_or_repeating_inline(INPUT_UP))
         {
             menu.move_cursor(-1);
@@ -2536,7 +2545,7 @@ i32 TitleInf::do_music_room()
         {
             menu.move_cursor(1);
         }
-        if (menu.current_selection != menu.next_selection)
+        if (menu_selection_moved(&menu))
         {
             g_SoundManager.play_sound_centered(SE_SELECT00, 0);
             if (menu.next_selection < music_scroll)
