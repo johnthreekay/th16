@@ -1286,8 +1286,8 @@ const char *EnemyInf::check_life_interrupts()
     return NULL;
 }
 
-// TODO: the original divides by 60 with one idiv (quotient and remainder) and keeps i in a stack
-// slot; ours strength-reduces the division.
+// Updates the boss timer display and fires the first time interrupt whose
+// time has come; returns its sub name (NULL if none is due).
 // FUNCTION: TH16 0x425010
 const char *EnemyInf::check_time_interrupts()
 {
@@ -1300,19 +1300,19 @@ const char *EnemyInf::check_time_interrupts()
         if (enemy.flags_low & ENEMY_FLAG_BOSS)
         {
             i32 remaining = enemy.interrupts[i].time - enemy.time_in_ecl.current;
-            i32 seconds = remaining / 60;
-            i32 hundredths = remaining % 60 * 100 / 60;
-            if (seconds > 99)
-            {
-                seconds = 99;
-                hundredths = 99;
-            }
-            g_Gui->boss_timer_seconds = seconds;
-            g_Gui->boss_timer_hundredths = hundredths;
+            // Dividing by a variable keeps the original's single idiv for
+            // the quotient and the remainder; the clamps are cmovs.
+            i32 fps = 60;
+            i32 seconds = remaining / fps;
+            i32 hundredths = remaining % fps * 100 / 60;
+            g_Gui->boss_timer_seconds = seconds > 99 ? 99 : seconds;
+            g_Gui->boss_timer_hundredths = seconds > 99 ? 99 : hundredths;
         }
+        // Not yet: leaves the loop to share its NULL return (a return here
+        // gets a copy of its own, and esi is then pushed later).
         if (enemy.time_in_ecl.current < enemy.interrupts[i].time)
         {
-            return NULL;
+            break;
         }
         enemy.life.current = enemy.interrupts[i].life;
         enemy.interrupts[i].life = -1;
