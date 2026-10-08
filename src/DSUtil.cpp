@@ -708,7 +708,8 @@ HRESULT CSound::Stop(BOOL close_file)
     return hr;
 }
 
-// TODO: the original reloads m_pWaveFile after SetFilePointer (alias analysis differs) and has a 4-byte frame.
+// The file position goes through a local: assigned directly, m_pWaveFile is
+// loaded for the store before the call and kept in a register.
 // FUNCTION: TH16 0x4712f0
 HRESULT CSound::Pause()
 {
@@ -726,8 +727,8 @@ HRESULT CSound::Pause()
     m_paused = TRUE;
     HRESULT hr = m_apDSBuffer[0]->Stop();
     m_pause_time = get_runtime();
-    m_pWaveFile->m_paused_position =
-        SetFilePointer(m_pWaveFile->m_file, 0, NULL, FILE_CURRENT) - m_pWaveFile->m_track->start_offset;
+    DWORD position = SetFilePointer(m_pWaveFile->m_file, 0, NULL, FILE_CURRENT);
+    m_pWaveFile->m_paused_position = position - m_pWaveFile->m_track->start_offset;
     m_pWaveFile->Close();
     return hr;
 }
