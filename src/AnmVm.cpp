@@ -38,8 +38,9 @@ HARNESS_CALLED void *AnmVm::scalar_delete(u32 flags)
     return this;
 }
 
-// TODO: the flags_hi and/or and one pop are scheduled one store later in the original
-// (not the bitfield view, a local, one expression, other positions or HARNESS_CALLED).
+// Clears the VM for reuse, keeping its pool slot, layer and position.
+// The list nodes are reset through ZunList::init: written out field by field,
+// the flags_hi update and the register pops are scheduled differently.
 // FUNCTION: TH16 0x4090f0
 void AnmVm::wipe()
 {
@@ -81,22 +82,10 @@ void AnmVm::wipe()
     num_cycles_in_texture = 0x10000;
     root_vm = NULL;
     parent_vm = NULL;
-    node_in_global_list.entry = this;
-    node_in_global_list.next = NULL;
-    node_in_global_list.prev = NULL;
-    node_in_global_list.unk_c = NULL;
-    node_as_child.entry = this;
-    node_as_child.next = NULL;
-    node_as_child.prev = NULL;
-    node_as_child.unk_c = NULL;
-    list_of_children.entry = this;
-    list_of_children.next = NULL;
-    list_of_children.prev = NULL;
-    list_of_children.unk_c = NULL;
-    node_in_delete_list.entry = this;
-    node_in_delete_list.next = NULL;
-    node_in_delete_list.prev = NULL;
-    node_in_delete_list.unk_c = NULL;
+    node_in_global_list.init(this);
+    node_as_child.init(this);
+    list_of_children.init(this);
+    node_in_delete_list.init(this);
 }
 
 // FUNCTION: TH16 0x406340
@@ -151,7 +140,9 @@ void AnmVm::set_alpha1_time(i32 end_time, i32 method, u8 initial, u8 goal)
     alpha1_i.time = 0;
 }
 
-// TODO: fast_id is restored before entity_pos in ours (scheduling).
+// wipe for the part of the VM after its script state (from id on), as
+// copy_vm does before copying a script's template over the rest. The list
+// nodes go through ZunList::init for the same scheduling reason as in wipe.
 // FUNCTION: TH16 0x407a50
 void AnmVm::wipe_suffix()
 {
@@ -162,18 +153,9 @@ void AnmVm::wipe_suffix()
     layer = saved_layer;
     fast_id = saved_fast_id;
     entity_pos = saved_entity_pos;
-    node_in_global_list.entry = this;
-    node_in_global_list.next = NULL;
-    node_in_global_list.prev = NULL;
-    node_in_global_list.unk_c = NULL;
-    node_as_child.entry = this;
-    node_as_child.next = NULL;
-    node_as_child.prev = NULL;
-    node_as_child.unk_c = NULL;
-    list_of_children.entry = this;
-    list_of_children.next = NULL;
-    list_of_children.prev = NULL;
-    list_of_children.unk_c = NULL;
+    node_in_global_list.init(this);
+    node_as_child.init(this);
+    list_of_children.init(this);
 }
 
 // FUNCTION: TH16 0x407b20
