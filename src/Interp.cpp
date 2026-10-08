@@ -16,9 +16,11 @@ static inline f32 ease_in_back(f32 x, f32 a)
            (1.0f - a * a / ((1.0f - a) * (1.0f - a)));
 }
 
-// TODO: (reccmp 83%) the two-branch curves assign x and return it once, which the original's
-// registers show; left: the in-out-2 else branch (original keeps 2.0f in xmm1 and moves the
-// result into xmm3) and out-in-sine (original result in xmm1, 0.5f loaded once in the else).
+// TODO: (reccmp 86%) most two-branch curves assign x and return it once, which the original's
+// registers show; in-out-2 returns from its else branch, which keeps 2.0f in xmm1 like the original.
+// Left: in-out-2's result is not moved back into xmm3 before the multiply, out-in-sine (original
+// result in xmm1, 0.5f loaded once in the else), and reccmp cannot name the original's addresses of
+// the constants only SSE code uses (the ease-back divisors), which count as differences.
 // FUNCTION: TH16 0x4033f0
 HARNESS_CALLED f32 interp_common_methods(i32 mode, f32 time, f32 end_time)
 {
@@ -49,7 +51,7 @@ HARNESS_CALLED f32 interp_common_methods(i32 mode, f32 time, f32 end_time)
         }
         else
         {
-            x = 2.0f - (2.0f - x) * (2.0f - x);
+            return (2.0f - (2.0f - x) * (2.0f - x)) * 0.5f;
         }
         return x * 0.5f;
     case INTERP_EASE_OUT_IN_2:
@@ -342,8 +344,8 @@ HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step()
     return current;
 }
 
-// TODO: the timer tick and the bezier terms differ in register allocation,
-// and the constant-acceleration case loads goal.x before bezier_2.x.
+// TODO: the timer tick and the bezier terms differ in register allocation (1.0f lives in xmm5, the original's xmm6),
+// and the constant-acceleration case loads goal.x before bezier_2.x (goal + bezier_2 fixes x but not y and z).
 // FUNCTION: TH16 0x406e10
 D3DXVECTOR3 InterpFloat3::step()
 {
@@ -389,7 +391,7 @@ D3DXVECTOR3 InterpFloat3::step()
         f32 c_goal = t * t * (3.0f - 2.0f * t);
         f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
         f32 c_bezier_2 = (t - 1.0f) * t * t;
-        current = goal * c_goal + initial * c_initial + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+        current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
     }
     else
     {
@@ -399,9 +401,9 @@ D3DXVECTOR3 InterpFloat3::step()
     return current;
 }
 
-// TODO: same as InterpFloat2::step, of which this is a second copy.
+// TODO: same remaining differences as InterpFloat2::step, of which this is a second copy.
 // FUNCTION: TH16 0x425570
-D3DXVECTOR2 InterpFloat2::step_radial_dist()
+HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step_radial_dist()
 {
     if (end_time > 0)
     {
@@ -455,14 +457,13 @@ D3DXVECTOR2 InterpFloat2::step_radial_dist()
     return current;
 }
 
-// TODO: some vector adds load their operands the other way round, and the per-axis constant acceleration keeps
-// the sum in xmm0 where the original copies it back through eax.
+// TODO: the per-axis constant acceleration loads bezier_2 before initial and stores current from xmm0 where the original copies it back through eax (`+=` and an int copy give that but swap esi and edi everywhere); the returned vector's z is loaded after x/y.
 // FUNCTION: TH16 0x4258b0
 D3DXVECTOR3 InterpStrange1::step()
 {
     if (end_time > 0)
     {
-        time.tick_mixed();
+        time.tick();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -487,14 +488,14 @@ D3DXVECTOR3 InterpStrange1::step()
         if (method_for_3d == INTERP_CONSTANT_VELOCITY)
         {
             D3DXVECTOR3 tmp = initial;
-            initial = goal + tmp;
+            initial = tmp + goal;
             current = initial;
         }
         else if (method_for_3d == INTERP_CONSTANT_ACCEL)
         {
             D3DXVECTOR3 tmp = initial;
             initial = bezier_2 + tmp;
-            bezier_2 = bezier_2 + goal;
+            bezier_2 = goal + bezier_2;
             current = initial;
         }
         else if (method_for_3d == INTERP_BEZIER)
@@ -523,9 +524,12 @@ D3DXVECTOR3 InterpStrange1::step()
             }
             else if (methods_1d[i] == INTERP_CONSTANT_ACCEL)
             {
+                // bezier_2 is the velocity here and goal the acceleration;
+                // the new velocity is computed before current is set.
                 initial[i] = bezier_2[i] + initial[i];
+                f32 velocity = bezier_2[i] + goal[i];
                 current[i] = initial[i];
-                bezier_2[i] = bezier_2[i] + goal[i];
+                bezier_2[i] = velocity;
             }
             else if (methods_1d[i] == INTERP_BEZIER)
             {
@@ -544,13 +548,15 @@ D3DXVECTOR3 InterpStrange1::step()
     return current;
 }
 
-// TODO: the timer tick: with tick() the stores match, but the result goes to the speed's xmm1 (the original loads current_f into xmm0, see docs/findings.md); the constant acceleration's bezier_2 + goal gets x or y/z operand order right, never both; one lea swaps its operands.
+// The timer tick is tick_goto: tick() and tick_mixed added current_f from
+// memory into the speed's register where the original loads it into xmm0.
+// TODO: 100%*: the merged timer stores come current_f first (current first in the original); with the stores after the branches instead, the lerp's y lea takes its operands the other way round.
 // FUNCTION: TH16 0x464590
 HARNESS_CALLED Int3 InterpInt3::step()
 {
     if (end_time > 0)
     {
-        time.tick_mixed();
+        time.tick_goto();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -580,7 +586,7 @@ HARNESS_CALLED Int3 InterpInt3::step()
     {
         Int3 tmp = initial;
         initial = tmp + bezier_2;
-        bezier_2 = bezier_2 + goal;
+        bezier_2 = goal + bezier_2;
         current = initial;
     }
     else if (method == INTERP_BEZIER)
