@@ -1724,6 +1724,9 @@ i32 Player::on_tick_body()
         switch (inner.time_in_state.current)
         {
         case 4:
+            // Stand-in: the original keeps the compare for this empty case,
+            // as it does for a call LTCG drops after the switch is lowered.
+            debug_log("state 3\n");
             break;
         case 15:
             g_LaserManager->clear_all(1, 0);
@@ -1742,7 +1745,10 @@ i32 Player::on_tick_body()
         source->pos.update_secondary_fields();
         source->pos.step();
         source->radius += source->radius_growth;
-        source->angle = wrap_angle(source->angle + source->angular_speed);
+        // TODO: written as += for the original's load order (angular_speed
+        // first), which adds a store of the unwrapped angle it does not have.
+        source->angle += source->angular_speed;
+        source->angle = wrap_angle(source->angle);
         source->last_enemy_id = 0;
         source->lifetime.decrement(1.0f);
         if (source->lifetime.current <= 0)
@@ -1804,7 +1810,11 @@ i32 Player::on_tick_body()
         if (player_scale_i.end_time != 0)
         {
             player_scale = player_scale_i.step();
-            if (player_scale_i.end_time != 0 && inner.time_in_state.current % 3 == 0)
+            // Copied into a local inside the condition: `% 3` on the member
+            // compiles to idiv, and a local set before the if is loaded
+            // ahead of the end_time check.
+            i32 time;
+            if (player_scale_i.end_time != 0 && (time = inner.time_in_state.current) % 3 == 0)
             {
                 vm.scale.x = 1.0f;
                 vm.scale.y = 1.0f;
@@ -1819,37 +1829,49 @@ i32 Player::on_tick_body()
             vm.scale.x = vm.scale.y = player_scale;
         }
         vm.flags_lo |= ANM_VM_SCALE_CHANGED;
-        f32 scale = player_scale;
-        hurtbox.min_pos = inner.pos - hurtbox_halfsize * scale;
-        hurtbox.max_pos = inner.pos + hurtbox_halfsize * scale;
-        item_collect_box.min_pos = inner.pos - item_attract_box_unfocused_halfsize * 0.5f * scale;
-        item_collect_box.max_pos = inner.pos + item_attract_box_unfocused_halfsize * 0.5f * scale;
-        item_attract_box_focused.min_pos = inner.pos - item_attract_box_focused_halfsize * scale;
-        item_attract_box_focused.max_pos = inner.pos + item_attract_box_focused_halfsize * scale;
-        item_attract_box_unfocused.min_pos = inner.pos - item_attract_box_unfocused_halfsize * scale;
-        item_attract_box_unfocused.max_pos = inner.pos + item_attract_box_unfocused_halfsize * scale;
+        // player_scale is read directly: a local copy takes xmm7 instead of
+        // the original's xmm6. The collect box's operand order decides
+        // whether the scale is copied before each multiply.
+        // TODO: the hurtbox, focused and unfocused boxes are scheduled
+        // differently, and the original folds pos.x and halfsize.x into
+        // addss/mulss in places where ours loads them.
+        hurtbox.min_pos = inner.pos - hurtbox_halfsize * player_scale;
+        hurtbox.max_pos = inner.pos + hurtbox_halfsize * player_scale;
+        item_collect_box.min_pos = inner.pos - player_scale * (item_attract_box_unfocused_halfsize * 0.5f);
+        item_collect_box.max_pos = inner.pos + player_scale * (item_attract_box_unfocused_halfsize * 0.5f);
+        item_attract_box_focused.min_pos = inner.pos - item_attract_box_focused_halfsize * player_scale;
+        item_attract_box_focused.max_pos = inner.pos + item_attract_box_focused_halfsize * player_scale;
+        item_attract_box_unfocused.min_pos = inner.pos - item_attract_box_unfocused_halfsize * player_scale;
+        item_attract_box_unfocused.max_pos = inner.pos + item_attract_box_unfocused_halfsize * player_scale;
     }
     else
     {
         vm.flags_lo |= ANM_VM_SCALE_CHANGED;
         vm.scale.x = 1.0f;
         vm.scale.y = 1.0f;
+        // The order of the operands of + decides which one is loaded and
+        // which is added from memory (written to match the original).
         hurtbox.min_pos = inner.pos - hurtbox_halfsize;
-        hurtbox.max_pos = inner.pos + hurtbox_halfsize;
+        hurtbox.max_pos = hurtbox_halfsize + inner.pos;
         item_collect_box.min_pos = inner.pos - item_attract_box_unfocused_halfsize * 0.5f;
         item_collect_box.max_pos = inner.pos + item_attract_box_unfocused_halfsize * 0.5f;
         item_attract_box_focused.min_pos = inner.pos - item_attract_box_focused_halfsize;
+        // TODO: the original loads pos.x but halfsize.y and .z first here;
+        // either operand order gives the same choice for all three.
         item_attract_box_focused.max_pos = inner.pos + item_attract_box_focused_halfsize;
         item_attract_box_unfocused.min_pos = inner.pos - item_attract_box_unfocused_halfsize;
-        item_attract_box_unfocused.max_pos = item_attract_box_unfocused_halfsize + inner.pos;
+        item_attract_box_unfocused.max_pos = inner.pos + item_attract_box_unfocused_halfsize;
     }
-    inner.time_in_state.tick();
-    inner.time_in_stage.tick();
-    inner.shot_time_in_stage.tick();
+    // tick_split stores current_f in each branch like the original.
+    inner.time_in_state.tick_split();
+    inner.time_in_stage.tick_split();
+    inner.shot_time_in_stage.tick_split();
     // Shooting: not during dialogue or before the stage's enemies run.
     if (g_Gui->msg == NULL && g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 &&
         !(*(u32 *)&g_GameThread->flags & GAME_THREAD_GAME_CLEARED) && inner.shot_time_in_stage.current >= 20 &&
-        !(inner.flags & PLAYER_FLAG_NO_SHOOTING) && !(inner.flags & PLAYER_FLAG_SCALED))
+        // Not PLAYER_FLAG_NO_SHOOTING, spelled out as a bit test: written
+        // with the mask, the two flag tests merge into one `test`.
+        (~(inner.flags >> 2) & 1) && !(inner.flags & PLAYER_FLAG_SCALED))
     {
         tick_shooting_state();
     }
