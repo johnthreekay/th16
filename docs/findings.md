@@ -1434,3 +1434,55 @@ functions):
   forceinline wrapper in Ending.cpp (EndingScriptVm::run loses its match),
   in EffectManager::create_effect (68%) and at Player.cpp's two calls
   (Player::move stops realigning).
+
+Second pass over bullets, enemies, ECL and spell cards:
+- `#pragma fenv_access(on)` around one function stops MSVC treating CRT
+  math calls as pure: members are reloaded after a floor call instead of
+  kept across it (Spellcard::measure_real_time matched). A double local
+  passed to floor gives the original's load into xmm0 and move to the x87
+  stack; `#pragma function(floor)` also forces the reload but passes the
+  argument as `movsd [esp]`.
+- Writing a tick's whole-frame step twice (one copy for a missing speed,
+  one for a speed close to 1) makes MSVC load 1.0f into a register early
+  and merge the copies afterwards: the new `ZunTimer::tick_nested`
+  matched EnemyManager::update and fixed Bullet::on_tick's tick (in
+  BulletManager::on_tick_body it hoists the constant but assigns the
+  registers differently). Other functions with the original's
+  1.0f-in-register tick: InterpFloat3::step, InterpCameraSky::step,
+  InterpStrange1::step, InterpFloat2::step and step_radial_dist,
+  InterpInt3::step, Gui::on_tick_body, PauseMenu::on_tick,
+  Player::on_tick_body, PopupManager::on_tick.
+- HARNESS_CALLED on both Bullet::on_tick and step_ex_08 removes both
+  functions' `and esp, -8` (step_ex_08's D3DXVECTOR2 alignment then comes
+  from on_tick_body's realigned frame); doing one alone moves the
+  realignment around.
+- Walking a loop by byte offset reproduces an "offset counter compared
+  with the end" loop: `for (u32 off = offsetof(...[10]); off <
+  offsetof(...[16]); off += 4)` (EnemyManager::destroy_all 78 -> 98); an
+  index loop counts down beside a pointer.
+- `Float3 pos(0, 0, 0); if (vm) pos = vm->pos;` gives the original's zero
+  temporary copied in on the else path, better than a zero local assigned
+  in an else (step_interpolators +7).
+- Inline helpers and D3DXVECTOR3 constructors with float arguments
+  evaluate them left to right in our build where the original reads them
+  right to left (int-argument helpers already go right to left); reading
+  y into a local first fixed anmScale/anmScale2.
+- A member updated with `+=` is added in memory and reloaded; computing the
+  new count into a local, storing it and using the local gives the
+  original's register add (load_ecl_data).
+- reccmp artifacts that source cannot fix: its float-constant scan only
+  looks at x87 instructions, so a constant only SSE code uses shows as
+  `<OFFSETn>` on the original side even when equal (step_interpolators'
+  0.03f, step_ex_08's -384.0f); its latin1 string scan reads the original's
+  1.9f at 0x494548 as a string, so eject_extra_drops cannot reach 100%.
+- Dead ends: eject_extra_drops (operand and statement orders, pointer
+  forms, f32 helpers; fenv_access made it worse); step_ex_17 (all six
+  statement orders); clear_all's x/y register swap; kill_all_no_set_death's
+  tick (tick_nested and tick_in_place also load); the kept `* 1.0f` in
+  decrement (fenv_access, float_control(except), a volatile 1.0f, an
+  out-of-line decrement with inline_depth(0): all fold or reorder);
+  get_int_arg_given_value's folded +4; load_ecl_data's redundant
+  `test esi, esi` before free; run_ex's ex pointer (index addressing in
+  every form); check_player_collision; step_logic's cmov reuses damage's
+  register; Spellcard::start's esi/edi; a volatile
+  EclRunContextHolder::current_context (cost 4 functions and SptInf::run_ecl).
