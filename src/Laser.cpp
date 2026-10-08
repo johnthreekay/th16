@@ -1159,6 +1159,15 @@ i32 LaserLineInf::cancel(i32 mode, i32 skip_invuln)
     {
         return 0;
     }
+    // Three dead named locals, as in LaserInfiniteInf::cancel: the count of
+    // named variables decides MSVC's choices here (docs/findings.md), and
+    // these come closer to the original. Matching only.
+    i32 unused_a = 0;
+    i32 unused_b = 0;
+    i32 unused_c = 0;
+    (void)unused_a;
+    (void)unused_b;
+    (void)unused_c;
     f32 dist = 8.0f;
     i32 count = 0;
     Float3 step;
