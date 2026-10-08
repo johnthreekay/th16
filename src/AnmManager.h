@@ -209,6 +209,26 @@ struct AnmLoaded
     void load_sprite(i32 index, AnmLoadedSprite *sprite);
 };
 
+// AnmLoaded::create_effect as a member function pointer. A call through it
+// compiles to the original's direct call, but is not an edge in LTCG's call
+// graph.
+typedef AnmId (AnmLoaded::*AnmLoadedCreateEffectFunc)(i32 script, i32 layer, AnmVm **out);
+static inline AnmLoadedCreateEffectFunc anm_create_effect_func()
+{
+    return &AnmLoaded::create_effect;
+}
+
+// anm->create_effect(script, layer, out), called through the member pointer.
+// Most of ZUN's call sites compile like this and not like a plain call: the
+// file pointer is loaded first, so for g_AsciiManager->ascii_anm the
+// original has g_AsciiManager in eax and the result slot in ecx (the menu
+// states, Gui::show_notice). An inline helper with a plain call does not do
+// it.
+static __forceinline AnmId create_effect_via_pointer(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out)
+{
+    return (anm->*anm_create_effect_func())(script, layer, out);
+}
+
 // A sprite as stored in an .anm entry.
 struct AnmRawSprite
 {

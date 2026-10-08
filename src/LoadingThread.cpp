@@ -178,7 +178,7 @@ int LoadingThread::on_draw()
 {
     if (logo_step == 1)
     {
-        anm_id = sig_anm->create_effect(0, -1, NULL);
+        anm_id = create_effect_via_pointer(sig_anm, 0, -1, NULL);
         logo_step++;
     }
     if (now_loading_step == 1)

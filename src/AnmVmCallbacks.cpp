@@ -78,8 +78,7 @@ static __forceinline void gather_setup_child(AnmId *id, ZunColor color, AnmVm *v
 // The direction temporaries reuse offset, as the original's stack slots
 // show (it computes mid - start once for both normalizations).
 // TODO: different stack slot layout (the original's frame is 0x90 bytes,
-// ours 0xa8), and the create_effect calls load g_EffectManager into ecx
-// where the original uses eax (see the menu functions in findings.md).
+// ours 0xa8).
 // Spawns four child VMs per frame for 50 frames and flies each along two
 // bezier curves: out from a point that circles the VM to one that circles
 // it closer, then back to the VM.
@@ -100,10 +99,14 @@ int __fastcall anm_gather_effect_on_tick(AnmVm *vm)
     if (data->timer.current != data->timer.previous && data->timer.current < 50)
     {
         i32 n = data->timer.current * 4;
-        data->vm_ids[n] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
-        data->vm_ids[n + 1] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
-        data->vm_ids[n + 2] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
-        data->vm_ids[n + 3] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE_2, -1, NULL);
+        data->vm_ids[n] = create_effect_via_pointer(g_EffectManager->effect_anm,
+                                                    EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
+        data->vm_ids[n + 1] = create_effect_via_pointer(g_EffectManager->effect_anm,
+                                                        EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
+        data->vm_ids[n + 2] = create_effect_via_pointer(g_EffectManager->effect_anm,
+                                                        EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
+        data->vm_ids[n + 3] = create_effect_via_pointer(g_EffectManager->effect_anm,
+                                                        EFFECT_SCRIPT_GATHER_PARTICLE_2, -1, NULL);
         ZunColor color = vm->color_1;
         gather_setup_child(&data->vm_ids[n], color, vm);
         gather_setup_child(&data->vm_ids[n + 1], color, vm);
