@@ -213,8 +213,8 @@ AnmId EffectManager::create_effect(i32 effect, D3DXVECTOR3 *pos, AnmVm *vm)
     return id;
 }
 
-// TODO: the original has a 4 bytes bigger frame, saves esi before the
-// script check, and copies the last five indices through ecx.
+// TODO: the original copies the last five indices through ecx (a loop, an
+// inline helper, a target pointer and struct views do not change it).
 // FUNCTION: TH16 0x418ba0
 HARNESS_CALLED AnmId EffectManager::create_ui_effect(i32 effect, D3DXVECTOR3 *pos, AnmVm *vm)
 {

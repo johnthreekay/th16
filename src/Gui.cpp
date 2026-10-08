@@ -763,6 +763,7 @@ waiting:
         return 0;
     }
     Float3 pos;
+    // D3DXVec3Add form as in update_callout: the original's operand order.
     D3DXVec3Add(&pos, &bubble->pos, &bubble->entity_pos);
     pos = pos + bubble->pos_2;
     bubble->transform_coords(&pos);
@@ -1392,9 +1393,6 @@ static __forceinline AnmId find_child_id_inline_search(AnmId &id, i32 script)
     return result;
 }
 
-// Fills the season gauge bar towards the next level and shows the level
-// (interrupt 7 + level), switching the gauge's look (interrupt 2 or 3) when
-// the first level is reached or lost.
 // update_season_gauge runs the gauge VM through this helper's member pointer,
 // which the optimizer turns back into the original's direct call. With
 // direct calls to AnmVm::run in its call graph, ours realigned the frame
@@ -1405,6 +1403,9 @@ static inline AnmVmRunFunc anm_vm_run_func()
     return &AnmVm::run;
 }
 
+// Fills the season gauge bar towards the next level and shows the level
+// (interrupt 7 + level), switching the gauge's look (interrupt 2 or 3) when
+// the first level is reached or lost.
 // TODO: the original keeps g_AnmManager and then the level in ebx (ours reloads
 // it and spills the level), and pads its frame for known alignment (push ecx).
 // FUNCTION: TH16 0x42c600
