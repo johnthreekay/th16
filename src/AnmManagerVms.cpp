@@ -271,7 +271,7 @@ void AnmManager::disable_vms_from_anm_file(AnmLoaded *anm)
 }
 
 // FUNCTION: TH16 0x46f2e0
-DECOMP_NOINLINE AnmVm *AnmId::find_or_clear()
+HARNESS_CALLED AnmVm *AnmId::find_or_clear()
 {
     AnmVm *vm = g_AnmManager->get_vm_with_id(*this);
     if (vm == NULL)

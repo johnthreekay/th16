@@ -164,6 +164,13 @@ struct EclStack
     // 0x474860. Closes the frame enter opened.
     HARNESS_CALLED i32 ecl_return();
 
+    // The local at the given byte offset from the frame base. Callers that
+    // go through it compute the frame address before adding the offset.
+    i32 *local_ptr(i32 offset)
+    {
+        return (i32 *)((u8 *)data + base_offset + offset);
+    }
+
     // Typed pushes and pops of the expression stack, inlined into
     // EclRunContext::ecl_run.
     __forceinline i32 pop_int()
@@ -182,17 +189,19 @@ struct EclStack
         }
         return item.i;
     }
+    // pop_float reads the entry as an int and reinterprets it for the float
+    // return (EclRunContext::pop_float_arg does the same).
     __forceinline f32 pop_float()
     {
         stack_offset -= 4;
-        EclStackItem item = *(EclStackItem *)((u8 *)data + stack_offset);
+        i32 item = *(i32 *)((u8 *)data + stack_offset);
         stack_offset -= 4;
         char type = *((char *)data + stack_offset);
         if (type != 'f' && type == 'i')
         {
-            return (f32)item.i;
+            return (f32)item;
         }
-        return item.f;
+        return *(f32 *)&item;
     }
     __forceinline void push_int(i32 value)
     {
