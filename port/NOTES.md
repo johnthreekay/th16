@@ -555,23 +555,24 @@ For finding where a replay desyncs: `TH16_REPLAY_TEST_TRACE=N` logs the
 state every N frames, and `TH16_REPLAY_TEST_DUMP=FILE` writes every
 frame's g_Globals, replay RNG and player position as hex (with
 `TH16_REPLAY_TEST_ITEMS=FIRST:LAST`, also every active item in those
-frames). The original's side of the comparison came from th16.exe itself
-under Wine (a fresh prefix, Wine's own d3dx9; the config set to a 640x480
-window without the startup dialog), started on the replay through the
-menus with xdotool under Xvfb, by a script that reads the same addresses
-from /proc/PID/mem every millisecond and keeps the last sample of each
-frame (g_Globals 0x4a5790, g_replay_safe_rng 0x4a6d88, g_Player 0x4a6ef8
-+0x61c, g_ReplayManager 0x4a6f08: stage_num +0x214, frame_current
-+0xd8 + 0x28 * stage; items from g_ItemManager 0x4a6ddc + 0x14, 0xc78
-bytes each). With ptrace_scope 1 the script has to be the game's ancestor:
-Wine's launcher exits after starting th16.exe, so the script makes itself a
-child subreaper (prctl PR_SET_CHILD_SUBREAPER) to inherit it. The two
-dumps are a phase apart (the port's is taken after GameThread's priority
-0xf tick, so time_in_stage is one ahead); everything else matched frame
-for frame once the evaluation order was fixed. The first difference before
-that was the season items' launch angles at frame 250 of the Extra stage,
-then item collection a few frames apart, and the first extra death at
-frame 6929.
+frames). `port/tools/replay_reference.py record` writes the same dump for
+the original: it runs th16.exe under Wine (a scratch prefix given as
+WINEPREFIX, Wine's own d3dx9; the config set to a 640x480 window without
+the startup dialog), opens the replay through the menus with xdotool under
+Xvfb, and reads the same addresses from /proc/PID/mem every millisecond,
+keeping the last sample of each frame (g_Globals 0x4a5790,
+g_replay_safe_rng 0x4a6d88, g_Player 0x4a6ef8 +0x61c, g_ReplayManager
+0x4a6f08: stage_num +0x214, frame_current +0xd8 + 0x28 * stage; items from
+g_ItemManager 0x4a6ddc + 0x14, 0xc78 bytes each). `replay_reference.py
+compare` then prints the first frame where each field differs. With
+ptrace_scope 1 the script has to be the game's ancestor: Wine's launcher
+exits after starting th16.exe, so the script makes itself a child
+subreaper (prctl PR_SET_CHILD_SUBREAPER) to inherit it. The two dumps are
+a phase apart (the port's is taken after GameThread's priority 0xf tick,
+so time_in_stage is one ahead); everything else matched frame for frame
+once the evaluation order was fixed. The first difference before that was
+the season items' launch angles at frame 250 of the Extra stage, then item
+collection a few frames apart, and the first extra death at frame 6929.
 
 ### Not done
 
