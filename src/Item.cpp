@@ -211,7 +211,7 @@ i32 ItemManager::on_tick_body()
                 item->speed = 0.0f;
                 item->angle = ZUN_PI / 2;
                 item->speed_towards_player = player->sht_file->grazebox_radius;
-                item->state = item->force_autocollect != 0 ? ITEM_STATE_AUTOCOLLECT : ITEM_STATE_FALLING;
+                item->state = item->force_autocollect == 0 ? ITEM_STATE_FALLING : ITEM_STATE_AUTOCOLLECT;
                 goto state_1;
             }
             if (!item_offscreen(item))
@@ -381,7 +381,7 @@ i32 ItemManager::on_tick_body()
                 case 16:
                     if (g_Globals.collect_season_item(0))
                     {
-                        g_Player->inner.repopulate_options();
+                        player->inner.repopulate_options();
                         g_PopupManager->generate_small_score_popup(&item->position, -1, 0xffffff40);
                         g_SoundManager.play_sound_at_position(SE_LGODSGET, item->position.x);
                     }
