@@ -964,10 +964,10 @@ i32 TitleInf::do_practice_stage_select()
             set_state(TITLE_STATE_EXIT);
             i32 stage = menu.next_selection + 1;
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
+            g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
             g_title_return_point = TITLE_RETURN_PRACTICE;
-            g_stage_data = &g_stage_table[stage];
             g_practice_last_stage = menu.next_selection;
             return 1;
         }

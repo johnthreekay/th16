@@ -990,11 +990,11 @@ i32 TitleInf::on_tick()
                     break;
                 }
             }
+            g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_START_REPLAY;
             RpyInfo *info = replay->info;
-            g_stage_data = &g_stage_table[stage];
             g_Globals.character = info->character;
             g_Globals.subshot = info->subshot;
             g_Globals.subseason = info->subseason;
