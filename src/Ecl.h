@@ -189,17 +189,19 @@ struct EclStack
         }
         return item.i;
     }
+    // pop_float reads the entry as an int and reinterprets it for the float
+    // return (EclRunContext::pop_float_arg does the same).
     __forceinline f32 pop_float()
     {
         stack_offset -= 4;
-        EclStackItem item = *(EclStackItem *)((u8 *)data + stack_offset);
+        i32 item = *(i32 *)((u8 *)data + stack_offset);
         stack_offset -= 4;
         char type = *((char *)data + stack_offset);
         if (type != 'f' && type == 'i')
         {
-            return (f32)item.i;
+            return (f32)item;
         }
-        return item.f;
+        return *(f32 *)&item;
     }
     __forceinline void push_int(i32 value)
     {
