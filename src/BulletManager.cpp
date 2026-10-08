@@ -1565,20 +1565,21 @@ static AnmLoadedSprite *vm_sprite(AnmVm *vm)
     return &g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id];
 }
 
-// Whether something of the given size at x is entirely outside [lo, hi].
-static i32 outside_range(f32 x, f32 size, f32 lo, f32 hi)
+// Whether something of the given size at *x is entirely outside [lo, hi].
+// The coordinate is read through the pointer after the half size is
+// computed, which makes it the destination of the add, as in the original.
+static i32 outside_range(f32 *x, f32 size, f32 lo, f32 hi)
 {
     f32 half = size * 0.5f;
-    return x + half <= lo || x - half >= hi;
+    return *x + half <= lo || *x - half >= hi;
 }
 
-// TODO: the original keeps all five constants in registers from the start
-// and adds the half size to the position (ours the other way round).
+// TODO: reccmp effective match: the original loads 192.0f before 448.0f.
 // FUNCTION: TH16 0x415d80
 i32 Bullet::step_ex_12()
 {
-    if (outside_range(pos.x, vm_sprite(&vm0)->sprite_width, -192.0f, 192.0f) ||
-        outside_range(pos.y, vm_sprite(&vm0)->sprite_height, 0.0f, 448.0f))
+    if (outside_range(&pos.x, vm_sprite(&vm0)->sprite_width, -192.0f, 192.0f) ||
+        outside_range(&pos.y, vm_sprite(&vm0)->sprite_height, 0.0f, 448.0f))
     {
         i32 sides = ex_state[6].ints[2];
         if ((sides & 1) && pos.y < 0.0f)
@@ -1883,8 +1884,8 @@ i32 Bullet::on_tick()
         }
         if (!(active_ex_flags & BULLET_EX_OFFSCREEN) && offscreen_grace < 1)
         {
-            if (outside_range(pos.x, vm_sprite(&vm0)->sprite_width * scale, -192.0f, 192.0f) ||
-                outside_range(pos.y, vm_sprite(&vm0)->sprite_height * scale, -64.0f, 480.0f))
+            if (outside_range(&pos.x, vm_sprite(&vm0)->sprite_width * scale, -192.0f, 192.0f) ||
+                outside_range(&pos.y, vm_sprite(&vm0)->sprite_height * scale, -64.0f, 480.0f))
             {
                 release();
                 return -1;
@@ -1918,8 +1919,8 @@ i32 Bullet::step_ex_08()
 {
     ex_state[11].timer.decrement(1.0f);
     if (ex_state[11].ints[0] != 0 &&
-        (outside_range(pos.x, vm_sprite(&vm0)->sprite_width, -192.0f, 192.0f) ||
-         outside_range(pos.y, vm_sprite(&vm0)->sprite_height, 0.0f, 448.0f)))
+        (outside_range(&pos.x, vm_sprite(&vm0)->sprite_width, -192.0f, 192.0f) ||
+         outside_range(&pos.y, vm_sprite(&vm0)->sprite_height, 0.0f, 448.0f)))
     {
         D3DXVECTOR3 dir;
         D3DXVECTOR2 corner;
