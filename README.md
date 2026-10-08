@@ -3,7 +3,7 @@
 A matching decompilation of 東方天空璋 ～ Hidden Star in Four Seasons (TH16) v1.00a:
 C++ source written to compile, with ZUN's own compiler and flags, back to the
 machine code of `th16.exe`, checked function by function. Every function is
-decompiled; 905 of 1207 compile to identical bytes so far.
+decompiled; 1007 of 1207 compile to identical bytes so far.
 
 This repository does not include the game's executable or its data files
 (`th16.dat`, music, the manual); you need your own copy of the game. The
@@ -14,20 +14,20 @@ SHA-256
 
 ## Status
 
-- 905 of the 1207 functions reccmp compares (75%) are byte-identical, and 19
+- 1007 of the 1207 functions reccmp compares (83%) are byte-identical, and 29
   more differ only in instruction scheduling; reccmp skips the 7 annotated
   CRT library functions. All 26 vtables match.
-- The other 283 compile to functionally equivalent code. Each carries a
+- The other 171 compile to functionally equivalent code. Each carries a
   one-line `// TODO:` saying what still differs, mostly register allocation
   and stack frame alignment. Those are whole-program decisions, so fixing
   one function can unmatch another, and some may never match;
   [docs/findings.md](docs/findings.md) has the patterns behind them.
-- reccmp's summary line, "1222 / 1222 implemented, 94.06% accuracy", is the
+- reccmp's summary line, "1222 / 1222 implemented, 96.80% accuracy", is the
   average instruction similarity per entry, not a share of matching
-  functions. It also counts 15 SIMD constants, which all match (93.99% over
+  functions. It also counts 15 SIMD constants, which all match (96.76% over
   the functions alone).
 - Every annotated global holds the original's data (`scripts/check_data.py`:
-  199 of 200 match; `g_Supervisor` differs only in defaults its initializer
+  201 of 202 match; `g_Supervisor` differs only in defaults its initializer
   clears at startup), and none is a field of another annotated object.
 - The source is readable: script opcodes (ECL, ANM, MSG, STD), game modes,
   sound effects, flags and file formats are named enums; structs and
