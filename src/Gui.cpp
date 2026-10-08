@@ -1823,6 +1823,33 @@ static __forceinline void delete_boss_bar_vms(GuiBossBar *bar)
     }
 }
 
+// ZunTimer::tick as on_tick_body inlines it for the stage clear bonus. A
+// missing speed jumps into the whole-frame branch (goto): that gives the
+// original's untouched stores per branch and 1.01f kept in a register,
+// where tick and its other variants merge the stores.
+static __forceinline void tick_stage_clear_timer(ZunTimer *t)
+{
+    f32 *speed = t->speed();
+    i32 cur = t->current;
+    t->previous = cur;
+    if (speed == NULL)
+    {
+        goto whole_frame;
+    }
+    if (*speed > 0.99f && *speed < 1.01f)
+    {
+    whole_frame:
+        cur++;
+        t->current_f = t->current_f + 1.0f;
+    }
+    else
+    {
+        t->current_f = *speed + t->current_f;
+        cur = (i32)t->current_f;
+    }
+    t->current = cur;
+}
+
 // The HUD's frame: the chapter result's count-up, the season gauge moving
 // out of the player's way, the boss timer, life bars and stars, the
 // dialogue, the enemy marker below the game area and the subseason
@@ -1833,7 +1860,7 @@ i32 Gui::on_tick_body()
 {
     if (hud_flags & GUI_STAGE_CLEAR_BONUS)
     {
-        notice_timer.tick_in_place();
+        tick_stage_clear_timer(&notice_timer);
     }
     if (hud_flags & GUI_CHAPTER_RESULT_MASK)
     {
