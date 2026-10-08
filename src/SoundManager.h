@@ -223,8 +223,9 @@ class CSound
     // 0x471120. offset is where to start in the track.
     HRESULT Play(DWORD dwPriority, DWORD dwFlags, DWORD offset);
     // 0x4711f0. Volume in hundredths of dB, scaled by the BGM volume
-    // setting.
-    HRESULT SetVolume(i32 volume);
+    // setting. Called at all six original sites; without noinline LTCG
+    // inlines it into BgmStream::set_volume and keeps that out of line.
+    DECOMP_NOINLINE HRESULT SetVolume(i32 volume);
     // 0x471270. Also closes the file if close_file is set.
     HRESULT Stop(BOOL close_file);
     // 0x4712f0 and 0x471380
