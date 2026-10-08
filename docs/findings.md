@@ -1101,3 +1101,60 @@ Bullets, enemies, ECL and spell cards:
   loop gives the original's instructions with permuted registers (net
   -0.06); an out-of-line LaserInfiniteInner constructor costs
   LaserInfiniteInf's constructor its match.
+
+ANM VM, loader, drawing and interpolation:
+- Resetting list nodes with `ZunList::init(this)` instead of four field
+  stores matched AnmVm::wipe and wipe_suffix (closes the open "AnmVm::wipe
+  scheduling" item; LaserBeamInf::initialize matched with it).
+- `char buf[0x10c]` left 8 unused bytes under the /GS cookie; MAX_PATH
+  (0x104; 0x108 also works) gives the original frame
+  (AnmLoaded::load_entry).
+- The three-argument `Int3(b, g, r)` constructor loads x, z, y; assigning
+  the fields y, z, x matched AnmVm::set_rgb1_time and set_rgb2_time.
+- Locals hoisted before a switch take callee-saved registers: draw_vm's
+  anchor_x/anchor_y went to ebx; reading them at each call matches.
+- Ending the RECT_ROT_GRAD case with `break` (returning 0 at the end) keeps
+  the later copy of the shared draw_rect_bordered tail like the original:
+  the cross-jumping item noted open for PauseMenu.
+- One epilogue per branch: `return pos;` in each branch of
+  transform_coords; one return after the if/else shares the epilogue.
+- A two-case switch on the resolution mode was laid out the other way
+  round; an if/else-if chain fixed both sprite corner functions. Where the
+  original has a jump table (draw_billboard_fog) it needs explicit
+  `case 2: case 3:` instead of `default:`.
+- HARNESS_CALLED on a function whose only caller already realigns stops it
+  realigning itself (InterpFloat2::step_radial_dist, called only by
+  EnemyData::step_interpolators).
+- `*(Float3 *)&vertex->pos += pos` keeps the original's z = 0 store and
+  reload; per field, the z sum is folded (update_special_vertices).
+  `D3DXVec3Add(p, p, &delta)` through a pointer local gives AnmVm::run's
+  per-component operand order for the camera add.
+- tick_goto matched InterpInt3::step (effective); it does nothing in
+  InterpFloat2 or InterpFloat3.
+- A function-local `static const f32` moved to file scope with a GLOBAL
+  annotation lets reccmp name it. The "cannot name" TODO in
+  SoundManager.cpp is outdated.
+- Operand order of `a + b` mattered in InterpStrange1 and InterpInt3
+  (`tmp + goal`, `goal + bezier_2`) though it is canonicalized elsewhere.
+- A dead double in AnmVm::run (not HARNESS_CALLED): 7 matched, 7 lost
+  (same lists as the HARNESS_CALLED experiment above); most losses trace
+  to ecl_run_over_300 and ItemManager::on_tick_body having different frames
+  from the original. The AnmLoaded callers (create_vm, create_effect,
+  set_vm_script) do not respond; they may be in run's call-graph cycle
+  (run -> EffectManager::create_effect -> AnmLoaded::create_effect -> run).
+- 16-byte realignment (draw_3d, draw_3d_vertex_strip,
+  write_sprite_corners__with_z_rot, build_world_matrix): a D3DXMATRIX
+  local passed to D3DXMatrixRotationX makes it realign to 8, and the
+  `world = vm->world_matrix` copy makes that 16. HARNESS_CALLED, or member
+  functions with forwarders, only gave the ebx form.
+- interp_common_methods cannot reach 100% in reccmp: reccmp names only the
+  float constants some x87 instruction references, so the SSE-only
+  ease-back divisors always count as differences.
+- quickdiff stops at the first `ret` in functions with jump tables
+  (interp_common_methods showed MATCH there at 83% in reccmp).
+- Dead ends: create_vm_front (blocked by callers: ecl_run_over_300's
+  helpers, repopulate_options); insert_in_* (manager in ecx instead of
+  edx); restore_snapshot (CS flag cached in bl); InterpFloat2's bezier
+  scheduling; preload_anm's 8 unused frame bytes; setup_entry,
+  AnmLoaded::load, reload_texture, load_texture_from_data (register
+  allocation, unmoved by statement order, locals, helpers, HARNESS_CALLED).
