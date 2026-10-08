@@ -655,13 +655,18 @@ void StageInner::draw_vms(i32 layer)
     }
 }
 
-// TODO: register and stack slot allocation differ (the original keeps 255.0f in memory, swaps two spill slots and adds d.x to pos.x the other way round).
+// TODO: kind 2's register and stack slot allocation differ (the original keeps 255.0f in memory, swaps the radius and radius squared spill slots and sums the squares into x's register).
 // Moves the distortion mesh: kind 1 waves the bottom of the screen while no
 // spell card is active, kind 2 bulges a disc around the center of the game
 // area whose radius shrinks towards distortion_min_radius.
 // FUNCTION: TH16 0x40c4a0
 void StageInner::step_fog()
 {
+    // A dead named local, not ZUN's code: one more named variable makes
+    // MSVC load pos.x before adding d.x in the kind 1 loop, as the original
+    // does (docs/findings.md, the count of named variables).
+    i32 unused = 0;
+    (void)unused;
     if (fog == NULL)
     {
         return;
