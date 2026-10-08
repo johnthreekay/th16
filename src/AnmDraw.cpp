@@ -396,6 +396,7 @@ i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
     f32 x = screen.x;
     f32 y = screen.y;
     D3DXVECTOR3 diff;
+    // Field by field, y first and from the x/y locals: the original's order.
     diff.y = screen_2.y - y;
     diff.x = screen_2.x - x;
     diff.z = screen_2.z - screen.z;
