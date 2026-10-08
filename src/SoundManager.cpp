@@ -845,7 +845,10 @@ void SoundManager::modify_bgm(i32 command, i32 arg, const char *name)
         (p) = NULL; \
     }
 
-// TODO: block layout differs (the original falls through into the failure paths and shares one log call).
+// The three "not a wav" failures share one copy, as the original's do.
+// TODO: 71%; the original keeps name in ebx and the first failure path
+// inline (the later ones jump into it); ours spills name and moves the
+// shared failure code to the end.
 // FUNCTION: TH16 0x45e990
 i32 SoundBufferEntry::load(const char *name)
 {
@@ -886,6 +889,7 @@ i32 SoundBufferEntry::load(const char *name)
     file += 4;
     if (strncmp((char *)file, "WAVE", 4) != 0)
     {
+    not_wave:
         g_GameErrorContext.log("Wav \x83t\x83@\x83" "C\x83\x8b\x82\xb6\x82\xe1\x82\xc8\x82\xa2? %s\r\n", name);
         SAFE_FREE(SOUND_FILE_DATA(this));
         return -1;
@@ -895,17 +899,13 @@ i32 SoundBufferEntry::load(const char *name)
     WAVEFORMATEX *fmt = get_wav_chunk(file, "fmt ", &chunk_size, riff_size - 12);
     if (fmt == NULL)
     {
-        g_GameErrorContext.log("Wav \x83t\x83@\x83" "C\x83\x8b\x82\xb6\x82\xe1\x82\xc8\x82\xa2? %s\r\n", name);
-        SAFE_FREE(SOUND_FILE_DATA(this));
-        return -1;
+        goto not_wave;
     }
     WAVEFORMATEX wfx = *fmt;
     u8 *samples = (u8 *)get_wav_chunk(file, "data", &chunk_size, riff_size - 12);
     if (samples == NULL)
     {
-        g_GameErrorContext.log("Wav \x83t\x83@\x83" "C\x83\x8b\x82\xb6\x82\xe1\x82\xc8\x82\xa2? %s\r\n", name);
-        SAFE_FREE(SOUND_FILE_DATA(this));
-        return -1;
+        goto not_wave;
     }
     DSBUFFERDESC desc;
     memset(&desc, 0, sizeof(desc));
@@ -965,7 +965,7 @@ static inline IDirectSoundBuffer *bgm_buffer(CStreamingSound *sound)
 // Returns the BGM command now first in the queue.
 // The steps are if chains: as switches they become jump tables where the
 // original compares.
-// TODO: 88%; in the sound effect loop the original keeps the count in edi
+// TODO: 95%; in the sound effect loop the original keeps the count in edi
 // and spills the id (ours does the reverse), and tests the count again
 // before the division.
 // FUNCTION: TH16 0x45e330
