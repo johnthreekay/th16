@@ -288,11 +288,11 @@ HARNESS_CALLED bool Arcfile::read_directory(const char *path)
     return false;
 }
 
-// TODO: count + 1 and entries swap stack slots; the original loads data
-// before the count test and keeps the loop counter in data's argument slot.
 // Turns the unpacked directory (per entry: the name, zero-padded to a
 // multiple of 4 bytes, then offset, size and unk_c) into count entries plus
-// the end entry at end_offset.
+// the end entry at end_offset. The directory is read through a copy of
+// data: written on the parameter itself, the loop counter does not get
+// data's argument slot and the stack slots come out swapped.
 // FUNCTION: TH16 0x4574b0
 HARNESS_CALLED ArcfileEntry *Arcfile::parse_directory(u8 *data, i32 count, u32 end_offset)
 {
@@ -301,24 +301,25 @@ HARNESS_CALLED ArcfileEntry *Arcfile::parse_directory(u8 *data, i32 count, u32 e
     {
         return NULL;
     }
+    u8 *cursor = data;
     for (i32 i = 0; i < count; i++)
     {
-        char *name = (char *)malloc(strlen((char *)data) + 1);
+        char *name = (char *)malloc(strlen((char *)cursor) + 1);
         if (name != NULL)
         {
-            strcpy(name, (char *)data);
+            strcpy(name, (char *)cursor);
         }
         entries[i].name = name;
-        i32 len = strlen((char *)data) + 1;
+        i32 len = strlen((char *)cursor) + 1;
         if (len % 4 != 0)
         {
             len += 4 - len % 4;
         }
-        data += len;
-        entries[i].offset = ((u32 *)data)[0];
-        entries[i].size = ((u32 *)data)[1];
-        entries[i].unk_c = ((u32 *)data)[2];
-        data += 12;
+        cursor += len;
+        entries[i].offset = ((u32 *)cursor)[0];
+        entries[i].size = ((u32 *)cursor)[1];
+        entries[i].unk_c = ((u32 *)cursor)[2];
+        cursor += 12;
     }
     entries[count].offset = end_offset;
     entries[count].size = 0;
