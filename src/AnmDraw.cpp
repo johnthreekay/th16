@@ -291,8 +291,11 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
 }
 
 // Corners for render modes 1 and 3: the same rectangle rotated by the
-// VM's total z rotation.
-// TODO: 48%; the original vectorizes the corner offsets through stack copies in another order.
+// VM's total z rotation. The corner offsets are plain arrays filled element
+// by element: as AnmAnchorCorners struct copies, LTCG keeps them 16-byte
+// aligned and the function realigns its frame (and esp, -16), which the
+// original does not; as arrays they keep the original's /GS cookie and frame.
+// TODO: 71%; the original copies each table row with one movups (ours: four scalar copies), and the x and y offsets (and scale_x/scale_y) trade registers and stack slots.
 // FUNCTION: TH16 0x4660b0
 void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
 {
@@ -300,28 +303,35 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
     f32 sine;
     f32 cosine;
     ZUN_ASM_SINCOS(angle, sine, cosine);
-    AnmAnchorCorners xs = g_anchor_corners_x[(vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3];
-    AnmAnchorCorners ys = g_anchor_corners_y[(vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3];
+    AnmAnchorCorners *xt = &g_anchor_corners_x[(vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3];
+    AnmAnchorCorners *yt = &g_anchor_corners_y[(vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3];
+    f32 xs[4];
+    f32 ys[4];
+    for (i32 j = 0; j < 4; j++)
+    {
+        xs[j] = xt->corner[j];
+        ys[j] = yt->corner[j];
+    }
     i32 i;
     for (i = 0; i < 4; i++)
     {
-        xs.corner[i] = xs.corner[i] * vm->sprite_size.x - vm->anchor_offset.x;
-        ys.corner[i] = ys.corner[i] * vm->sprite_size.y - vm->anchor_offset.y;
+        xs[i] = xs[i] * vm->sprite_size.x - vm->anchor_offset.x;
+        ys[i] = ys[i] * vm->sprite_size.y - vm->anchor_offset.y;
     }
     if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_SCALED)
     {
         for (i = 0; i < 4; i++)
         {
-            xs.corner[i] *= g_screen_coord_scale;
-            ys.corner[i] *= g_screen_coord_scale;
+            xs[i] *= g_screen_coord_scale;
+            ys[i] *= g_screen_coord_scale;
         }
     }
     else if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_HALF_SCALED)
     {
         for (i = 0; i < 4; i++)
         {
-            xs.corner[i] *= g_screen_coord_scale * 0.5f;
-            ys.corner[i] *= g_screen_coord_scale * 0.5f;
+            xs[i] *= g_screen_coord_scale * 0.5f;
+            ys[i] *= g_screen_coord_scale * 0.5f;
         }
     }
     Float3 pos;
@@ -335,17 +345,17 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
     }
     for (i = 0; i < 4; i++)
     {
-        xs.corner[i] *= scale_x;
-        ys.corner[i] *= scale_y;
+        ys[i] *= scale_y;
+        xs[i] *= scale_x;
     }
-    a->x = xs.corner[0] * cosine - ys.corner[0] * sine + pos.x;
-    a->y = ys.corner[0] * cosine + xs.corner[0] * sine + pos.y;
-    b->x = xs.corner[1] * cosine - ys.corner[1] * sine + pos.x;
-    b->y = ys.corner[1] * cosine + xs.corner[1] * sine + pos.y;
-    c->x = xs.corner[2] * cosine - ys.corner[2] * sine + pos.x;
-    c->y = ys.corner[2] * cosine + xs.corner[2] * sine + pos.y;
-    d->x = xs.corner[3] * cosine - ys.corner[3] * sine + pos.x;
-    d->y = ys.corner[3] * cosine + xs.corner[3] * sine + pos.y;
+    a->x = xs[0] * cosine - ys[0] * sine + pos.x;
+    a->y = ys[0] * cosine + xs[0] * sine + pos.y;
+    b->x = xs[1] * cosine - ys[1] * sine + pos.x;
+    b->y = ys[1] * cosine + xs[1] * sine + pos.y;
+    c->x = xs[2] * cosine - ys[2] * sine + pos.x;
+    c->y = ys[2] * cosine + xs[2] * sine + pos.y;
+    d->x = xs[3] * cosine - ys[3] * sine + pos.x;
+    d->y = ys[3] * cosine + xs[3] * sine + pos.y;
     a->z = b->z = c->z = d->z = vm->entity_pos.z + vm->pos.z + vm->pos_2.z;
 }
 
