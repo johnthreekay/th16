@@ -2776,7 +2776,10 @@ void LaserCurveInf::run_ex()
     }
 }
 
-// TODO: register allocation and the order of the vector temporaries differ (the original builds them with unpcklps).
+// Steps a segment back from the previous one's position (pos, speed, angle)
+// along the node's motion. In mode 2 the whole part of t is kept as the
+// double floor returns: the original converts it with cvtpd2ps.
+// TODO: mode 1 differs in operand order only: the original copies dt to multiply velocity.x from memory, loads the x operands of b + a the other way round and squares sum.x into the register it adds to (a + b or a field-wise sum flips other components).
 // FUNCTION: TH16 0x438370
 void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle,
                                f32 t)
@@ -2815,8 +2818,8 @@ void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
         Float3 d;
         d.z = 0.0f;
         laser_sincosmul(&d, angle, speed);
-        f32 whole = (f32)floor(t);
-        *out_pos = *pos - d * (t - whole);
+        double whole = floor(t);
+        *out_pos = *pos - d * (t - (f32)whole);
         *out_speed = speed - speed_delta;
         i32 i = 0;
         f32 a = angle - angle_delta;
@@ -2838,7 +2841,7 @@ void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
         }
         *out_angle = a;
         laser_sincosmul(&d, a, *out_speed);
-        *out_pos = *out_pos - d * (1.0f - t + whole);
+        *out_pos = *out_pos - d * (1.0f - t + (f32)whole);
         break;
     }
     }
