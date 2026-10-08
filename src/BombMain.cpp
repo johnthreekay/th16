@@ -512,11 +512,11 @@ static DECOMP_NOINLINE void orb_update(BombReimuAOrb *orb)
 // The orb search jumps out with a goto, so the loop's normal exit is the
 // end of the bomb without a second test of the counter.
 // The orb update loop is a do/while counting down: it gives the original's
-// `sub esi, 1` loop test.
+// `sub esi, 1` loop test. Reading the damage source index into a local
+// before the radial_speed store loads it first, like the original.
 // TODO: register allocation differs (orbs is read from its stack slot in
 // the original, the timer goes to edx, the loop counters swap stack
-// slots) and the radial_speed store comes before the damage source load;
-// calls update through the orb_update stand-in (see there).
+// slots); calls update through the orb_update stand-in (see there).
 // FUNCTION: TH16 0x410de0
 i32 BombReimuAInf::on_tick()
 {
@@ -565,8 +565,9 @@ orb_alive:
             motion->flags = (motion->flags & ~0xd) | 2;
             motion->radial_dist = 0.0f;
             motion->angle.value = wrap_angle(angle);
+            i32 source = orb->damage_source;
             motion->radial_speed = ZUN_PI / 64;
-            g_Player->get_damage_source(orb->damage_source)->damage_limit = 300;
+            g_Player->get_damage_source(source)->damage_limit = 300;
             angle = wrap_angle(angle + ZUN_PI / 4);
         }
     }
