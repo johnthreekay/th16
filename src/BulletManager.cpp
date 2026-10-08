@@ -1741,15 +1741,17 @@ void Bullet::release()
 // HARNESS_CALLED (its one caller is BulletManager::on_tick_body), like
 // step_ex_08: the 8-byte alignment step_ex_08's D3DXVECTOR2 wants then comes
 // from on_tick_body's realigned frame, and neither realigns its own.
-// The seven unused locals at the top are there for matching: MSVC's choice of
+// The six unused locals at the top are there for matching: MSVC's choice of
 // operand order and scheduling for the vector moves follows the function's
 // count of named variables modulo 8 (docs/findings.md, "Vector operand
-// order"), and seven more (one fewer, in effect) brings the half steps closer
+// order"), and with the `anm` local this count brings the half steps closer
 // to the original. Dropping the `vm` or `goal` local instead changes the code.
+// The cancel VM's file is read into `anm` first, which loads the manager
+// before the pushes as in the original (as cancel_bullet does).
 // TODO: the half-step moves are still scheduled differently per case (the
 // original's spawning case computes all three components before storing, its
-// active case stores each in turn), and the hit case does not share the
-// cancelled case's tail.
+// active case stores each in turn), and the offscreen test adds the half size
+// the other way round.
 // FUNCTION: TH16 0x411e70
 HARNESS_CALLED i32 Bullet::on_tick()
 {
@@ -1765,8 +1767,6 @@ HARNESS_CALLED i32 Bullet::on_tick()
     (void)unused_4;
     i32 unused_5 = 0;
     (void)unused_5;
-    i32 unused_6 = 0;
-    (void)unused_6;
     time_alive.tick_nested();
     if (flags & BULLET_FLAG_DELETE)
     {
@@ -1900,7 +1900,8 @@ HARNESS_CALLED i32 Bullet::on_tick()
             vm0.interrupt_out_of_line(1);
             if (cancel_script >= 0)
             {
-                AnmVm *vm = g_BulletManager->bullet_anm->create_vm(cancel_script, &pos, 0.0f, -1, 0).find_or_clear();
+                AnmLoaded *anm = g_BulletManager->bullet_anm;
+                AnmVm *vm = anm->create_vm(cancel_script, &pos, 0.0f, -1, 0).find_or_clear();
                 D3DXVECTOR3 goal = velocity * g_game_speed * 10.0f;
                 vm->set_pos_time(30, 6, &g_zero_vec, &goal);
             }
