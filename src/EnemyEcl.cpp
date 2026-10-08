@@ -353,7 +353,7 @@ int EnemyData::ecl_run_over_300()
         {
             f32 angle = -ZUN_PI / 2;
             Float3 *pos = &final_pos.pos;
-            if (!(0.04f > (last_damage_pos.x - pos->x) * (last_damage_pos.x - pos->x) +
+            if (!(0.2f * 0.2f > (last_damage_pos.x - pos->x) * (last_damage_pos.x - pos->x) +
                               (last_damage_pos.y - pos->y) * (last_damage_pos.y - pos->y)))
             {
                 angle = zun_atan2f(pos->y - last_damage_pos.y, pos->x - last_damage_pos.x);

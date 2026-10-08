@@ -1120,8 +1120,6 @@ void EnemyData::update_final_pos()
     }
 }
 
-// TODO: ours saves ebx/esi after the death sound (shrink-wrapped) and reuses the loaded
-// positions for the atan2 arguments; the original reloads them.
 // FUNCTION: TH16 0x41d520
 int EnemyInf::die()
 {
@@ -1133,13 +1131,19 @@ int EnemyInf::die()
     {
         f32 angle = -ZUN_PI / 2;
         Float3 *pos = &enemy.final_pos.pos;
-        if (!(0.04f > (enemy.last_damage_pos.x - pos->x) * (enemy.last_damage_pos.x - pos->x) +
+        // The angle is computed through pointers of its own (from, to), so
+        // the positions are loaded again rather than reused from the
+        // distance test, as in the original. The threshold is 0.2 squared
+        // (as a float product it is one ulp above 0.04f).
+        Float3 *from = &enemy.last_damage_pos;
+        if (!(0.2f * 0.2f > (enemy.last_damage_pos.x - pos->x) * (enemy.last_damage_pos.x - pos->x) +
                           (enemy.last_damage_pos.y - pos->y) * (enemy.last_damage_pos.y - pos->y)))
         {
-            angle = zun_atan2f(pos->y - enemy.last_damage_pos.y, pos->x - enemy.last_damage_pos.x);
+            Float3 *to = &enemy.final_pos.pos;
+            angle = zun_atan2f(to->y - from->y, to->x - from->x);
         }
-        g_EffectManager->track_inline(g_EnemyManager->anim_statement_anms[enemy.death_anm_index]->create_vm(
-            enemy.death_anm_script, pos, angle, 3, 0));
+        AnmLoaded *anm = g_EnemyManager->anim_statement_anms[enemy.death_anm_index];
+        g_EffectManager->track_inline(anm->create_vm(enemy.death_anm_script, pos, angle, 3, 0));
     }
     if (enemy.drop_season.bonus_timer.current <= 0)
     {
