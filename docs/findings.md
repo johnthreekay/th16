@@ -1101,3 +1101,290 @@ Bullets, enemies, ECL and spell cards:
   loop gives the original's instructions with permuted registers (net
   -0.06); an out-of-line LaserInfiniteInner constructor costs
   LaserInfiniteInf's constructor its match.
+
+ANM VM, loader, drawing and interpolation:
+- Resetting list nodes with `ZunList::init(this)` instead of four field
+  stores matched AnmVm::wipe and wipe_suffix (closes the open "AnmVm::wipe
+  scheduling" item; LaserBeamInf::initialize matched with it).
+- `char buf[0x10c]` left 8 unused bytes under the /GS cookie; MAX_PATH
+  (0x104; 0x108 also works) gives the original frame
+  (AnmLoaded::load_entry).
+- The three-argument `Int3(b, g, r)` constructor loads x, z, y; assigning
+  the fields y, z, x matched AnmVm::set_rgb1_time and set_rgb2_time.
+- Locals hoisted before a switch take callee-saved registers: draw_vm's
+  anchor_x/anchor_y went to ebx; reading them at each call matches.
+- Ending the RECT_ROT_GRAD case with `break` (returning 0 at the end) keeps
+  the later copy of the shared draw_rect_bordered tail like the original:
+  the cross-jumping item noted open for PauseMenu.
+- One epilogue per branch: `return pos;` in each branch of
+  transform_coords; one return after the if/else shares the epilogue.
+- A two-case switch on the resolution mode was laid out the other way
+  round; an if/else-if chain fixed both sprite corner functions. Where the
+  original has a jump table (draw_billboard_fog) it needs explicit
+  `case 2: case 3:` instead of `default:`.
+- HARNESS_CALLED on a function whose only caller already realigns stops it
+  realigning itself (InterpFloat2::step_radial_dist, called only by
+  EnemyData::step_interpolators).
+- `*(Float3 *)&vertex->pos += pos` keeps the original's z = 0 store and
+  reload; per field, the z sum is folded (update_special_vertices).
+  `D3DXVec3Add(p, p, &delta)` through a pointer local gives AnmVm::run's
+  per-component operand order for the camera add.
+- tick_goto matched InterpInt3::step (effective); it does nothing in
+  InterpFloat2 or InterpFloat3.
+- A function-local `static const f32` moved to file scope with a GLOBAL
+  annotation lets reccmp name it. The "cannot name" TODO in
+  SoundManager.cpp is outdated.
+- Operand order of `a + b` mattered in InterpStrange1 and InterpInt3
+  (`tmp + goal`, `goal + bezier_2`) though it is canonicalized elsewhere.
+- A dead double in AnmVm::run (not HARNESS_CALLED): 7 matched, 7 lost
+  (same lists as the HARNESS_CALLED experiment above); most losses trace
+  to ecl_run_over_300 and ItemManager::on_tick_body having different frames
+  from the original. The AnmLoaded callers (create_vm, create_effect,
+  set_vm_script) do not respond; they may be in run's call-graph cycle
+  (run -> EffectManager::create_effect -> AnmLoaded::create_effect -> run).
+- 16-byte realignment (draw_3d, draw_3d_vertex_strip,
+  write_sprite_corners__with_z_rot, build_world_matrix): a D3DXMATRIX
+  local passed to D3DXMatrixRotationX makes it realign to 8, and the
+  `world = vm->world_matrix` copy makes that 16. HARNESS_CALLED, or member
+  functions with forwarders, only gave the ebx form.
+- interp_common_methods cannot reach 100% in reccmp: reccmp names only the
+  float constants some x87 instruction references, so the SSE-only
+  ease-back divisors always count as differences.
+- quickdiff stops at the first `ret` in functions with jump tables
+  (interp_common_methods showed MATCH there at 83% in reccmp).
+- Dead ends: create_vm_front (blocked by callers: ecl_run_over_300's
+  helpers, repopulate_options); insert_in_* (manager in ecx instead of
+  edx); restore_snapshot (CS flag cached in bl); InterpFloat2's bezier
+  scheduling; preload_anm's 8 unused frame bytes; setup_entry,
+  AnmLoaded::load, reload_texture, load_texture_from_data (register
+  allocation, unmoved by statement order, locals, helpers, HARNESS_CALLED).
+
+ANM manager, callbacks, rendering and loaded ANMs:
+- How much dead double math it takes: in anm_jagged_line_on_draw one or
+  two `double unused = 0.0;` changed the `entity_pos.x + pos.x` operand
+  order but did not realign; three or more realigned but flipped the order
+  back; one double with three `unused = unused * 2.0;` did both and
+  matched. A dead double inside a loop counts for more than one outside.
+  anm_masked_effect_on_tick matched with one.
+- A callee the original realigns, whose callers do not: put the dead
+  double in an out-of-line body and route callers through a `static
+  inline` wrapper in the header (interrupt_tree_and_run, now
+  interrupt_tree_and_run_out_of_line at the same address, matched; without
+  the wrapper the same double cost 11 functions and 3 matches). This does
+  not work for a function returning a struct (create_effect): callers then
+  read the AnmId back from the return slot instead of eax (-30 functions).
+- ENTER_CS/LEAVE_CS with the flag read once into a bool, reloaded after
+  EnterCriticalSection and tested in LEAVE, keeps it in bl across the call
+  (restore_snapshot, effective match). The macros' two reads do not.
+- `src++` with a `const AnmVm *vm = src;` copy for the field reads gives
+  load_from's stack slots (copy in a local, extra-data pointer in src's
+  argument slot).
+- `*(Float3 *)&vertex->pos += a + b` computes all three sums before the
+  stores like the original; field-wise adds reload after each store
+  (anm_fan_init, anm_on_tick_fan).
+- `*(radius + 33) = speed` instead of `radius[33] = speed` puts the store
+  between the multiply and the add of the x87 expression (anm_fan_init).
+  Walking with a saved first pointer and `*vertex = *first` gives
+  on_tick_fan's loop. Reusing `offset = mid - start;` as the normalize
+  input gives the original's CSE (anm_gather_effect_on_tick 55.7 -> 68.7).
+- Open, x/y vs z operand order: in the original x and y often use one
+  operand order and z the other (anm_fan_init, anm_on_tick_fan,
+  gather_on_tick's `start_center += offset`, jagged's sums; compare
+  LaserCurveInf::on_draw's z adds and Player::on_tick_body's scaled boxes).
+  Our D3DX operators always give all three the same order; swapping
+  operands flips all three, field-wise temporaries in any order change
+  nothing, only IL numbering changes (dead doubles) move one component.
+- Alignment cluster (show_notice, add_power, the collect_* functions,
+  do_shooting): it does come from AnmLoaded::create_effect wanting
+  alignment (contradicting the do_shooting note above): a dead double with
+  three multiplies in create_effect matches it and Player::do_shooting,
+  tick_shooting_state and shoot_one_bullet, but costs 21 functions
+  (add_to_score, PlayerBullet::create, Gui::on_tick_callback lose their
+  matches; EffectManager::create_effect 100* -> 79.7; show_notice
+  realigns itself where the original pads it). The same math in a
+  `__forceinline` helper inside create_effect pads instead of realigning:
+  the three Player matches stay, 8 functions go down (add_power realigns
+  and is no longer inlined into collect_*; EffectManager::create_effect,
+  replace_with_effect and PlayerBullet::create get padded frames). What
+  blocks a commit is the show_notice/add_power/collect_* arrangement and
+  the direct callers that become padded (Gui, Globals, Item, Effect,
+  PlayerBullet).
+- Dead ends: draw_triangle_fan's known-alignment padding (dead doubles
+  anywhere only make it realign through ebx); ANM rendering functions that
+  never use ebx in ours (anm_on_draw_masked, draw_vertex_strip,
+  draw_triangle_fan, draw_circle_outline, draw_ring, reload_texture,
+  create_d3d_textures, build_world_matrix); `and esp, -16` from the movaps
+  matrix row (write_sprite_corners__with_z_rot, draw_3d,
+  draw_3d_vertex_strip, build_world_matrix: memcpy, loop copy, `m.m[3][]`,
+  a float pointer, a g_AnmManager destination); world_pos's /GS cookie
+  (removing it loses the root_vm reload); gather_on_copy's spilled counter;
+  copy_screen_to_sprite; insert_in_* (edx/ecx swap); draw_text's height
+  lookup; convert_texture (`row[x]` is worse). create_effect calls load
+  g_EffectManager into ecx where the original uses eax (same open item as
+  the menu functions).
+
+Collision, second pass over lasers, menus and system:
+- Collision rotations: writing `sinf`/`cosf` inside the 4-point rotation
+  loop keeps it rolled like the original (`mov eax, 4` counter, pointer
+  walk), the array in memory and the original's /GS cookie; with the calls
+  before the loop MSVC unrolls and scalarizes it (whether rotate_points is
+  forceinline, inline or takes a count). collision_test_points_in_rect
+  28.75 -> 97.50.
+- The original squares each corner offset again in every test. That comes
+  back when the squared length is read through a pointer:
+  `offset_length_sq(const Float3 *d)` returning `d->y*d->y + d->x*d->x`
+  (y term first gives the original's x-term accumulator). It must be a
+  Float3: an 8-byte Float2 local made LTCG realign the callers' frames
+  (cancel_rectangle_as_bomb lost its match). The plain expression and a
+  by-value helper get the squares shared. The helper in Collision.h also
+  helped the inlined copy in the three sum_rect_damage functions.
+- `fabsf(y) <= h * 0.5f` evaluates fabsf before the multiply like the
+  original; `h * 0.5f >= fabsf(y)` does not.
+- tick_goto matched ZunTimer::operator-= (the unscaled branch gets its own
+  load of current_f) and both step_ex_angle functions (effective).
+- Component pointers decide add operand order: `f32 *px = &position.x;
+  *px += offset.x;` loads position and adds the offset from memory
+  (LaserCurveInf::initialize). LaserCurveInf::on_draw matched with x and y
+  as `D3DXVec2Add` plus a block-scoped `f32 *segment_z =
+  &segment->pos.z; vertex->pos.z = *segment_z + vertex->pos.z;` (one
+  pointer shared by both vertices was worse). `&((T *)segments)[i - 1]`
+  instead of `&segment[-1]` loads segments before scaling i.
+- Menu states: writing `g_stage_data = &g_stage_table[stage]` before the
+  stage_num/weird_stage_num stores keeps `stage + 1` in ecx with the imul
+  hoisted (solves the open item; do_spell_practice_subseason and
+  do_spell_practice_difficulty matched). A clamp in place on the member
+  (`cfg.x += 5; if (cfg.x > 100) cfg.x = 100;`) gave do_options' al/ecx.
+- ~ReplayManager: the three unregister blocks written out instead of an
+  inline helper (+4.5). The original hoists EnterCriticalSection's address
+  into a register in some loops (ScorefileStatus::init, ~ReplayManager);
+  not reproduced.
+- Dead ends: draw_circle/draw_circle_outline/draw_ring's
+  `movaps xmm0, step; addss angle, xmm0` copy that pushes the angle add
+  past the stores (every loop and add form; the original's own
+  update_special_vertices has the same copy); draw_rect's cos/sin slot
+  order; ZunAngle::operator-'s PI/b register swap; the `* 1.0f` in
+  decrement (an out-of-line HARNESS_CALLED function with an i32 parameter
+  gets `ret 4` but folds; an f32 parameter goes in xmm1; a const reference,
+  an extern const, a never-written global all fold); the rotation loops'
+  store order; collision_segment_intersection's canonicalized operand
+  orders; do_key_config's byte load widened to a dword; the shared ascii
+  create_effect push order; do_spell_practice_row's base/index order;
+  CSound::Unpause's add order; SoundBufferEntry::play's merged SetVolume
+  calls; a dead double around interrupt_child_and_run's run() (cost two
+  cursor functions their matches); camera_update_2d calling zun_tanf
+  (zun_tanf becomes a jmp thunk and loses its match); lzss setup order.
+
+Second pass over GUI, stage and GameThread:
+- Cutting a call-graph edge with a member function pointer: write the call
+  as `(obj->*f())()`, with `f` a small `static inline` helper returning
+  `&Class::method`. The optimizer turns it back into a direct call, but
+  LTCG's call graph has no edge, so an aligned caller's alignment does not
+  reach the callee. This resolved the GameThread trade-off (the bgm seek
+  inline in on_tick_body realigns it early; begin_stage calls
+  start_std_vms through the pointer, which keeps its shrink-wrapped edi):
+  GameThread::on_tick_body and ReplayManager::begin_stage matched.
+  Gui::on_draw_2_body realigns early (`and esp, -64` like the original)
+  while AsciiInf::create_number, called through the pointer, stays
+  unpadded; update_season_gauge stopped realigning once its AnmVm::run
+  calls went through it. An address-taken member keeps `this` in ecx, so
+  callees whose callers never set ecx must be `static` (`__stdcall static`
+  when the original ends in `ret N`).
+- /GS cookies come from `__forceinline` helpers: a forceinline helper
+  brings its own buffer check into the caller even when the caller is
+  `__declspec(safebuffers)` (documented MSVC behaviour). InterpCameraSky::step
+  lost its cookie once its sky_step_* helpers were
+  `static __declspec(safebuffers) __forceinline` (its CameraSky operators
+  need safebuffers too, or they are not inlined into them). safebuffers on
+  the declaration alone removed the extra cookies in StageInner::run_std
+  (+9) and HelpManual::on_tick_body (matched). Candidates with a cookie the
+  original lacks: AnmVm::world_pos, BombMarisaAInf::on_tick,
+  TitleInf::do_music_room, Player::update_options,
+  PlayerInner::repopulate_options, sht_on_tick_sideways, sht_on_tick_laser.
+- A dead double in a callee whose callers are aligned gives it known
+  alignment: Fog::Fog saves its registers up front with `this` in ebx, no
+  shrink-wrap, like the original (+43). It did nothing in
+  create_ui_effect, create_ui_vm, update_score or update_callout.
+- `Stage *stage = g_Stage2; if (stage != NULL && ...) delete g_Stage2;`
+  keeps the delete's own null test. Three separate `if (flag) return 3;`
+  keep three `test al, n` and the first return-3 epilogue at the top where
+  one `||` merges them into `test al, 0x70` (GameThread::on_tick_body). An
+  early `return` from find_child_id_inline_search for a missing parent
+  keeps the child search inline (setup_stage_hud +7).
+- run_std's entry loop test: `i32 now = time_in_stage.current; if
+  (ins->time > now) goto ticked; do {...} while (ins->time <= current);`
+  gives `mov eax, [cur]; cmp [esi], eax`.
+- Fog::Fog HARNESS_CALLED folds its two unused constant arguments, and the
+  callers push junk into those slots like the original.
+- `D3DXVec3Add(&pos, &a, &b); pos = pos + c;` adds every component in the
+  original's operand order where the operator+ chain swapped y and z
+  (GuiMsgVm::update_callout).
+- Loading `g_ending_files[i]` into a local before `strcpy(path, "");
+  strcat(path, file)` puts the path clear after the load
+  (Ending::initialize). A forceinline helper returning the AnmId makes the
+  caller read the id back from its stack slot (Fog::Fog).
+- PopupManager::on_tick wants the plain `tick()` in both loops; tick_goto
+  did not help run_std's or PauseMenu's ticks.
+- Cross-file, measured but not committed: a dead double plus
+  HARNESS_CALLED on AnmVm::run gained 4 matches and lost 9 (the
+  function-pointer trick at the losing call sites might keep them); a dead
+  double in Gui::show_notice gained collect_full_power and
+  Globals::add_power but lost Spellcard::end, Item::init_anm and
+  Globals::add_to_score. begin_stage and finish_stage_transition are now
+  blocked only by allocate_new_enemy's folded third argument.
+- Dead ends: Fog::set_rect's divss/cvt scheduling; begin_score_entry's
+  folded character offset; PauseMenu::on_tick's tick combinations;
+  show_boss_marker (the join gives cmov, `> -1` gives cmp/jle);
+  update_score and update_callout do not realign with a dead double;
+  open_game_over_menu realigns instead of padding; PopupManager::on_draw's
+  esi/edi swap; Gui::on_tick_body's `this` in esi not edi; AsciiInf::tick's
+  shrink-wrap is not from caller alignment; take_snapshot's dead
+  `test eax, eax` after the D3DX call; create_stringf and
+  create_number_with_digit put the padding above the cookie in the
+  original, between cookie and buffer in ours.
+
+Vector operand order (research; the x/y vs z item above):
+- Method: a standalone snippet compiled with build.py's CFLAGS reproduced
+  the tree's code for anm_fan_init exactly, z mismatch included, so most of
+  this ran on snippets (tools in the overnight scratchpad were not kept).
+- For `a + b` with both operands in memory MSVC does not follow source
+  order: `p->f[k] + p->e[k]` and `p->e[k] + p->f[k]` compile the same. In
+  straight-line code with one base pointer, the field at the higher offset
+  is loaded and the lower one folded into addss; with two pointer
+  parameters the earlier parameter's load comes first. Globals differ:
+  `a + b` loads b, inside a loop a.
+- A component read at offset 0 through a pointer (x of every D3DX operand:
+  operator+, +=, D3DXVec3Add's `this` and `v`, a local `D3DXVECTOR3 *`) is
+  ordered by the function's count of named variables and parameters, with
+  period 8: every named variable counts 1, whatever its type, scope or
+  position. Only that component flips (with `float *p = &v.y`, p[0] = y
+  flips instead). Dead stores, identity inline helpers and CSE'd duplicates
+  change nothing; field-wise `vm->pos.x + vm->entity_pos.x` never flips.
+  Each D3DX operation has its own flip window, so one count change can fix
+  one and break another. Three dead named locals matched
+  LaserInfiniteInf::cancel (the "only x differs" case in straight-line
+  code).
+- Inside a loop body (base pointer not an induction variable) the choice
+  follows a period-4 pattern over the loop's statements; its phase moves
+  with the memory statements before the loop and with the loop form:
+  top-tested counted loops (for, while, guarded do) alike, bottom-tested
+  loops (do/while, goto, for(;;) with break) one phase earlier,
+  end-pointer loops (`p < end`) one phase later. Dead locals, field offsets
+  and source operand order do not move it. This is where the mixed x/y vs
+  z orders in loops come from: a do/while counting up matched
+  anm_fan_init, and the same idea LaserCurveInf::on_draw.
+- Ruled out: the struct-copy pairing (unpcklps/movq; the patterns appear
+  without any copy); the D3DX header (five other operator definitions and
+  a Float3 built on a Float2 only shift the patterns, and field-wise code
+  shows the same effects); /d2SSAOptimizer-, /d2newcolor-, /d2linscan,
+  /d2Loop0-2 (no change except Loop0 on vectorized loops).
+- A local declared at function scope instead of an inner block changes
+  stack slot reuse: AnmVm::load_from's `i32 read` at the top gave
+  &index_of_on_serialize its own slot like the original.
+- Python's subprocess with capture_output makes every build wait for
+  mspdbsrv.exe to exit (minutes); redirect to a file instead.
+- Dead ends: anm_on_tick_fan (about 3000 snippet combinations of loop
+  forms, dead locals 0-7, helper parameters, statement orders);
+  anm_gather_effect_on_tick's `start_center += offset` (y never flips);
+  draw_text's height lookup; load_from's `read` slot; gather_on_copy's
+  spilled counter; insert_in_* (dead locals 1-7 included). A loop-form
+  scan over 17 functions found no further matches.

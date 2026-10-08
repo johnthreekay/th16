@@ -8,7 +8,7 @@
 #include "Enemy.h"
 #include "EnemyManager.h"
 #include "GameThread.h"
-#include "MainMenu.h"
+#include "MainMenu.h" // search_children_inline
 #include "Input.h"
 #include "Laser.h"
 #include "Player.h"
@@ -490,27 +490,28 @@ HARNESS_CALLED i32 GuiMsgVm::run()
         case MSG_PLAYER_SHOW:
             if (instr()->args.i[0] == 0)
             {
-                player_face = g_Player->anm_file->create_effect(g_msg_player_face_scripts[g_Globals.character], -1, NULL);
+                player_face = create_effect_via_pointer(g_Player->anm_file,
+                                                        g_msg_player_face_scripts[g_Globals.character], -1, NULL);
             }
             else
             {
-                player_face = g_EnemyManager->anim_statement_anms[5]->create_effect(0xb, -1, NULL);
+                player_face = create_effect_via_pointer(g_EnemyManager->anim_statement_anms[5], 0xb, -1, NULL);
             }
             break;
         case MSG_BOSS_SHOW:
         {
             i32 i = instr()->args.i[0];
             StageBoss *boss = &g_stage_data->bosses[i];
-            enemy_faces[i] =
-                g_EnemyManager->anim_statement_anms[boss->face_anm_slot]->create_effect(boss->face_script, -1, NULL);
+            enemy_faces[i] = create_effect_via_pointer(g_EnemyManager->anim_statement_anms[boss->face_anm_slot],
+                                                       boss->face_script, -1, NULL);
             unk_1c0 = 0;
             break;
         }
         case MSG_BOSS_SHOW_SECOND:
         {
             StageBoss *boss = &g_stage_data->bosses[1];
-            enemy_faces[1] =
-                g_EnemyManager->anim_statement_anms[boss->face_anm_slot]->create_effect(boss->face_script, -1, NULL);
+            enemy_faces[1] = create_effect_via_pointer(g_EnemyManager->anim_statement_anms[boss->face_anm_slot],
+                                                       boss->face_script, -1, NULL);
             unk_1c0 = 0;
             break;
         }
@@ -695,14 +696,14 @@ HARNESS_CALLED i32 GuiMsgVm::run()
         // Starts the boss theme and shows its title (stage logo script 2).
         case MSG_MUSIC_BOSS:
             g_Supervisor.play_bgm(1, g_stage_data->music_ids[1]);
-            g_Gui->stage_logo_anm->create_effect(LOGO_ANM_BOSS_THEME, -1, NULL);
+            create_effect_via_pointer(g_Gui->stage_logo_anm, LOGO_ANM_BOSS_THEME, -1, NULL);
             break;
         // The boss's name and title, and the boss marker.
         case MSG_INTRO:
         {
             StageBoss *boss = &g_stage_data->bosses[instr()->args.i[0]];
-            intro = g_EnemyManager->anim_statement_anms[boss->intro_anm_slot]->create_effect(boss->intro_script, -1,
-                                                                                            NULL);
+            intro = create_effect_via_pointer(g_EnemyManager->anim_statement_anms[boss->intro_anm_slot],
+                                              boss->intro_script, -1, NULL);
             g_Gui->show_boss_marker();
             break;
         }
@@ -751,7 +752,8 @@ waiting:
         return 0;
     }
     Float3 pos;
-    pos = bubble->pos + bubble->entity_pos + bubble->pos_2;
+    D3DXVec3Add(&pos, &bubble->pos, &bubble->entity_pos);
+    pos = pos + bubble->pos_2;
     bubble->transform_coords(&pos);
     f32 scale = 2.0f / g_screen_coord_scale;
     pos.y *= scale;
@@ -796,11 +798,20 @@ waiting:
 }
 
 // Puts vm just outside the bubble's body, on the side of the speaker.
-// TODO: the original aligns its frame to 8 bytes and adds two of the
-// vector components the other way round.
+// The position sum written with D3DXVec3Add for the first two vectors adds
+// every component in the original's operand order. The scale is written out
+// at each use: through a local, both multiplies load the coordinate into a
+// register instead of multiplying a copy of the scale from memory.
 // FUNCTION: TH16 0x42b480
 void GuiMsgVm::update_callout(AnmVm *vm)
 {
+    // Dead double math, not ZUN's code: with it LTCG realigns the frame
+    // (and esp, -8, esp-relative locals) like the original's. A plain dead
+    // double is not enough here.
+    double unused = 0.0;
+    unused = unused * 2.0;
+    unused = unused * 2.0;
+    (void)unused;
     i32 script = textbox_kind + FRONT_ANM_BUBBLE_BODY;
     if (get_vm_or_clear(textbox) == NULL)
     {
@@ -812,11 +823,11 @@ void GuiMsgVm::update_callout(AnmVm *vm)
         return;
     }
     Float3 pos;
-    pos = bubble->pos + bubble->entity_pos + bubble->pos_2;
+    D3DXVec3Add(&pos, &bubble->pos, &bubble->entity_pos);
+    pos = pos + bubble->pos_2;
     bubble->transform_coords(&pos);
-    f32 scale = 2.0f / g_screen_coord_scale;
-    pos.x *= scale;
-    pos.y *= scale;
+    pos.x *= 2.0f / g_screen_coord_scale;
+    pos.y *= 2.0f / g_screen_coord_scale;
     if (active_side >= 1)
     {
         if (bubble->scale.x < 1.0f)
@@ -1038,12 +1049,20 @@ void Gui::update_score()
 // FUNCTION: TH16 0x42bcf0
 HARNESS_CALLED void Gui::show_notice(i32 bonus, i32 kind)
 {
+    // A dead double, not ZUN's code: LTCG then counts show_notice as wanting
+    // an 8-aligned stack, and its callers realign (the Item::collect_*
+    // functions through ebx, ItemManager::on_tick_body) or are padded for it
+    // (Globals::add_power) as in the original. The create_effect calls go
+    // through create_effect_via_pointer: direct, create_effect's own wish
+    // adds up with this one and show_notice realigns itself.
+    double unused = 0.0;
+    (void)unused;
     switch (kind)
     {
     case GUI_NOTICE_SPELL_BONUS:
     {
         delete_vm_and_clear(spell_notice_id);
-        spell_notice_id = front_anm->create_effect(FRONT_ANM_SPELL_BONUS, -1, NULL);
+        spell_notice_id = create_effect_via_pointer(front_anm, FRONT_ANM_SPELL_BONUS, -1, NULL);
         i32 divisor = 10000000;
         i32 rest = bonus;
         i32 shown = 0;
@@ -1052,7 +1071,8 @@ HARNESS_CALLED void Gui::show_notice(i32 bonus, i32 kind)
         for (i32 i = 0; i < 8; i++)
         {
             delete_vm_and_clear(bonus_digit_ids[i]);
-            bonus_digit_ids[i] = g_AsciiManager->ascii_anm->create_effect(i + ASCII_ANM_BONUS_DIGITS, -1, NULL);
+            bonus_digit_ids[i] = create_effect_via_pointer(g_AsciiManager->ascii_anm,
+                                                           i + ASCII_ANM_BONUS_DIGITS, -1, NULL);
             anm = g_AnmManager;
             i32 digit = rest / divisor;
             rest = rest % divisor;
@@ -1086,7 +1106,8 @@ HARNESS_CALLED void Gui::show_notice(i32 bonus, i32 kind)
         delete_vm_and_clear(bonus_digit_ids[8]);
         if (bonus >= 1000000)
         {
-            bonus_digit_ids[8] = g_AsciiManager->ascii_anm->create_effect(ASCII_ANM_BONUS_COMMA_1, -1, NULL);
+            bonus_digit_ids[8] = create_effect_via_pointer(g_AsciiManager->ascii_anm,
+                                                           ASCII_ANM_BONUS_COMMA_1, -1, NULL);
             anm = g_AnmManager;
             vm = anm->get_vm_with_id(bonus_digit_ids[8]);
             if (vm != NULL)
@@ -1097,7 +1118,8 @@ HARNESS_CALLED void Gui::show_notice(i32 bonus, i32 kind)
         delete_vm_and_clear(bonus_digit_ids[9]);
         if (bonus >= 1000)
         {
-            bonus_digit_ids[9] = g_AsciiManager->ascii_anm->create_effect(ASCII_ANM_BONUS_COMMA_2, -1, NULL);
+            bonus_digit_ids[9] = create_effect_via_pointer(g_AsciiManager->ascii_anm,
+                                                           ASCII_ANM_BONUS_COMMA_2, -1, NULL);
             anm = g_AnmManager;
             vm = anm->get_vm_with_id(bonus_digit_ids[9]);
             if (vm != NULL)
@@ -1106,30 +1128,32 @@ HARNESS_CALLED void Gui::show_notice(i32 bonus, i32 kind)
             }
         }
         spell_bonus_shown = 1;
-        overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK] = front_anm->create_effect(FRONT_ANM_SPELL_BONUS_BACK, -1, NULL);
+        overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK] = create_effect_via_pointer(front_anm,
+                                                                              FRONT_ANM_SPELL_BONUS_BACK, -1, NULL);
         break;
     }
     case GUI_NOTICE_BONUS_FAILED:
         delete_vm_and_clear(spell_notice_id);
-        spell_notice_id = front_anm->create_effect(FRONT_ANM_BONUS_FAILED, -1, NULL);
+        spell_notice_id = create_effect_via_pointer(front_anm, FRONT_ANM_BONUS_FAILED, -1, NULL);
         spell_bonus_shown = 1;
-        overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK] = front_anm->create_effect(FRONT_ANM_SPELL_BONUS_BACK, -1, NULL);
+        overlay_ids[GUI_OVERLAY_SPELL_BONUS_BACK] = create_effect_via_pointer(front_anm,
+                                                                              FRONT_ANM_SPELL_BONUS_BACK, -1, NULL);
         break;
     case GUI_NOTICE_FULL_POWER:
         delete_vm_and_clear(notice_id);
-        notice_id = front_anm->create_effect(FRONT_ANM_FULL_POWER, -1, NULL);
+        notice_id = create_effect_via_pointer(front_anm, FRONT_ANM_FULL_POWER, -1, NULL);
         break;
     case GUI_NOTICE_HISCORE:
         delete_vm_and_clear(notice_id);
-        notice_id = front_anm->create_effect(FRONT_ANM_HISCORE, -1, NULL);
+        notice_id = create_effect_via_pointer(front_anm, FRONT_ANM_HISCORE, -1, NULL);
         break;
     case GUI_NOTICE_EXTEND:
         delete_vm_and_clear(notice_id);
-        notice_id = front_anm->create_effect(FRONT_ANM_EXTEND, -1, NULL);
+        notice_id = create_effect_via_pointer(front_anm, FRONT_ANM_EXTEND, -1, NULL);
         break;
     case GUI_NOTICE_6:
         delete_vm_and_clear(spell_notice_id);
-        spell_notice_id = front_anm->create_effect(FRONT_ANM_NOTICE_6, -1, NULL);
+        spell_notice_id = create_effect_via_pointer(front_anm, FRONT_ANM_NOTICE_6, -1, NULL);
         break;
     default:
         __assume(0);
@@ -1202,7 +1226,7 @@ void show_stage_logo()
 {
     if (g_Supervisor.gamemode_to_switch_to != GAMEMODE_UNUSED_8 && !(g_Globals.flags_hi_45c & GLOBALS_HI_DEMO_PLAY))
     {
-        g_Gui->stage_logo_anm->create_effect(LOGO_ANM_STAGE_TITLE, -1, NULL);
+        create_effect_via_pointer(g_Gui->stage_logo_anm, LOGO_ANM_STAGE_TITLE, -1, NULL);
     }
 }
 
@@ -1280,7 +1304,7 @@ void Gui::show_boss_marker()
         script += FRONT_ANM_BOSS_MARKER;
         if (script >= 0)
         {
-            boss_marker_id = front_anm->create_effect(script, -1, NULL);
+            boss_marker_id = create_effect_via_pointer(front_anm, script, -1, NULL);
         }
     }
 }
@@ -1341,19 +1365,18 @@ static inline AnmId find_child_id_of(AnmManager *anm, AnmId &id, i32 script)
 }
 
 // find_child_id_of as LTCG inlined it into setup_stage_hud, with the first
-// level of AnmVm::search_children inlined as well.
+// level of AnmVm::search_children inlined as well. The early return for a
+// missing parent keeps the search laid out in line, as in the original (an
+// if/else assigning the child moved it after the function's ret).
 static __forceinline AnmId find_child_id_inline_search(AnmId &id, i32 script)
 {
-    AnmVm *child;
+    AnmId result;
     if (get_vm_or_clear(id) == NULL)
     {
-        child = NULL;
+        result.id = 0;
+        return result;
     }
-    else
-    {
-        child = search_children_inline(get_vm_or_clear(id), script, 0);
-    }
-    AnmId result;
+    AnmVm *child = search_children_inline(get_vm_or_clear(id), script, 0);
     result.id = child != NULL ? child->id.id : 0;
     return result;
 }
@@ -1361,7 +1384,18 @@ static __forceinline AnmId find_child_id_inline_search(AnmId &id, i32 script)
 // Fills the season gauge bar towards the next level and shows the level
 // (interrupt 7 + level), switching the gauge's look (interrupt 2 or 3) when
 // the first level is reached or lost.
-// TODO: the original keeps g_AnmManager and then the level in ebx; ours spills both.
+// update_season_gauge runs the gauge VM through this helper's member pointer,
+// which the optimizer turns back into the original's direct call. With
+// direct calls to AnmVm::run in its call graph, ours realigned the frame
+// (ebx form); the original has an unrealigned frame.
+typedef i32 (AnmVm::*AnmVmRunFunc)();
+static inline AnmVmRunFunc anm_vm_run_func()
+{
+    return &AnmVm::run;
+}
+
+// TODO: the original keeps g_AnmManager and then the level in ebx (ours reloads
+// it and spills the level), and pads its frame for known alignment (push ecx).
 // FUNCTION: TH16 0x42c600
 void Gui::update_season_gauge()
 {
@@ -1378,7 +1412,7 @@ void Gui::update_season_gauge()
         if (gui->season_gauge_has_level == 1)
         {
             gauge->interrupt(3);
-            gauge->run();
+            (gauge->*anm_vm_run_func())();
         }
         gui->season_gauge_has_level = 0;
     }
@@ -1398,7 +1432,7 @@ void Gui::update_season_gauge()
         if (gui->season_gauge_has_level == 0)
         {
             gauge->interrupt(2);
-            gauge->run();
+            (gauge->*anm_vm_run_func())();
         }
         gui->season_gauge_has_level = 1;
     }
@@ -1516,16 +1550,16 @@ GuiMsgVm::GuiMsgVm(void *script)
     unk_154 = 0;
     pause_timer.reset();
     current_instr = script;
-    text_line_1 = g_Supervisor.text_anm->create_effect(0, -1, NULL);
-    text_line_2 = g_Supervisor.text_anm->create_effect(0, -1, NULL);
+    text_line_1 = create_effect_via_pointer(g_Supervisor.text_anm, 0, -1, NULL);
+    text_line_2 = create_effect_via_pointer(g_Supervisor.text_anm, 0, -1, NULL);
     AnmManager::interrupt_tree_and_run(text_line_2, 7);
     // Both lines and both furigana VMs use 21-pixel glyphs.
     get_vm_or_clear(text_line_1)->font_dims[0] = 0x15;
     get_vm_or_clear(text_line_1)->font_dims[1] = 0x15;
     get_vm_or_clear(text_line_2)->font_dims[0] = 0x15;
     get_vm_or_clear(text_line_2)->font_dims[1] = 0x15;
-    furigana_1 = g_Supervisor.text_anm->create_effect(1, -1, NULL);
-    furigana_2 = g_Supervisor.text_anm->create_effect(1, -1, NULL);
+    furigana_1 = create_effect_via_pointer(g_Supervisor.text_anm, 1, -1, NULL);
+    furigana_2 = create_effect_via_pointer(g_Supervisor.text_anm, 1, -1, NULL);
     AnmManager::interrupt_tree_and_run(furigana_2, 7);
     get_vm_or_clear(furigana_1)->font_dims[0] = 0x15;
     get_vm_or_clear(furigana_1)->font_dims[1] = 0x15;
@@ -1600,7 +1634,7 @@ void Gui::start_dialogue(i32 script)
         }
         g_SoundManager.modify_bgm(BGM_PLAY, boss, "dummy");
         g_Scorefile->bgm_unlocked[track] = 1;
-        g_Gui->stage_logo_anm->create_effect(boss + LOGO_ANM_STAGE_THEME, -1, NULL);
+        create_effect_via_pointer(g_Gui->stage_logo_anm, boss + LOGO_ANM_STAGE_THEME, -1, NULL);
     }
     else if (script == -2)
     {
@@ -1688,7 +1722,8 @@ static inline void set_entity_pos_xyz(AnmId id, f32 x, f32 y, f32 z)
 // Sets the HUD up for a stage: the life and bomb counters, the boss timer,
 // the stage logo, the demo and difficulty markers and the season gauge.
 // TODO: the original adds the difficulty scripts' base at the copy_vm call (ours
-// before spilling the script) and lays the season gauge icon's child search out in line.
+// before spilling the script); after the icon search it shares the g_AnmManager reload
+// between the found and not-found exits, and has no nop before the search loop.
 // FUNCTION: TH16 0x426d70
 void Gui::setup_stage_hud()
 {
@@ -2029,13 +2064,13 @@ i32 Gui::on_tick_body()
             }
             if (bar->vms_created == 0)
             {
-                bar->ids[0] = front_anm->create_effect(FRONT_ANM_BOSS_BAR, -1, NULL);
-                bar->ids[1] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_2, -1, NULL);
-                bar->ids[2] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_3, -1, NULL);
-                bar->ids[3] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
-                bar->ids[4] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
-                bar->ids[5] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
-                bar->ids[6] = front_anm->create_effect(FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
+                bar->ids[0] = create_effect_via_pointer(front_anm, FRONT_ANM_BOSS_BAR, -1, NULL);
+                bar->ids[1] = create_effect_via_pointer(front_anm, FRONT_ANM_BOSS_BAR_2, -1, NULL);
+                bar->ids[2] = create_effect_via_pointer(front_anm, FRONT_ANM_BOSS_BAR_3, -1, NULL);
+                bar->ids[3] = create_effect_via_pointer(front_anm, FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
+                bar->ids[4] = create_effect_via_pointer(front_anm, FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
+                bar->ids[5] = create_effect_via_pointer(front_anm, FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
+                bar->ids[6] = create_effect_via_pointer(front_anm, FRONT_ANM_BOSS_BAR_MARKER, -1, NULL);
                 bar->vms_created = 1;
             }
             show_boss_marker();
@@ -2120,7 +2155,7 @@ i32 Gui::on_tick_body()
         {
             if (stars[i].id == 0)
             {
-                stars[i] = front_anm->create_effect(i + FRONT_ANM_BOSS_STARS, -1, NULL);
+                stars[i] = create_effect_via_pointer(front_anm, i + FRONT_ANM_BOSS_STARS, -1, NULL);
             }
         }
         else if (stars[i].id != 0)
@@ -2274,20 +2309,24 @@ i32 Gui::on_tick_body()
     return UPDATE_FUNC_CONTINUE;
 }
 
-// The original formats the percentage inline. Written out in on_draw_2_body,
-// the double argument makes LTCG realign it early enough to pad the frame of
-// AsciiInf::create_number (0x4082b0); a plain inline helper keeps the double
-// in its own call graph node, as for CStreamingSound::get_play_time.
-static inline void draw_percentage(Float3 *pos, f32 percentage)
+// on_draw_2_body calls AsciiInf::create_number through this helper's
+// function pointer; the optimizer turns it back into the original's direct
+// calls. The percentage's double makes LTCG realign on_draw_2_body early,
+// like the original (and esp, -64), and a direct call edge would hand that
+// alignment down to create_number, which would get a padded frame;
+// create_number is a __stdcall static since an address-taken member keeps
+// this in ecx.
+typedef void(__stdcall *CreateNumberFunc)(Float3 *pos, u32 value);
+static inline CreateNumberFunc create_number_func()
 {
-    g_AsciiManager->create_stringf(pos, "%3.1f%%", (double)percentage);
+    return &AsciiInf::create_number;
 }
 
 // The HUD's text: the stage clear bonus, the chapter result, the spell
 // card's capture time and record, the score, hiscore, next extend, bomb
 // fragments, power, point item value and graze, the boss timer's
 // hundredths and the season level.
-// TODO: written for behaviour; the original aligns its frame to 64 bytes, and register allocation and the text-setting store order are not matched yet.
+// TODO: the original stores pos as immediates where ours builds it in xmm registers, and its stack slots and text-setting store order differ.
 // FUNCTION: TH16 0x428e70
 i32 Gui::on_draw_2_body()
 {
@@ -2307,7 +2346,7 @@ i32 Gui::on_draw_2_body()
         ascii->font_id = 4;
         ascii->align_h = 0;
         ascii->align_v = 0;
-        ascii->create_number(&pos, stage_clear_bonus);
+        create_number_func()(&pos, stage_clear_bonus);
         ascii = g_AsciiManager;
         ascii->color.a = 0xff;
         ascii->font_id = 0;
@@ -2335,7 +2374,7 @@ i32 Gui::on_draw_2_body()
             ascii->create_stringf(&pos, "%d", chapter_result_count);
             pos.x = 308.0f;
             pos.y = 246.0f;
-            draw_percentage(&pos, chapter_percent);
+            g_AsciiManager->create_stringf(&pos, "%3.1f%%", (double)chapter_percent);
             pos.x = 300.0f;
             pos.y = 266.0f;
             g_AsciiManager->create_stringf(&pos, "%3d", chapter_result_count_2);
@@ -2443,7 +2482,7 @@ i32 Gui::on_draw_2_body()
     ascii->scale.y = 0.6f;
     if ((u32)get_score_extend_quota() < 900000000)
     {
-        g_AsciiManager->create_number(&pos, get_score_extend_quota() * 10);
+        create_number_func()(&pos, get_score_extend_quota() * 10);
     }
 
     // Bomb fragments.
@@ -2496,12 +2535,12 @@ i32 Gui::on_draw_2_body()
     pos = Float3(620.0f, 204.0f, 0.0f);
     ascii->color.a = life_counter_vms[0]->color_1.a;
     i32 piv = g_Globals.piv / 100;
-    ascii->create_number(&pos, piv - piv % 10);
+    create_number_func()(&pos, piv - piv % 10);
     ascii = g_AsciiManager;
     ascii->color.d3d = 0xffffffff;
     pos.y = 226.0f;
     ascii->color.a = life_counter_vms[0]->color_1.a;
-    ascii->create_number(&pos, g_Globals.graze);
+    create_number_func()(&pos, g_Globals.graze);
     ascii = g_AsciiManager;
     ascii->color.d3d = 0xffffffff;
     ascii->align_h = 1;
@@ -2551,7 +2590,7 @@ i32 Gui::on_draw_2_body()
     ascii->font_id = 2;
     ascii->align_h = 0;
     ascii->align_v = 2;
-    ascii->create_number(&pos, g_Globals.season_level());
+    create_number_func()(&pos, g_Globals.season_level());
     ascii = g_AsciiManager;
     ascii->color.d3d = 0xffffffff;
     ascii->color.a = 0xff;

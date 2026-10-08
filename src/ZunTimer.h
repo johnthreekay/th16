@@ -267,11 +267,12 @@ struct ZunTimer
         current = cur;
     }
 
-    // tick with a missing speed jumping into the whole-frame branch: the
-    // scaled branch then adds current_f from memory into the speed's
-    // register (addss xmm1, [current_f]) and each branch keeps its own
-    // stores, where the other variants load current_f first
-    // (ScreenEffect::on_tick_flash, on_tick_hold).
+    // tick with a missing speed jumping into the whole-frame branch, so each
+    // branch keeps its own stores. How the scaled branch adds depends on
+    // the caller and can go either way: some get the original's
+    // `addss xmm1, [current_f]` (ScreenEffect::on_tick_flash, on_tick_hold),
+    // others its load of current_f into xmm0 first (InterpInt3::step,
+    // Bullet::step_ex_00 and step_ex_04, EnemyManager::kill_all).
     void tick_goto()
     {
         f32 *speed = this->speed();

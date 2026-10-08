@@ -254,13 +254,13 @@ void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_i
     flags &= ~SPELLCARD_EARLY_BOMB;
     ticks = 1;
     flags &= ~SPELLCARD_TIMING;
-    text_anm_ids[0] = g_AsciiManager->ascii_anm->create_effect(0, -1, NULL);
-    text_anm_ids[1] = g_Supervisor.text_anm->create_effect(2, -1, NULL);
-    text_anm_ids[2] = g_AsciiManager->ascii_anm->create_effect(1, -1, NULL);
+    text_anm_ids[0] = create_effect_via_pointer(g_AsciiManager->ascii_anm, 0, -1, NULL);
+    text_anm_ids[1] = create_effect_via_pointer(g_Supervisor.text_anm, 2, -1, NULL);
+    text_anm_ids[2] = create_effect_via_pointer(g_AsciiManager->ascii_anm, 1, -1, NULL);
     AnmManager *anm = g_AnmManager;
     g_AnmManager->draw_text_right(get_vm_or_clear(text_anm_ids[1]), 0xffffff, 0, 0, 0, name);
     g_SoundManager.play_sound_centered(SE_CAT00, 0);
-    boss_anm_id = g_EffectManager->effect_anm->create_effect(0xd, -1, NULL);
+    boss_anm_id = create_effect_via_pointer(g_EffectManager->effect_anm, 0xd, -1, NULL);
     EnemyInf *boss = NULL;
     i32 boss_id = g_EnemyManager->inner.boss_ids[0];
     if (boss_id != 0)
@@ -286,19 +286,22 @@ void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_i
     i32 bonuses[5] = {500000, 1000000, 1500000, 2000000, 1000000};
     bonus = bonuses[g_Globals.difficulty] * g_Globals.stage_num;
     bonus_max = bonus >= 1000000000 ? 999999999 : bonus;
-    g_EffectManager->effect_anm->create_effect(0x14, -1, NULL);
+    create_effect_via_pointer(g_EffectManager->effect_anm, 0x14, -1, NULL);
     StageBoss *stage_boss = &g_stage_data->bosses[g_Globals.chapter < 43 && g_stage_data->bosses[1].spell_bg_anm_slot != -1];
-    background_anm_id = g_EnemyManager->anim_statement_anms[stage_boss->spell_bg_anm_slot]->create_effect(
-        stage_boss->spell_bg_script, -1, NULL);
+    background_anm_id = create_effect_via_pointer(g_EnemyManager->anim_statement_anms[stage_boss->spell_bg_anm_slot],
+                                                  stage_boss->spell_bg_script, -1, NULL);
     flags = (flags & ~SPELLCARD_FLAG_200) | ((stage_boss->spell_flag_200 << 9) & SPELLCARD_FLAG_200);
     stage_boss = &g_stage_data->bosses[boss_index];
     if (stage_boss->spell_anm_slot != -1)
     {
-        g_EnemyManager->anim_statement_anms[stage_boss->spell_anm_slot]->create_effect(stage_boss->spell_script, -1,
-                                                                                       NULL);
+        create_effect_via_pointer(g_EnemyManager->anim_statement_anms[stage_boss->spell_anm_slot],
+                                  stage_boss->spell_script, -1, NULL);
     }
 }
 
+// show_notice is called through its member pointer (gui_show_notice_func):
+// as direct calls, show_notice's wish for an aligned stack makes this
+// function realign its frame, which the original does not.
 // FUNCTION: TH16 0x4182f0
 HARNESS_CALLED void Spellcard::end()
 {
@@ -318,7 +321,7 @@ HARNESS_CALLED void Spellcard::end()
     if (flags & SPELLCARD_CAPTURABLE)
     {
         g_Globals.add_to_score(bonus);
-        g_Gui->show_notice(bonus, GUI_NOTICE_SPELL_BONUS);
+        (g_Gui->*gui_show_notice_func())(bonus, GUI_NOTICE_SPELL_BONUS);
         if (g_ReplayManager->mode != 1)
         {
             i32 practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE;
@@ -337,7 +340,7 @@ HARNESS_CALLED void Spellcard::end()
     }
     else
     {
-        g_Gui->show_notice(0, GUI_NOTICE_BONUS_FAILED);
+        (g_Gui->*gui_show_notice_func())(0, GUI_NOTICE_BONUS_FAILED);
     }
     if (flags & SPELLCARD_TIMED_OUT)
     {

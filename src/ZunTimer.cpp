@@ -9,10 +9,9 @@
 // GLOBAL: TH16 0x490eb0
 f32 *const g_timer_speed_ptrs[] = {&g_game_speed};
 
-// TODO: the unscaled path adds current_f into the delta register instead of
-// loading current_f into xmm0 and adding the delta.
 // Counts back by whole frames, scaled by the speed multiplier unless it is
-// close enough to 1.
+// close enough to 1. A missing speed jumps into the unscaled branch (as in
+// tick_goto), which gives that branch its own load of current_f.
 // FUNCTION: TH16 0x43ac80
 void ZunTimer::operator-=(i32 frames)
 {
@@ -23,9 +22,14 @@ void ZunTimer::operator-=(i32 frames)
     }
     f32 *speed = g_timer_speed_ptrs[speed_index];
     previous = current;
-    if (speed == NULL || (*speed > 0.99f && *speed < 1.01f))
+    if (speed == NULL)
     {
-        current_f += delta;
+        goto unscaled;
+    }
+    if (*speed > 0.99f && *speed < 1.01f)
+    {
+    unscaled:
+        current_f = current_f + delta;
         current = (i32)current_f;
     }
     else

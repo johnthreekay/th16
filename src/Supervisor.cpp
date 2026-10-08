@@ -1216,6 +1216,8 @@ void __cdecl Supervisor::write_screenshot(void *arg)
     shot->thread = 0;
 }
 
+// HARNESS_CALLED: LTCG then drops the unused `this`, so WinMain calls it
+// without setting ecx, as the original does.
 // FUNCTION: TH16 0x43ba40
 HARNESS_CALLED int Supervisor::initialize()
 {

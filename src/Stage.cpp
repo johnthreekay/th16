@@ -821,24 +821,26 @@ i32 Stage::load_std(const char *path)
 }
 
 // Starts a VM for every quad of every object, the update functions and
-// the script.
+// the script. Static and reading g_Stage itself: GameThread::begin_stage
+// calls it through a function pointer (see start_std_vms_func there).
 // FUNCTION: TH16 0x40add0
 HARNESS_CALLED void Stage::start_std_vms()
 {
+    Stage *stage = g_Stage;
     i32 vm_index = 0;
-    on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
-    on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
-    on_draw_func_2->flags |= UPDATE_FUNC_ACTIVE;
-    for (i32 i = 0; i < std->num_objects; i++)
+    stage->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
+    stage->on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+    stage->on_draw_func_2->flags |= UPDATE_FUNC_ACTIVE;
+    for (i32 i = 0; i < stage->std->num_objects; i++)
     {
-        objects[i]->flags = 1;
-        for (StdQuad *quad = objects[i]->quads; quad->type >= 0; quad = (StdQuad *)((u8 *)quad + quad->size))
+        stage->objects[i]->flags = 1;
+        for (StdQuad *quad = stage->objects[i]->quads; quad->type >= 0; quad = (StdQuad *)((u8 *)quad + quad->size))
         {
-            stage_anm->copy_vm_and_run(&vms[vm_index], quad->script);
+            stage->stage_anm->copy_vm_and_run(&stage->vms[vm_index], quad->script);
             quad->vm_index = vm_index++;
         }
     }
-    inner.cur_instr_offset = 0;
+    stage->inner.cur_instr_offset = 0;
 }
 
 // Runs the VMs of objects still marked as running; unmarks objects whose
@@ -908,17 +910,20 @@ HARNESS_CALLED void Stage::start_enter()
 
 // InterpCameraSky::step's methods, written as inline helpers: with the
 // bodies in step itself, its registers and return paths come out further
-// from the original's.
+// from the original's. They are __declspec(safebuffers) (as are the
+// CameraSky operators they inline) because a __forceinline callee brings its
+// own /GS check into step: the CameraSky temporaries gave step a cookie the
+// original does not have, and safebuffers on step alone did not remove it.
 
 // Method 7: initial moves by goal every frame.
-static __forceinline void sky_step_7(InterpCameraSky *s)
+static __declspec(safebuffers) __forceinline void sky_step_7(InterpCameraSky *s)
 {
     CameraSky tmp = s->initial;
     s->initial = tmp.add_inline(s->goal);
     s->current = s->initial;
 }
 // Method 17: initial moves by bezier_2, which itself moves by goal.
-static __forceinline void sky_step_17(InterpCameraSky *s)
+static __declspec(safebuffers) __forceinline void sky_step_17(InterpCameraSky *s)
 {
     CameraSky tmp = s->initial;
     s->initial = tmp + s->bezier_2;
@@ -927,7 +932,7 @@ static __forceinline void sky_step_17(InterpCameraSky *s)
 }
 // Method 8: Hermite curve from initial to goal with tangents bezier_1 and
 // bezier_2.
-static __forceinline void sky_step_8(InterpCameraSky *s)
+static __declspec(safebuffers) __forceinline void sky_step_8(InterpCameraSky *s)
 {
     f32 t = s->time.current_f / (f32)s->end_time;
     f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
@@ -937,15 +942,18 @@ static __forceinline void sky_step_8(InterpCameraSky *s)
     s->current = s->initial * c_initial + s->goal * c_goal + s->bezier_1 * c_bezier_1 + s->bezier_2 * c_bezier_2;
 }
 // The other methods: the shared easing curves between initial and goal.
-static __forceinline void sky_step_other(InterpCameraSky *s)
+static __declspec(safebuffers) __forceinline void sky_step_other(InterpCameraSky *s)
 {
     f32 x = interp_common_methods(s->method, s->time.current_f, (f32)s->end_time);
     s->current = (s->goal - s->initial) * x + s->initial;
 }
 
-// TODO: ours gets a /GS cookie (the CameraSky temporaries; safebuffers does not
-// remove it), which with the alignment run_std hands down also pads the frame by 4;
-// the original computes (goal - initial) * x for the other methods in a different order.
+// The finished interpolation's return is shared by the two checks of
+// end_time (goto): written out twice, it stayed two copies.
+// TODO: ours keeps the return pointer in ebx where the original reloads it at each
+// return; the CameraSky multiplications use the other operand order (method 8's
+// first field and the color loops), and the original computes (goal - initial) * x
+// for the other methods in a different order.
 // FUNCTION: TH16 0x40cd10
 CameraSky InterpCameraSky::step()
 {
@@ -956,15 +964,12 @@ CameraSky InterpCameraSky::step()
         {
             time.set(end_time);
             end_time = 0;
-            if (method == 7 || method == 17)
-            {
-                return initial;
-            }
-            return goal;
+            goto finished;
         }
     }
     else if (end_time == 0)
     {
+    finished:
         if (method == 7 || method == 17)
         {
             return initial;
@@ -1024,8 +1029,8 @@ HARNESS_CALLED CameraSky::CameraSky(f32 begin_distance, f32 end_distance, f32 c0
 }
 
 // TODO: the original frame has 4 more (unused) bytes: padding for the
-// known alignment run_std's realignment gives it (ours stays unpadded, also
-// HARNESS_CALLED, although run_std now realigns).
+// known alignment run_std's realignment gives it (ours stays unpadded, even
+// when made HARNESS_CALLED, although run_std now realigns).
 // FUNCTION: TH16 0x40b2f0
 void Stage::interrupt_vms(i32 n)
 {
@@ -1048,13 +1053,22 @@ void Stage::interrupt_vms(i32 n)
 // The stage script (STD) and the camera rocking patterns. The rocking code
 // calls the out-of-line sinf and cosf (0x405510, 0x4054f0), which LTCG
 // keeps out of line here (this function has an EH frame).
-// TODO: same ebx-frame realignment as the original (since Stage::on_tick
-// realigns early); register allocation and stack slots still differ.
+// safebuffers (on the declaration) drops the /GS cookie ours got for its
+// locals; the original only has the EH frame's. The first time check is
+// written separately from the loop's (current loaded first, as in the
+// original's entry test).
+// TODO: a few vector stores are scheduled around unpcklps differently, and
+// the final timer tick adds current_f from memory where the original loads it.
 // FUNCTION: TH16 0x40b3b0
 i32 StageInner::run_std()
 {
     StdInstr *ins = (StdInstr *)((u8 *)stage->script + cur_instr_offset);
-    while (ins->time <= time_in_stage.current)
+    i32 now = time_in_stage.current;
+    if (ins->time > now)
+    {
+        goto ticked;
+    }
+    do
     {
         switch (ins->opcode)
         {
@@ -1248,7 +1262,8 @@ i32 StageInner::run_std()
         }
         cur_instr_offset += ins->size;
         ins = (StdInstr *)((u8 *)stage->script + cur_instr_offset);
-    }
+    } while (ins->time <= time_in_stage.current);
+ticked:
     time_in_stage.tick();
 stopped:
     if (camera_facing_i.end_time != 0)

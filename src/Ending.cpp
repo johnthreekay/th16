@@ -220,8 +220,11 @@ i32 Ending::initialize()
         g_Scorefile->endings_seen[8] = 1;
     }
 
+    // The file name is looked up first: the original clears the path after
+    // loading the index.
+    const char *file = g_ending_files[ending_index];
     strcpy(g_ecl_path, "");
-    strcat(g_ecl_path, g_ending_files[ending_index]);
+    strcat(g_ecl_path, file);
     script_file = file_read_all(g_ecl_path, NULL, 0);
     if (script_file == NULL)
     {

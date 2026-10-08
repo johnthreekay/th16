@@ -120,7 +120,7 @@ void TitleInf::load_replay_list()
 }
 
 // Saving the replay after a game: picking a slot, then entering the name.
-// TODO: this lives in esi (the original edi, spilled), the ascii create_effect pattern (see docs/findings.md), and g_stage_table[8] lands on another global here.
+// TODO: this lives in esi (the original edi, spilled), and g_stage_table[8] lands on another global here.
 // FUNCTION: TH16 0x453c10
 i32 TitleInf::do_replay_save()
 {
@@ -141,10 +141,10 @@ i32 TitleInf::do_replay_save()
         }
         if (g_AnmManager->get_vm_with_id(anm_ids[0x61]) == NULL)
         {
-            anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
+            anm_ids[0x61] = create_effect_via_pointer(title_anm, 0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
         }
-        anm_ids[0x70] = title_anm->create_effect(0x70, -1, NULL);
+        anm_ids[0x70] = create_effect_via_pointer(title_anm, 0x70, -1, NULL);
         set_substate(1);
     case 1:
         if (time_in_state.current > 6)
@@ -330,7 +330,7 @@ i32 g_last_difficulty = DIFFICULTY_NORMAL;
 i32 g_last_character;
 
 // Picking the difficulty, or confirming Extra.
-// TODO: the original reuses g_Globals.difficulty from the entry in ecx for num_choices (reloading it after the ascii create_effect); ours compares memory; plus the ascii create_effect pattern (see docs/findings.md).
+// TODO: the original reuses g_Globals.difficulty from the entry in ecx for num_choices (reloading it after the ascii create_effect); ours compares memory.
 // FUNCTION: TH16 0x44fe20
 i32 TitleInf::do_difficulty_select()
 {
@@ -340,13 +340,13 @@ i32 TitleInf::do_difficulty_select()
     case 0:
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = create_effect_via_pointer(g_AsciiManager->ascii_anm, 0x13, -1, NULL);
         }
         menu.wraps = 0;
         menu.num_choices = g_Globals.difficulty < DIFFICULTY_EXTRA ? 4 : 1;
         AnmManager::interrupt_tree(anm_ids[script], 1);
         anm_ids[script].id = 0;
-        anm_ids[script] = title_anm->create_effect(script, -1, NULL);
+        anm_ids[script] = create_effect_via_pointer(title_anm, script, -1, NULL);
         AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
         AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 13));
         if (g_title_return_point == TITLE_RETURN_PRACTICE)
@@ -358,7 +358,7 @@ i32 TitleInf::do_difficulty_select()
             AnmManager::interrupt_tree(find_child_id(script, menu.next_selection + 0x74), 2);
             goto confirm;
         }
-        anm_ids[0x68] = title_anm->create_effect(0x68, -1, NULL);
+        anm_ids[0x68] = create_effect_via_pointer(title_anm, 0x68, -1, NULL);
         set_substate(1);
         if (g_Globals.difficulty < DIFFICULTY_EXTRA)
         {
@@ -530,13 +530,13 @@ i32 TitleInf::do_character_select()
         }
         if (g_AnmManager->get_vm_with_id(anm_ids[0x69]) == NULL)
         {
-            anm_ids[0x69] = title_anm->create_effect(0x69, -1, NULL);
+            anm_ids[0x69] = create_effect_via_pointer(title_anm, 0x69, -1, NULL);
         }
         if (g_AnmManager->get_vm_with_id(anm_ids[script]) == NULL)
         {
             AnmManager::interrupt_tree(anm_ids[script], 1);
             anm_ids[script].id = 0;
-            anm_ids[script] = title_anm->create_effect(script, -1, NULL);
+            anm_ids[script] = create_effect_via_pointer(title_anm, script, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
         }
         else
@@ -679,12 +679,12 @@ i32 TitleInf::do_subseason_select()
         }
         AnmManager::interrupt_tree(anm_ids[script], 1);
         anm_ids[script].id = 0;
-        anm_ids[script] = title_anm->create_effect(script, -1, NULL);
+        anm_ids[script] = create_effect_via_pointer(title_anm, script, -1, NULL);
         AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
         AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(menu.next_selection + 7));
         AnmManager::interrupt_tree_and_run(anm_ids[script], (i16)(g_Globals.character + 31));
         set_substate(1);
-        anm_ids[0x6a] = title_anm->create_effect(0x6a, -1, NULL);
+        anm_ids[0x6a] = create_effect_via_pointer(title_anm, 0x6a, -1, NULL);
         if (g_title_return_point == TITLE_RETURN_PRACTICE)
         {
             menu.set_cursor(g_Globals.subseason);
@@ -819,7 +819,7 @@ i32 TitleInf::do_practice_stage_select()
     case 0:
         menu.num_choices = 6;
         menu.set_cursor(g_practice_last_stage);
-        anm_ids[0x71] = title_anm->create_effect(0x71, -1, NULL);
+        anm_ids[0x71] = create_effect_via_pointer(title_anm, 0x71, -1, NULL);
         set_substate(1);
         if (g_title_return_point == TITLE_RETURN_PRACTICE)
         {
@@ -964,10 +964,11 @@ i32 TitleInf::do_practice_stage_select()
             set_state(TITLE_STATE_EXIT);
             i32 stage = menu.next_selection + 1;
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
+            // Stage table pointer first, for matching (see do_spell_practice_difficulty).
+            g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
             g_title_return_point = TITLE_RETURN_PRACTICE;
-            g_stage_data = &g_stage_table[stage];
             g_practice_last_stage = menu.next_selection;
             return 1;
         }
@@ -1007,7 +1008,7 @@ u8 g_cheat_prev_keys[0x100];
 // The player data screen: difficulty (player_data_difficulty_menu) and character (menu)
 // records, and pages of spell cards (page_menu, 0 for none). On Extra with
 // the fourth character selected it also reads the unlock cheat.
-// TODO: the ascii create_effect call loads g_AsciiManager into ecx (the original eax, with the result slot in ecx), and the vectorized OR loads the second 16 key bytes first (the original the first; not the operand order, the accumulator type or a reversed loop).
+// TODO: the vectorized OR loads the second 16 key bytes first (the original the first; not the operand order, the accumulator type or a reversed loop).
 // FUNCTION: TH16 0x452330
 i32 TitleInf::do_player_data()
 {
@@ -1024,20 +1025,20 @@ i32 TitleInf::do_player_data()
         page_menu.wraps = 1;
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = create_effect_via_pointer(g_AsciiManager->ascii_anm, 0x13, -1, NULL);
         }
-        anm_ids[0x6d] = title_anm->create_effect(0x6d, -1, NULL);
+        anm_ids[0x6d] = create_effect_via_pointer(title_anm, 0x6d, -1, NULL);
         set_substate(1);
         create_effect(menu.next_selection + 0xa7);
         create_effect(player_data_difficulty_menu.next_selection + 0xaf);
-        anm_ids[0xb7] = title_anm->create_effect(0xb7, -1, NULL);
-        anm_ids[0xb8] = title_anm->create_effect(0xb8, -1, NULL);
-        anm_ids[0xb9] = title_anm->create_effect(0xb9, -1, NULL);
-        anm_ids[0xba] = title_anm->create_effect(0xba, -1, NULL);
-        anm_ids[0xb4] = title_anm->create_effect(0xb4, -1, NULL);
-        anm_ids[0xb5] = title_anm->create_effect(0xb5, -1, NULL);
-        anm_ids[0xb6] = title_anm->create_effect(0xb6, -1, NULL);
-        anm_ids[0xbb] = title_anm->create_effect(0xbb, -1, NULL);
+        anm_ids[0xb7] = create_effect_via_pointer(title_anm, 0xb7, -1, NULL);
+        anm_ids[0xb8] = create_effect_via_pointer(title_anm, 0xb8, -1, NULL);
+        anm_ids[0xb9] = create_effect_via_pointer(title_anm, 0xb9, -1, NULL);
+        anm_ids[0xba] = create_effect_via_pointer(title_anm, 0xba, -1, NULL);
+        anm_ids[0xb4] = create_effect_via_pointer(title_anm, 0xb4, -1, NULL);
+        anm_ids[0xb5] = create_effect_via_pointer(title_anm, 0xb5, -1, NULL);
+        anm_ids[0xb6] = create_effect_via_pointer(title_anm, 0xb6, -1, NULL);
+        anm_ids[0xbb] = create_effect_via_pointer(title_anm, 0xbb, -1, NULL);
     case 1:
         if (time_in_state.current > 6)
         {
@@ -1098,7 +1099,7 @@ i32 TitleInf::do_player_data()
             {
                 for (i32 i = 0; i < 10; i++)
                 {
-                    text_row_ids[i] = g_Supervisor.text_anm->create_effect(i + 3, -1, NULL);
+                    text_row_ids[i] = create_effect_via_pointer(g_Supervisor.text_anm, i + 3, -1, NULL);
                 }
             }
             page_menu.move_cursor(1);
@@ -1473,7 +1474,7 @@ i32 g_last_replay_slot;
 
 // The replay menu: picking a replay (pages of 25) while the list loads on
 // the menu's thread, then the stage to start from.
-// TODO: register allocation: this moves through eax around the first slot % 25, the ascii create_effect loads g_AsciiManager into ecx, and stage + 1 stays in eax (as in do_spell_practice_difficulty).
+// TODO: register allocation: this moves through eax around the first slot % 25.
 // FUNCTION: TH16 0x451750
 i32 TitleInf::do_replay_menu()
 {
@@ -1490,9 +1491,9 @@ i32 TitleInf::do_replay_menu()
         g_last_replay_slot = 0;
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = create_effect_via_pointer(g_AsciiManager->ascii_anm, 0x13, -1, NULL);
         }
-        anm_ids[0x6c] = title_anm->create_effect(0x6c, -1, NULL);
+        anm_ids[0x6c] = create_effect_via_pointer(title_anm, 0x6c, -1, NULL);
         set_substate(1);
         memset(replays, 0, sizeof(replays));
         menu_flags &= ~(TITLE_STOP_REPLAY_LOADING | TITLE_REPLAYS_LOADED);
@@ -1500,7 +1501,7 @@ i32 TitleInf::do_replay_menu()
         thread.restart((ThreadStart)replay_list_thread, this);
         if (g_AnmManager->get_vm_with_id(anm_ids[0x61]) == NULL)
         {
-            anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
+            anm_ids[0x61] = create_effect_via_pointer(title_anm, 0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
         }
     }
@@ -1624,9 +1625,10 @@ i32 TitleInf::do_replay_menu()
             set_state(TITLE_STATE_EXIT);
             i32 stage = replay_stage + 1;
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_START_REPLAY;
+            // Stage table pointer first, for matching (see do_spell_practice_difficulty).
+            g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
-            g_stage_data = &g_stage_table[stage];
             strcpy(g_current_replay_filename, replays[replay_slot]->filename);
             RpyInfo *info = replays[replay_slot]->info;
             g_Globals.character = info->character;
@@ -1887,7 +1889,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
 // The high score name entry after a game (score_not_ranked is set when the score
 // did not make the top ten), then on to saving the replay unless the game
 // was continued.
-// TODO: the original saves ebx (push ecx; push ebx) and keeps &replay_name in it for the score copy, tests the pressed word in memory before the name entry, and has the ascii create_effect pattern (see docs/findings.md).
+// TODO: the original saves ebx (push ecx; push ebx) and keeps &replay_name in it for the score copy, and tests the pressed word in memory before the name entry.
 // FUNCTION: TH16 0x4532f0
 i32 TitleInf::do_score_name_entry()
 {
@@ -1900,7 +1902,7 @@ i32 TitleInf::do_score_name_entry()
         g_Supervisor.play_bgm(0, 0x11);
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = create_effect_via_pointer(g_AsciiManager->ascii_anm, 0x13, -1, NULL);
         }
         create_effect(0x6f);
         set_substate(1);
@@ -2304,7 +2306,6 @@ HARNESS_CALLED i32 TitleInf::on_draw__replay_save()
 }
 
 // The manual (help.anm), shown until HelpManual says it is done.
-// TODO: the first create_effect call swaps eax and ecx (g_AsciiManager and the result slot).
 // FUNCTION: TH16 0x4545a0
 i32 TitleInf::do_manual()
 {
@@ -2313,9 +2314,9 @@ i32 TitleInf::do_manual()
     case 0:
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = create_effect_via_pointer(g_AsciiManager->ascii_anm, 0x13, -1, NULL);
         }
-        anm_ids[0x72] = title_anm->create_effect(0x72, -1, NULL);
+        anm_ids[0x72] = create_effect_via_pointer(title_anm, 0x72, -1, NULL);
         HelpManual::create();
         substate = 1;
         time_in_state.reset();
@@ -2402,7 +2403,7 @@ i32 TitleInf::do_music_room()
             menu.set_cursor(0);
             if (submenu_ascii_id.id == 0)
             {
-                submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+                submenu_ascii_id = create_effect_via_pointer(g_AsciiManager->ascii_anm, 0x13, -1, NULL);
             }
             create_effect(0x6e);
             i32 count = 0;
@@ -2649,16 +2650,16 @@ i32 TitleInf::do_spell_practice_stage_select()
     case 0:
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = create_effect_via_pointer(g_AsciiManager->ascii_anm, 0x13, -1, NULL);
         }
         menu.num_choices = 7;
         if (g_AnmManager->get_vm_with_id(anm_ids[0x11c]) == NULL)
         {
-            anm_ids[0x11c] = title_anm->create_effect(0x11c, -1, NULL);
+            anm_ids[0x11c] = create_effect_via_pointer(title_anm, 0x11c, -1, NULL);
         }
         if (g_AnmManager->get_vm_with_id(anm_ids[0xd7]) == NULL)
         {
-            anm_ids[0xd7] = title_anm->create_effect(0xd7, -1, NULL);
+            anm_ids[0xd7] = create_effect_via_pointer(title_anm, 0xd7, -1, NULL);
         }
         set_substate(1);
         if (g_spell_practice_last_stage >= 0)
@@ -2681,7 +2682,7 @@ i32 TitleInf::do_spell_practice_stage_select()
             menu.set_cursor(0);
             return 1;
         }
-        anm_ids[0x71] = title_anm->create_effect(0x71, -1, NULL);
+        anm_ids[0x71] = create_effect_via_pointer(title_anm, 0x71, -1, NULL);
     case 1:
         if (time_in_state.current > 10)
         {
@@ -2813,11 +2814,11 @@ i32 TitleInf::do_spell_practice_row()
         menu.num_choices = row_counts[spell_stage];
         if (g_AnmManager->get_vm_with_id(anm_ids[0x6b]) == NULL)
         {
-            anm_ids[0x6b] = title_anm->create_effect(0x6b, -1, NULL);
+            anm_ids[0x6b] = create_effect_via_pointer(title_anm, 0x6b, -1, NULL);
         }
         if (g_AnmManager->get_vm_with_id(anm_ids[0xd8]) == NULL)
         {
-            anm_ids[0xd8] = title_anm->create_effect(0xd8, -1, NULL);
+            anm_ids[0xd8] = create_effect_via_pointer(title_anm, 0xd8, -1, NULL);
         }
         set_substate(1);
         for (i32 i = 0; i < 13 - row_counts[spell_stage]; i++)
@@ -2929,7 +2930,6 @@ i32 g_spell_practice_last_stage = -1;
 i32 g_practice_last_stage = -1;
 
 // Spell practice: picking the subseason, then starting the game.
-// TODO: as do_spell_practice_difficulty, the original keeps stage + 1 in ecx and computes the stage table pointer before the two stage number stores.
 // FUNCTION: TH16 0x455d50
 i32 TitleInf::do_spell_practice_subseason()
 {
@@ -2940,7 +2940,7 @@ i32 TitleInf::do_spell_practice_subseason()
         menu.set_cursor(0);
         if (g_AnmManager->get_vm_with_id(anm_ids[0xd9]) == NULL)
         {
-            anm_ids[0xd9] = title_anm->create_effect(0xd9, -1, NULL);
+            anm_ids[0xd9] = create_effect_via_pointer(title_anm, 0xd9, -1, NULL);
         }
         set_substate(1);
     case 1:
@@ -3000,9 +3000,10 @@ i32 TitleInf::do_spell_practice_subseason()
             set_state(TITLE_STATE_EXIT);
             g_title_return_point = TITLE_RETURN_SPELL_PRACTICE;
             i32 stage = spell_stage + 1;
+            // Stage table pointer first, for matching (see do_spell_practice_difficulty).
+            g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
-            g_stage_data = &g_stage_table[stage];
             g_Globals.spell_id = spell_ids[spell_index];
             g_Globals.character = spell_character_menu.next_selection;
             g_Globals.subshot = 0;
@@ -3032,7 +3033,7 @@ i32 TitleInf::do_spell_practice_subseason()
 
 // Spell practice: picking the spell card (the difficulty row). Extra stage
 // cards start the game right away; the others go on to the subseason.
-// TODO: the original keeps stage + 1 in ecx and computes the stage table pointer before the two stage number stores (ours eax, after; not with a pointer local or reading g_Globals.stage_num back).
+// The stage table pointer is assigned before the two stage numbers: that keeps stage + 1 in ecx with the multiply ahead of the stores, as in the original.
 // FUNCTION: TH16 0x456a20
 i32 TitleInf::do_spell_practice_difficulty()
 {
@@ -3114,9 +3115,9 @@ i32 TitleInf::do_spell_practice_difficulty()
                 set_state(TITLE_STATE_EXIT);
                 g_title_return_point = TITLE_RETURN_SPELL_PRACTICE;
                 i32 stage = spell_stage + 1;
+                g_stage_data = &g_stage_table[stage];
                 g_Globals.stage_num = stage;
                 g_Globals.weird_stage_num = stage;
-                g_stage_data = &g_stage_table[stage];
                 g_Globals.spell_id = spell_ids[menu.next_selection];
                 g_Globals.character = spell_character_menu.next_selection;
                 g_Globals.subshot = 0;
@@ -3214,7 +3215,7 @@ HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 s
     {
         for (i32 i = 0; i < 4; i++)
         {
-            anm_ids[0x10d + i] = title_anm->create_effect(i + 0x10d, -1, NULL);
+            anm_ids[0x10d + i] = create_effect_via_pointer(title_anm, i + 0x10d, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x10d + i], 3);
         }
     }
@@ -3234,11 +3235,11 @@ HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 s
         {
             if (g_spell_difficulty[id] == 4)
             {
-                anm_ids[0x111] = title_anm->create_effect(0x111, -1, NULL);
+                anm_ids[0x111] = create_effect_via_pointer(title_anm, 0x111, -1, NULL);
             }
             else if (g_spell_difficulty[id] == 5)
             {
-                anm_ids[0x113] = title_anm->create_effect(0x113, -1, NULL);
+                anm_ids[0x113] = create_effect_via_pointer(title_anm, 0x113, -1, NULL);
             }
             difficulty = g_spell_difficulty[id];
             slot = difficulty != DIFFICULTY_EXTRA;
@@ -3247,7 +3248,7 @@ HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 s
         {
             if (g_spell_difficulty[id] >= 5)
             {
-                anm_ids[0x112] = title_anm->create_effect(0x112, -1, NULL);
+                anm_ids[0x112] = create_effect_via_pointer(title_anm, 0x112, -1, NULL);
                 AnmManager::interrupt_tree_and_run(anm_ids[0x112], 3);
             }
             difficulty = g_spell_difficulty[id];
