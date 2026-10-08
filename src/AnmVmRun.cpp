@@ -1351,7 +1351,10 @@ done:
     }
     if (flags_lo & ANM_VM_FOLLOW_CAMERA)
     {
-        entity_pos += g_Supervisor.cameras[3].position_delta;
+        // Through D3DXVec3Add and a pointer, for the original's operand
+        // order in each component.
+        Float3 *p = &entity_pos;
+        D3DXVec3Add(p, p, &g_Supervisor.cameras[3].position_delta);
     }
     if (flags_hi & ANM_VM_UV_QUAD_FROM_CORNERS)
     {
@@ -1374,7 +1377,7 @@ done:
 
 // Steps the VM by one frame, at the game speed scaled down by the
 // slowdown of the VM (or its root). 1 once the VM should be deleted.
-// TODO: same cases and layout; differs in: 106/112 keep the store pointer in ecx (original eax), 121 stores the fmod result before the pointer test so 123 cross-jumps into its tail, 130/131 register use (the lerp multiplies t from memory), the GameThread check's branch sense, case 2 clearing eax itself instead of jumping to the final return 0, and the camera add's operand order (y, z).
+// TODO: same cases and layout; differs in: 106/112 keep the store pointer in ecx (original eax), 121 stores the fmod result before the pointer test so 123 cross-jumps into its tail, 130/131 register use (the lerp multiplies t from memory), the GameThread check's branch sense and case 2 clearing eax itself instead of jumping to the final return 0.
 // FUNCTION: TH16 0x45f980
 i32 AnmVm::run()
 {
