@@ -323,7 +323,7 @@ HARNESS_CALLED i32 __stdcall collision_line_intersection(f32 *out_x, f32 *out_y,
     return 1;
 }
 
-// TODO: same logic; the rotation loop stores x before y and the register allocation after the rotation differs.
+// TODO: the rotation loop stores x before y, pos is loaded later (eax, not esi) with y read first, and start_x/start_y swap stack slots.
 // FUNCTION: TH16 0x404600
 HARNESS_CALLED i32 __stdcall collision_line_rect(Float2 *near_point, Float2 *far_point, Float3 *pos, f32 line_angle,
                                                  f32 rect_x, f32 rect_y, f32 w, f32 h, f32 rect_angle)
@@ -350,11 +350,13 @@ HARNESS_CALLED i32 __stdcall collision_line_rect(Float2 *near_point, Float2 *far
     f32 start_x = pos->x - dx;
     f32 start_y = pos->y - dy;
     i32 n = 0;
-    for (const i32(*edge)[2] = g_rect_edges; edge < g_rect_edges + 4; edge++)
+    // An index loop: MSVC walks the edge table with a pointer it compares
+    // signed (jl), as in the original; a pointer loop compares unsigned.
+    for (i32 i = 0; i < 4; i++)
     {
         if (collision_segment_intersection(&hits[n].x, &hits[n].y, start_x, start_y, end_x, end_y,
-                                           corners[(*edge)[0]].x, corners[(*edge)[0]].y, corners[(*edge)[1]].x,
-                                           corners[(*edge)[1]].y))
+                                           corners[g_rect_edges[i][0]].x, corners[g_rect_edges[i][0]].y,
+                                           corners[g_rect_edges[i][1]].x, corners[g_rect_edges[i][1]].y))
         {
             n++;
             if (n >= 2)
@@ -369,8 +371,9 @@ HARNESS_CALLED i32 __stdcall collision_line_rect(Float2 *near_point, Float2 *far
     }
     if (n == 2)
     {
-        if ((start_x - hits[1].x) * (start_x - hits[1].x) + (start_y - hits[1].y) * (start_y - hits[1].y) >
-            (start_x - hits[0].x) * (start_x - hits[0].x) + (start_y - hits[0].y) * (start_y - hits[0].y))
+        // The first hit's distance written first: it is computed first.
+        if ((start_x - hits[0].x) * (start_x - hits[0].x) + (start_y - hits[0].y) * (start_y - hits[0].y) <
+            (start_x - hits[1].x) * (start_x - hits[1].x) + (start_y - hits[1].y) * (start_y - hits[1].y))
         {
             near_point->x = hits[0].x;
             near_point->y = hits[0].y;
