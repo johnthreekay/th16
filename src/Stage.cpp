@@ -657,7 +657,7 @@ void StageInner::draw_vms(i32 layer)
     }
 }
 
-// TODO: register and stack slot allocation differ (the original keeps 255.0f in memory and adds d.x to pos.x the other way round).
+// TODO: register and stack slot allocation differ (the original keeps 255.0f in memory, swaps two spill slots and adds d.x to pos.x the other way round).
 // Moves the distortion mesh: kind 1 waves the bottom of the screen while no
 // spell card is active, kind 2 bulges a disc around the center of the game
 // area whose radius shrinks towards distortion_min_radius.
@@ -700,9 +700,12 @@ void StageInner::step_fog()
                 d.y = sinf(angle_b.value) * t;
                 if (i != 0 && j != 0 && i != fog->strip_count - 1 && j != fog->strip_points - 1)
                 {
-                    vertex->pos.x = vertex->pos.x + d.x;
-                    vertex->pos.y = vertex->pos.y + d.y;
-                    vertex->pos.z = 0.0f;
+                    // Through a pointer to the position: pos.y is then loaded
+                    // before d.y is added, as in the original.
+                    D3DXVECTOR3 *pos = &vertex->pos;
+                    pos->x = pos->x + d.x;
+                    pos->y = pos->y + d.y;
+                    pos->z = 0.0f;
                     point->z = 0.0f;
                 }
                 angle_a.value = wrap_angle(angle_a.value + 0.66842401f);
@@ -758,10 +761,12 @@ void StageInner::step_fog()
             }
         }
         wave_angle_a = wrap_angle(wave_angle_a + ZUN_PI / 64);
-        wave_angle_b = wrap_angle(g_replay_unsafe_rng.randf_0_to_1() * ZUN_PI / 40.0f + ZUN_PI / 80 + wave_angle_b);
+        // The random number in a local: the sum then adds wave_angle_b last.
+        f32 r = g_replay_unsafe_rng.randf_0_to_1();
+        wave_angle_b = wrap_angle(r * ZUN_PI / 40.0f + ZUN_PI / 80 + wave_angle_b);
     }
 tick:
-    fog_timer.tick_in_place();
+    fog_timer.tick_split();
 }
 
 // FUNCTION: TH16 0x40a7b0
