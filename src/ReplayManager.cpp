@@ -467,7 +467,7 @@ void clear_input_state()
 // Each update function is unregistered with its own written-out copy of
 // UpdateFuncRegistry::unregister_locked, with the registry read inside the
 // null check (the inline helper kept the function pointer in a stack slot).
-// TODO: the original keeps each func in ebx and EnterCriticalSection's address in eax (ours rereads the func and keeps the address in ebx), and our loops get alignment padding.
+// TODO: the original keeps each func in ebx and EnterCriticalSection's address in eax (ours rereads the func and keeps the address in ebx).
 // FUNCTION: TH16 0x447c80
 ReplayManager::~ReplayManager()
 {

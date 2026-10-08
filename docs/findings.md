@@ -1798,3 +1798,41 @@ Enemy-file sweep continuation:
   difference in opposite directions with the same tick(); no form or
   count moves either. step_logic: the original hoists g_MainBomb into the
   prologue where ours hoists g_SubseasonBomb (no form found).
+
+Research: loop-head nops and functions that never use ebx:
+- MSVC 19.10 at /O2 aligns a loop head to 16 bytes when that takes at
+  most 7 bytes of padding, or (up to 15 bytes) when the loop's first
+  instructions would otherwise straddle the 16-byte boundary. "First
+  instructions" means up to three, stopping after the first branch or call
+  (two if the three come to more than 16 bytes). Loop size, nesting, calls,
+  the loop form, function size and `/favor` make no difference; /O1 and /Os
+  never pad. No padded head in either binary breaks the rule; 2236 of 2561
+  original heads follow it exactly, and every exception is an unpadded
+  backward-jump target (shared error or return tails, interpreter jumps, a
+  merged head as below).
+- To avoid a nop the original lacks: write the head statements once before
+  the loop and again at the end of the body. The compiler merges the two
+  copies and the back edge jumps to the one before the loop, which is not
+  its own loop-head label and is never padded (read_line).
+- Extra nops in ScorefileStatus::init and WinMain come from earlier
+  code-size differences, not from alignment.
+- A COM call written as `g_Supervisor.d3d_device->X(...)` (also d3d and
+  back_buffer) makes LTCG leave ebx unused in the whole function, inlined
+  code included. The same call through `supervisor_d3d_device()`
+  (Supervisor.h) or a local copy of the pointer keeps ebx usable, with
+  otherwise identical code. The original has functions of both kinds:
+  using the getter at all 268 call sites gave 10 up and 4 down
+  (AsciiInf::draw_group, GameWindow::do_frame, render_sprite_2d and
+  draw_circle prefer the direct form), so it is chosen per function. The
+  same call through another global, another Supervisor-typed global or a
+  struct field defined in another file does not trigger it; stack
+  alignment, HARNESS_CALLED, dead locals, `/d2:-newcolor-`,
+  `/d2:-linscan`, the DirectInput enum callbacks and the `&g_Supervisor`
+  registrations are ruled out. Getters for dinput, keyboard, joystick and
+  the arcade surfaces gained nothing and cost get_controller_state its
+  match. SoundBufferEntry::load (`g_SoundManager.dsound->...`) shows the
+  same signature (untested). reload_texture lacks ebx even compiled
+  without /GL, so its cause is different.
+- Tooling: objdump mis-disassembles .obj files at `$LN` labels (a
+  capstone-based COFF disassembler works), and linking with `/d2:-cands`
+  crashes LTCG.
