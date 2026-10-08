@@ -35,14 +35,19 @@ HARNESS_CALLED i32 EnemyManager::reset_for_stage(i32 unused)
     return 0;
 }
 
-// TODO: the original keeps g_AnmManager in a register across the loop; LTCG
-// knows the (here undecompiled) callee leaves it alone.
+// Disables the VMs of the enemy ANM files (slots 10 to 15), then deletes every
+// enemy. The first loop walks the byte offset of the loaded_anms slots, which
+// gives the original's offset counter compared against the end; an index loop
+// counts down beside a pointer instead.
+// TODO: the original encodes the slot address as [offset + manager] (base and
+// index registers swapped).
 // FUNCTION: TH16 0x4185b0
 void EnemyManager::destroy_all()
 {
-    for (u32 i = 10; i < 16; i++)
+    for (u32 off = offsetof(AnmManager, loaded_anms[10]); off < offsetof(AnmManager, loaded_anms[16]);
+         off += sizeof(AnmLoaded *))
     {
-        g_AnmManager->disable_vms_from_anm_file(g_AnmManager->loaded_anms[i]);
+        g_AnmManager->disable_vms_from_anm_file(*(AnmLoaded **)((u8 *)g_AnmManager + off));
     }
     EnemyList *node = active_enemy_list_head;
     while (node != NULL)

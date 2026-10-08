@@ -776,7 +776,10 @@ i32 PlayerBullet::create(i32 shooter_ref, i32 time, PlayerInner *inner)
     else
     {
         AnmLoaded *anm = g_Player->subseason_anm_file;
-        anm_id = anm->create_effect(shooter->anm_script, -1, NULL);
+        // Only this call goes through the member pointer: with both direct,
+        // create_effect's wish for an aligned stack makes this function
+        // realign; with neither, Player::do_shooting does not.
+        anm_id = create_effect_via_pointer(anm, shooter->anm_script, -1, NULL);
     }
     AnmVm *vm = get_vm_or_clear(anm_id);
     if (vm->flags_hi & ANM_VM_AUTO_ROTATE)

@@ -591,8 +591,6 @@ HARNESS_CALLED void Player::reset()
     damage_multiplier = 1.0f;
 }
 
-// TODO: the original clears eax before the pops in both early returns; ours
-// does it after popping edi and esi.
 // FUNCTION: TH16 0x445360
 i32 Player::shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner)
 {
@@ -626,8 +624,8 @@ i32 Player::shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner)
     return bullet->create(shooter_ref, time, inner) != 0 ? -1 : 0;
 }
 
-// TODO: the original realigns its frame (ebx form); the body matches. Not
-// for PlayerBullet::create (real code now, no realignment of its own).
+// Realigns its frame through ebx: AnmLoaded::create_effect wants an aligned
+// stack and PlayerBullet::create (through shoot_one_bullet) passes that on.
 // FUNCTION: TH16 0x445470
 i32 Player::do_shooting(i32 short_time, i32 long_time)
 {
@@ -677,9 +675,6 @@ i32 Player::do_shooting(i32 short_time, i32 long_time)
     return 0;
 }
 
-// TODO: the original saves ecx and edi on entry (most likely an LTCG
-// convention asked for by its caller, on_tick_body, which does not match
-// either); ours saves edi only around the short timer part.
 // FUNCTION: TH16 0x4455d0
 i32 Player::tick_shooting_state()
 {

@@ -295,8 +295,6 @@ HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
     }
 }
 
-// TODO: the original loads 1.0f into xmm2 at the damage_multiplier store and adds it
-// from there in the inlined tick (tick_goto gives the rest of the tick's registers).
 // FUNCTION: TH16 0x41b3d0
 int EnemyManager::update()
 {
@@ -324,7 +322,7 @@ int EnemyManager::update()
         g_Player->inner.flags &= ~PLAYER_FLAG_DAMAGE_BOOSTED;
     }
     g_Player->damage_multiplier = 1.0f;
-    inner.time_in_stage.tick_goto();
+    inner.time_in_stage.tick_nested();
     return UPDATE_FUNC_CONTINUE;
 }
 
@@ -898,7 +896,9 @@ void EnemyDrop::eject_all_drops(D3DXVECTOR3 *pos)
 }
 
 // TODO: the original multiplies x as dist * x with dist loaded into a register; ours loads x
-// early (operand order, declaration order and indexing do not change it).
+// early (operand order, declaration order, indexing, D3DX operators and inline helpers do not
+// change it). reccmp also shows the 1.9f as <OFFSET>: its string scan reads the original's
+// constant at 0x494548 (33 33 f3 3f 00) as the string "33\xf3?", so it never names it a float.
 // FUNCTION: TH16 0x41d700
 void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
 {
@@ -1221,9 +1221,11 @@ void EnemyManager::kill_all()
 }
 
 // kill_all for the enemies in the given kill_group (ECL 551).
-// TODO: register allocation: the original keeps value in ebx and spills next to the argument slot.
+// HARNESS_CALLED: its one caller is ecl_run_over_300 (ECL 551).
+// TODO: register allocation: the original keeps value in ebx and spills next to the argument
+// slot, and its timer tick shares one epilogue.
 // FUNCTION: TH16 0x41da30
-void __stdcall EnemyManager::kill_all_in_group(i32 value)
+HARNESS_CALLED void __stdcall EnemyManager::kill_all_in_group(i32 value)
 {
     EnemyManager *mgr = g_EnemyManager;
     EnemyList *node = mgr->active_enemy_list_head;
@@ -1246,7 +1248,8 @@ void __stdcall EnemyManager::kill_all_in_group(i32 value)
 }
 
 // TODO: in the inlined tick the original adds current_f into the speed's xmm1; ours loads
-// current_f into xmm0 and adds the speed, the opposite of kill_all (tick or tick_mixed alike).
+// current_f into xmm0 and adds the speed, the opposite of kill_all (tick, tick_mixed,
+// tick_goto, tick_nested and tick_in_place alike).
 // FUNCTION: TH16 0x41db70
 void EnemyManager::kill_all_no_set_death()
 {
@@ -2160,15 +2163,23 @@ void EnemyData::ecl_anm_vm_instr()
         vm->rotation.z = full->context.current_context->get_float_arg(1);
         vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         break;
-    // anmScale(slot, x, y)
+    // anmScale(slot, x, y). Here and in anmScale2 the original reads y
+    // before x, as if the helper's arguments were evaluated right to left.
     case ECL_OP_ANM_SCALE:
-        anm_set_scale(vm, full->context.current_context->get_float_arg(1), full->context.current_context->get_float_arg(2));
+    {
+        f32 y = full->context.current_context->get_float_arg(2);
+        f32 x = full->context.current_context->get_float_arg(1);
+        anm_set_scale(vm, x, y);
         break;
+    }
     // anmScale2(slot, x, y)
     case ECL_OP_ANM_SCALE2:
-        anm_set_scale_2(vm, full->context.current_context->get_float_arg(1),
-                        full->context.current_context->get_float_arg(2));
+    {
+        f32 y = full->context.current_context->get_float_arg(2);
+        f32 x = full->context.current_context->get_float_arg(1);
+        anm_set_scale_2(vm, x, y);
         break;
+    }
     // anmScaleTime(slot, time, mode, x, y)
     case ECL_OP_ANM_SCALE_TIME:
         vm->scale_to(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
@@ -2228,8 +2239,10 @@ void EnemyData::ecl_anm_vm_instr()
     }
 }
 
-// TODO: frame layout (the original keeps the zero vector higher up and its frame is 8 bytes
-// bigger), the directional VM sits in edx, and the camera's y is added the other way round.
+// TODO: frame layout (the original keeps the zero vector in a slot of its own at the top
+// of a frame 16 bytes bigger), the directional VM sits in edx, and the camera's y is added
+// the other way round. reccmp also shows the +-0.03f constants as <OFFSET>: it only
+// names constants an x87 instruction somewhere references.
 // FUNCTION: TH16 0x41bb50
 int EnemyData::step_interpolators()
 {
@@ -2307,16 +2320,11 @@ int EnemyData::step_interpolators()
             }
             AnmVm *vm = get_vm_or_clear(anm_ids[0]);
             AnmLoaded *file = g_EnemyManager->anim_statement_anms[anm_slot_0_anm_index];
-            Float3 zero(0.0f, 0.0f, 0.0f);
-            Float3 pos;
+            Float3 pos(0.0f, 0.0f, 0.0f);
             if (vm != NULL)
             {
                 pos = vm->pos;
                 delete_vm_and_clear(anm_ids[0]);
-            }
-            else
-            {
-                pos = zero;
             }
             i32 layer = anm_layers + 7;
             i32 script = anm_set_main + script_offset;

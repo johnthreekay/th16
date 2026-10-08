@@ -98,6 +98,7 @@ i32 EclRunContext::get_int_arg_given_value(int index, i32 value)
             EclStackEntry *entry = (EclStackEntry *)((u8 *)stack.data + stack.stack_offset) + value;
             EclStackItem item = entry->value;
             char type = entry->type;
+            // As in get_int_arg (matching).
             i32 result;
             if (type == 'f')
             {
@@ -156,12 +157,14 @@ HARNESS_CALLED i32 EclRunContext::pop_int_arg(int index)
         {
             return *(i32 *)((u8 *)stack.data + stack.base_offset + value);
         }
+        // As in get_int_arg (matching).
         if (ins->args[index].i <= -1 && value >= -100)
         {
             stack.stack_offset -= 4;
             EclStackItem item = *(EclStackItem *)((u8 *)stack.data + stack.stack_offset);
             stack.stack_offset -= 4;
             char type = *((char *)stack.data + stack.stack_offset);
+            // As in get_int_arg (matching).
             i32 result;
             if (type == 'f')
             {
@@ -228,6 +231,7 @@ i32 EclRunContext::pop_int_arg_given_value(int index, i32 value)
             EclStackItem item = *(EclStackItem *)((u8 *)stack.data + stack.stack_offset);
             stack.stack_offset -= 4;
             char type = *((char *)stack.data + stack.stack_offset);
+            // As in get_int_arg (matching).
             i32 result;
             if (type == 'f')
             {
@@ -331,9 +335,11 @@ int SptResourceInf::load_ecl_data(void *data)
     }
     u32 *offsets = (u32 *)((u8 *)file + sizeof(EclRawFile) + file->include_length);
     char *name = (char *)(offsets + file->sub_count);
-    subroutine_count += file->sub_count;
+    // The new count is computed in a register and also gives the size.
+    i32 total = subroutine_count + file->sub_count;
+    subroutine_count = total;
     EclSubroutinePtrs *old = subroutines;
-    subroutines = (EclSubroutinePtrs *)malloc(subroutine_count * sizeof(EclSubroutinePtrs));
+    subroutines = (EclSubroutinePtrs *)malloc(total * sizeof(EclSubroutinePtrs));
     if (old == NULL)
     {
         for (i32 i = 0; i < subroutine_count; i++)
