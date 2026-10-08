@@ -294,8 +294,6 @@ HARNESS_CALLED i32 *EclRunContext::get_int_arg_ptr(int index)
     return NULL;
 }
 
-// TODO: ours hoists (i32)value above the sign test (both paths convert it); the original
-// converts in each path and adds the frame base before the stack address.
 // FUNCTION: TH16 0x4743a0
 f32 *EclRunContext::get_float_arg_ptr(int index)
 {
@@ -305,7 +303,7 @@ f32 *EclRunContext::get_float_arg_ptr(int index)
         f32 value = ins->args[index].f;
         if (value >= 0.0f)
         {
-            return (f32 *)((u8 *)stack.data + stack.base_offset + (i32)value);
+            return (f32 *)stack.local_ptr((i32)value);
         }
         return vm->get_float_global_ptr((i32)value);
     }
