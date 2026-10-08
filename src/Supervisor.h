@@ -303,7 +303,8 @@ struct Supervisor
     // Creates the DirectInput keyboard and the first game controller.
     i32 dx_direct_input_initialize();
     // Sets up DirectInput and picks the input paths it made available.
-    static void init_input();
+    // WinMain, its only caller, calls it (our build would inline it).
+    DECOMP_NOINLINE static void init_input();
     // Checksums th16.exe into exe_checksum; -1 if it cannot be read.
     static i32 compute_exe_checksum();
     // Runs a loader function on `thread`. Every caller passes NULL for arg,

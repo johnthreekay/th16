@@ -34,9 +34,13 @@ void window_debug_log(const char *fmt, ...)
 {
 }
 
-// TODO: the original realigns with the ebx frame (push ebx; mov ebx, esp) and ebp-based locals; ours with ebp and esp-based locals.
-// FUNCTION: TH16 0x45b130
-double LTCG_VECTORCALL get_runtime()
+// get_runtime's body. Its double math has to sit in an inline helper: that
+// makes it a call graph node of its own, so LTCG's double stack alignment
+// pass sees get_runtime as a function whose callee wants an aligned stack.
+// get_runtime then realigns through ebx and its callers get padded frames
+// (CSound::Unpause, PauseMenu::leave_paused) as in the original; with the
+// math written in get_runtime itself it realigns plainly (and esp, -8).
+static __forceinline double runtime_seconds()
 {
     ENTER_CS(CS_SUPERVISOR_GAMEMODE);
     if (g_GameWindow.performance_frequency.QuadPart != 0)
@@ -60,6 +64,15 @@ double LTCG_VECTORCALL get_runtime()
     double result = (t - g_GameWindow.runtime_base * 1000.0) / 1000.0;
     LEAVE_CS(CS_SUPERVISOR_GAMEMODE);
     return result;
+}
+
+// TODO: the timeGetTime path spills its result to [ebp-8] (the slot of the
+// counter path's t); the original uses [ebp-0x10], the slot of now.
+// Seconds since startup, from the performance counter if there is one.
+// FUNCTION: TH16 0x45b130
+double LTCG_VECTORCALL get_runtime()
+{
+    return runtime_seconds();
 }
 
 void window_debug_log(const char *fmt, ...);
@@ -153,7 +166,9 @@ HARNESS_CALLED i32 GameWindow::do_frame_sleeping()
     return 0;
 }
 
-// TODO: ours realigns its frame (ebx form); matches when the DirectInput enum callbacks are left out (whole-program effect).
+// TODO: ours realigns its frame (ebx form): the original gets known
+// alignment from do_frame_sleeping, ours does not (whole-program effect;
+// leaving out the DirectInput enum callbacks no longer changes it).
 // FUNCTION: TH16 0x45a9f0
 HARNESS_CALLED void GameWindow::update_window_sleeping()
 {
@@ -296,7 +311,9 @@ HARNESS_CALLED i32 GameWindow::do_frame_frameskip()
     return 0;
 }
 
-// TODO: ours lacks the push ecx padding; matches when the DirectInput enum callbacks are left out (whole-program effect).
+// TODO: ours lacks the push ecx padding the original has for known
+// alignment from do_frame_frameskip (whole-program effect; leaving out the
+// DirectInput enum callbacks no longer changes it).
 // FUNCTION: TH16 0x45adf0
 HARNESS_CALLED void GameWindow::present()
 {

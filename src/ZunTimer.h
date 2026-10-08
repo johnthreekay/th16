@@ -267,6 +267,34 @@ struct ZunTimer
         current = cur;
     }
 
+    // tick with a missing speed jumping into the whole-frame branch: the
+    // scaled branch then adds current_f from memory into the speed's
+    // register (addss xmm1, [current_f]) and each branch keeps its own
+    // stores, where the other variants load current_f first
+    // (ScreenEffect::on_tick_flash, on_tick_hold).
+    void tick_goto()
+    {
+        f32 *speed = this->speed();
+        i32 cur = current;
+        previous = cur;
+        if (speed == NULL)
+        {
+            goto whole_frame;
+        }
+        if (*speed > 0.99f && *speed < 1.01f)
+        {
+        whole_frame:
+            cur++;
+            current_f = current_f + 1.0f;
+        }
+        else
+        {
+            current_f = *speed + current_f;
+            cur = (i32)current_f;
+        }
+        current = cur;
+    }
+
     // Count back by whole frames, ignoring the speed multiplier (ANM's
     // wait instruction, which AnmVm::run runs once the time has passed).
     void rewind(i32 frames)

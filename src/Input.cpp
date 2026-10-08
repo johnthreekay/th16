@@ -48,10 +48,13 @@ void clear_all_keydown_states()
 // GLOBAL: TH16 0x4dfb50
 u8 g_controller_data[0x80];
 
-// TODO: the original aligns its frame through ebx (push ebx; mov ebx, esp;
-// ... ebp-relative locals); ours aligns with esp-relative locals.
-// FUNCTION: TH16 0x401c30
-u8 *get_controller_state()
+// get_controller_state's body: the buttons of the first controller, from
+// winmm or DirectInput. As an inline helper it is a call graph node of its
+// own, which LTCG's stack alignment pass treats as a callee that wants an
+// aligned frame: get_controller_state then realigns through ebx with
+// ebp-relative locals like the original; written in place it realigns with
+// and esp, -8 and esp-relative locals.
+static __forceinline u8 *controller_state()
 {
     JOYINFOEX info;
     DIJOYSTATE2 js;
@@ -105,6 +108,12 @@ u8 *get_controller_state()
         memcpy(g_controller_data, js.rgbButtons, sizeof(js.rgbButtons));
         return g_controller_data;
     }
+}
+
+// FUNCTION: TH16 0x401c30
+u8 *get_controller_state()
+{
+    return controller_state();
 }
 
 #define KEY_PRESSED(button, key) (keys[key] & 0x80 ? (button) : 0)

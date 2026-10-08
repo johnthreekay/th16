@@ -213,8 +213,25 @@ struct Globals
 
 extern Globals g_Globals;
 
-// The score (divided by 10) of the next extend.
-i32 get_score_extend_quota();
+// The scores (divided by 10) of the score extends (Globals.cpp).
+extern const i32 g_score_extend_quotas_extra[7];
+extern const i32 g_score_extend_quotas_standard[11];
+
+// The score (divided by 10) of the next extend. The HUD inlines it;
+// Globals::add_to_score calls the out-of-line copy.
+inline i32 get_score_extend_quota()
+{
+    if (g_Globals.difficulty == DIFFICULTY_EXTRA)
+    {
+        return g_score_extend_quotas_extra[g_Globals.next_score_extend_index];
+    }
+    return g_score_extend_quotas_standard[g_Globals.next_score_extend_index];
+}
+
+// 0x43ddd0, get_score_extend_quota out of line. Kept alive by its caller so
+// that LTCG gives it a custom convention: add_to_score keeps the score in
+// edx across the call.
+HARNESS_CALLED i32 score_extend_quota_out_of_line();
 // How far the season power is from the current level to the next (1 at
 // the top level).
 HARNESS_CALLED f32 get_season_gauge_fill_ratio();

@@ -139,9 +139,6 @@ i32 __fastcall ScreenEffect::on_draw_screen(ScreenEffect *self)
     return UPDATE_FUNC_CONTINUE;
 }
 
-// TODO: the inlined tick's slow path loads current_f into xmm0 and adds the
-// speed; the original adds current_f from memory into the speed's xmm1
-// (tick_split, tick_in_place and either operand order give ours).
 // FUNCTION: TH16 0x45c9e0
 i32 __fastcall ScreenEffect::on_tick_flash(ScreenEffect *self)
 {
@@ -160,13 +157,10 @@ i32 __fastcall ScreenEffect::on_tick_flash(ScreenEffect *self)
     {
         return UPDATE_FUNC_CLEANUP;
     }
-    self->timer.tick();
+    self->timer.tick_goto();
     return UPDATE_FUNC_CONTINUE;
 }
 
-// TODO: the inlined tick's slow path loads current_f into xmm0 and adds the
-// speed; the original adds current_f from memory into the speed's xmm1
-// (tick_split, tick_in_place and either operand order give ours).
 // FUNCTION: TH16 0x45cac0
 i32 __fastcall ScreenEffect::on_tick_hold(ScreenEffect *self)
 {
@@ -175,7 +169,7 @@ i32 __fastcall ScreenEffect::on_tick_hold(ScreenEffect *self)
     {
         return UPDATE_FUNC_CLEANUP;
     }
-    self->timer.tick();
+    self->timer.tick_goto();
     return UPDATE_FUNC_CONTINUE;
 }
 
@@ -237,9 +231,8 @@ i32 __fastcall ScreenEffect::on_draw_arcade_2(ScreenEffect *self)
     return UPDATE_FUNC_CONTINUE;
 }
 
-// TODO: the inlined tick's slow path loads current_f into xmm0 and adds the
-// speed (the original adds current_f from memory into the speed's xmm1), and
-// push esi comes before the current store.
+// TODO: push esi comes after the current store in the original (reccmp
+// counts it as an effective match).
 // FUNCTION: TH16 0x45cd30
 i32 __fastcall ScreenEffect::on_tick_shake(ScreenEffect *self)
 {
@@ -247,7 +240,7 @@ i32 __fastcall ScreenEffect::on_tick_shake(ScreenEffect *self)
     {
         return UPDATE_FUNC_CLEANUP;
     }
-    self->timer.tick_split();
+    self->timer.tick_goto();
     if (self->timer.current >= self->arg_18)
     {
         return UPDATE_FUNC_CLEANUP;
