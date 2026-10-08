@@ -2649,7 +2649,6 @@ i32 TitleInf::do_music_room()
 
 // Spell practice: picking the stage. Coming back from a game goes straight
 // on to the spell card list of the last stage.
-// TODO: the original keeps both input words in registers for the cursor tests.
 // FUNCTION: TH16 0x4553d0
 i32 TitleInf::do_spell_practice_stage_select()
 {
@@ -2676,19 +2675,13 @@ i32 TitleInf::do_spell_practice_stage_select()
             g_spell_practice_last_stage = -1;
             spell_character_menu.wraps = 1;
             spell_character_menu.num_choices = 4;
-            spell_character_menu.set_cursor(g_Globals.character + g_Globals.subshot);
+            spell_character_menu.set_cursor(g_Globals.subshot + g_Globals.character);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 3);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd7], (i16)(menu.next_selection + 7));
             AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 6);
             AnmManager::interrupt_tree_and_run(anm_ids[0x11c], 3);
             AnmManager::interrupt_tree(anm_ids[0x11c], (i16)(spell_character_menu.next_selection + 7));
-            AnmManager::interrupt_tree(anm_ids[0x71], 1);
-            anm_ids[0x71].id = 0;
-            set_state(TITLE_STATE_SPELL_PRACTICE_ROW_SELECT);
-            spell_stage = menu.next_selection;
-            menu.push();
-            menu.set_cursor(0);
-            return 1;
+            goto start_rows;
         }
         anm_ids[0x71] = title_anm->create_effect(0x71, -1, NULL);
     case 1:
@@ -2738,6 +2731,7 @@ i32 TitleInf::do_spell_practice_stage_select()
     case 3:
         if (time_in_state.current >= 20)
         {
+        start_rows:
             AnmManager::interrupt_tree(anm_ids[0x71], 1);
             anm_ids[0x71].id = 0;
             set_state(TITLE_STATE_SPELL_PRACTICE_ROW_SELECT);
