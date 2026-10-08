@@ -962,14 +962,16 @@ const char *const g_demo_replay_names[3] = {"demo/demo1.rpy", "demo/demo2.rpy", 
 
 // Plays a demo replay after 30 idle seconds on the title screen, starts the
 // title BGM a few frames after it appears, and runs the current screen.
-// TODO: the original computes the demo index as x % -3 would (imul 0x55555555; sub; sar 1); ours uses idiv, or the /3 magic through a local (also with % -3); it also calls the Supervisor members without this and keeps the replay info in ecx.
+// The input test masks the low word (a u16 cast compares the word in
+// memory) and the timer ticks as tick_mixed.
+// TODO: the original computes the demo index as x % -3 would (imul 0x55555555; sub; sar 1); ours uses idiv, or the /3 magic through a local (also with % -3, x / -3 * 3, or % through an inline helper); it also calls the Supervisor members without this and keeps the replay info in ecx.
 // FUNCTION: TH16 0x44af80
 i32 TitleInf::on_tick()
 {
     if (state == TITLE_STATE_MAIN)
     {
         g_title_idle_frames++;
-        if ((u16)g_hardware_input != 0)
+        if (g_hardware_input & 0xffff)
         {
             g_title_idle_frames = 0;
         }
@@ -1184,7 +1186,7 @@ i32 TitleInf::on_tick()
         do_replay_save();
         break;
     }
-    time_in_state.tick();
+    time_in_state.tick_mixed();
     return 1;
 }
 
