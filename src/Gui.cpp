@@ -1825,7 +1825,7 @@ static __forceinline void delete_boss_bar_vms(GuiBossBar *bar)
 
 // ZunTimer::tick as on_tick_body inlines it for the stage clear bonus. A
 // missing speed jumps into the whole-frame branch (goto): that gives the
-// original's untouched stores per branch and 1.01f kept in a register,
+// original's separate stores in each branch and 1.01f kept in a register,
 // where tick and its other variants merge the stores.
 static __forceinline void tick_stage_clear_timer(ZunTimer *t)
 {
