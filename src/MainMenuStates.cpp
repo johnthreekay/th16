@@ -1476,7 +1476,6 @@ i32 g_last_replay_slot;
 
 // The replay menu: picking a replay (pages of 25) while the list loads on
 // the menu's thread, then the stage to start from.
-// TODO: register allocation: this moves through eax around the first slot % 25.
 // FUNCTION: TH16 0x451750
 i32 TitleInf::do_replay_menu()
 {
@@ -1484,8 +1483,8 @@ i32 TitleInf::do_replay_menu()
     {
     case 0:
     {
-        i32 last = g_last_replay_slot;
         menu.num_choices = REPLAY_SLOTS;
+        i32 last = g_last_replay_slot;
         menu.set_cursor(last % REPLAY_SLOTS);
         page_menu.num_choices = 3;
         page_menu.set_cursor(last / REPLAY_SLOTS);
