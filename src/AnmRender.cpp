@@ -554,7 +554,11 @@ static inline void fan_scroll_v(AnmFanData *data, RenderVertex144 *vertex)
 
 // The on_tick callback of the fan VMs: grows the points, scrolls the
 // texture and places the fan at the VM.
-// TODO: the original hoists the -pi, 0 and 1 constants into xmm4-6 at entry and walks the radii with ebx; scheduling differs.
+// The loop walks vertex and radius pointers and copies the first point to
+// the closing vertex through them, as the original's registers show.
+// TODO: the original loads -pi into xmm6 at entry, and adds
+// uv.x + uv_speed (first vertex), uv.y + uv_speed (in the loop) and
+// pos.y + entity_pos.y with the operands the other way round.
 // FUNCTION: TH16 0x46a0b0
 i32 __fastcall anm_on_tick_fan(AnmVm *vm)
 {
@@ -578,21 +582,23 @@ i32 __fastcall anm_on_tick_fan(AnmVm *vm)
     }
     data->vertices[0].diffuse = vm->color_1.d3d;
     f32 angle = -ZUN_PI;
-    for (i32 i = 0; i < 31; i++)
+    RenderVertex144 *first = &data->vertices[1];
+    RenderVertex144 *vertex = first;
+    f32 *radius = data->radius;
+    for (i32 i = 31; i != 0; i--)
     {
-        RenderVertex144 *vertex = &data->vertices[i + 1];
         fan_scroll_u(data, vertex);
         fan_scroll_v(data, vertex);
         vertex->diffuse = vm->color_1.d3d;
         ((ZunColor *)&vertex->diffuse)->a = 0;
-        data->radius[i] = data->radius_speed[i] + data->radius[i];
-        fan_sincosmul((Float3 *)&vertex->pos, angle, data->radius[i]);
+        *radius = *(radius + 33) + *radius;
+        fan_sincosmul((Float3 *)&vertex->pos, angle, *radius);
         angle += ZUN_2PI / 31.0f;
-        vertex->pos.x = vertex->pos.x + (vm->pos.x + vm->entity_pos.x);
-        vertex->pos.y = (vm->pos.y + vm->entity_pos.y) + vertex->pos.y;
-        vertex->pos.z = (vm->entity_pos.z + vm->pos.z) + vertex->pos.z;
+        *(Float3 *)&vertex->pos += vm->pos + vm->entity_pos;
+        vertex++;
+        radius++;
     }
-    data->vertices[32] = data->vertices[1];
+    *vertex = *first;
     return 0;
 }
 
