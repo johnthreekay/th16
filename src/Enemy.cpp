@@ -2238,8 +2238,10 @@ void EnemyData::ecl_anm_vm_instr()
     }
 }
 
-// TODO: frame layout (the original keeps the zero vector higher up and its frame is 8 bytes
-// bigger), the directional VM sits in edx, and the camera's y is added the other way round.
+// TODO: frame layout (the original keeps the zero vector in a slot of its own at the top
+// of a frame 16 bytes bigger), the directional VM sits in edx, and the camera's y is added
+// the other way round. reccmp also shows the +-0.03f constants as <OFFSET>: it only
+// names constants an x87 instruction somewhere references.
 // FUNCTION: TH16 0x41bb50
 int EnemyData::step_interpolators()
 {
@@ -2317,16 +2319,11 @@ int EnemyData::step_interpolators()
             }
             AnmVm *vm = get_vm_or_clear(anm_ids[0]);
             AnmLoaded *file = g_EnemyManager->anim_statement_anms[anm_slot_0_anm_index];
-            Float3 zero(0.0f, 0.0f, 0.0f);
-            Float3 pos;
+            Float3 pos(0.0f, 0.0f, 0.0f);
             if (vm != NULL)
             {
                 pos = vm->pos;
                 delete_vm_and_clear(anm_ids[0]);
-            }
-            else
-            {
-                pos = zero;
             }
             i32 layer = anm_layers + 7;
             i32 script = anm_set_main + script_offset;
