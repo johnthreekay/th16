@@ -1388,3 +1388,49 @@ Vector operand order (research; the x/y vs z item above):
   draw_text's height lookup; load_from's `read` slot; gather_on_copy's
   spilled counter; insert_in_* (dead locals 1-7 included). A loop-form
   scan over 17 functions found no further matches.
+
+Cross-file alignment (create_effect, show_notice, the item and shooting
+functions):
+- The wish for an aligned stack is weighted and adds up across call edges.
+  A plain dead double in AnmLoaded::create_effect, or one with one or two
+  multiplies, makes its direct callers realign while create_effect itself
+  only loses shrink-wrapping; with three multiplies it realigns too. One
+  direct call to a wishing callee is fine, two make the caller realign
+  (TitleInf::on_tick, the GuiMsgVm constructor, PlayerBullet::create,
+  show_notice); calls in loops count more. Dead doubles add up: Fog's own
+  plus the wish create_fog_vm passes on made Fog::Fog realign, while the
+  same double in a plain `static inline` helper (its own call-graph node)
+  kept the known alignment without realigning and matched Fog.
+- The fix (commit 5431169): create_effect and show_notice get dead
+  doubles, and the callers that must not realign reach them through
+  member function pointers (gui_show_notice_func(), the
+  create_effect_via_pointer forceinline wrapper), which cuts the call-graph
+  edge. PlayerBullet::create keeps one direct call, which passes the wish
+  on so do_shooting realigns through ebx and tick_shooting_state is padded
+  like the original. ItemManager::on_tick_body calls init_anm through a
+  member pointer and realigns early like the original. Matched
+  create_effect, Fog::Fog, Item::collect_full_power, Globals::add_power,
+  Player::shoot_one_bullet, do_shooting and tick_shooting_state
+  (collect_big_power effective); 16 up, 0 down.
+- A member-pointer call inside a `static __forceinline` wrapper loads the
+  object pointer first (g_AsciiManager in eax, the result slot in ecx):
+  that solves the open "ascii create_effect" menu item (TitleInf::do_manual
+  matched). The raw member-pointer call in the caller leaves the order
+  alone; a forceinline wrapper with a plain call is worse.
+- Member-pointer calls lose return-slot forwarding (create_fog_vm, which
+  returns create_effect's result, fell to 56% that way), and taking the
+  address of a function whose `this` LTCG had dropped brings `this` back.
+- GuiMsgVm::update_callout needed two dead multiplies to realign (a plain
+  dead double does nothing); writing the scale out at each use
+  (`pos.x *= 2.0f / scale` twice) fixed the multiply order and the x add
+  order followed. It matched.
+- The ebx form appears when the wish comes from a callee or a helper node;
+  a strong dead double in the body gives the plain `and esp, -8` form.
+- Dead ends: a dead double in AnmVm::run on top of this (15 down, 8 lost);
+  Gui::update_score and ReplayManager::on_tick_record realigning through
+  ebx (a strong double gives the plain form; helpers and HARNESS_CALLED do
+  nothing); the missing 4 frame bytes in create_vm, create_vm_front,
+  create_ui_vm and create_ui_effect; show_notice's loop registers; the
+  forceinline wrapper in Ending.cpp (EndingScriptVm::run loses its match),
+  in EffectManager::create_effect (68%) and at Player.cpp's two calls
+  (Player::move stops realigning).
