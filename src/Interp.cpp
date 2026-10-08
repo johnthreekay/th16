@@ -350,10 +350,15 @@ HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step()
 // The fields are read through a local copy of this: through this itself LTCG
 // gave the bezier terms other registers (1.0f in xmm5, the original's xmm6)
 // and took the operands of the adds in another order.
-// TODO: 93%; the timer tick adds current_f from memory into the speed's register and stores in each branch (tick() merges the stores but still adds into the speed's register), and the constant-acceleration case loads bezier_2.x before goal.x.
+// TODO: 97%; the timer tick adds current_f from memory into the speed's register and stores in each branch (tick() merges the stores but still adds into the speed's register).
 // FUNCTION: TH16 0x406e10
 D3DXVECTOR3 InterpFloat3::step()
 {
+    // Never used: one more named local puts the x components of the vector
+    // adds in the original's load order (that order follows the function's
+    // count of named variables).
+    i32 unused;
+    (void)unused;
     InterpFloat3 *self = this;
     if (self->end_time > 0)
     {
