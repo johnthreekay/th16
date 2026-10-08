@@ -231,11 +231,13 @@ HARNESS_CALLED Stage *Stage::create(const char *path)
 // Runs the objects' VMs and the script (not while entering, for its first
 // 30 frames), copies the camera to the Supervisor's camera 3 and moves the
 // distortion mesh.
-// TODO: the original aligns its frame to 8 bytes (LTCG, for a callee), and
-// saves esi/edi in the prologue.
 // FUNCTION: TH16 0x409e50
 i32 Stage::on_tick()
 {
+    // A dead double: it makes LTCG realign this frame (and esp, -8) early,
+    // as the original does (docs/findings.md).
+    double unused = 0.0;
+    (void)unused;
     if (stage_flags & STAGE_DISABLED)
     {
         return UPDATE_FUNC_CONTINUE;
@@ -841,10 +843,6 @@ HARNESS_CALLED void Stage::start_std_vms()
 
 // Runs the VMs of objects still marked as running; unmarks objects whose
 // VMs have all finished.
-// TODO: ours saves ebx/edi after the loop guard (shrink-wrapped): the
-// original's frame is padded for alignment from Stage::on_tick, which
-// realigns itself there and not in ours (it matched while on_tick_callback
-// was entered aligned, which costs that thunk its jump).
 // FUNCTION: TH16 0x40aed0
 i32 Stage::update_std_vms()
 {
@@ -945,8 +943,9 @@ static __forceinline void sky_step_other(InterpCameraSky *s)
     s->current = (s->goal - s->initial) * x + s->initial;
 }
 
-// TODO: ours gets a /GS cookie (the CameraSky temporaries) and shares one return path per result; the
-// original has neither and computes (goal - initial) * x for the other methods in a different order.
+// TODO: ours gets a /GS cookie (the CameraSky temporaries; safebuffers does not
+// remove it), which with the alignment run_std hands down also pads the frame by 4;
+// the original computes (goal - initial) * x for the other methods in a different order.
 // FUNCTION: TH16 0x40cd10
 CameraSky InterpCameraSky::step()
 {
@@ -1025,8 +1024,8 @@ HARNESS_CALLED CameraSky::CameraSky(f32 begin_distance, f32 end_distance, f32 c0
 }
 
 // TODO: the original frame has 4 more (unused) bytes: padding for the
-// known alignment run_std's realignment gives it (run_std does not realign
-// in ours).
+// known alignment run_std's realignment gives it (ours stays unpadded, also
+// HARNESS_CALLED, although run_std now realigns).
 // FUNCTION: TH16 0x40b2f0
 void Stage::interrupt_vms(i32 n)
 {
@@ -1049,9 +1048,8 @@ void Stage::interrupt_vms(i32 n)
 // The stage script (STD) and the camera rocking patterns. The rocking code
 // calls the out-of-line sinf and cosf (0x405510, 0x4054f0), which LTCG
 // keeps out of line here (this function has an EH frame).
-// TODO: the original realigns its frame (and esp, -8 with an ebx frame),
-// which moves every stack slot; ours does not, also now that its callees
-// that realign (AnmVm::run) are decompiled.
+// TODO: same ebx-frame realignment as the original (since Stage::on_tick
+// realigns early); register allocation and stack slots still differ.
 // FUNCTION: TH16 0x40b3b0
 i32 StageInner::run_std()
 {

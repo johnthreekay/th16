@@ -1174,6 +1174,10 @@ static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECT
 // FUNCTION: TH16 0x42c070
 void Gui::show_stage_clear_bonus()
 {
+    // A dead double: it makes LTCG realign this frame (and esp, -8) early,
+    // as the original does (docs/findings.md).
+    double unused = 0.0;
+    (void)unused;
     Gui *gui = g_Gui;
     gui->overlay_ids[GUI_OVERLAY_STAGE_CLEAR_BONUS] =
         create_vm_inline(gui->front_anm, FRONT_ANM_STAGE_CLEAR_BONUS, NULL, 0.0f, -1);
@@ -1683,11 +1687,15 @@ static inline void set_entity_pos_xyz(AnmId id, f32 x, f32 y, f32 z)
 
 // Sets the HUD up for a stage: the life and bomb counters, the boss timer,
 // the stage logo, the demo and difficulty markers and the season gauge.
-// TODO: the original realigns its frame (and esp, -8; probably for AnmVm::run in the
-// inlined create_effect) and lays the season gauge icon's child search out in line (ours moves it to the end).
+// TODO: the original adds the difficulty scripts' base at the copy_vm call (ours
+// before spilling the script) and lays the season gauge icon's child search out in line.
 // FUNCTION: TH16 0x426d70
 void Gui::setup_stage_hud()
 {
+    // A dead double: it makes LTCG realign this frame (and esp, -8) early,
+    // as the original does (docs/findings.md).
+    double unused = 0.0;
+    (void)unused;
     Gui *gui = g_Gui;
     if (gui->on_tick != NULL)
     {
@@ -1779,10 +1787,13 @@ void Gui::setup_stage_hud()
     }
 }
 
-// TODO: the original realigns the frame (and esp, -8) and has 4 more bytes of it.
 // FUNCTION: TH16 0x426780
 void Gui::show_lights_out()
 {
+    // A dead double: it makes LTCG realign this frame (and esp, -8) early,
+    // as the original does (docs/findings.md).
+    double unused = 0.0;
+    (void)unused;
     Gui *gui = g_Gui;
     gui->lights_out_id = gui->front_anm->create_vm_inline(FRONT_ANM_LIGHTS_OUT, NULL, 0.0f, -1);
 }
