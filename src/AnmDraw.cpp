@@ -623,9 +623,11 @@ static inline void set_color_op_modulate()
     }
 }
 
-// TODO: 44%; the rotation order cases and the texture matrix copy are laid out differently.
+// HARNESS_CALLED: kept alive by draw_vm alone, it realigns to 8 (ebx form)
+// instead of 16.
+// TODO: 41%; the original does not realign at all (its frame is laid out for draw_vm's known 8-byte alignment), and the rotation order cases and the texture matrix copy are laid out differently.
 // FUNCTION: TH16 0x467410
-i32 AnmManager::draw_3d(AnmVm *vm)
+HARNESS_CALLED i32 AnmManager::draw_3d(AnmVm *vm)
 {
     if (!(vm->flags_lo & ANM_VM_VISIBLE))
     {
