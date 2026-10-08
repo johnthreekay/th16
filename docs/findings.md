@@ -1623,3 +1623,27 @@ Third pass over menu states, collision and primitives:
   bottom of the frame); draw_rect_outline's movq copy; BombInf::draw's
   `* 1.0f` (double literals keep the conversions but fold the multiply);
   load_spell_list; draw_spell_card_page (quickdiff and reccmp disagreed).
+
+Player, shots, bombs, items and PosVel (first pass; the agent stalled
+before its final report, so this comes from its commits and messages):
+- Player::on_draw_callback matched with draw_vm through an inline helper;
+  Player::check_hit_rotated_rect with r.y first and `half size + r`;
+  sht_on_hit_burst with g_Player read at each use and get_damage_source;
+  damage_source_on_hit_bullet with shooter_ref read through the bullet.
+- Item::collect_point 57 -> 99 and collect_power 54 -> 75: the piv
+  rounding written as an expression of the global
+  (`g_Globals.piv / 100 - g_Globals.piv / 100 % 10`), which keeps
+  `mov reg, 10; idiv` like the original; through a local it is
+  strength-reduced (the same fix matched get_piv_rounded).
+- Player::tick_bullets 54 -> 80 with a pointer loop and a negated
+  off-screen test; Player::on_tick_body's damage source loop advances a
+  pointer (79 -> 81), then the angle wrap, deathbomb branch and power drop
+  forms (-> 85). PosVel::step 86 -> 97 with an angle temporary and the
+  rotation order in the ellipse case. BombReimuAInf::on_tick 86 -> 95 with
+  a goto out of the orb search and a ternary damage source lookup.
+  sht_on_hit_laser 60 -> 77 with the damage source looked up in each
+  branch; sht_on_tick_sideways 35 -> 43 with a separate no-hurtbox flag
+  test (its `not; test al, 1` shape is the `(~flags & 1)` pattern above).
+- Its alignment experiment (a dead double in show_notice) and its lead
+  that the Item/Globals realignment cluster came from show_notice and
+  create_effect started the cross-file alignment work above.
