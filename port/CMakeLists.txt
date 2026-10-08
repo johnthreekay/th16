@@ -303,3 +303,19 @@ foreach(replay extra_clear_reimu easy_clear_cirno)
                      ${CMAKE_CURRENT_SOURCE_DIR}/tests/replays/${replay}.rpy ${CMAKE_CURRENT_BINARY_DIR}/record_test)
     set_tests_properties(record_${replay} PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 3600)
 endforeach()
+
+# The 68 third-party replays in tests/vendor (credited in its README): a
+# 1cc for every character, season and difficulty and an Extra clear per
+# character. About an hour with ctest -j4, so only with this option; they
+# carry the label "vendor" (ctest -L vendor runs only them).
+option(TH16_VENDOR_REPLAY_TESTS "Add the replay sync tests for tests/vendor" OFF)
+if(TH16_VENDOR_REPLAY_TESTS)
+    file(GLOB vendor_replays ${CMAKE_CURRENT_SOURCE_DIR}/../tests/vendor/*.rpy)
+    foreach(path ${vendor_replays})
+        get_filename_component(replay ${path} NAME_WE)
+        add_test(NAME vendor_${replay}
+                 COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_replay_test.sh $<TARGET_FILE:th16> ${path}
+                         ${CMAKE_CURRENT_BINARY_DIR}/vendor_test)
+        set_tests_properties(vendor_${replay} PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 3600 LABELS vendor)
+    endforeach()
+endif()

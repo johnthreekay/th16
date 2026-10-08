@@ -551,6 +551,15 @@ That takes about 80 s per Extra replay and 3.5 min for the Easy run. All
 three play in sync with Clang and GCC builds (64-bit, checked on the merge
 of main 67fb187).
 
+tests/vendor (at the top of the repository) holds 68 more, by other
+players and credited in its README: a 1cc for every character, season and
+difficulty and an Extra clear for each character. They take about an hour
+with `ctest -j4`, so they are added only with
+`-DTH16_VENDOR_REPLAY_TESTS=ON`, labelled `vendor` (`ctest -L vendor` runs
+just them, `ctest -LE vendor` everything else). All 68 play in sync (clang64
+null renderer, on port 5a1c982, the merge of main 6d99888), with every stage transition's
+g_Globals, RNG seed and final score as recorded.
+
 For finding where a replay desyncs: `TH16_REPLAY_TEST_TRACE=N` logs the
 state every N frames, and `TH16_REPLAY_TEST_DUMP=FILE` writes every
 frame's g_Globals, replay RNG and player position as hex (with
