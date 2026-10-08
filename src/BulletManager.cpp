@@ -1774,8 +1774,7 @@ static __forceinline void move_full_step(Bullet *b)
 // before the pushes as in the original (as cancel_bullet does).
 // TODO: the half-step moves are still scheduled differently per case (the
 // original's spawning case computes all three components before storing, its
-// active case stores each in turn), and in the offscreen test the original
-// inlines the height's sprite lookup that ours calls.
+// active case stores each in turn).
 // FUNCTION: TH16 0x411e70
 HARNESS_CALLED i32 Bullet::on_tick()
 {
@@ -1941,8 +1940,13 @@ HARNESS_CALLED i32 Bullet::on_tick()
         }
         if (!(active_ex_flags & BULLET_EX_OFFSCREEN) && offscreen_grace < 1)
         {
+            // The height's sprite is looked up in place: through vm_sprite,
+            // ours called it here, where the original inlines both lookups.
             if (outside_range_scaled(&pos.x, vm_sprite(&vm0)->sprite_width * scale, -192.0f, 192.0f) ||
-                outside_range_scaled(&pos.y, vm_sprite(&vm0)->sprite_height * scale, -64.0f, 480.0f))
+                outside_range_scaled(&pos.y,
+                                     g_AnmManager->loaded_anms[vm0.anm_loaded_index]->sprites[vm0.sprite_id].sprite_height *
+                                         scale,
+                                     -64.0f, 448.0f))
             {
                 release();
                 return -1;
