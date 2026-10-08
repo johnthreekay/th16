@@ -1752,3 +1752,49 @@ Sweep of collision, primitives and menu states:
   do_difficulty_select, on_draw__replay, do_replay_save,
   do_character_select, draw_spell_card_page, BombInf::draw, draw_rect and
   draw_rect_outline, and made draw_ring and draw_circle_outline worse.
+
+Second pass over player, shots, bombs and PosVel:
+- `__declspec(safebuffers)` on the declaration removed the /GS cookie the
+  original lacks in BombMarisaAInf::on_tick (which then matched with
+  `D3DXVec3Add(&beam_pos, &beam_pos, &pos)` for its third add),
+  sht_on_tick_laser, sht_on_tick_sideways and
+  PlayerInner::repopulate_options; it made Player::update_options worse.
+- Two levers at once: in PosVel::step six dead locals fixed the circle and
+  wave sums but flipped `pos += velocity`; scanning the form of the broken
+  op together with the count found 5 locals plus
+  `D3DXVec3Add(&pos, &velocity, &pos)`, which matched.
+- In sht_on_tick_laser a plain dead double did not realign; one with three
+  `unused = unused * 2.0;` gave `and esp, -8` with esp-relative locals.
+- sht_on_tick_sideways matched (43 -> 100): an inline `advance_enemy_iter`
+  returning `EnemyInf *e = node != NULL ? node->entry : NULL; return e;`
+  (the iter_advance pattern), `Float3 pos` copied before the unk_15c
+  store, and `if (c) set_angle(-PI); else set_angle(0.0f);` instead of a
+  ternary argument, which had hoisted `xorps xmm1` to the top.
+- `do { if (orb->active) {...} orb++; } while (--i != 0);` gives
+  `sub esi, 1; mov [slot], esi; jne`; `for (i = 8; i != 0; i--)` gives
+  dec/mov/test (BombReimuAInf::on_tick). A member-pointer call
+  `(orb->*orb_update_func())()` replaced a DECOMP_NOINLINE stand-in
+  function.
+- Timers: Player::tick_bullets wants tick_in_place (+14); all three of
+  Player::on_tick_body's timers as tick_nested (+1.4); BombReimuAOrb::update
+  stays best with tick_mixed. A named `Gui *gui = g_Gui;` local in
+  check_hit_circle fixed the distance registers (+4.3).
+
+Enemy-file sweep continuation:
+- Behaviour fix: Bullet::on_tick's offscreen test used 480.0f as the
+  bottom bound; the original compares with 448.0f (0x4946b0).
+- EnemyData::ecl_enm_create became exact with `EclRawInstr *instr =
+  full->context.current_context->current_instr();` written before
+  `EnemyInf *vm = full;`.
+- A separate copy of a shared inline helper per caller with a different
+  body (`f32 v = *x; return v + half <= lo || v - half >= hi;`) fixed
+  Bullet::on_tick's add order without touching step_ex_12; a byte-identical
+  copy changed nothing. Writing the inlined sprite height lookup out in
+  place gave 85 -> 89. The active-case step in a forceinline helper with
+  two dead locals confirmed in reccmp (82.2 -> 83.9).
+- tick_nested in BulletManager::on_tick_body raises quickdiff 78.6 -> 84.4
+  but lowers reccmp 90.67 -> 86.32.
+- kill_all_no_set_death and Spellcard::on_tick_body have the same tick
+  difference in opposite directions with the same tick(); no form or
+  count moves either. step_logic: the original hoists g_MainBomb into the
+  prologue where ours hoists g_SubseasonBomb (no form found).
