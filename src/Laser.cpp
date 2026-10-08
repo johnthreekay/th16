@@ -2929,10 +2929,14 @@ void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
 // full length, moving and shrinking to laser_new_arg_3), leaving the screen
 // once the two delay timers ran out, then the graze check and the VMs.
 // Nonzero once the laser is done.
-// TODO: the original realigns the frame, keeps the * 1.0f of the inlined timer decrement, and loads g_game_speed once for the three position components.
+// The dead double is not ZUN's code: as in LaserLineInf::initialize, it
+// makes LTCG realign the frame (and esp, -8) like the original.
+// TODO: the original keeps the * 1.0f of the inlined timer decrement and loads g_game_speed once for the three position components.
 // FUNCTION: TH16 0x432f40
 i32 LaserLineInf::on_tick()
 {
+    double unused = 0.0;
+    (void)unused;
     i32 again;
     do
     {
