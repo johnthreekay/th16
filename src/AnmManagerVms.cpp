@@ -998,7 +998,13 @@ HARNESS_CALLED AnmId AnmManager::store_snapshot_of_vm(AnmVm *vm, AnmVm *parent, 
     return result;
 }
 
-// TODO: the original keeps the critical section flag in bl across the lookup.
+// Brings the snapshot with this id back to life as a new VM tree; returns
+// the new root VM's id.
+// ENTER_CS and LEAVE_CS are spelled out with the enabled flag in a local:
+// the original keeps it in bl across the lookup (reloaded after
+// EnterCriticalSection), which the macros' two separate reads do not give.
+// TODO: effective match only: the original reloads id into eax before the
+// flag after EnterCriticalSection, ours after.
 // FUNCTION: TH16 0x46f8f0
 HARNESS_CALLED AnmId AnmManager::restore_snapshot(AnmId id)
 {
@@ -1006,9 +1012,19 @@ HARNESS_CALLED AnmId AnmManager::restore_snapshot(AnmId id)
     {
         return AnmId();
     }
-    ENTER_CS(CS_ANM_MANAGER);
+    bool locking = g_CriticalSections.enabled;
+    if (locking)
+    {
+        EnterCriticalSection(&g_CriticalSections.cs[CS_ANM_MANAGER]);
+        g_CriticalSections.depth[CS_ANM_MANAGER]++;
+        locking = g_CriticalSections.enabled;
+    }
     AnmVm *snapshot = get_snapshot_vm_with_id(id);
-    LEAVE_CS(CS_ANM_MANAGER);
+    if (locking)
+    {
+        LeaveCriticalSection(&g_CriticalSections.cs[CS_ANM_MANAGER]);
+        g_CriticalSections.depth[CS_ANM_MANAGER]--;
+    }
     return restore_snapshot_vm(snapshot, NULL);
 }
 
