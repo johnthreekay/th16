@@ -2906,10 +2906,22 @@ void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
     }
 }
 
-// TODO: register allocation differs (the original keeps the stepped position in xmm registers and stack shadows; the frame is aligned to 64).
+// The four dead locals are not ZUN's: the function's count of named
+// variables decides MSVC's register choices here (docs/findings.md), and
+// these come closest to the original. The mode 2 loop is a guarded do/while
+// counting down like the original's sub/jne. Matching only.
+// TODO: in mode 2's loop the original keeps s in xmm6 and pos.x in its stack slot (ours keeps pos.x in xmm7 and s in memory); the frame is aligned to 64.
 // FUNCTION: TH16 0x437ee0
 void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, f32 time)
 {
+    i32 unused_a = 0;
+    i32 unused_b = 0;
+    i32 unused_c = 0;
+    i32 unused_d = 0;
+    (void)unused_a;
+    (void)unused_b;
+    (void)unused_c;
+    (void)unused_d;
     time -= start_time;
     switch (mode)
     {
@@ -2947,31 +2959,35 @@ void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
         f32 s = speed;
         Float3 d;
         d.z = 0.0f;
-        for (i32 n = (i32)time; n > 0; n--)
+        i32 n = (i32)time;
+        if (n > 0)
         {
-            laser_sincosmul(&d, a, s);
-            i32 i = 0;
-            a += angle_delta;
-            while (a > ZUN_PI)
+            do
             {
-                a -= ZUN_2PI;
-                if (i++ > 32)
+                laser_sincosmul(&d, a, s);
+                i32 i = 0;
+                a += angle_delta;
+                while (a > ZUN_PI)
                 {
-                    break;
+                    a -= ZUN_2PI;
+                    if (i++ > 32)
+                    {
+                        break;
+                    }
                 }
-            }
-            while (a < -ZUN_PI)
-            {
-                a += ZUN_2PI;
-                if (i++ > 32)
+                while (a < -ZUN_PI)
                 {
-                    break;
+                    a += ZUN_2PI;
+                    if (i++ > 32)
+                    {
+                        break;
+                    }
                 }
-            }
-            pos.x += d.x;
-            s += speed_delta;
-            pos.y += d.y;
-            pos.z += d.z;
+                pos.x += d.x;
+                s += speed_delta;
+                pos.y += d.y;
+                pos.z += d.z;
+            } while (--n);
         }
         laser_sincosmul(&d, a, s);
         *out_pos = pos + d * (time - (f32)floor(time));
