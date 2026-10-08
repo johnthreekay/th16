@@ -199,6 +199,7 @@ void __stdcall AsciiInf::create_number(Float3 *pos, u32 value)
     ascii->create_string(pos, buf);
 }
 
+// HARNESS_CALLED: it then gets its callers' known alignment, like the original.
 // TODO: same code; the original frame is 0x10c with the cookie at [ebp-8]
 // (4 bytes padding above it); ours, known aligned as well, is 0x114 with 8
 // bytes between the cookie and the buffer (see create_stringf).

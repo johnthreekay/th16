@@ -49,10 +49,23 @@ i32 AnmLoaded::init_script_vm(AnmVm *vm, i32 script)
     return 0;
 }
 
-// TODO: the original reserves a dead 4-byte local (push ecx) and saves esi before the checks.
-// FUNCTION: TH16 0x45f160
-void AnmLoaded::set_vm_script(AnmVm *vm, i32 script)
+// A dead double, not ZUN's code: it stands in for AnmVm::run wanting an
+// aligned stack (docs/findings.md). In this plain inline helper it is a call
+// graph node of its own, so set_vm_script does not realign itself; with
+// every caller visible (HARNESS_CALLED; they are all aligned) it gets known
+// alignment and pads its frame (push ecx) like the original.
+static inline void set_vm_script_want_aligned_stack()
 {
+    double unused = 0.0;
+    (void)unused;
+}
+
+// Starts the VM on the script, or clears it if the script is missing or the
+// file is still loading.
+// FUNCTION: TH16 0x45f160
+HARNESS_CALLED void AnmLoaded::set_vm_script(AnmVm *vm, i32 script)
+{
+    set_vm_script_want_aligned_stack();
     if (scripts[script] == NULL || load_wait != 0)
     {
         memset(vm, 0, sizeof(AnmVm));

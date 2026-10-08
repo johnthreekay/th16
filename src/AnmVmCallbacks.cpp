@@ -85,6 +85,15 @@ static __forceinline void gather_setup_child(AnmId *id, ZunColor color, AnmVm *v
 // FUNCTION: TH16 0x405700
 int __fastcall anm_gather_effect_on_tick(AnmVm *vm)
 {
+    // Dead named locals, not ZUN's code: with three more named variables
+    // more of the vector sums take the original's operand order
+    // (docs/findings.md, the count of named variables).
+    i32 unused_1 = 0;
+    i32 unused_2 = 0;
+    i32 unused_3 = 0;
+    (void)unused_1;
+    (void)unused_2;
+    (void)unused_3;
     i32 alive = 0;
     AnmGatherEffectData *data = (AnmGatherEffectData *)vm->extra_data;
     Float3 offset;

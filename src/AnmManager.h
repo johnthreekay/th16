@@ -232,7 +232,8 @@ static inline AnmLoadedCreateEffectFunc anm_create_effect_func()
 // PlayerBullet::create (its unseasoned shot hands the alignment on to
 // Player::do_shooting), Supervisor::create_fog_vm (it returns create_effect's
 // result in its own return slot), Fog's main VM, the ending script VM,
-// AnmId::replace_with_effect and the Player effects.
+// AnmId::replace_with_effect, TitleInf::create_effect (MainMenu.h) and the
+// Player effects.
 static __forceinline AnmId create_effect_via_pointer(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out)
 {
     return (anm->*anm_create_effect_func())(script, layer, out);

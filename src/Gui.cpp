@@ -414,7 +414,10 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                 }
                 else
                 {
-                    f32 width = (strlen(text) / 2 * 16 - 28) * 2.0f;
+                    // strlen / 2 * 16 (two bytes per Shift-JIS character, 16 pixels
+                    // each), spelled the way the original computes it (lea; and):
+                    // `/ 2 * 16` compiles to shr; shl.
+                    f32 width = ((strlen(text) * 8 & ~15) - 28) * 2.0f;
                     bubble_width = width > bubble_width ? width : bubble_width;
                     set_textbox(bubble_x, bubble_y, bubble_width, MSG_TEXTBOX_KIND());
                     set_textbox_width(bubble_width, MSG_TEXTBOX_KIND());
@@ -453,7 +456,7 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                 }
                 else
                 {
-                    f32 width = (strlen(text) / 2 * 16 - 28) * 2.0f;
+                    f32 width = ((strlen(text) * 8 & ~15) - 28) * 2.0f;
                     bubble_width = width > bubble_width ? width : bubble_width;
                     set_textbox(bubble_x, bubble_y, bubble_width, MSG_TEXTBOX_KIND() + 8);
                     set_textbox_width(bubble_width, MSG_TEXTBOX_KIND() + 8);
@@ -515,12 +518,20 @@ HARNESS_CALLED i32 GuiMsgVm::run()
             unk_1c0 = 0;
             break;
         }
+        // Each VM looked up into a local first: the instruction is then read
+        // after the lookup, as in the original.
         case MSG_TEXT_OFFSET_Y:
-            get_vm_or_clear(text_line_1)->pos_2.y = instr()->args.i[0];
-            get_vm_or_clear(text_line_2)->pos_2.y = instr()->args.i[0];
-            get_vm_or_clear(furigana_1)->pos_2.y = instr()->args.i[0];
-            get_vm_or_clear(furigana_2)->pos_2.y = instr()->args.i[0];
+        {
+            AnmVm *vm = get_vm_or_clear(text_line_1);
+            vm->pos_2.y = instr()->args.i[0];
+            vm = get_vm_or_clear(text_line_2);
+            vm->pos_2.y = instr()->args.i[0];
+            vm = get_vm_or_clear(furigana_1);
+            vm->pos_2.y = instr()->args.i[0];
+            vm = get_vm_or_clear(furigana_2);
+            vm->pos_2.y = instr()->args.i[0];
             break;
+        }
         case MSG_PLAYER_SHAKE:
             AnmManager::interrupt_tree(player_face, MSG_ANM_SHAKE);
             break;
@@ -752,6 +763,7 @@ waiting:
         return 0;
     }
     Float3 pos;
+    // D3DXVec3Add form as in update_callout: the original's operand order.
     D3DXVec3Add(&pos, &bubble->pos, &bubble->entity_pos);
     pos = pos + bubble->pos_2;
     bubble->transform_coords(&pos);
@@ -1381,9 +1393,6 @@ static __forceinline AnmId find_child_id_inline_search(AnmId &id, i32 script)
     return result;
 }
 
-// Fills the season gauge bar towards the next level and shows the level
-// (interrupt 7 + level), switching the gauge's look (interrupt 2 or 3) when
-// the first level is reached or lost.
 // update_season_gauge runs the gauge VM through this helper's member pointer,
 // which the optimizer turns back into the original's direct call. With
 // direct calls to AnmVm::run in its call graph, ours realigned the frame
@@ -1394,6 +1403,9 @@ static inline AnmVmRunFunc anm_vm_run_func()
     return &AnmVm::run;
 }
 
+// Fills the season gauge bar towards the next level and shows the level
+// (interrupt 7 + level), switching the gauge's look (interrupt 2 or 3) when
+// the first level is reached or lost.
 // TODO: the original keeps g_AnmManager and then the level in ebx (ours reloads
 // it and spills the level), and pads its frame for known alignment (push ecx).
 // FUNCTION: TH16 0x42c600
@@ -1486,11 +1498,20 @@ void __fastcall anm_vm_interrupt_2(AnmVm *vm)
     vm->interrupt(2);
 }
 
-// TODO: same frame difference as create_vm (4 more bytes, esi saved
-// before the critical section).
+// A dead double, not ZUN's code, as in create_vm (AnmManager.cpp): it
+// stands in for AnmVm::run wanting an aligned stack, and as its own call
+// graph node it gives create_ui_effect known alignment from its aligned
+// callers (the original's 4 unused frame bytes) without a realignment.
+static inline void create_ui_effect_want_aligned_stack()
+{
+    double unused_double = 0.0;
+    (void)unused_double;
+}
+
 // FUNCTION: TH16 0x42c920
 HARNESS_CALLED AnmId AnmLoaded::create_ui_effect(i32 script, i32 unused, AnmVm **out)
 {
+    create_ui_effect_want_aligned_stack();
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;
     AnmVm *vm = g_AnmManager->allocate_vm();
@@ -1659,8 +1680,11 @@ void Gui::start_dialogue(i32 script)
     }
 }
 
-// AnmLoaded::create_effect as LTCG inlined it into setup_stage_hud.
-static __forceinline AnmId create_effect_inline(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out)
+// AnmLoaded::create_effect as LTCG inlined it into setup_stage_hud. The
+// script is base + index: with the index passed on its own, the add happens
+// at the copy_vm call, after the index was spilled across allocate_vm, as in
+// the original (written as one argument, it was added before the spill).
+static __forceinline AnmId create_effect_inline(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out, i32 index = 0)
 {
     ENTER_CS(CS_ANM_MANAGER);
     anm->vm_count++;
@@ -1669,7 +1693,7 @@ static __forceinline AnmId create_effect_inline(AnmLoaded *anm, i32 script, i32 
     {
         *out = vm;
     }
-    anm->copy_vm(vm, script);
+    anm->copy_vm(vm, index + script);
     vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
     if (layer >= 0)
     {
@@ -1721,9 +1745,9 @@ static inline void set_entity_pos_xyz(AnmId id, f32 x, f32 y, f32 z)
 
 // Sets the HUD up for a stage: the life and bomb counters, the boss timer,
 // the stage logo, the demo and difficulty markers and the season gauge.
-// TODO: the original adds the difficulty scripts' base at the copy_vm call (ours
-// before spilling the script); after the icon search it shares the g_AnmManager reload
-// between the found and not-found exits, and has no nop before the search loop.
+// TODO: after the icon search the original shares the g_AnmManager reload between
+// the found and not-found exits (ours loads it in each), and has no nop before the
+// search loop.
 // FUNCTION: TH16 0x426d70
 void Gui::setup_stage_hud()
 {
@@ -1792,10 +1816,10 @@ void Gui::setup_stage_hud()
     }
     if (g_Supervisor.new_game_started != 0)
     {
-        gui->id_104 = create_effect_inline(gui->front_anm, g_Globals.difficulty + FRONT_ANM_DIFFICULTY_2, -1, NULL);
+        gui->id_104 = create_effect_inline(gui->front_anm, FRONT_ANM_DIFFICULTY_2, -1, NULL, g_Globals.difficulty);
         AnmManager::interrupt_tree(gui->id_104, 3);
     }
-    gui->difficulty_id = create_effect_inline(gui->front_anm, g_Globals.difficulty + FRONT_ANM_DIFFICULTY, -1, NULL);
+    gui->difficulty_id = create_effect_inline(gui->front_anm, FRONT_ANM_DIFFICULTY, -1, NULL, g_Globals.difficulty);
     interrupt_tree_inline(gui->id_104, 3);
     gui->boss_star_count = 0;
     for (i32 i = 0; i < 3; i++)

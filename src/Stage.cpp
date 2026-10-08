@@ -454,11 +454,21 @@ i32 Stage::on_draw_06()
 // FUNCTION: TH16 0x40a7d0
 HARNESS_CALLED i32 StdObject::is_culled(D3DXVECTOR3 *pos, f32 max_distance_sq, Camera *camera)
 {
+    // Dead named locals, not ZUN's code: with three more named variables the
+    // x sums load center.x and rocking_vector_1.x first like the original
+    // (docs/findings.md, the count of named variables); the camera sum's
+    // operands are swapped to compensate for that count.
+    i32 unused_1 = 0;
+    i32 unused_2 = 0;
+    i32 unused_3 = 0;
+    (void)unused_1;
+    (void)unused_2;
+    (void)unused_3;
     D3DXVECTOR3 corners[16];
     D3DXVECTOR3 projected[16];
     D3DXMATRIX world;
 
-    corners[0] = (center + *pos) - (camera->position + camera->rocking_vector_1);
+    corners[0] = (center + *pos) - (camera->rocking_vector_1 + camera->position);
     if (D3DXVec3LengthSq(&corners[0]) > max_distance_sq)
     {
         return 1;
@@ -655,13 +665,18 @@ void StageInner::draw_vms(i32 layer)
     }
 }
 
-// TODO: register and stack slot allocation differ (the original keeps 255.0f in memory, swaps two spill slots and adds d.x to pos.x the other way round).
+// TODO: kind 2's register and stack slot allocation differ (the original keeps 255.0f in memory, swaps the radius and radius squared spill slots and sums the squares into x's register).
 // Moves the distortion mesh: kind 1 waves the bottom of the screen while no
 // spell card is active, kind 2 bulges a disc around the center of the game
 // area whose radius shrinks towards distortion_min_radius.
 // FUNCTION: TH16 0x40c4a0
 void StageInner::step_fog()
 {
+    // A dead named local, not ZUN's code: one more named variable makes
+    // MSVC load pos.x before adding d.x in the kind 1 loop, as the original
+    // does (docs/findings.md, the count of named variables).
+    i32 unused = 0;
+    (void)unused;
     if (fog == NULL)
     {
         return;
@@ -951,12 +966,23 @@ static __declspec(safebuffers) __forceinline void sky_step_other(InterpCameraSky
 // The finished interpolation's return is shared by the two checks of
 // end_time (goto): written out twice, it stayed two copies.
 // TODO: ours keeps the return pointer in ebx where the original reloads it at each
-// return; the CameraSky multiplications use the other operand order (method 8's
-// first field and the color loops), and the original computes (goal - initial) * x
-// for the other methods in a different order.
+// return; method 8's color loops multiply in the other operand order (no loop form
+// changes it), and for the other methods ours vectorizes (goal - initial) * x
+// (mulps) where the original recomputes the differences field by field.
 // FUNCTION: TH16 0x40cd10
 CameraSky InterpCameraSky::step()
 {
+    // Dead named locals, not ZUN's code: with four more named variables
+    // method 8 multiplies initial's first field in the original's operand
+    // order (docs/findings.md, the count of named variables).
+    i32 unused_1 = 0;
+    i32 unused_2 = 0;
+    i32 unused_3 = 0;
+    i32 unused_4 = 0;
+    (void)unused_1;
+    (void)unused_2;
+    (void)unused_3;
+    (void)unused_4;
     if (end_time > 0)
     {
         time.tick();
@@ -1028,12 +1054,21 @@ HARNESS_CALLED CameraSky::CameraSky(f32 begin_distance, f32 end_distance, f32 c0
     }
 }
 
-// TODO: the original frame has 4 more (unused) bytes: padding for the
-// known alignment run_std's realignment gives it (ours stays unpadded, even
-// when made HARNESS_CALLED, although run_std now realigns).
+// A dead double, not ZUN's code: it stands in for AnmVm::run wanting an
+// aligned stack (docs/findings.md). In this plain inline helper it is a call
+// graph node of its own, so interrupt_vms pads its frame (4 unused bytes,
+// like the original) instead of realigning it.
+static inline void interrupt_vms_want_aligned_stack()
+{
+    double unused_double = 0.0;
+    (void)unused_double;
+}
+
+// Sends the interrupt to the stage's VMs and runs them.
 // FUNCTION: TH16 0x40b2f0
 void Stage::interrupt_vms(i32 n)
 {
+    interrupt_vms_want_aligned_stack();
     if (vms != NULL)
     {
         AnmVm *vm = vms;
@@ -1216,14 +1251,18 @@ i32 StageInner::run_std()
                 vm->root_vm = NULL;
                 vm->run();
             }
+            // A VM pointer in each branch: the -2 branch then jumps into the
+            // -1 branch's shared flag store, as in the original.
             else if (script == -2)
             {
-                anm_vms[ins->args[0]].flags_lo &= ~1;
+                AnmVm *vm = &anm_vms[ins->args[0]];
+                vm->flags_lo &= ~1;
             }
             else if (script == -1)
             {
-                anm_vms[ins->args[0]].instr_offset = script;
-                anm_vms[ins->args[0]].flags_lo &= ~1;
+                AnmVm *vm = &anm_vms[ins->args[0]];
+                vm->instr_offset = script;
+                vm->flags_lo &= ~1;
             }
             anm_vm_layers[ins->args[0]] = ins->args[2];
             break;
