@@ -736,7 +736,7 @@ HARNESS_CALLED i32 GuiMsgVm::run()
         }
         current_instr = (u8 *)current_instr + instr()->args_size + 4;
     }
-    time_in_script.tick();
+    time_in_script.tick_goto();
 waiting:
     // Keep the text next to the speech bubble.
     i32 script = textbox_kind + FRONT_ANM_BUBBLE_BODY;
@@ -2127,7 +2127,7 @@ i32 Gui::on_tick_body()
         }
         else
         {
-            msg->time_alive.tick_in_place();
+            msg->time_alive.tick_goto();
         }
     }
 
@@ -2258,7 +2258,7 @@ i32 Gui::on_tick_body()
         }
         release_ready = 0;
     }
-    time_in_stage.tick();
+    time_in_stage.tick_goto();
     return UPDATE_FUNC_CONTINUE;
 }
 
