@@ -1260,6 +1260,11 @@ i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i3
     {
         return 0;
     }
+    // A dead named local: MSVC's register choices here follow the function's
+    // count of named variables (docs/findings.md, vector operand order), and
+    // one more gives the original's. Matching only.
+    i32 unused_a = 0;
+    (void)unused_a;
     Float3 origin = position;
     i32 count = 0;
     f32 dist = 8.0f;
