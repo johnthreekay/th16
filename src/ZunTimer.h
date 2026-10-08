@@ -295,6 +295,38 @@ struct ZunTimer
         current = cur;
     }
 
+    // tick with the whole-frame step written twice, once for a missing
+    // speed and once for a speed close to 1. MSVC loads the 1.0f for the two
+    // copies into a register early, then merges them into one block
+    // (EnemyManager::update keeps 1.0f in xmm2 across the store before it).
+    void tick_nested()
+    {
+        f32 *speed = this->speed();
+        i32 cur = current;
+        f32 cur_f;
+        previous = cur;
+        if (speed != NULL)
+        {
+            if (*speed > 0.99f && *speed < 1.01f)
+            {
+                cur++;
+                cur_f = current_f + 1.0f;
+            }
+            else
+            {
+                cur_f = current_f + *speed;
+                cur = (i32)cur_f;
+            }
+        }
+        else
+        {
+            cur++;
+            cur_f = current_f + 1.0f;
+        }
+        current = cur;
+        current_f = cur_f;
+    }
+
     // Count back by whole frames, ignoring the speed multiplier (ANM's
     // wait instruction, which AnmVm::run runs once the time has passed).
     void rewind(i32 frames)

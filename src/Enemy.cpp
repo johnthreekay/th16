@@ -295,8 +295,6 @@ HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
     }
 }
 
-// TODO: the original loads 1.0f into xmm2 at the damage_multiplier store and adds it
-// from there in the inlined tick (tick_goto gives the rest of the tick's registers).
 // FUNCTION: TH16 0x41b3d0
 int EnemyManager::update()
 {
@@ -324,7 +322,7 @@ int EnemyManager::update()
         g_Player->inner.flags &= ~PLAYER_FLAG_DAMAGE_BOOSTED;
     }
     g_Player->damage_multiplier = 1.0f;
-    inner.time_in_stage.tick_goto();
+    inner.time_in_stage.tick_nested();
     return UPDATE_FUNC_CONTINUE;
 }
 
