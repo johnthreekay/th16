@@ -450,7 +450,9 @@ i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
 // values (a jump table like the original's; a default case compares
 // instead). Nothing follows it: a return after the switch changes the
 // layout, hence the C4715 pragma.
-// TODO: 85%; the original keeps the scaled color channels in dword stack slots and sums each position component in another order.
+// The position is summed pos + entity_pos + pos_2 and assigned to a declared
+// vector (not initialized), which gives the original's operand order.
+// TODO: 88%; the original rematerializes 0xff for each color clamp where ours keeps it in edi, and the fog distances take other stack slots.
 #pragma warning(push)
 #pragma warning(disable : 4715)
 // FUNCTION: TH16 0x466820
@@ -464,7 +466,8 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm_param)
     Camera *camera = g_Supervisor.current_camera;
     f32 fog_begin = camera->sky.begin_distance;
     f32 fog_range = fog_begin - camera->sky.end_distance;
-    D3DXVECTOR3 diff = vm->entity_pos + vm->pos + vm->pos_2 - camera->position;
+    D3DXVECTOR3 diff;
+    diff = vm->pos + vm->entity_pos + vm->pos_2 - camera->position;
     if ((vm->flags_hi & ANM_VM_ORIGIN_MODE_MASK) && vm->parent_vm == NULL)
     {
         diff.x += g_resolution_x * 0.5f;
