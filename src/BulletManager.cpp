@@ -1726,15 +1726,17 @@ void Bullet::release()
     tick_list_node.unlink_inline();
 }
 
-// TODO: ours realigns the frame (and esp, -8), places the free path at
-// the end and orders the half-step moves differently.
+// Ticks one bullet: state, ex steps, movement, offscreen deletion and VMs.
+// Returns -1 once the bullet is released. The release is written out at
+// each place (the original keeps the first copy inline at the top).
+// TODO: ours realigns the frame (and esp, -8) and schedules the half-step moves
+// differently (the original computes all three components before storing).
 // FUNCTION: TH16 0x411e70
 i32 Bullet::on_tick()
 {
     time_alive.tick();
     if (flags & BULLET_FLAG_DELETE)
     {
-    die:
         release();
         return -1;
     }
@@ -1753,7 +1755,7 @@ i32 Bullet::on_tick()
     switch (state)
     {
     case BULLET_STATE_SPAWNING:
-        pos = pos + velocity * g_game_speed * 0.5f;
+        pos += velocity * g_game_speed * 0.5f;
         if (state_time.current >= 8 && check_player_collision(0) == 1)
         {
             break;
@@ -1853,7 +1855,7 @@ i32 Bullet::on_tick()
         }
         break;
     case BULLET_STATE_HIT:
-        pos = pos + velocity * g_game_speed * 0.5f;
+        pos += velocity * g_game_speed * 0.5f;
         break;
     case BULLET_STATE_5:
         if (state_time.current < 3)
@@ -1870,7 +1872,7 @@ i32 Bullet::on_tick()
                 vm->set_pos_time(30, 6, &g_zero_vec, &goal);
             }
         }
-        pos = pos + velocity * g_game_speed * 0.5f;
+        pos += velocity * g_game_speed * 0.5f;
         break;
     }
     if (vm_sprite(&vm0) != NULL)
@@ -1884,7 +1886,8 @@ i32 Bullet::on_tick()
             if (outside_range(pos.x, vm_sprite(&vm0)->sprite_width * scale, -192.0f, 192.0f) ||
                 outside_range(pos.y, vm_sprite(&vm0)->sprite_height * scale, -64.0f, 480.0f))
             {
-                goto die;
+                release();
+                return -1;
             }
         }
     }
@@ -1898,7 +1901,8 @@ i32 Bullet::on_tick()
     }
     if (!(flags & BULLET_FLAG_NO_DRAW) && vm0.run())
     {
-        goto die;
+        release();
+        return -1;
     }
     if (vm1.flags_lo & 1)
     {
