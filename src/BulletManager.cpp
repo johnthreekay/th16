@@ -1651,8 +1651,10 @@ i32 Bullet::step_ex_17()
     return 0;
 }
 
-// TODO: the original keeps cancel_script in ecx and the manager in eax, puts goal
-// 4 bytes lower, and multiplies goal.x from a copy of the game speed.
+// The cancel VM's file is read into `anm` before the call, which keeps the
+// manager in eax and cancel_script in ecx like the original.
+// TODO: the original puts goal 4 bytes lower and multiplies goal.x from a copy
+// of the game speed.
 // FUNCTION: TH16 0x4124b0
 i32 Bullet::check_player_collision(i32 graze_only)
 {
@@ -1697,8 +1699,8 @@ i32 Bullet::check_player_collision(i32 graze_only)
                 }
                 if (cancel_script >= 0)
                 {
-                    BulletManager *mgr = g_BulletManager;
-                    AnmVm *vm = mgr->bullet_anm->create_vm(cancel_script, p, 0.0f, -1, 0).find_or_clear();
+                    AnmLoaded *anm = g_BulletManager->bullet_anm;
+                    AnmVm *vm = anm->create_vm(cancel_script, p, 0.0f, -1, 0).find_or_clear();
                     D3DXVECTOR3 goal = g_game_speed * velocity * 10.0f;
                     vm->set_pos_time(30, 6, &g_zero_vec, &goal);
                 }
@@ -1739,13 +1741,32 @@ void Bullet::release()
 // HARNESS_CALLED (its one caller is BulletManager::on_tick_body), like
 // step_ex_08: the 8-byte alignment step_ex_08's D3DXVECTOR2 wants then comes
 // from on_tick_body's realigned frame, and neither realigns its own.
-// TODO: the half-step moves are scheduled the other way round per case (the
+// The six unused locals at the top are there for matching: MSVC's choice of
+// operand order and scheduling for the vector moves follows the function's
+// count of named variables modulo 8 (docs/findings.md, "Vector operand
+// order"), and with the `anm` local this count brings the half steps closer
+// to the original. Dropping the `vm` or `goal` local instead changes the code.
+// The cancel VM's file is read into `anm` first, which loads the manager
+// before the pushes as in the original (as cancel_bullet does).
+// TODO: the half-step moves are still scheduled differently per case (the
 // original's spawning case computes all three components before storing, its
-// active case stores each in turn), and the hit case does not share the
-// cancelled case's tail.
+// active case stores each in turn), and the offscreen test adds the half size
+// the other way round.
 // FUNCTION: TH16 0x411e70
 HARNESS_CALLED i32 Bullet::on_tick()
 {
+    i32 unused_0 = 0;
+    (void)unused_0;
+    i32 unused_1 = 0;
+    (void)unused_1;
+    i32 unused_2 = 0;
+    (void)unused_2;
+    i32 unused_3 = 0;
+    (void)unused_3;
+    i32 unused_4 = 0;
+    (void)unused_4;
+    i32 unused_5 = 0;
+    (void)unused_5;
     time_alive.tick_nested();
     if (flags & BULLET_FLAG_DELETE)
     {
@@ -1879,7 +1900,8 @@ HARNESS_CALLED i32 Bullet::on_tick()
             vm0.interrupt_out_of_line(1);
             if (cancel_script >= 0)
             {
-                AnmVm *vm = g_BulletManager->bullet_anm->create_vm(cancel_script, &pos, 0.0f, -1, 0).find_or_clear();
+                AnmLoaded *anm = g_BulletManager->bullet_anm;
+                AnmVm *vm = anm->create_vm(cancel_script, &pos, 0.0f, -1, 0).find_or_clear();
                 D3DXVECTOR3 goal = velocity * g_game_speed * 10.0f;
                 vm->set_pos_time(30, 6, &g_zero_vec, &goal);
             }
