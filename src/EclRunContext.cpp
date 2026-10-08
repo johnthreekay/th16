@@ -248,7 +248,6 @@ i32 EclRunContext::pop_int_arg_given_value(int index, i32 value)
     return value;
 }
 
-// TODO: eax and ecx swapped around the popped entry.
 // FUNCTION: TH16 0x474240
 HARNESS_CALLED f32 EclRunContext::pop_float_arg_given_value(int index, f32 value)
 {
@@ -261,15 +260,17 @@ HARNESS_CALLED f32 EclRunContext::pop_float_arg_given_value(int index, f32 value
         }
         if (value <= -1.0f && value >= -100.0f)
         {
+            // The entry is read as an int and reinterpreted for the float
+            // return; through EclStackItem the registers come out swapped.
             stack.stack_offset -= 4;
-            EclStackItem item = *(EclStackItem *)((u8 *)stack.data + stack.stack_offset);
+            i32 item = *(i32 *)((u8 *)stack.data + stack.stack_offset);
             stack.stack_offset -= 4;
             char type = *((char *)stack.data + stack.stack_offset);
             if (type != 'f' && type == 'i')
             {
-                return (f32)item.i;
+                return (f32)item;
             }
-            return item.f;
+            return *(f32 *)&item;
         }
         return vm->get_float_global((i32)value);
     }
