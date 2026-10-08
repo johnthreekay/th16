@@ -829,7 +829,10 @@ HARNESS_CALLED i32 AnmManager::draw_3d(AnmVm *vm)
     return 0;
 }
 
-// TODO: 39%; the identity matrix stores and the texture matrix copy are scheduled differently.
+// The identity is written through D3DXMatrixIdentity's return value: as a
+// separate statement followed by `world_matrix = sprite_matrix`, our build
+// dropped the identity stores entirely (sprite_matrix kept its old contents).
+// TODO: 31%; ours realigns the frame to 16 for the rotation matrix (the original does not realign) and keeps vm in esi (original ebx).
 // FUNCTION: TH16 0x467d00
 i32 AnmManager::draw_3d_vertex_strip(AnmVm *vm, RenderVertexXyzDiffuseTex *vertices, i32 vertex_count)
 {
@@ -853,8 +856,7 @@ i32 AnmManager::draw_3d_vertex_strip(AnmVm *vm, RenderVertexXyzDiffuseTex *verti
     {
         g_Supervisor.disable_zwrite();
     }
-    D3DXMatrixIdentity(&vm->sprite_matrix);
-    vm->world_matrix = vm->sprite_matrix;
+    vm->world_matrix = *D3DXMatrixIdentity(&vm->sprite_matrix);
     vm->world_matrix._11 *= vm->scale_2.x * vm->scale.x;
     vm->world_matrix._22 *= vm->scale_2.y * vm->scale.y;
     vm->flags_lo &= ~ANM_VM_SCALE_CHANGED;
