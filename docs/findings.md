@@ -852,3 +852,58 @@ assume is in [workflow.md](workflow.md).
   EnemyInf's memset pushes, come a few stores later in the original; the
   bitfield view, a local, one expression and other statement positions
   do not move them.
+
+### Overnight round (2026-10-08)
+
+Lasers and MainMenuStates:
+- A function the original realigns (`and esp, -8`, ebx frame) and ours
+  does not: a dead `double unused = 0.0; (void)unused;` in that function
+  makes it realign itself (LaserLineInf::initialize and
+  LaserInfiniteInf::initialize matched, nothing else moved). The same
+  double in a callee (AnmVm::run) cost nine matches.
+- Early realignment that comes from calling a callee which realigns itself
+  (TitleInf::draw_spell_card_page calling AnmManager::draw_text_centered)
+  goes away when the calls go through small `static inline` helpers, each
+  its own call-graph node.
+- Rotations: `Float3 d = *pos - position;` and computing y before x
+  (`y = d.x*s + d.y*c; x = d.x*c - d.y*s`) give the original's registers
+  and stack slots (all three touches_circle). The same form helped the
+  line and infinite sum_rect_damage and LaserLineInf::cancel_as_bomb_rectangle
+  but made LaserCurveInf::sum_rect_damage and the infinite
+  cancel_as_bomb_rectangle worse.
+- `double whole = floor(t);` with `(f32)whole` at each use reproduces
+  `fstp qword; movsd; cvtpd2ps`; `(f32)floor(t)` gives `fstp dword; movss`
+  (LaserCurveNode::step_back).
+- Indexing `segs[i]` / `segs[i - 1]` from a base pointer loaded before the
+  loop gives the original's induction pointer biased by -8; a `segment++`
+  loop does not. The bias follows the first address the body reads.
+- Storing a computed value through an `f32 *` local
+  (`*node_angle = wrap_angle(angle)`) makes MSVC reload the source member
+  for its next use. Reading the member back instead of the local it was
+  just stored from put the local in xmm0 like the original (step_ex_angle).
+- `position += vel * g_game_speed` (or a temp plus D3DXVec3Add) loads
+  g_game_speed once like the original; the field-wise form reloads it after
+  each store. Writing `length * g_game_speed` in each branch instead of a
+  local before the compare gives the original's compare-then-multiply.
+- Switch case layout: `if (a >= b) { ...fall through } else { ...; break; }`
+  instead of `if (a < b) { ...; break; }` (LaserInfiniteInf::on_tick).
+- Writing `vm_950.field` directly instead of through `AnmVm *vm = &vm_950`
+  keeps `this` in ebx; setting the blend mode through such a pointer gives
+  the `inc [ex_index]` and reload in LaserInfiniteInf::run_ex.
+- `i32 i = 0` declared before `memset(hit, 0, ...)` makes the memset reuse
+  i's zero register (`xor ebx, ebx; push ebx`); `step.z = 0` before the
+  sincosmul call matches the original's order (bomb cancels).
+- reccmp finds functions by PDB file and line: rebuild before compare.py
+  after any edit that shifts lines, or functions drop out of the compare.
+- Dead ends: LaserCurveInf::on_draw's z add order (every field-wise
+  permutation, D3DXVec3Add both ways, `+=` on a Float3 view, pointer
+  locals); the timer tick that adds current_f into the speed register
+  (every tick variant and a hand-written local); `*speed * 1.0f` in
+  decrement (int argument, `fenv_access(on)`, `float_control(except)`, a
+  double multiply: all still folded); cancel_in_rectangle/cancel_in_radius's
+  8-byte frame (dead double, 8-aligned harness caller); allocate_new_laser's
+  `push ecx` (`new T` vs `new T()`, typed locals, NULL init);
+  draw_spell_card_page's `idiv` by a register 10 (ours multiplies for
+  `id % 10`; tens first, locals, unsigned); on_draw__replay's setne vs
+  neg/sbb/and (ternary, `!!`, bool/u8 locals all identical); do_music_room's
+  /GS cookie comes from its direct AnmManager::interrupt_tree calls.
