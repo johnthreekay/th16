@@ -1836,3 +1836,44 @@ Research: loop-head nops and functions that never use ebx:
 - Tooling: objdump mis-disassembles .obj files at `$LN` labels (a
   capstone-based COFF disassembler works), and linking with `/d2:-cands`
   crashes LTCG.
+
+### Behaviour diff triage (2026-10-08)
+
+`scripts/behavior_diff.py` over every function: every exact and
+scheduling-only match reports nothing, and 53 of the others reported
+differences. All were read against the original. Two were real, both
+latent (no caller reaches them today):
+- Gui::show_notice: the original's jump table has an empty case 5; ours
+  left it out under `__assume(0)`, so kind 5 jumped to address 0. Now
+  `case GUI_NOTICE_5: break;`.
+- etAim (EnemyData::ecl_run_over_300) stored all 32 bits of aim_type; the
+  original stores a word, like every other writer. Our build never reads
+  the upper half.
+
+The other 51 are equivalent shapes, in these kinds (each listed function
+was checked):
+- Field offsets shifted by one constant beyond the pairing threshold:
+  Player::move, LaserLineInf::on_tick, LaserInfiniteInf::on_tick,
+  draw_spell_card_page, PopupManager::on_tick, PlayerInner::
+  repopulate_options, Player::update_options, compute_damage_to_enemy.
+- Loop bounds at the end of an unannotated table, which sits before a
+  different variable in each build (collision_line_rect,
+  collision_test_rect_rect, draw_sprite_fog), or a loop that tests the
+  other of two pointers moving together (update_sound_thread, WinMain).
+- Displacements folded differently (get_int_arg_given_value, ecl_run,
+  do_title_screen, do_replay_save, draw_rect_outline's 8-byte movq copy).
+- Inlining: helpers ours keeps out of line (draw_3d and
+  draw_3d_vertex_strip's set_texture_of_vm and friends,
+  enemy_play_hit_sound, item_angle_to_player) or the original keeps out of
+  line (load_sub_by_name, the g_Supervisor initializer's dead config
+  defaults, cleared by its memset).
+- Bitfield writes merged into one masked store (bleed_color,
+  convert_texture), range checks as one unsigned compare (draw_string),
+  `x + s * -2` as `x - s * 2` and `0x40 + (int)(d * 191 / 64)` as
+  `0x40 - (int)(d * -191 / 64)` (Gui::on_tick_body), division by 10 or 3
+  through idiv or magic multiplication (on_draw_2_body, TitleInf::on_tick).
+- Equivalent functions under other names: zun_tanf is `return tanf(x)`,
+  sub_4798d4 is the UCRT's atoi.
+- Wider loads used only in their low part (read_joypad's g_pad_mapping),
+  and a signed loop counter that is never negative (repopulate_options;
+  the original's unsigned compares suggest a u32 counter there).

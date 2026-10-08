@@ -11,7 +11,8 @@ and our build, and reports the functions where they differ:
 - call order: two calls made one after the other in one build and the other
   way round in the other (the order of argument reads, for example)
 - constants: integer immediates (not stack adjustments), float constants by
-  value, string literals by content, tables of pointers by their first entry
+  value (loaded from memory or stored as an integer immediate), string
+  literals by content, tables of pointers by their first entry
 - globals: loads, stores and address-of, at the original's address (ours
   are moved there first, so a bound just past an array names the same
   thing in both)
@@ -23,9 +24,13 @@ and our build, and reports the functions where they differ:
 - switches: jump table cases with no code (`__assume(0)`), which are
   undefined if reached
 
-Calls and stores are compared by count; everything else only by presence,
-since reloading a value instead of keeping it in a register is register
-allocation. A function that differs only in registers and scheduling
+Items are compared by presence, not count: reloading a value instead of
+keeping it in a register, or one call shared by two paths, changes counts
+without changing behaviour (--items shows the counts). For the same
+reason a load of something the function also stores is left out, and field
+accesses that line up under one constant shift (ours through `this` plus an
+offset, the original through a pointer to the inner struct) are paired. A
+function that differs only in registers and scheduling
 reports nothing (every exact and every scheduling-only match comes out
 empty), so what is reported is either a behaviour difference or an
 equivalent shape (inlining, x * 20 as lea and shl or as imul, a loop
@@ -62,10 +67,13 @@ MD.detail = True
 # The /GS cookie check: whether a function has one is a matching question.
 IGNORED_CALLS = {"@__security_check_cookie@4"}
 IGNORED_GLOBALS = re.compile(r"_*security_cookie")
-# Item kinds compared by count; every other kind only by presence, since
-# reloading a value or a constant instead of keeping it in a register is
-# register allocation.
-COUNTED = ("call", "tailcall", "global store", "field store", "table store")
+# Item kinds compared by count. None: reloading a value instead of keeping
+# it in a register is register allocation, and identical code on two paths
+# shared (or duplicated) by the compiler changes the number of calls and
+# stores. Every behaviour difference found so far was a difference in
+# presence (a store or load missing, a constant or argument changed);
+# --items shows the counts.
+COUNTED = ()
 STACK_REGS = {X.X86_REG_ESP, X.X86_REG_EBP}
 ARG_REGS = {X.X86_REG_ECX, X.X86_REG_EDX}
 COND = {
@@ -358,6 +366,17 @@ def walk(img, start, bound):
     return [insns[a] for a in sorted(insns)], leaders, missing_cases
 
 
+def float_immediate(value):
+    """An immediate that is most likely a float constant stored as an
+    integer (`mov dword ptr [esp + 0x38], 0x43960000` for 300.0f): a
+    magnitude between 1/1024 and 2^25 with at most 12 significant bits."""
+    v = value & 0xFFFFFFFF
+    exponent = (v >> 23) & 0xFF
+    if not 117 <= exponent <= 152 or v & 0x7FF:
+        return None
+    return struct.unpack("<f", struct.pack("<I", v))[0]
+
+
 def is_float_op(insn):
     m = insn.mnemonic
     return (m.endswith(("ss", "sd", "ps", "pd")) and not m.startswith(("movs", "cmps", "lods", "stos", "scas"))
@@ -418,6 +437,11 @@ def fingerprint(side, va, names):
     insns, leaders, missing_cases = walk(img, va, bound)
     incoming = incoming_args(side, insns, leaders, va, bound, names)
     by_addr = {insn.address: k for k, insn in enumerate(insns)}
+    # A frame realigned through ebx (push ebx; mov ebx, esp; ...; and esp, -8)
+    # reaches its arguments and return address through ebx.
+    frame_regs = set(STACK_REGS)
+    if len(insns) > 1 and insns[0].op_str == "ebx" and insns[1].op_str == "ebx, esp":
+        frame_regs.add(X.X86_REG_EBX)
     items = Counter()
     returns = set()
     pending_args = []
@@ -498,12 +522,15 @@ def fingerprint(side, va, names):
 
         if m.startswith(("j", "loop")) or m in ("ret", "nop", "int3"):
             continue
-        sp_dest = ops and ops[0].type == X.X86_OP_REG and ops[0].reg in STACK_REGS
+        sp_dest = ops and ops[0].type == X.X86_OP_REG and ops[0].reg in frame_regs
 
         # Comparisons with a constant and how their result is used.
-        if m == "cmp" and len(ops) == 2 and ops[1].type == X.X86_OP_IMM and idx + 1 < len(insns):
-            nxt = insns[idx + 1].mnemonic
-            cc = re.match(r"(?:j|set|cmov)(n?[a-z]{1,2})$", nxt)
+        if m == "cmp" and len(ops) == 2 and ops[1].type == X.X86_OP_IMM:
+            # The flags' user, past instructions that leave the flags alone.
+            for nxt in insns[idx + 1:idx + 5]:
+                cc = re.match(r"(?:j|set|cmov)(n?[a-z]{1,2})$", nxt.mnemonic)
+                if cc or nxt.mnemonic not in ("mov", "lea", "push", "pop", "movss", "movd", "movzx", "movsx"):
+                    break
             if cc and cc.group(1) in COND:
                 items[f"compare: {COND[cc.group(1)]} {names.constant(side, ops[1].imm)}"] += 1
 
@@ -512,6 +539,8 @@ def fingerprint(side, va, names):
                 v = op.imm & 0xFFFFFFFF
                 if img.section_of(v) and v >= img.base:
                     items[f"address: {names.data(side, v, 0, False)}"] += 1
+                elif not sp_dest and m == "mov" and float_immediate(v) is not None:
+                    items[f"fconst: f32 {float_immediate(v)!r}"] += 1
                 elif not sp_dest:
                     items[f"imm: {op.imm}"] += 1
             elif op.type == X.X86_OP_MEM:
@@ -519,16 +548,26 @@ def fingerprint(side, va, names):
                 access = "store" if op.access & capstone.CS_AC_WRITE else "load"
                 disp = mem.disp & 0xFFFFFFFF
                 if m == "lea":
-                    if mem.base not in STACK_REGS and mem.index == 0 and mem.disp and not img.section_of(disp):
+                    if mem.base not in frame_regs and mem.index == 0 and mem.disp and not img.section_of(disp):
                         items[f"imm: {mem.disp}"] += 1
                         continue
                     access = "addr"
                 if img.section_of(disp) and disp >= img.base:
                     kind = "global" if mem.base == 0 and mem.index == 0 else "table"
-                    if IGNORED_GLOBALS.search(names.data(side, disp, op.size, float_op)):
+                    what = names.data(side, disp, op.size, float_op)
+                    if IGNORED_GLOBALS.search(what):
                         continue
-                    items[f"{kind} {access}{op.size * 8}: {names.data(side, disp, op.size, float_op)}"] += 1
-                elif mem.base not in STACK_REGS and not (mem.base == 0 and mem.index in STACK_REGS):
+                    if kind == "global" and access == "load" and what.startswith(("f32 ", "f64 ", "xmm ")):
+                        # However the build gets it: loaded, or (below) an immediate.
+                        items[f"fconst: {what}"] += 1
+                        continue
+                    if kind == "table" or access == "addr":
+                        # An indexed table and a pointer walked through it
+                        # start at the same address.
+                        items[f"address: {what}"] += 1
+                        continue
+                    items[f"{kind} {access}{op.size * 8}: {what}"] += 1
+                elif mem.base not in frame_regs and not (mem.base == 0 and mem.index in frame_regs):
                     if mem.base == 0 and mem.index == 0:
                         continue
                     items[f"field {access}{op.size * 8}: {mem.disp:+#x}"] += 1
@@ -543,7 +582,12 @@ def compare(o, r, names):
     a, na = fingerprint("orig", o, names)
     b, nb = fingerprint("ours", r, names)
     only_orig, only_ours = Counter(), Counter()
+    # A load of something the function also stores: reloading it after the
+    # store or keeping it in a register is register allocation.
+    stored = {re.sub(r"^(\w+) store\d+", r"\1", k) for k in set(a) | set(b) if " store" in k.split(":")[0]}
     for k in set(a) | set(b):
+        if " load" in k.split(":")[0] and re.sub(r"^(\w+) load\d+", r"\1", k) in stored:
+            continue
         if k.startswith("order: "):
             # Only calls made in the opposite order: whether two calls share
             # a basic block depends on the layout.
@@ -553,14 +597,43 @@ def compare(o, r, names):
                 only_orig[k] = 1
             if k in b and k not in a and reverse in a:
                 only_ours[k] = 1
-        elif k.split(":")[0].startswith(COUNTED):
+        elif COUNTED and k.split(":")[0].startswith(COUNTED):
             if a[k] > b[k]:
                 only_orig[k] = a[k] - b[k]
             elif b[k] > a[k]:
                 only_ours[k] = b[k] - a[k]
         elif (k in a) != (k in b):
             (only_orig if k in a else only_ours)[k] = 1
+    shifted_fields(only_orig, only_ours)
     return only_orig, only_ours, na, nb
+
+
+def shifted_fields(only_orig, only_ours):
+    """Drop field accesses that are the same fields reached from another base:
+    ours through `this` + 0xc88, the original through a pointer to that inner
+    struct, which shifts every offset by one constant. A shift counts when it
+    pairs at least three accesses of the same kind and size."""
+    def fields(items):
+        out = {}
+        for k in items:
+            m = re.match(r"field (\w+?)(\d+): ([+-]0x[0-9a-f]+)$", k)
+            if m:
+                out[k] = (m.group(1) + m.group(2), int(m.group(3), 16))
+        return out
+    for _ in range(3):
+        fo, fu = fields(only_orig), fields(only_ours)
+        deltas = Counter(u_off - o_off for o_kind, o_off in fo.values() for u_kind, u_off in fu.values()
+                         if o_kind == u_kind and u_off != o_off)
+        if not deltas:
+            return
+        delta, n = deltas.most_common(1)[0]
+        if n < 3:
+            return
+        for ko, (kind, off) in fo.items():
+            match = next((k for k, (uk, uo) in fu.items() if uk == kind and uo == off + delta and k in only_ours), None)
+            if match is not None:
+                del only_orig[ko]
+                del only_ours[match]
 
 
 def report(o, sym, only_orig, only_ours, na, nb):

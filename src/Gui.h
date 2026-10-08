@@ -319,6 +319,8 @@ enum GuiNotice
     GUI_NOTICE_FULL_POWER = 2,
     GUI_NOTICE_HISCORE = 3,
     GUI_NOTICE_EXTEND = 4,
+    // Shows nothing: an empty case in show_notice.
+    GUI_NOTICE_5 = 5,
     // Not used by any caller (front.anm script 0x42).
     GUI_NOTICE_6 = 6,
 };
