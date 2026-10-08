@@ -168,7 +168,7 @@ int __fastcall anm_gather_effect_on_tick(AnmVm *vm)
     {
         return -1;
     }
-    data->timer.tick_split();
+    data->timer.tick_goto();
     return 0;
 }
 
