@@ -1028,12 +1028,21 @@ HARNESS_CALLED CameraSky::CameraSky(f32 begin_distance, f32 end_distance, f32 c0
     }
 }
 
-// TODO: the original frame has 4 more (unused) bytes: padding for the
-// known alignment run_std's realignment gives it (ours stays unpadded, even
-// when made HARNESS_CALLED, although run_std now realigns).
+// A dead double, not ZUN's code: it stands in for AnmVm::run wanting an
+// aligned stack (docs/findings.md). In this plain inline helper it is a call
+// graph node of its own, so interrupt_vms pads its frame (4 unused bytes,
+// like the original) instead of realigning it.
+static inline void interrupt_vms_want_aligned_stack()
+{
+    double unused_double = 0.0;
+    (void)unused_double;
+}
+
+// Sends the interrupt to the stage's VMs and runs them.
 // FUNCTION: TH16 0x40b2f0
 void Stage::interrupt_vms(i32 n)
 {
+    interrupt_vms_want_aligned_stack();
     if (vms != NULL)
     {
         AnmVm *vm = vms;
