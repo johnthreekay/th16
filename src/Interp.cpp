@@ -16,9 +16,11 @@ static inline f32 ease_in_back(f32 x, f32 a)
            (1.0f - a * a / ((1.0f - a) * (1.0f - a)));
 }
 
-// TODO: (reccmp 83%) the two-branch curves assign x and return it once, which the original's
-// registers show; left: the in-out-2 else branch (original keeps 2.0f in xmm1 and moves the
-// result into xmm3) and out-in-sine (original result in xmm1, 0.5f loaded once in the else).
+// TODO: (reccmp 86%) most two-branch curves assign x and return it once, which the original's
+// registers show; in-out-2 returns from its else branch, which keeps 2.0f in xmm1 like the original.
+// Left: in-out-2's result is not moved back into xmm3 before the multiply, out-in-sine (original
+// result in xmm1, 0.5f loaded once in the else), and reccmp cannot name the original's addresses of
+// the constants only SSE code uses (the ease-back divisors), which count as differences.
 // FUNCTION: TH16 0x4033f0
 HARNESS_CALLED f32 interp_common_methods(i32 mode, f32 time, f32 end_time)
 {
@@ -49,7 +51,7 @@ HARNESS_CALLED f32 interp_common_methods(i32 mode, f32 time, f32 end_time)
         }
         else
         {
-            x = 2.0f - (2.0f - x) * (2.0f - x);
+            return (2.0f - (2.0f - x) * (2.0f - x)) * 0.5f;
         }
         return x * 0.5f;
     case INTERP_EASE_OUT_IN_2:
