@@ -59,8 +59,8 @@ Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
 
 // Spreads the grid evenly over the rectangle (in game area coordinates),
 // with texture coordinates that sample the screen at each point.
-// TODO: the original reloads pos.z inside the inner loop (ours keeps it in
-// ebx) and tests uv.x only after storing uv.y.
+// TODO: before the loops the original converts strip_points - 1 after the
+// game area origin's y and divides after adding y; ours the other way round.
 // FUNCTION: TH16 0x418df0
 HARNESS_CALLED void Fog::set_rect(f32 x, f32 y, f32 width, f32 height)
 {
@@ -82,7 +82,9 @@ HARNESS_CALLED void Fog::set_rect(f32 x, f32 y, f32 width, f32 height)
         {
             vertex->pos = *point = pos;
             vertex->uv.x = point->x / (f32)g_resolution_x;
-            vertex->uv.y = point->y / (f32)g_resolution_y;
+            // Through D3DXVECTOR2's operator FLOAT*: the store may alias uv.x,
+            // so its test comes after it, as in the original.
+            vertex->uv[1] = point->y / (f32)g_resolution_y;
             if (vertex->uv.x < 0.0f)
             {
                 vertex->uv.x = 0.0f;
