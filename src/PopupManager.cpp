@@ -90,7 +90,7 @@ int PopupManager::on_tick()
         {
             str->pos.y -= str->rise_speed * g_game_speed;
             str->rise_speed *= 0.95f;
-            str->time.tick();
+            str->time.tick_goto();
             if (str->time.current > 60)
             {
                 str->active = 0;

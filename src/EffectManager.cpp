@@ -143,9 +143,10 @@ i32 __fastcall EffectManager::on_draw_callback(EffectManager *self)
     return 1;
 }
 
-// TODO: this and last_used_index's old value trade ebx and the stack slot
-// with the original since get_vm_with_id has a visible body (it matched
-// while get_vm_with_id was an opaque placeholder).
+// Advances last_used_index to the next slot that is free (no id, or its VM
+// is gone, which clears the id) and returns the previous index; -1 when
+// every slot is in use. The slot is indexed afresh in each test (a
+// reference to it puts this, not the index, in the stack slot).
 // FUNCTION: TH16 0x40e6c0
 i32 EffectManager::next_index()
 {
@@ -153,16 +154,14 @@ i32 EffectManager::next_index()
     {
         i32 index = last_used_index;
         last_used_index = (last_used_index + 1) % EFFECT_COUNT;
-        AnmId &id = anm_ids[last_used_index];
-        if (id.id == 0)
+        if (anm_ids[last_used_index].id == 0)
         {
             return index;
         }
-        if (g_AnmManager->get_vm_with_id(id) != NULL)
+        if (get_vm_or_clear(anm_ids[last_used_index]) != NULL)
         {
             return index;
         }
-        id.id = 0;
     }
     return -1;
 }

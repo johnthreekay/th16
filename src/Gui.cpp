@@ -8,6 +8,7 @@
 #include "Enemy.h"
 #include "EnemyManager.h"
 #include "GameThread.h"
+#include "MainMenu.h"
 #include "Input.h"
 #include "Laser.h"
 #include "Player.h"
@@ -327,9 +328,10 @@ static const i32 g_msg_player_face_scripts[4] = {26, 16, 22, 35};
 // has ended. Holding shot or skip in a skippable script runs every
 // instruction at once, and MSG_TEXT_PAUSE waits for a key. Then keeps the
 // text next to the speech bubble.
-// TODO: ours gets a /GS cookie (from the Float3 locals of MSG_TEXT_ADD and
-// the bubble code; still unexplained) and uses ebx; the original keeps the
-// instruction pointer in ecx and reloads it after calls.
+// TODO: without __declspec(safebuffers) (see Gui.h) ours gets a /GS cookie
+// from the Float3 copies of MSG_TEXT_ADD and the bubble code, still
+// unexplained; the original also keeps the instruction pointer in ecx and
+// reloads it after calls, where ours keeps it in esi.
 // FUNCTION: TH16 0x42a1d0
 HARNESS_CALLED i32 GuiMsgVm::run()
 {
@@ -735,7 +737,7 @@ HARNESS_CALLED i32 GuiMsgVm::run()
         }
         current_instr = (u8 *)current_instr + instr()->args_size + 4;
     }
-    time_in_script.tick();
+    time_in_script.tick_goto();
 waiting:
     // Keep the text next to the speech bubble.
     i32 script = textbox_kind + FRONT_ANM_BUBBLE_BODY;
@@ -1172,6 +1174,10 @@ static __forceinline AnmId create_vm_inline(AnmLoaded *anm, i32 script, D3DXVECT
 // FUNCTION: TH16 0x42c070
 void Gui::show_stage_clear_bonus()
 {
+    // A dead double: it makes LTCG realign this frame (and esp, -8) early,
+    // as the original does (docs/findings.md).
+    double unused = 0.0;
+    (void)unused;
     Gui *gui = g_Gui;
     gui->overlay_ids[GUI_OVERLAY_STAGE_CLEAR_BONUS] =
         create_vm_inline(gui->front_anm, FRONT_ANM_STAGE_CLEAR_BONUS, NULL, 0.0f, -1);
@@ -1334,6 +1340,24 @@ static inline AnmId find_child_id_of(AnmManager *anm, AnmId &id, i32 script)
     return result;
 }
 
+// find_child_id_of as LTCG inlined it into setup_stage_hud, with the first
+// level of AnmVm::search_children inlined as well.
+static __forceinline AnmId find_child_id_inline_search(AnmId &id, i32 script)
+{
+    AnmVm *child;
+    if (get_vm_or_clear(id) == NULL)
+    {
+        child = NULL;
+    }
+    else
+    {
+        child = search_children_inline(get_vm_or_clear(id), script, 0);
+    }
+    AnmId result;
+    result.id = child != NULL ? child->id.id : 0;
+    return result;
+}
+
 // Fills the season gauge bar towards the next level and shows the level
 // (interrupt 7 + level), switching the gauge's look (interrupt 2 or 3) when
 // the first level is reached or lost.
@@ -1467,13 +1491,22 @@ void __fastcall anm_vm_interrupt_2_run(AnmVm *vm)
     vm->run();
 }
 
+// Sets a vector from a D3DXVECTOR3 temporary. Through this helper the
+// temporary belongs to its own call graph node: written in place, the
+// 12-byte temporaries give the caller a /GS cookie the original does not
+// have (GuiMsgVm's constructor).
+static inline void set_float3(Float3 *p, f32 x, f32 y, f32 z)
+{
+    *p = Float3(x, y, z);
+}
+
 // Starts a dialogue script: creates the text and furigana VMs (text.anm
 // scripts 0 and 1; the second of each gets interrupt 7, presumably to make
 // it the lower line),
 // clears bullets, lasers and enemies, and puts the bubble at its default
 // place.
-// TODO: ours gets a /GS cookie and keeps the create_effect results in a
-// local; the original has no cookie and reuses script's argument slot for them.
+// TODO: the original stores next_text_line to active_side before the side
+// text positions; ours after them, just before clear_all.
 // FUNCTION: TH16 0x429b20
 GuiMsgVm::GuiMsgVm(void *script)
 {
@@ -1513,10 +1546,10 @@ GuiMsgVm::GuiMsgVm(void *script)
     side_text_color_2 = 0;
     side_text_color_3 = 0;
     active_side = 0;
-    side_text_pos_0 = Float3(16.0f, 0.0f, 0.0f);
-    side_text_pos_1 = Float3(16.0f, 0.0f, 0.0f);
-    side_text_pos_2 = Float3(16.0f, 0.0f, 0.0f);
-    side_text_pos_3 = Float3(16.0f, 0.0f, 0.0f);
+    set_float3(&side_text_pos_0, 16.0f, 0.0f, 0.0f);
+    set_float3(&side_text_pos_1, 16.0f, 0.0f, 0.0f);
+    set_float3(&side_text_pos_2, 16.0f, 0.0f, 0.0f);
+    set_float3(&side_text_pos_3, 16.0f, 0.0f, 0.0f);
     // Dialogue starts on a clean screen.
     g_BulletManager->clear_all(0);
     // LaserManager::clear_all(0, 0), inlined.
@@ -1638,12 +1671,31 @@ static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
     }
 }
 
+// Moves the VM with the id to (x, y, z), if it still exists. A plain inline
+// helper: the Float3 local, which stays in memory across the lookup, then
+// belongs to the helper's call graph node and does not give the caller a
+// /GS cookie (written in setup_stage_hud, it did; __forceinline did too).
+static inline void set_entity_pos_xyz(AnmId id, f32 x, f32 y, f32 z)
+{
+    Float3 pos(x, y, z);
+    AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+    if (vm != NULL)
+    {
+        vm->entity_pos = pos;
+    }
+}
+
 // Sets the HUD up for a stage: the life and bomb counters, the boss timer,
 // the stage logo, the demo and difficulty markers and the season gauge.
-// TODO: ours gets a /GS cookie for pos (see docs/findings.md) and realigns through ebx; the original realigns plainly.
+// TODO: the original adds the difficulty scripts' base at the copy_vm call (ours
+// before spilling the script) and lays the season gauge icon's child search out in line.
 // FUNCTION: TH16 0x426d70
 void Gui::setup_stage_hud()
 {
+    // A dead double: it makes LTCG realign this frame (and esp, -8) early,
+    // as the original does (docs/findings.md).
+    double unused = 0.0;
+    (void)unused;
     Gui *gui = g_Gui;
     if (gui->on_tick != NULL)
     {
@@ -1701,12 +1753,7 @@ void Gui::setup_stage_hud()
     if (g_Globals.stage_num == 1 && g_GameThread->replay_mode == 0 && g_Globals.continues_used == 0)
     {
         AnmId id = create_effect_inline(gui->front_anm, FRONT_ANM_GAME_START, -1, NULL);
-        Float3 pos(0.0f, g_Globals.character == CHARACTER_MARISA ? 148 : 128, 0.0f);
-        AnmVm *vm = g_AnmManager->get_vm_with_id(id);
-        if (vm != NULL)
-        {
-            vm->entity_pos = pos;
-        }
+        set_entity_pos_xyz(id, 0.0f, g_Globals.character == CHARACTER_MARISA ? 148 : 128, 0.0f);
     }
     if (g_Supervisor.new_game_started != 0)
     {
@@ -1724,8 +1771,9 @@ void Gui::setup_stage_hud()
     {
         gui->release_ready = 0;
         gui->season_gauge_id = create_effect_inline(gui->front_anm, FRONT_ANM_SEASON_GAUGE, -1, NULL);
+        AnmId icon_id = find_child_id_inline_search(gui->season_gauge_id, FRONT_ANM_SEASON_GAUGE_ICON);
         AnmManager *anm = g_AnmManager;
-        AnmVm *vm = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, FRONT_ANM_SEASON_GAUGE_ICON));
+        AnmVm *vm = anm->get_vm_with_id(icon_id);
         if (vm != NULL)
         {
             anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, g_Globals.subseason + FRONT_ANM_SPRITE_SUBSEASON);
@@ -1739,10 +1787,13 @@ void Gui::setup_stage_hud()
     }
 }
 
-// TODO: the original realigns the frame (and esp, -8) and has 4 more bytes of it.
 // FUNCTION: TH16 0x426780
 void Gui::show_lights_out()
 {
+    // A dead double: it makes LTCG realign this frame (and esp, -8) early,
+    // as the original does (docs/findings.md).
+    double unused = 0.0;
+    (void)unused;
     Gui *gui = g_Gui;
     gui->lights_out_id = gui->front_anm->create_vm_inline(FRONT_ANM_LIGHTS_OUT, NULL, 0.0f, -1);
 }
@@ -1794,7 +1845,7 @@ i32 Gui::on_tick_body()
 {
     if (hud_flags & GUI_STAGE_CLEAR_BONUS)
     {
-        notice_timer.tick_in_place();
+        notice_timer.tick_goto();
     }
     if (hud_flags & GUI_CHAPTER_RESULT_MASK)
     {
@@ -2088,7 +2139,7 @@ i32 Gui::on_tick_body()
         }
         else
         {
-            msg->time_alive.tick_in_place();
+            msg->time_alive.tick_goto();
         }
     }
 
@@ -2098,7 +2149,9 @@ i32 Gui::on_tick_body()
     if (g_EnemyManager != NULL)
     {
         EnemyInf *boss = get_boss_inline(g_EnemyManager, 0);
-        if (boss != NULL && !((boss->enemy.flags_low >> 5) & 1) && !(boss->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX))
+        // Written with ~: the original tests each bit on its own
+        // (shr, not, test al, 1), where !(x & mask) merges the two tests.
+        if (boss != NULL && (~(boss->enemy.flags_low >> 5) & 1) && (~boss->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX))
         {
             AnmVm *vm = get_vm_or_clear(enemy_marker_id);
             vm->show_tree_inline();
@@ -2217,7 +2270,7 @@ i32 Gui::on_tick_body()
         }
         release_ready = 0;
     }
-    time_in_stage.tick();
+    time_in_stage.tick_goto();
     return UPDATE_FUNC_CONTINUE;
 }
 

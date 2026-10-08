@@ -35,14 +35,13 @@ HARNESS_CALLED i32 InputState::get_hold_time(int button)
     return (g_InputState.input & (1 << button)) ? g_InputState.hold_time[button] : 0;
 }
 
-// TODO: the original divides by 10 with idiv (as if the 10 were a folded
-// parameter); ours strength-reduces it.
 // The point item value in hundreds, rounded down to a multiple of ten.
+// Written on the global: through a local, % 10 becomes a multiply by the
+// reciprocal, where the original divides (mov reg, 10; idiv).
 // FUNCTION: TH16 0x42c860
 i32 get_piv_rounded()
 {
-    i32 base = g_Globals.piv / 100;
-    return base - base % 10;
+    return g_Globals.piv / 100 - g_Globals.piv / 100 % 10;
 }
 
 // Debug logging, compiled out of the release build.

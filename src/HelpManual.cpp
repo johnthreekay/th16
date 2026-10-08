@@ -175,6 +175,17 @@ static __forceinline void help_hide_pages(HelpManual *manual)
     }
 }
 
+// The menu helpers the list inlines; they address the menu through a
+// pointer, as the original's code does ([edi + 4] for the selection).
+static __forceinline void help_menu_save(MenuHelper *m)
+{
+    m->current_selection = m->next_selection;
+}
+static __forceinline i32 help_menu_moved(MenuHelper *m)
+{
+    return m->current_selection != m->next_selection;
+}
+
 // The manual's frame: choose a page from the list (up and down; shot or
 // enter opens it, bomb or menu closes the manual), read its picture on the
 // worker thread, then show it (up and down turn the page, cancel goes back
@@ -208,7 +219,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
             {
                 break;
             }
-            menu.current_selection = menu.next_selection;
+            help_menu_save(&menu);
             if (help_pressed_or_repeating(INPUT_UP))
             {
                 menu.move_cursor(-1);
@@ -217,7 +228,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
             {
                 menu.move_cursor(1);
             }
-            if (menu.current_selection != menu.next_selection)
+            if (help_menu_moved(&menu))
             {
                 g_SoundManager.play_sound_centered(SE_SELECT00, 0);
                 help_highlight_pages(this);
