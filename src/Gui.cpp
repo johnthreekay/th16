@@ -328,9 +328,10 @@ static const i32 g_msg_player_face_scripts[4] = {26, 16, 22, 35};
 // has ended. Holding shot or skip in a skippable script runs every
 // instruction at once, and MSG_TEXT_PAUSE waits for a key. Then keeps the
 // text next to the speech bubble.
-// TODO: ours gets a /GS cookie (from the Float3 locals of MSG_TEXT_ADD and
-// the bubble code; still unexplained) and uses ebx; the original keeps the
-// instruction pointer in ecx and reloads it after calls.
+// TODO: without __declspec(safebuffers) (see Gui.h) ours gets a /GS cookie
+// from the Float3 copies of MSG_TEXT_ADD and the bubble code, still
+// unexplained; the original also keeps the instruction pointer in ecx and
+// reloads it after calls, where ours keeps it in esi.
 // FUNCTION: TH16 0x42a1d0
 HARNESS_CALLED i32 GuiMsgVm::run()
 {
