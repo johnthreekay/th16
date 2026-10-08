@@ -283,7 +283,6 @@ static __forceinline i32 key_config_pressed_or_repeating(u8 mask)
     return 0;
 }
 
-// TODO: the volume clamps use al/ecx where ours uses cl/eax (also with an if instead of the ternary).
 // FUNCTION: TH16 0x44c570
 i32 TitleInf::do_options()
 {
@@ -372,19 +371,21 @@ i32 TitleInf::do_options()
             switch (menu.next_selection)
             {
             case OPTIONS_ITEM_BGM_VOLUME:
-            {
-                i8 volume = g_Supervisor.config.bgm_volume + 5;
-                g_Supervisor.config.bgm_volume = volume > 100 ? 100 : volume;
+                g_Supervisor.config.bgm_volume += 5;
+                if (g_Supervisor.config.bgm_volume > 100)
+                {
+                    g_Supervisor.config.bgm_volume = 100;
+                }
                 update_options_sprites();
                 break;
-            }
             case OPTIONS_ITEM_SE_VOLUME:
-            {
-                i8 volume = g_Supervisor.config.se_volume + 5;
-                g_Supervisor.config.se_volume = volume > 100 ? 100 : volume;
+                g_Supervisor.config.se_volume += 5;
+                if (g_Supervisor.config.se_volume > 100)
+                {
+                    g_Supervisor.config.se_volume = 100;
+                }
                 update_options_sprites();
                 break;
-            }
             }
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
