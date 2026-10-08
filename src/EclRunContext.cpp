@@ -183,7 +183,6 @@ HARNESS_CALLED i32 EclRunContext::pop_int_arg(int index)
 }
 
 // get_float_arg, popping a stack reference.
-// TODO: register allocation differs around the popped entry.
 // FUNCTION: TH16 0x474090
 HARNESS_CALLED f32 EclRunContext::pop_float_arg(int index)
 {
@@ -197,15 +196,16 @@ HARNESS_CALLED f32 EclRunContext::pop_float_arg(int index)
         }
         if (value <= -1.0f && value >= -100.0f)
         {
+            // Read as an int, as in pop_float_arg_given_value.
             stack.stack_offset -= 4;
-            EclStackItem item = *(EclStackItem *)((u8 *)stack.data + stack.stack_offset);
+            i32 item = *(i32 *)((u8 *)stack.data + stack.stack_offset);
             stack.stack_offset -= 4;
             char type = *((char *)stack.data + stack.stack_offset);
             if (type != 'f' && type == 'i')
             {
-                return (f32)item.i;
+                return (f32)item;
             }
-            return item.f;
+            return *(f32 *)&item;
         }
         return vm->get_float_global((i32)value);
     }
