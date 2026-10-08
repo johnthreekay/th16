@@ -1590,7 +1590,11 @@ i32 Player::on_tick_body()
     case PLAYER_STATE_HIT:
         // Hit: 8 frames to bomb out of it (a deathbomb); then the life is
         // lost and the player is dead.
-        if (inner.time_in_state.current < 8)
+        if (inner.time_in_state.current >= 8)
+        {
+            lose_life();
+        }
+        else
         {
             if (g_MainBomb != NULL && (g_InputState.input_rising & INPUT_BOMB) && g_MainBomb->can_activate())
             {
@@ -1605,14 +1609,12 @@ i32 Player::on_tick_body()
             }
             break;
         }
-        lose_life();
     case PLAYER_STATE_DEAD:
         if (inner.time_in_state.current == 3)
         {
             // Drop half a power level as items, spread toward the top.
-            g_Globals.power = g_Globals.power - g_Globals.power_per_level / 2 < g_Globals.power_per_level
-                                  ? g_Globals.power_per_level
-                                  : g_Globals.power - g_Globals.power_per_level / 2;
+            i32 power = g_Globals.power - g_Globals.power_per_level / 2;
+            g_Globals.power = power < g_Globals.power_per_level ? g_Globals.power_per_level : power;
             f32 dx = 0.0f - inner.pos.x;
             f32 dy = inner.pos.y - 224.0f - inner.pos.y;
             f32 angle;
@@ -1687,10 +1689,9 @@ i32 Player::on_tick_body()
         source->pos.update_secondary_fields();
         source->pos.step();
         source->radius += source->radius_growth;
-        // TODO: written as += for the original's load order (angular_speed
-        // first), which adds a store of the unwrapped angle it does not have.
-        source->angle += source->angular_speed;
-        source->angle = wrap_angle(source->angle);
+        f32 angle = source->angle;
+        angle += source->angular_speed;
+        source->angle = wrap_angle(angle);
         source->last_enemy_id = 0;
         source->lifetime.decrement(1.0f);
         if (source->lifetime.current <= 0)
