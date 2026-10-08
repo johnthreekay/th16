@@ -212,7 +212,9 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
 
 // Corners for render modes 0, 2 and 3: the anchored sprite rectangle,
 // scaled, at the VM's transformed position.
-// TODO: 39%; ours adds a /GS cookie for pos and walks the anchor tables differently.
+// The resolution scaling is an if/else-if chain: as a switch the two cases
+// were laid out the other way round.
+// TODO: 86%; the corner multiplies take their operands in another order for b, c, d.
 // FUNCTION: TH16 0x465c40
 void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
 {
@@ -242,9 +244,8 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
     b->y -= vm->anchor_offset.y;
     c->y -= vm->anchor_offset.y;
     d->y -= vm->anchor_offset.y;
-    switch (vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK)
+    if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_SCALED)
     {
-    case ANM_VM_RESOLUTION_SCALED:
         a->x *= g_screen_coord_scale;
         b->x *= g_screen_coord_scale;
         c->x *= g_screen_coord_scale;
@@ -253,8 +254,9 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
         b->y *= g_screen_coord_scale;
         c->y *= g_screen_coord_scale;
         d->y *= g_screen_coord_scale;
-        break;
-    case ANM_VM_RESOLUTION_HALF_SCALED:
+    }
+    else if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_HALF_SCALED)
+    {
         a->x *= g_screen_coord_scale * 0.5f;
         b->x *= g_screen_coord_scale * 0.5f;
         c->x *= g_screen_coord_scale * 0.5f;
@@ -263,7 +265,6 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
         b->y *= g_screen_coord_scale * 0.5f;
         c->y *= g_screen_coord_scale * 0.5f;
         d->y *= g_screen_coord_scale * 0.5f;
-        break;
     }
     f32 scale_x = vm->scale_2.x * vm->scale.x;
     f32 scale_y = vm->scale_2.y * vm->scale.y;
@@ -307,22 +308,21 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
         xs.corner[i] = xs.corner[i] * vm->sprite_size.x - vm->anchor_offset.x;
         ys.corner[i] = ys.corner[i] * vm->sprite_size.y - vm->anchor_offset.y;
     }
-    switch (vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK)
+    if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_SCALED)
     {
-    case ANM_VM_RESOLUTION_SCALED:
         for (i = 0; i < 4; i++)
         {
             xs.corner[i] *= g_screen_coord_scale;
             ys.corner[i] *= g_screen_coord_scale;
         }
-        break;
-    case ANM_VM_RESOLUTION_HALF_SCALED:
+    }
+    else if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_HALF_SCALED)
+    {
         for (i = 0; i < 4; i++)
         {
             xs.corner[i] *= g_screen_coord_scale * 0.5f;
             ys.corner[i] *= g_screen_coord_scale * 0.5f;
         }
-        break;
     }
     Float3 pos;
     vm->get_own_transformed_pos(&pos);
