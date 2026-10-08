@@ -137,7 +137,8 @@ PauseMenu *PauseMenu::create()
 
 // Opens the pause menu on Esc (or after a device reset) once the stage has
 // run for 30 frames, unless a demo plays; runs the open menu.
-// TODO: the inlined timer ticks use other xmm registers for 1.0, 1.01 and the first speed.
+// Both timers tick with tick_nested: its two whole-frame copies make MSVC
+// load 1.0f, 0.99f and 1.01f into registers once for both inlined ticks.
 // FUNCTION: TH16 0x43e5f0
 int PauseMenu::on_tick()
 {
@@ -158,8 +159,8 @@ int PauseMenu::on_tick()
         tick_open();
         break;
     }
-    time_in_current_menu.tick();
-    time_since_pause_or_unpause.tick_goto();
+    time_in_current_menu.tick_nested();
+    time_since_pause_or_unpause.tick_nested();
     return 1;
 }
 
