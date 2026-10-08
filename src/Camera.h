@@ -39,7 +39,9 @@ struct CameraSky
         return result;
     }
 
-    CameraSky operator-(const CameraSky &other) const
+    // safebuffers: see InterpCameraSky::step's helpers (Stage.cpp); without
+    // it they are not inlined into those safebuffers helpers.
+    __declspec(safebuffers) CameraSky operator-(const CameraSky &other) const
     {
         CameraSky result;
         result.begin_distance = begin_distance - other.begin_distance;
@@ -55,7 +57,7 @@ struct CameraSky
         return result;
     }
 
-    CameraSky operator*(f32 s) const
+    __declspec(safebuffers) CameraSky operator*(f32 s) const
     {
         CameraSky result;
         result.begin_distance = begin_distance * s;
