@@ -27,7 +27,7 @@ void read_resolution_dialog();
 INT_PTR CALLBACK resolution_dialog_proc(HWND dialog, UINT message, WPARAM wparam, LPARAM lparam);
 LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
 extern HANDLE g_app_mutex;
-extern D3DThreadInf g_D3DThreadInf;
+extern ThreadInf g_unused_thread;
 
 // Something WinMain allocates first and frees last; nothing else is known
 // to use it.
@@ -564,7 +564,8 @@ create_d3d:
         goto shutdown;
     }
     g_Supervisor.init_input();
-    g_D3DThreadInf.join_if_running();
+    // The original joins g_unused_thread here, which nothing ever starts.
+    g_unused_thread.join_if_running();
     start_sound(g_GameWindow.window);
     if (init_d3d() != 0)
     {
