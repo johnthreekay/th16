@@ -755,8 +755,8 @@ void Item::collect_full_power()
 }
 
 // The piv rounding is written out as in collect_point (see there).
-// TODO: the original realigns its frame to 8 bytes (see
-// collect_full_power), and this and the value swap esi and edi.
+// TODO: register allocation: this and the value swap esi and edi (the frame
+// already realigns in the ebx form, as in the original).
 // FUNCTION: TH16 0x430100
 void Item::collect_power()
 {

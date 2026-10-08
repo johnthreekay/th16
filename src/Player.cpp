@@ -1166,8 +1166,8 @@ static __forceinline void player_set_script(Player *player, i32 script)
     player->vm.run();
 }
 
-// TODO: the original realigns its frame (and esp, -8) and keeps 1.0f in
-// xmm2; register allocation differs.
+// TODO: the original keeps 1.0f in xmm2; register allocation differs (the
+// frame already realigns with and esp, -8 like the original's).
 // FUNCTION: TH16 0x441cf0
 i32 Player::move()
 {
