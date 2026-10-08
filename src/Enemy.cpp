@@ -898,7 +898,9 @@ void EnemyDrop::eject_all_drops(D3DXVECTOR3 *pos)
 }
 
 // TODO: the original multiplies x as dist * x with dist loaded into a register; ours loads x
-// early (operand order, declaration order and indexing do not change it).
+// early (operand order, declaration order, indexing, D3DX operators and inline helpers do not
+// change it). reccmp also shows the 1.9f as <OFFSET>: its string scan reads the original's
+// constant at 0x494548 (33 33 f3 3f 00) as the string "33\xf3?", so it never names it a float.
 // FUNCTION: TH16 0x41d700
 void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
 {
