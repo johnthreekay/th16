@@ -399,8 +399,6 @@ HARNESS_CALLED void ReplayManager::start_stage()
     }
 }
 
-// TODO: the original realigns its frame through ebx (and esp, -8), most
-// likely for repopulate_options; the body matches.
 // FUNCTION: TH16 0x448eb0
 HARNESS_CALLED void ReplayManager::begin_stage()
 {

@@ -1029,8 +1029,8 @@ HARNESS_CALLED CameraSky::CameraSky(f32 begin_distance, f32 end_distance, f32 c0
 }
 
 // TODO: the original frame has 4 more (unused) bytes: padding for the
-// known alignment run_std's realignment gives it (ours stays unpadded, also
-// HARNESS_CALLED, although run_std now realigns).
+// known alignment run_std's realignment gives it (ours stays unpadded, even
+// when made HARNESS_CALLED, although run_std now realigns).
 // FUNCTION: TH16 0x40b2f0
 void Stage::interrupt_vms(i32 n)
 {

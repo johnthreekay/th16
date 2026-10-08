@@ -143,10 +143,10 @@ i32 __fastcall EffectManager::on_draw_callback(EffectManager *self)
     return 1;
 }
 
-// Advances last_used_index to the next slot that is free (no id, or its VM
-// is gone, which clears the id) and returns the previous index; -1 when
-// every slot is in use. The slot is indexed afresh in each test (a
-// reference to it puts this, not the index, in the stack slot).
+// Steps last_used_index on and returns its previous value; while the slot it
+// lands on holds the id of a VM that is gone, clears that id and steps on
+// again; -1 after EFFECT_COUNT steps. The slot is indexed afresh in each
+// test (a reference to it puts this, not the index, in the stack slot).
 // FUNCTION: TH16 0x40e6c0
 i32 EffectManager::next_index()
 {

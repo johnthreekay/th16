@@ -8,7 +8,7 @@
 #include "Enemy.h"
 #include "EnemyManager.h"
 #include "GameThread.h"
-#include "MainMenu.h"
+#include "MainMenu.h" // search_children_inline
 #include "Input.h"
 #include "Laser.h"
 #include "Player.h"
