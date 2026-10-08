@@ -35,9 +35,11 @@ struct WinMainUnk
 {
     i32 value;
 
+    // The store goes through volatile: WinMain sets value to 0 again right
+    // after the new, and the original keeps both stores.
     WinMainUnk()
     {
-        value = 0;
+        ((volatile WinMainUnk *)this)->value = 0;
     }
 };
 
@@ -424,7 +426,9 @@ static inline void stop_sound_threads()
 // changed) starts over from creating Direct3D. On exit it saves th16.cfg
 // and log.txt and restores the screen saver settings.
 // WinMain has C linkage, so it is annotated by its linker symbol.
-// TODO: 80%; the critical section loops count differently and some blocks are laid out in another order.
+// TODO: 87%; the original hoists PeekMessageA's address into edi, stores the
+// log reset before the restart message's log call, and lays out some
+// blocks in another order.
 // SYNTHETIC: TH16 0x459830 SYMBOL
 // _WinMain@16
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_line, int show)
@@ -436,9 +440,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
     i32 result = 0;
     g_GameWindow.instance = instance;
     timeBeginPeriod(1);
-    for (i32 i = 0; i < CS_COUNT; i++)
+    // Counted down: the original then reuses the counter's final 0 in edi.
+    CRITICAL_SECTION *cs = g_CriticalSections.cs;
+    for (i32 i = CS_COUNT; i != 0; i--)
     {
-        InitializeCriticalSection(&g_CriticalSections.cs[i]);
+        InitializeCriticalSection(cs);
+        cs++;
     }
     g_CriticalSections.enabled = true;
     g_unk_4a6d90 = new WinMainUnk;
