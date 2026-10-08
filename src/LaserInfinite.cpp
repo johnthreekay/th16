@@ -12,7 +12,7 @@ i32 LaserInfiniteInf::on_destroy()
 }
 
 // Runs the laser's pending et_ex transforms.
-// TODO: in the blend mode case the original increments ex_index in memory (inc, reload) instead of from the loaded index.
+// TODO: the original keeps ex in eax and its type in edx (ours the other way round; a type local, an index local, (u32) and the case order do not change it).
 // FUNCTION: TH16 0x436fd0
 void LaserInfiniteInf::run_ex()
 {
@@ -36,16 +36,21 @@ void LaserInfiniteInf::run_ex()
             state = LASER_STATE_WARNING;
             break;
         case BULLET_EX_BLEND:
+        {
+            // Through a VM pointer: the original then increments ex_index
+            // in memory (inc, reload) in this case.
+            AnmVm *vm = &vm_950;
             if (ex->a != 0)
             {
-                vm_950.flags_lo = vm_950.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+                vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
             }
             else
             {
-                vm_950.flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
+                vm->flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
             }
             ex_index++;
             continue;
+        }
         }
         ex_index++;
     }
