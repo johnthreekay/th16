@@ -1001,10 +1001,34 @@ int EnemyInf::on_tick()
     return result;
 }
 
-// TODO: ours realigns the frame (and esp, -8) because of the direct zun_atan2f call; the
-// original calls it without realigning (GameThread::thread_start's aligned
-// EnemyManager::create call and HARNESS_CALLED update/on_tick do not change it). Separate float
-// locals for the summed position keep it in registers and avoid a /GS cookie.
+// The direction of a velocity. An inline helper node of its own: calling
+// zun_atan2f directly made EnemyData::on_tick realign its frame early.
+static inline f32 heading_of(D3DXVECTOR3 *v)
+{
+    return zun_atan2f(v->y, v->x);
+}
+
+// Places the VM of an animation slot at the enemy's position plus the
+// slot's offset (plus its parent slot VM's position). A forceinline helper
+// owning the position temporary: written in on_tick, the memory-resident
+// Float3 gave it a /GS cookie.
+static __forceinline void place_slot_vm(EnemyData *e, AnmVm *vm, i32 i)
+{
+    Float3 pos = e->anm_pos_array[i] + e->final_pos.pos;
+    if (e->anm_parent_slot[i] >= 0)
+    {
+        AnmVm *base = e->anm_ids[e->anm_parent_slot[i]].find_or_clear();
+        if (base != NULL)
+        {
+            D3DXVec3Add(&pos, &pos, &base->pos);
+        }
+    }
+    vm->entity_pos = pos;
+}
+
+// TODO: the original keeps the summed position in xmm1-xmm3 across find_or_clear as
+// well as in memory; ours spills them. With AnmId::find_or_clear HARNESS_CALLED instead of
+// DECOMP_NOINLINE (LTCG then knows it leaves them alone) this matches.
 // FUNCTION: TH16 0x41d2e0
 int EnemyData::on_tick()
 {
@@ -1039,25 +1063,10 @@ int EnemyData::on_tick()
             {
                 continue;
             }
-            f32 x = anm_pos_array[i].x + final_pos.pos.x;
-            f32 y = anm_pos_array[i].y + final_pos.pos.y;
-            f32 z = anm_pos_array[i].z + final_pos.pos.z;
-            if (anm_parent_slot[i] >= 0)
-            {
-                AnmVm *base = anm_ids[anm_parent_slot[i]].find_or_clear();
-                if (base != NULL)
-                {
-                    x += base->pos.x;
-                    y += base->pos.y;
-                    z += base->pos.z;
-                }
-            }
-            vm->entity_pos.x = x;
-            vm->entity_pos.y = y;
-            vm->entity_pos.z = z;
+            place_slot_vm(this, vm, i);
             if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
             {
-                vm->rotation.z = zun_atan2f(final_pos.velocity.y, final_pos.velocity.x);
+                vm->rotation.z = heading_of(&final_pos.velocity);
                 vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
                 rotation = vm->rotation.z;
             }
