@@ -518,12 +518,20 @@ HARNESS_CALLED i32 GuiMsgVm::run()
             unk_1c0 = 0;
             break;
         }
+        // Each VM looked up into a local first: the instruction is then read
+        // after the lookup, as in the original.
         case MSG_TEXT_OFFSET_Y:
-            get_vm_or_clear(text_line_1)->pos_2.y = instr()->args.i[0];
-            get_vm_or_clear(text_line_2)->pos_2.y = instr()->args.i[0];
-            get_vm_or_clear(furigana_1)->pos_2.y = instr()->args.i[0];
-            get_vm_or_clear(furigana_2)->pos_2.y = instr()->args.i[0];
+        {
+            AnmVm *vm = get_vm_or_clear(text_line_1);
+            vm->pos_2.y = instr()->args.i[0];
+            vm = get_vm_or_clear(text_line_2);
+            vm->pos_2.y = instr()->args.i[0];
+            vm = get_vm_or_clear(furigana_1);
+            vm->pos_2.y = instr()->args.i[0];
+            vm = get_vm_or_clear(furigana_2);
+            vm->pos_2.y = instr()->args.i[0];
             break;
+        }
         case MSG_PLAYER_SHAKE:
             AnmManager::interrupt_tree(player_face, MSG_ANM_SHAKE);
             break;
