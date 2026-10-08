@@ -290,16 +290,17 @@ i32 AnmManager::draw_vertex_fan(AnmVm *vm, RenderVertex144 *vertices, i32 vertex
 }
 
 // Draws count points, each center + offsets[i] in colors[i], as a line
-// strip (despite the name) from the primitive buffer.
-// TODO: ours never uses ebx (the original keeps count * 20 and center in it) and spills the loop counter.
+// strip (despite the name) from the primitive buffer. Always returns 0
+// (the original sets eax although its caller ignores it).
+// TODO: ours never uses ebx (the original keeps count * 20 and center in it) and spills the loop counter; the original's frame has known 8-byte alignment from its caller, which dead doubles here (each form tried) turn into an ebx-form realignment of its own instead.
 // FUNCTION: TH16 0x469890
-HARNESS_CALLED void AnmManager::draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors)
+HARNESS_CALLED i32 AnmManager::draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors)
 {
     AnmManager *mgr = g_AnmManager;
     RenderVertex044 *vertices = mgr->primitive_write_cursor;
     if (vertices + 1 + count >= mgr->primitive_vertex_data + 0x8000)
     {
-        return;
+        return 0;
     }
     mgr->flush_sprites();
     for (i32 i = 0; i < count; i++)
@@ -330,6 +331,7 @@ HARNESS_CALLED void AnmManager::draw_triangle_fan(i32 count, Float3 *center, Flo
                                              sizeof(RenderVertex044));
     mgr->primitive_write_cursor += count;
     mgr->stat_draw_calls++;
+    return 0;
 }
 
 // The extra data of VMs drawn by anm_on_draw_masked (ExpHP:

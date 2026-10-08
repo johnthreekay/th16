@@ -623,7 +623,7 @@ struct AnmManager
     // 0x469890. Draws a triangle fan of count points around center, each
     // offset by offsets[i] and colored colors[i]. Every caller goes through
     // g_AnmManager, so LTCG dropped this.
-    HARNESS_CALLED void draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors);
+    HARNESS_CALLED i32 draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors);
     // 0x469a00. A circle outline of count segments around (x, y), from
     // angle on. draw_vm passes x, y and radius in xmm registers.
     HARNESS_CALLED i32 draw_circle_outline(f32 x, f32 y, f32 radius, f32 angle, i32 count, D3DCOLOR color);
