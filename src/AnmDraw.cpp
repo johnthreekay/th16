@@ -299,10 +299,13 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm_param, Float3 
 // by element: as AnmAnchorCorners struct copies, LTCG keeps them 16-byte
 // aligned and the function realigns its frame (and esp, -16), which the
 // original does not; as arrays they keep the original's /GS cookie and frame.
-// TODO: 71%; the original copies each table row with one movups (ours: four scalar copies), and the x and y offsets (and scale_x/scale_y) trade registers and stack slots.
+// The VM is read through a local copy of the pointer (see
+// write_sprite_corners__without_rot).
+// TODO: 74%; the original copies each table row with one movups (ours: four scalar copies), and the x and y offsets (and scale_x/scale_y) trade registers and stack slots.
 // FUNCTION: TH16 0x4660b0
-void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
+void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm_param, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
 {
+    AnmVm *vm = vm_param;
     f32 angle = vm->get_total_rotation()->z;
     f32 sine;
     f32 cosine;
