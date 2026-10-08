@@ -50,8 +50,9 @@ EnemyData::EnemyData()
 {
 }
 
-// TODO: drops.reset()'s memset arguments (push 0, lea esi, push esi) are scheduled a few
-// stores later in the original; ours pushes them right after push 0x50.
+// Sets up a new enemy running the ECL sub of the given name. The list node is
+// set with ZunList::init: written field by field, the scheduler moved the
+// pushes of drops.reset()'s memset ahead of the stores.
 // FUNCTION: TH16 0x41b580
 EnemyInf::EnemyInf(const char *sub_name)
 {
@@ -77,10 +78,7 @@ EnemyInf::EnemyInf(const char *sub_name)
     enemy.hitbox_size.y = 24.0f;
     enemy.rotation = 0.0f;
     enemy.own_boss_id = -1;
-    enemy.node_in_global_storage.entry = this;
-    enemy.node_in_global_storage.next = NULL;
-    enemy.node_in_global_storage.prev = NULL;
-    enemy.node_in_global_storage.unk_c = NULL;
+    enemy.node_in_global_storage.init(this);
     enemy.drops.reset();
     enemy.time_in_ecl = 0;
     enemy.time_alive = 0;
