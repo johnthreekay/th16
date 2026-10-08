@@ -206,6 +206,9 @@ enum EnemyFlags
     ENEMY_FLAG_RECT_HITBOX = 1 << 12,
     // No damage flash or hit sound.
     ENEMY_FLAG_NO_HIT_EFFECT = 1 << 13,
+    // Has been on screen (EnemyFlagsLow::was_on_screen); only then does
+    // leaving the screen delete it.
+    ENEMY_FLAG_WAS_ON_SCREEN = 1 << 16,
     // final_pos is kept inside move_limit_center/size (moveLimit).
     ENEMY_FLAG_MOVE_LIMIT = 1 << 17,
     // EnemyData::on_tick ran this frame; EnemyManager::update clears it.

@@ -1644,8 +1644,8 @@ i32 Bullet::step_ex_17()
     return 0;
 }
 
-// TODO: the original saves ebx and edi in the prologue, keeps
-// cancel_script in ecx and the manager in eax, and puts goal 4 bytes lower.
+// TODO: the original keeps cancel_script in ecx and the manager in eax, puts goal
+// 4 bytes lower, and multiplies goal.x from a copy of the game speed.
 // FUNCTION: TH16 0x4124b0
 i32 Bullet::check_player_collision(i32 graze_only)
 {

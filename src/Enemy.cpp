@@ -2208,8 +2208,8 @@ void EnemyData::ecl_anm_vm_instr()
     }
 }
 
-// TODO: frame layout (the original keeps the zero vector higher up), &rel_pos stays in esi, and
-// ours combines the two flag tests of the vertical off-screen check.
+// TODO: frame layout (the original keeps the zero vector higher up and its frame is 8 bytes
+// bigger), the directional VM sits in edx, and the camera's y is added the other way round.
 // FUNCTION: TH16 0x41bb50
 int EnemyData::step_interpolators()
 {
@@ -2263,18 +2263,16 @@ int EnemyData::step_interpolators()
     abs_pos.step();
     if (flags_low & ENEMY_FLAG_4000000)
     {
-        rel_pos.pos.x += g_Supervisor.cameras[0].position_delta.x;
-        rel_pos.pos.y += g_Supervisor.cameras[0].position_delta.y;
-        rel_pos.pos.z += g_Supervisor.cameras[0].position_delta.z;
+        rel_pos.pos += g_Supervisor.cameras[0].position_delta;
     }
     rel_pos.step();
     update_final_pos();
     if (((EnemyFlagsLow *)&flags_low)->directional_anm)
     {
+        i32 script_offset = 0;
         i32 dir = -0.03f > final_pos.velocity.x ? -1 : final_pos.velocity.x > 0.03f;
         if (anm_direction != dir)
         {
-            i32 script_offset = 0;
             switch (anm_direction)
             {
             case -1:
@@ -2347,9 +2345,13 @@ int EnemyData::step_interpolators()
         half = final_sprite_size.y * 0.5f;
         if (0.0f > final_pos.pos.y + half || final_pos.pos.y - half > 448.0f)
         {
-            if (flags->was_on_screen)
+            // The flags are read once and the second bit is tested on the
+            // low byte, which keeps the two tests apart as in the original
+            // (on the dword they merge into one and/cmp).
+            u32 f = flags_low;
+            if (f & ENEMY_FLAG_WAS_ON_SCREEN)
             {
-                if (!flags->no_offscreen_delete_y)
+                if (!((u8)f & ENEMY_FLAG_OFFSCREEN_Y))
                 {
                     return -1;
                 }
