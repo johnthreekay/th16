@@ -220,7 +220,11 @@ i32 __fastcall sht_on_init_sideways(PlayerBullet *bullet)
 
 // Waits for an enemy in the same row, then stops and flies at it
 // sideways. (The masks that clear the phase before setting it are ZUN's.)
-// TODO: ours gets a /GS cookie for pos and merges the ENEMY_FLAG_NO_HURTBOX test into the ENEMY_FLAGS_UNTARGETABLE one.
+// `~flags & ENEMY_FLAG_NO_HURTBOX` keeps the original's separate
+// not/test al, 1 instead of merging the bit into the next mask test.
+// TODO: ours gets a /GS cookie (it goes away without the interrupt_tree
+// call; separate float copies of pos also avoid it, but the original keeps
+// pos in memory) and so swaps esi and edi.
 // FUNCTION: TH16 0x4470f0
 i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet)
 {
@@ -242,7 +246,7 @@ i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet)
             Float3 pos = bullet->pos.pos;
             while (enemy != NULL)
             {
-                if (!(enemy->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX) && !(enemy->enemy.flags_low & ENEMY_FLAGS_UNTARGETABLE) &&
+                if ((~enemy->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX) && !(enemy->enemy.flags_low & ENEMY_FLAGS_UNTARGETABLE) &&
                     pos.y >= enemy->enemy.final_pos.pos.y - 16.0f && enemy->enemy.final_pos.pos.y + 16.0f >= pos.y &&
                     (enemy->enemy.final_pos.pos.x - 16.0f >= pos.x || pos.x >= enemy->enemy.final_pos.pos.x + 16.0f))
                 {
