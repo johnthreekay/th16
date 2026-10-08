@@ -129,8 +129,10 @@ struct InterpFloat2
         reset_timer();
     }
     // 0x425570. A second copy of step that the enemies' radial distance
-    // interpolators use (ExpHP: InterpRadialDist::step).
-    D3DXVECTOR2 step_radial_dist();
+    // interpolators use (ExpHP: InterpRadialDist::step). HARNESS_CALLED:
+    // its only caller, EnemyData::step_interpolators, realigns its frame,
+    // so LTCG knows this one need not.
+    HARNESS_CALLED D3DXVECTOR2 step_radial_dist();
 };
 
 // InterpFloat for 3D vectors.

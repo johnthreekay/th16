@@ -401,9 +401,9 @@ D3DXVECTOR3 InterpFloat3::step()
     return current;
 }
 
-// TODO: same as InterpFloat2::step, of which this is a second copy.
+// TODO: same remaining differences as InterpFloat2::step, of which this is a second copy.
 // FUNCTION: TH16 0x425570
-D3DXVECTOR2 InterpFloat2::step_radial_dist()
+HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step_radial_dist()
 {
     if (end_time > 0)
     {
