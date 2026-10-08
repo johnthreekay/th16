@@ -66,7 +66,7 @@ struct HelpManual
     static HelpManual *create();
     static void destroy();
     i32 initialize();
-    i32 on_tick_body();
+    __declspec(safebuffers) i32 on_tick_body();
     static i32 __fastcall on_tick_callback(HelpManual *manual);
     static i32 __fastcall on_draw_callback(HelpManual *manual);
 };

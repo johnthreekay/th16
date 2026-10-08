@@ -33,7 +33,9 @@ struct Fog
 
     // 0x418c70 (ExpHP: Fog::initialize). Every caller passes the same
     // first and third arguments, which LTCG folded away.
-    Fog(i32 unused_0, i32 points_per_strip, i32 unused_2);
+    // HARNESS_CALLED: with every caller visible LTCG folds the two unused
+    // arguments, whose slots callers then fill with junk like the original.
+    HARNESS_CALLED Fog(i32 unused_0, i32 points_per_strip, i32 unused_2);
     // 0x409550
     ~Fog();
     // 0x418df0. Lays the mesh out over a rectangle of the game area. LTCG

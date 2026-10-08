@@ -14,15 +14,28 @@ static_assert(sizeof(FogVertex) == 0x1c, "FogVertex size");
 // text.anm script of the main VM and the strip VMs.
 #define FOG_TEXT_ANM_SCRIPT 0x3b
 
+// The main VM's creation. Through this helper the returned id is read back
+// from its stack slot, as in the original.
+static __forceinline AnmId fog_create_main_vm()
+{
+    return g_Supervisor.text_anm->create_effect(FOG_TEXT_ANM_SCRIPT, 0x22, NULL);
+}
+
 // Allocates the grid and creates the VMs (the main VM on layer 0x22,
 // drawing through anm_effect_4_on_draw). Without the arcade surface to
 // sample there is no mesh. The id and VM pointer arrays are allocated one
 // byte short of 17 entries, room for the 16 strips.
 // TODO: the original pops each malloc's argument right after the call
-// (ours merges them), keeps this in ebx and the loop index in memory.
+// (ours merges the four pops).
 // FUNCTION: TH16 0x418c70
-Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
+HARNESS_CALLED Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
 {
+    // A dead double: LTCG then treats the constructor as wanting an aligned
+    // stack, which its (aligned) callers give it. With that known alignment
+    // it saves its registers up front and pops each malloc argument right
+    // after the call, as the original does.
+    double unused_double = 0.0;
+    (void)unused_double;
     if (g_Supervisor.arcade_surface_0 == NULL)
     {
         memset(this, 0, sizeof(Fog));
@@ -35,8 +48,7 @@ Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
     i32 num_points = FOG_STRIP_COUNT * points_per_strip;
     vertices = malloc(num_points * sizeof(FogVertex));
     points = malloc(num_points * sizeof(D3DXVECTOR3));
-    AnmId id;
-    id = g_Supervisor.text_anm->create_effect(FOG_TEXT_ANM_SCRIPT, 0x22, NULL);
+    AnmId id = fog_create_main_vm();
     AnmVm *vm = g_AnmManager->get_vm_with_id(id);
     if (vm == NULL)
     {

@@ -79,7 +79,10 @@ int __fastcall PopupManager::on_draw_thunk(void *arg)
 }
 
 // TODO: the original addresses each string through its timer's current
-// field and assigns the hoisted float constants to other xmm registers.
+// field (ours through speed_index), assigns the hoisted float constants to
+// other xmm registers and, in the second loop, adds current_f from memory
+// into the speed's register (every tick form tried loads it first or splits
+// the stores).
 // FUNCTION: TH16 0x449ea0
 int PopupManager::on_tick()
 {
@@ -90,8 +93,10 @@ int PopupManager::on_tick()
         {
             str->pos.y -= str->rise_speed * g_game_speed;
             str->rise_speed *= 0.95f;
-            str->time.tick_goto();
-            if (str->time.current > 60)
+            // Through a timer pointer: closer to the original's addressing.
+            ZunTimer *timer = &str->time;
+            timer->tick();
+            if (timer->current > 60)
             {
                 str->active = 0;
             }
