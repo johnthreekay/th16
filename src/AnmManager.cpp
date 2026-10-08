@@ -12,10 +12,28 @@ void AnmLoaded::copy_vm_and_run(AnmVm *vm, i32 script)
     vm->run();
 }
 
-// TODO: only difference: ours adds a /GS cookie for the recursive call's parent_pos (with the body in an inline helper the cookie goes, but root_vm stays cached in edi).
+// Adds the parent's world position. Matching workaround: written in
+// world_pos, the parent_pos local (its address goes to the recursive call)
+// gives world_pos a /GS cookie the original lacks; in a safebuffers
+// forceinline helper it does not (docs/findings.md).
+static __declspec(safebuffers) __forceinline void world_pos_add_parent(D3DXVECTOR3 *result, AnmVm *root)
+{
+    D3DXVECTOR3 parent_pos = root->world_pos();
+    *result += parent_pos;
+}
+
+// The VM's position plus its root VM's, rotated with the root's rotation if
+// the VM asks for it.
+// TODO: effective match only: the original loads root_vm for the test after
+// storing the result; ours before.
 // FUNCTION: TH16 0x40e490
 D3DXVECTOR3 AnmVm::world_pos()
 {
+    // A dead named local, not ZUN's code: with parent_pos moved into the
+    // helper, it keeps the count of named variables that gives the
+    // original's operand order for the position sums (docs/findings.md).
+    i32 unused = 0;
+    (void)unused;
     D3DXVECTOR3 result;
     result = entity_pos + pos + pos_2;
     if (root_vm != NULL && !(flags_hi & ANM_VM_NO_PARENT_POS))
@@ -29,8 +47,9 @@ D3DXVECTOR3 AnmVm::world_pos()
             result.x = x * c - y * s;
             result.y = y * c + x * s;
         }
-        D3DXVECTOR3 parent_pos = root_vm->world_pos();
-        result += parent_pos;
+        // root_vm read again (volatile) after the result stores: the original
+        // reloads it there, which the helper's local result no longer forces.
+        world_pos_add_parent(&result, *(AnmVm *volatile *)&root_vm);
     }
     return result;
 }
