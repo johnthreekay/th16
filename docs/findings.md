@@ -743,7 +743,33 @@ assume is in [workflow.md](workflow.md).
 - D3DXVECTOR3 `a + b` with both operands in memory loads b and adds a
   from memory (`pos + halfsize` loads halfsize); swap the operands for
   the other order. With a product on one side (`pos + halfsize * scale`),
-  and for `v * f` against `f * v`, the operand order changes nothing.
+  and for `v * f` against `f * v` with v a member, the operand order
+  changes nothing. With both operands in registers it does:
+  `player_scale * (halfsize * 0.5f)` copies the scale (movaps) before each
+  multiply like the original, `halfsize * 0.5f * player_scale` multiplies
+  in place.
+- on_tick_body's scaled boxes: `f32 scale = player_scale;` puts the scale
+  in xmm7 and 0.5f in xmm6; reading the member in every line still loads
+  it once, into the original's xmm6 (0.5f in xmm5). The remaining
+  differences there are scheduling and whether pos.x/halfsize.x are folded
+  into addss/mulss. Removing the state switch or the blue flash code
+  changes that scheduling; the code after the block no longer does.
+- `(~(inner.flags >> 2) & 1) && !(inner.flags & 0x10)` gives the original's
+  `mov eax, ecx; shr eax, 2; not eax; test al, 1` and a separate
+  `test cl, 0x10`. `!(flags & 4)`, `!((flags >> 2) & 1)`, `== 0` and a
+  bitfield view all merge both tests into `test byte ptr [...], 0x14`.
+  sht_on_tick_sideways (0x4470f0, bit 0 of the enemy flags) and 0x428a9f
+  have the same `not; test al, 1` shape, which may be the same fix.
+- An empty switch case that keeps its compare (`cmp eax, 4; je` to the
+  end) comes back with a one-argument debug_log call in the case: LTCG
+  drops the call after the switch is lowered (on_tick_body, state 3).
+- `x->angle = wrap_angle(x->angle + x->angular_speed)` loads angle first
+  in either operand order, also through add_normalize_angle or a local;
+  `x->angle += x->angular_speed;` loads angular_speed first like the
+  original but keeps a store of the unwrapped angle.
+- The `*speed * 1.0f` the original keeps in decrement (TODO at 0x40d490)
+  is not from late inlining: an out-of-line decrement(f32) in
+  ZunTimer.cpp, inlined by LTCG, folds it too.
 
 ### Sweep round 2, list B
 
