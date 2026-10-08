@@ -1341,3 +1341,50 @@ Second pass over GUI, stage and GameThread:
   `test eax, eax` after the D3DX call; create_stringf and
   create_number_with_digit put the padding above the cookie in the
   original, between cookie and buffer in ours.
+
+Vector operand order (research; the x/y vs z item above):
+- Method: a standalone snippet compiled with build.py's CFLAGS reproduced
+  the tree's code for anm_fan_init exactly, z mismatch included, so most of
+  this ran on snippets (tools in the overnight scratchpad were not kept).
+- For `a + b` with both operands in memory MSVC does not follow source
+  order: `p->f[k] + p->e[k]` and `p->e[k] + p->f[k]` compile the same. In
+  straight-line code with one base pointer, the field at the higher offset
+  is loaded and the lower one folded into addss; with two pointer
+  parameters the earlier parameter's load comes first. Globals differ:
+  `a + b` loads b, inside a loop a.
+- A component read at offset 0 through a pointer (x of every D3DX operand:
+  operator+, +=, D3DXVec3Add's `this` and `v`, a local `D3DXVECTOR3 *`) is
+  ordered by the function's count of named variables and parameters, with
+  period 8: every named variable counts 1, whatever its type, scope or
+  position. Only that component flips (with `float *p = &v.y`, p[0] = y
+  flips instead). Dead stores, identity inline helpers and CSE'd duplicates
+  change nothing; field-wise `vm->pos.x + vm->entity_pos.x` never flips.
+  Each D3DX operation has its own flip window, so one count change can fix
+  one and break another. Three dead named locals matched
+  LaserInfiniteInf::cancel (the "only x differs" case in straight-line
+  code).
+- Inside a loop body (base pointer not an induction variable) the choice
+  follows a period-4 pattern over the loop's statements; its phase moves
+  with the memory statements before the loop and with the loop form:
+  top-tested counted loops (for, while, guarded do) alike, bottom-tested
+  loops (do/while, goto, for(;;) with break) one phase earlier,
+  end-pointer loops (`p < end`) one phase later. Dead locals, field offsets
+  and source operand order do not move it. This is where the mixed x/y vs
+  z orders in loops come from: a do/while counting up matched
+  anm_fan_init, and the same idea LaserCurveInf::on_draw.
+- Ruled out: the struct-copy pairing (unpcklps/movq; the patterns appear
+  without any copy); the D3DX header (five other operator definitions and
+  a Float3 built on a Float2 only shift the patterns, and field-wise code
+  shows the same effects); /d2SSAOptimizer-, /d2newcolor-, /d2linscan,
+  /d2Loop0-2 (no change except Loop0 on vectorized loops).
+- A local declared at function scope instead of an inner block changes
+  stack slot reuse: AnmVm::load_from's `i32 read` at the top gave
+  &index_of_on_serialize its own slot like the original.
+- Python's subprocess with capture_output makes every build wait for
+  mspdbsrv.exe to exit (minutes); redirect to a file instead.
+- Dead ends: anm_on_tick_fan (about 3000 snippet combinations of loop
+  forms, dead locals 0-7, helper parameters, statement orders);
+  anm_gather_effect_on_tick's `start_center += offset` (y never flips);
+  draw_text's height lookup; load_from's `read` slot; gather_on_copy's
+  spilled counter; insert_in_* (dead locals 1-7 included). A loop-form
+  scan over 17 functions found no further matches.
