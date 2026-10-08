@@ -381,7 +381,9 @@ struct EnemyData
     int on_tick();
     // 0x41bb50, 0x41c330, 0x41cbd0: on_tick's steps.
     int step_interpolators();
-    int step_logic();
+    // Matching workaround: safebuffers drops the /GS cookie ours gets for
+    // the hitbox position passed to check_hit_rotated_rect.
+    __declspec(safebuffers) int step_logic();
     void update_fog();
     // 0x41c1f0. Moves final_pos to abs_pos + rel_pos, then keeps it inside
     // the movement limit.

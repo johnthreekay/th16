@@ -579,6 +579,10 @@ static inline void enemy_play_hit_sound(EnemyData *enemy, i32 low_life_spell, i3
 // FUNCTION: TH16 0x41c330
 int EnemyData::step_logic()
 {
+    // A dead double: LTCG then realigns the frame (and esp, -8) like the
+    // original's.
+    double unused = 0.0;
+    (void)unused;
     if ((flags_low & ENEMY_FLAG_BOMBSHIELD) && (g_MainBomb->in_use == 1 || g_SubseasonBomb->in_use == 1) &&
         !(flags_low & ENEMY_FLAG_BOMBSHIELD_UP))
     {
