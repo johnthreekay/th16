@@ -477,9 +477,11 @@ AnmLoaded *__stdcall AnmManager::load_next_entry(AnmLoaded *anm)
     return anm;
 }
 
-// TODO: the original loads the last dword of the sprite before the first movups store.
+// sprite is the caller's local, never part of sprites[]: written __restrict so
+// the copy may load the last dword before the first movups store, like the
+// original.
 // FUNCTION: TH16 0x46d8a0
-void AnmLoaded::load_sprite(i32 index, AnmLoadedSprite *sprite)
+void AnmLoaded::load_sprite(i32 index, AnmLoadedSprite *__restrict sprite)
 {
     sprites[index] = *sprite;
     sprites[index].uv_start.x = sprites[index].start_pixel_inclusive.x / sprites[index].bitmap_width;
