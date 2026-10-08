@@ -81,7 +81,8 @@ HARNESS_CALLED f32 EclRunContext::get_float_arg(int index)
     return ins->args[index].f;
 }
 
-// TODO: the original adds the frame base to the stack address first and loads the entry value before its type.
+// TODO: the original computes the entry's value offset (value * 8 + 4) on its own and
+// addresses the type 4 bytes below it; ours folds the 4 into the displacement.
 // FUNCTION: TH16 0x473e40
 i32 EclRunContext::get_int_arg_given_value(int index, i32 value)
 {
@@ -90,22 +91,27 @@ i32 EclRunContext::get_int_arg_given_value(int index, i32 value)
     {
         if (value >= 0)
         {
-            return *(i32 *)((u8 *)stack.data + stack.base_offset + value);
+            return *stack.local_ptr(value);
         }
         if (value <= -1 && value >= -100)
         {
             EclStackEntry *entry = (EclStackEntry *)((u8 *)stack.data + stack.stack_offset) + value;
             EclStackItem item = entry->value;
             char type = entry->type;
+            i32 result;
             if (type == 'f')
             {
-                return (i32)item.f;
+                result = (i32)item.f;
             }
             else if (type == 'i')
             {
-                return item.i;
+                result = item.i;
             }
-            return item.i;
+            else
+            {
+                result = item.i;
+            }
+            return result;
         }
         return vm->get_int_global(value);
     }

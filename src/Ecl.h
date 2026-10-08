@@ -164,6 +164,13 @@ struct EclStack
     // 0x474860. Closes the frame enter opened.
     HARNESS_CALLED i32 ecl_return();
 
+    // The local at the given byte offset from the frame base. Callers that
+    // go through it compute the frame address before adding the offset.
+    i32 *local_ptr(i32 offset)
+    {
+        return (i32 *)((u8 *)data + base_offset + offset);
+    }
+
     // Typed pushes and pops of the expression stack, inlined into
     // EclRunContext::ecl_run.
     __forceinline i32 pop_int()
