@@ -17,8 +17,8 @@ struct AnmAnchorCorners
     f32 corner[4];
 };
 
-// At 0x4a3048, right after g_sound_effect_table; not annotated, since the
-// sound code's end-of-table pointer would compare as this symbol.
+// At 0x4a3048, right after g_sound_effect_table.
+// GLOBAL: TH16 0x4a3048
 AnmAnchorCorners g_anchor_corners_x[3] = {
     {-0.5f, 0.5f, -0.5f, 0.5f},
     {0.0f, 1.0f, 0.0f, 1.0f},
