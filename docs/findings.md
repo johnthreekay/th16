@@ -1544,3 +1544,28 @@ Second pass over ANM VM, loader, drawing and interpolation:
   a match); AnmVm::run (`fenv_access(on)` took it 92 -> 79);
   draw_3d_vertex_strip's rotation matrix as D3DMATRIX or f32[16] still
   realigns to 16.
+
+Sweep of the enemy files with the vector-research levers (first half):
+- Behaviour fix: anmPosTime (ecl_anm_vm_instr) and anmPlayPos
+  (ecl_run_over_300) read their y argument before x, as the original does
+  (0x4236dd, 0x41dfca); get_float_arg consumes g_replay_safe_rng for the
+  random variables, so the old order swapped the two random values. The
+  D3DXVECTOR3 constructor evaluates float arguments left to right in our
+  build, so y is read into a local first (as anmScale already did).
+  ecl_anm_vm_instr dropped 65.89 -> 65.42 for it; accepted.
+- The dead-local lever does not reach inside inlined helpers: dead locals
+  in the caller never moved the load or operand order inside an inlined
+  ZunTimer tick (kill_all_no_set_death, Spellcard::on_tick_body) or in the
+  static outside_range helper (step_ex_08). The count seems to apply within
+  each inlined body, so the helper itself would need them.
+- The lever also moves scheduling: in Bullet::on_tick dead locals changed
+  whether the half-step moves compute all three components before storing
+  or store each in turn (7 dead locals measured 77.76 -> 79.94).
+- quickdiff can mislead after a layout shift (Bullet::on_tick 51.2 -> 75 in
+  quickdiff, 77.76 -> 77.96 in reccmp); confirm with compare.py.
+- No dead-local count 1-7 or loop form moved run_ex,
+  kill_all_no_set_death, BulletManager::on_tick_body,
+  Spellcard::on_tick_body, step_ex_08, step_logic or shoot_one;
+  check_player_collision gets worse at counts 4-6; step_interpolators'
+  camera y add never flips (field-wise, pointer, D3DXVec3Add and operator+
+  either way, an `f32 *` component pointer with counts 0-7).
