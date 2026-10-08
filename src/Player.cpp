@@ -1390,9 +1390,10 @@ static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
     }
 }
 
-// TODO: ours gets a /GS cookie for the zero position passed to
-// create_vm_inline; the original zeroes one local before the loops and
-// aligns its frame.
+// Declared __declspec(safebuffers) (Player.h): without it ours gets a /GS
+// cookie for the zero position passed to create_vm_inline.
+// TODO: the original zeroes one local before the loops and aligns its
+// frame.
 // FUNCTION: TH16 0x4440e0
 void PlayerInner::repopulate_options()
 {
