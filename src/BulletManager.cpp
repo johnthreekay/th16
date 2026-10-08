@@ -1580,6 +1580,16 @@ static i32 outside_range(f32 *x, f32 size, f32 lo, f32 hi)
     return *x + half <= lo || *x - half >= hi;
 }
 
+// outside_range for Bullet::on_tick's offscreen test (sizes scaled by the
+// bullet's scale). The coordinate is read into a local here: on_tick's
+// original adds the two the other way round from step_ex_12's.
+static i32 outside_range_scaled(f32 *x, f32 size, f32 lo, f32 hi)
+{
+    f32 half = size * 0.5f;
+    f32 v = *x;
+    return v + half <= lo || v - half >= hi;
+}
+
 // TODO: reccmp effective match: the original loads 192.0f before 448.0f.
 // FUNCTION: TH16 0x415d80
 i32 Bullet::step_ex_12()
@@ -1764,8 +1774,8 @@ static __forceinline void move_full_step(Bullet *b)
 // before the pushes as in the original (as cancel_bullet does).
 // TODO: the half-step moves are still scheduled differently per case (the
 // original's spawning case computes all three components before storing, its
-// active case stores each in turn), and the offscreen test adds the half size
-// the other way round.
+// active case stores each in turn), and in the offscreen test the original
+// inlines the height's sprite lookup that ours calls.
 // FUNCTION: TH16 0x411e70
 HARNESS_CALLED i32 Bullet::on_tick()
 {
@@ -1931,8 +1941,8 @@ HARNESS_CALLED i32 Bullet::on_tick()
         }
         if (!(active_ex_flags & BULLET_EX_OFFSCREEN) && offscreen_grace < 1)
         {
-            if (outside_range(&pos.x, vm_sprite(&vm0)->sprite_width * scale, -192.0f, 192.0f) ||
-                outside_range(&pos.y, vm_sprite(&vm0)->sprite_height * scale, -64.0f, 480.0f))
+            if (outside_range_scaled(&pos.x, vm_sprite(&vm0)->sprite_width * scale, -192.0f, 192.0f) ||
+                outside_range_scaled(&pos.y, vm_sprite(&vm0)->sprite_height * scale, -64.0f, 480.0f))
             {
                 release();
                 return -1;
