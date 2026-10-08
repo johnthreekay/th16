@@ -1732,10 +1732,15 @@ void Bullet::release()
 // Ticks one bullet: state, ex steps, movement, offscreen deletion and VMs.
 // Returns -1 once the bullet is released. The release is written out at
 // each place (the original keeps the first copy inline at the top).
-// TODO: ours realigns the frame (and esp, -8) and schedules the half-step moves
-// differently (the original computes all three components before storing).
+// HARNESS_CALLED (its one caller is BulletManager::on_tick_body), like
+// step_ex_08: the 8-byte alignment step_ex_08's D3DXVECTOR2 wants then comes
+// from on_tick_body's realigned frame, and neither realigns its own.
+// TODO: the half-step moves are scheduled the other way round per case (the
+// original's spawning case computes all three components before storing, its
+// active case stores each in turn), and the hit case does not share the
+// cancelled case's tail.
 // FUNCTION: TH16 0x411e70
-i32 Bullet::on_tick()
+HARNESS_CALLED i32 Bullet::on_tick()
 {
     time_alive.tick_nested();
     if (flags & BULLET_FLAG_DELETE)
@@ -1914,10 +1919,12 @@ i32 Bullet::on_tick()
     return 0;
 }
 
-// TODO: ours realigns the frame (and esp, -8) for corner, folds the
-// timer decrement's multiply by 1.0f, and adds pos.x + half the other way.
+// HARNESS_CALLED: see Bullet::on_tick (otherwise it realigns its frame for
+// corner).
+// TODO: the original puts dir and corner at the top of the frame (ebp-0x10,
+// ebp-8), keeps the timer decrement's multiply by 1.0f, and adds half + pos.y.
 // FUNCTION: TH16 0x4162d0
-i32 Bullet::step_ex_08()
+HARNESS_CALLED i32 Bullet::step_ex_08()
 {
     ex_state[11].timer.decrement(1.0f);
     if (ex_state[11].ints[0] != 0 &&
