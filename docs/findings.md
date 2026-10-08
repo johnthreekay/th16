@@ -1671,3 +1671,59 @@ Enemy-file sweep, second half:
 - Unfinished lead: Bullet::on_tick's active-case `pos += velocity *
   g_game_speed` in a forceinline helper with two dead locals gave the best
   quickdiff (80.1 vs 76.7); not yet confirmed in reccmp.
+
+Third pass over GUI, stage, GameThread and the ANM manager:
+- Padded frames (4 unused bytes, a `push ecx` or a 4-byte-bigger
+  `sub esp`) need a callee that wants an aligned stack: a dead double in a
+  plain `static inline` helper of its own, called at the top, makes the
+  function pad without realigning itself. Matched AnmLoaded::set_vm_script
+  (with HARNESS_CALLED), create_vm, create_ui_effect, create_ui_vm,
+  create_vm_front and Stage::interrupt_vms; LaserManager::cancel_in_radius
+  needed two calls (85.7 -> 95.2). On Player::on_draw_callback it matched
+  but cost 4 matches; on preload_anm +10 but EndingScriptVm::run lost its
+  match; on open_game_over_menu +4 but two matches lost.
+- allocate_new_enemy's junk third argument comes from LTCG dropping the
+  unused parameter once it is HARNESS_CALLED; a stand-in caller on a second
+  object (src/harness/r3b.cpp) keeps `this` in ecx
+  (GameThread::finish_stage_transition effective). In the original
+  Bullet::run_ex and ECL still push 0, probably from a call-graph cycle
+  compiled before it.
+- AnmVm::world_pos: parent_pos in a `static __declspec(safebuffers)
+  __forceinline` helper removes the cookie, but lets root_vm be cached; a
+  volatile re-read (`*(AnmVm *volatile *)&root_vm`) restores the reload and
+  one dead named local the sums' order (effective match). A volatile load
+  does not stay ordered after normal stores.
+- Look an object up into a local before reading the instruction pointer:
+  `vm = get_vm_or_clear(x); vm->f = instr()->args...` loads the instruction
+  after the call, into ecx like the original (GuiMsgVm::run).
+- `strlen / 2 * 16` compiles to shr; shl; the original's lea; and comes
+  from the equivalent `len * 8 & ~15`. A VM pointer local in each branch
+  gave run_std's cross-jump into the shared flag store. Passing an index as
+  its own parameter to a forceinline create helper puts the add at the
+  call after the spill (setup_stage_hud).
+- Dead ends: do_key_config's byte load widens to a dword whenever the same
+  address is read as a dword anywhere in the function;
+  interrupt_child_and_run (the helper pads it but moves registers);
+  read_line's alignment nop (five loop forms); Fog::set_rect;
+  do_title_screen's 4-byte slot offset; EffectManager::create_ui_effect's
+  eax/ecx copies; InterpCameraSky::step's loop operand order;
+  update_season_gauge's ebx; Gui::on_tick_body's tick (the original lays
+  out the whole-frame block first; no tick form reproduces it).
+
+Sweep of lasers, system and GUI-side files with the new levers:
+- Dead locals move register choices and stack slots, not only the x load
+  (LaserLineInf::cancel_as_bomb_circle +12.9 with one, get_state +6.2
+  with four). Removing a named variable did not act as "minus one".
+- The D3DX operation decides which count window applies: in
+  LaserCurveNode::step_back six dead locals fixed the dt copy, and only
+  `D3DXVec3Add(&sum, &a, &b)` then also fixed the sum's x operands.
+- The x flip can come with swapped registers: in LaserInfiniteInf::on_tick
+  three dead locals fixed the x add but swapped x and y's registers;
+  writing the scaled vector field by field (`Float3 v; v.x = ...;
+  position += v;`) with two dead locals matches that block.
+- tick_nested matched PauseMenu::on_tick (both timers). In
+  PopupManager::on_tick the timer form decides the loop pointer's base.
+- Of the loop forms, only the guarded do moved anything (while and
+  for(;;)+break compile like for).
+- Screening: insert N dead locals into every function at once and build
+  once per N, then confirm each hit alone.
