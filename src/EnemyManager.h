@@ -74,10 +74,13 @@ struct EnemyManager
     EnemyList *owned_list_188;
     i32 enemy_count_real;
 
+    // flags is set through a pointer of its own: that keeps the store ahead of
+    // the next_enemy_id load, as in the original (EnemyManager::create).
     EnemyManager()
     {
         memset(this, 0, sizeof(*this));
-        flags |= 2;
+        u32 *f = &flags;
+        *f |= 2;
         inner.last_enemy_id = inner.next_enemy_id;
         g_EnemyManager = this;
         if (++inner.next_enemy_id == 0)
