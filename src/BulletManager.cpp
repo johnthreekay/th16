@@ -231,11 +231,14 @@ i32 BulletManager::on_draw_body()
     return 1;
 }
 
-// TODO: the original aligns the stack (and esp, -8) and keeps 1.0f in xmm2
-// across the loop; the inlined ZunTimer::tick differs a little too.
+// TODO: the original keeps 1.0f in xmm2 across the loop for the inlined
+// ZunTimer::tick (reloaded after Bullet::on_tick).
 // FUNCTION: TH16 0x412860
 i32 BulletManager::on_tick_body()
 {
+    // A dead double: LTCG then realigns the frame like the original's.
+    double unused = 0.0;
+    (void)unused;
     Bullet *b;
     b = iter_first();
     bullet_count = 0;
