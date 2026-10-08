@@ -268,6 +268,21 @@ i32 __fastcall TitleInf::on_draw_thunk(void *arg)
 
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 
+// input_pressed_or_repeating as the key config screen inlines it: the
+// original tests the low bytes of both input words (mov cl/al, byte ptr).
+static __forceinline i32 key_config_pressed_or_repeating(u8 mask)
+{
+    if (*(u8 *)&g_hardware_input_pressed & mask)
+    {
+        return 1;
+    }
+    if (*(u8 *)&g_hardware_input_repeat & mask)
+    {
+        return 1;
+    }
+    return 0;
+}
+
 // TODO: the volume clamps use al/ecx where ours uses cl/eax (also with an if instead of the ternary).
 // FUNCTION: TH16 0x44c570
 i32 TitleInf::do_options()
@@ -543,7 +558,9 @@ void TitleInf::update_options_sprites()
     }
 }
 
-// TODO: for the up/down tests the original loads the pressed and repeat words as bytes (mov cl/al); ours loads dwords (byte casts only narrow the repeat load).
+// TODO: for the up/down tests the original loads the pressed word as a byte
+// (mov cl, byte ptr); ours loads the dword (the byte reads only narrow the
+// repeat load).
 // FUNCTION: TH16 0x44e930
 i32 TitleInf::do_key_config()
 {
@@ -573,11 +590,11 @@ i32 TitleInf::do_key_config()
     case 2:
     {
         menu.current_selection = menu.next_selection;
-        if (input_pressed_or_repeating(INPUT_UP))
+        if (key_config_pressed_or_repeating(INPUT_UP))
         {
             menu.move_cursor(-1);
         }
-        if (input_pressed_or_repeating(INPUT_DOWN))
+        if (key_config_pressed_or_repeating(INPUT_DOWN))
         {
             menu.move_cursor(1);
         }
@@ -945,14 +962,16 @@ const char *const g_demo_replay_names[3] = {"demo/demo1.rpy", "demo/demo2.rpy", 
 
 // Plays a demo replay after 30 idle seconds on the title screen, starts the
 // title BGM a few frames after it appears, and runs the current screen.
-// TODO: the original computes the demo index as x % -3 would (imul 0x55555555; sub; sar 1); ours uses idiv, or the /3 magic through a local (also with % -3); it also calls the Supervisor members without this and keeps the replay info in ecx.
+// The input test masks the low word (a u16 cast compares the word in
+// memory) and the timer ticks as tick_mixed.
+// TODO: the original computes the demo index as x % -3 would (imul 0x55555555; sub; sar 1); ours uses idiv, or the /3 magic through a local (also with % -3, x / -3 * 3, or % through an inline helper); it also calls the Supervisor members without this and keeps the replay info in ecx.
 // FUNCTION: TH16 0x44af80
 i32 TitleInf::on_tick()
 {
     if (state == TITLE_STATE_MAIN)
     {
         g_title_idle_frames++;
-        if ((u16)g_hardware_input != 0)
+        if (g_hardware_input & 0xffff)
         {
             g_title_idle_frames = 0;
         }
@@ -1167,7 +1186,7 @@ i32 TitleInf::on_tick()
         do_replay_save();
         break;
     }
-    time_in_state.tick();
+    time_in_state.tick_mixed();
     return 1;
 }
 
@@ -1179,6 +1198,22 @@ extern i32 g_last_character;
 static __forceinline void title_interrupt_child(TitleInf *menu, i32 script, i32 interrupt)
 {
     AnmVm *vm = find_child_of(menu->anm_ids[0], script);
+    vm->interrupt(interrupt);
+}
+
+// title_interrupt_child with search_children inlined too, as for the
+// greyed out Extra Start items.
+static __forceinline void title_interrupt_child_inline(TitleInf *menu, i32 script, i32 interrupt)
+{
+    AnmVm *vm;
+    if (get_vm_or_clear(menu->anm_ids[0]) == NULL)
+    {
+        vm = NULL;
+    }
+    else
+    {
+        vm = search_children_inline(get_vm_or_clear(menu->anm_ids[0]), script, 0);
+    }
     vm->interrupt(interrupt);
 }
 
@@ -1207,7 +1242,8 @@ static __forceinline void title_highlight_inline(TitleInf *menu)
     }
 }
 
-// TODO: functionally complete; register allocation and the choice of inlined vs called menu highlight copies differ in places.
+// The first "no clear" greying inlines search_children, the second calls it.
+// TODO: 92%; some locals sit 4 bytes off the original's stack slots.
 // FUNCTION: TH16 0x44b5f0
 i32 TitleInf::do_title_screen()
 {
@@ -1289,8 +1325,8 @@ i32 TitleInf::do_title_screen()
             title_highlight_inline(this);
             if (!g_Scorefile->any_cleared())
             {
-                title_interrupt_child(this, 4, TITLE_INTERRUPT_DISABLED);
-                title_interrupt_child(this, 14, TITLE_INTERRUPT_DISABLED);
+                title_interrupt_child_inline(this, 4, TITLE_INTERRUPT_DISABLED);
+                title_interrupt_child_inline(this, 14, TITLE_INTERRUPT_DISABLED);
             }
         }
         break;

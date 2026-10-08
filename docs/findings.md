@@ -852,3 +852,183 @@ assume is in [workflow.md](workflow.md).
   EnemyInf's memset pushes, come a few stores later in the original; the
   bitfield view, a local, one expression and other statement positions
   do not move them.
+
+### Overnight round (2026-10-08)
+
+Lasers and MainMenuStates:
+- A function the original realigns (`and esp, -8`, ebx frame) and ours
+  does not: a dead `double unused = 0.0; (void)unused;` in that function
+  makes it realign itself (LaserLineInf::initialize and
+  LaserInfiniteInf::initialize matched, nothing else moved). The same
+  double in a callee (AnmVm::run) cost nine matches.
+- Early realignment that comes from calling a callee which realigns itself
+  (TitleInf::draw_spell_card_page calling AnmManager::draw_text_centered)
+  goes away when the calls go through small `static inline` helpers, each
+  its own call-graph node.
+- Rotations: `Float3 d = *pos - position;` and computing y before x
+  (`y = d.x*s + d.y*c; x = d.x*c - d.y*s`) give the original's registers
+  and stack slots (all three touches_circle). The same form helped the
+  line and infinite sum_rect_damage and LaserLineInf::cancel_as_bomb_rectangle
+  but made LaserCurveInf::sum_rect_damage and the infinite
+  cancel_as_bomb_rectangle worse.
+- `double whole = floor(t);` with `(f32)whole` at each use reproduces
+  `fstp qword; movsd; cvtpd2ps`; `(f32)floor(t)` gives `fstp dword; movss`
+  (LaserCurveNode::step_back).
+- Indexing `segs[i]` / `segs[i - 1]` from a base pointer loaded before the
+  loop gives the original's induction pointer biased by -8; a `segment++`
+  loop does not. The bias follows the first address the body reads.
+- Storing a computed value through an `f32 *` local
+  (`*node_angle = wrap_angle(angle)`) makes MSVC reload the source member
+  for its next use. Reading the member back instead of the local it was
+  just stored from put the local in xmm0 like the original (step_ex_angle).
+- `position += vel * g_game_speed` (or a temp plus D3DXVec3Add) loads
+  g_game_speed once like the original; the field-wise form reloads it after
+  each store. Writing `length * g_game_speed` in each branch instead of a
+  local before the compare gives the original's compare-then-multiply.
+- Switch case layout: `if (a >= b) { ...fall through } else { ...; break; }`
+  instead of `if (a < b) { ...; break; }` (LaserInfiniteInf::on_tick).
+- Writing `vm_950.field` directly instead of through `AnmVm *vm = &vm_950`
+  keeps `this` in ebx; setting the blend mode through such a pointer gives
+  the `inc [ex_index]` and reload in LaserInfiniteInf::run_ex.
+- `i32 i = 0` declared before `memset(hit, 0, ...)` makes the memset reuse
+  i's zero register (`xor ebx, ebx; push ebx`); `step.z = 0` before the
+  sincosmul call matches the original's order (bomb cancels).
+- reccmp finds functions by PDB file and line: rebuild before compare.py
+  after any edit that shifts lines, or functions drop out of the compare.
+- Dead ends: LaserCurveInf::on_draw's z add order (every field-wise
+  permutation, D3DXVec3Add both ways, `+=` on a Float3 view, pointer
+  locals); the timer tick that adds current_f into the speed register
+  (every tick variant and a hand-written local); `*speed * 1.0f` in
+  decrement (int argument, `fenv_access(on)`, `float_control(except)`, a
+  double multiply: all still folded); cancel_in_rectangle/cancel_in_radius's
+  8-byte frame (dead double, 8-aligned harness caller); allocate_new_laser's
+  `push ecx` (`new T` vs `new T()`, typed locals, NULL init);
+  draw_spell_card_page's `idiv` by a register 10 (ours multiplies for
+  `id % 10`; tens first, locals, unsigned); on_draw__replay's setne vs
+  neg/sbb/and (ternary, `!!`, bool/u8 locals all identical); do_music_room's
+  /GS cookie comes from its direct AnmManager::interrupt_tree calls.
+
+System files and MainMenu:
+- Moving a function's double math into a `static __forceinline` helper
+  makes it realign through ebx with ebp-relative locals like the original;
+  written in place, the same body realigns with `and esp, -8` and
+  esp-relative locals. get_runtime's helper also gave its callers their
+  padded frames (PauseMenu::leave_paused matched, CSound::Unpause's frame
+  fixed); get_controller_state matched with its whole body in a helper.
+- A dead `double unused = 0.0;` matched Globals::add_to_score (ebx-form
+  realignment), in the body or in a helper around the show_notice call. It
+  is not universal: in ReplayManager::begin_stage it gives `and esp, -8`
+  instead; in on_tick_record and present (inside an if) it does nothing;
+  in the /INCLUDE'd add_power it only moves esi's push into the prologue.
+- A function inlined at some call sites and called at others
+  (get_score_extend_quota: inlined by the HUD, called by add_to_score,
+  which keeps the score in edx across the call): an inline definition in
+  the header plus a HARNESS_CALLED out-of-line copy
+  (score_extend_quota_out_of_line, 0x43ddd0). Marking the one function
+  HARNESS_CALLED instead cost Gui::update_lives its match.
+- Shared return/failure blocks: the original keeps the first copy inline
+  and later returns jump back into it; which copy ours keeps follows the
+  loop structure. read_joypad's Acquire retry loop written like
+  get_controller_state's (`while (hr == LOST) { hr = Acquire(); if (++n >=
+  400) return; }`) makes the joyGetPosEx failure the shared copy.
+- Switches on a step counter became jump tables where the original
+  compares (SoundManager::update_sound_thread); if/else-if chains gave
+  +11%. In the same function a `for` pan-sum loop was vectorized (unrolled
+  by 2 with no_vector); `do { } while (--j)` inside `if (count > 0)` gives
+  the plain loop. SoundBufferEntry::play and CSound::SetVolume need
+  DECOMP_NOINLINE (the original calls them at every site).
+- Computing a call's result into a local first keeps the destination
+  pointer reload after the call (`DWORD pos = SetFilePointer(...);
+  wave->x = pos - ...` matched CSound::Pause).
+- `if (!(p & m) && !(r & m)) return 0; return 1;` avoids the setcc that
+  two `if (...) return 1;` give (input_pressed_or_repeating). Nested
+  `if (!reset) { if (dev) ... }` loads the device before the test where
+  `&&` does not (create_d3d_device). A cursor copy of a pointer parameter
+  frees its argument slot for the loop counter (Arcfile::parse_directory).
+  `for (i = N; i != 0; i--)` lets WinMain reuse the final 0 in edi.
+  `(x & 0xffff)` gives `movzx; test`, a `(u16)` cast gives
+  `cmp word [mem], 0` (TitleInf::on_tick).
+- volatile locals for values the original spills (WinMain's result,
+  on_tick_record's input) help partly; the original also keeps a register
+  copy.
+- Dead ends: the demo index's divide by -3 (`% 3`, `% -3`,
+  `x - x / -3 * -3`, an inline helper: all fold to /3 or idiv); register
+  choices in CSound::SetVolume, SoundBufferEntry::play, preload_bgm,
+  file_read_all, ScorefileStatus::init and lzss_decompress; get_runtime's
+  spill slot ([ebp-8] vs [ebp-0x10]); loop-alignment nops ours adds at
+  some loop heads (read_line, ScorefileStatus::init, the ReplayManager
+  destructor, WinMain); SoundManager::initialize (99.53%) differs only in
+  data layout.
+- Open, cross-file: an early-aligned GameThread::on_tick_body (seek
+  written inline, or a dead double in begin_stage) matches
+  ReplayManager::begin_stage and gives finish_stage_transition and
+  begin_stage their frames, but Stage::start_std_vms loses its match (it
+  loses edi shrink-wrapping). EnemyManager::allocate_new_enemy's dead
+  parameter (junk third argument in begin_stage) needs it HARNESS_CALLED
+  plus a harness caller with a second object.
+
+GUI, stage, effects, pause and help menus:
+- The open timer item (the original adds current_f from memory into the
+  speed's register) is solved by `ZunTimer::tick_goto`:
+  `if (speed == NULL) goto whole_frame; if (*speed > 0.99f && *speed <
+  1.01f) { whole_frame: cur++; current_f = current_f + 1.0f; } else {
+  current_f = *speed + current_f; cur = (i32)current_f; } current = cur;`
+  gives `addss xmm1, [current_f]`, a store in each branch and 1.01f kept in
+  a register (ScreenEffect::on_tick_flash, on_tick_hold and on_tick_shake
+  matched). Candidates elsewhere: the bullet ex steps, InterpFloat3::step,
+  Spellcard::on_tick_body, kill_all.
+- /GS cookies from struct temporaries: a plain `static inline` helper that
+  owns the Float3 temporary (LTCG inlines it) removes the cookie
+  (set_float3 in the GuiMsgVm constructor, set_entity_pos_xyz in
+  setup_stage_hud); `__forceinline` keeps it whenever the local stays in
+  memory, and LTCG does not inline plain helpers whose local's address
+  goes to a call. Even a dead Float3 local or a POD D3DVECTOR triggers the
+  cookie. `__declspec(safebuffers)` on the declaration removes it in
+  GuiMsgVm::run (a documented workaround) but not in InterpCameraSky::step.
+  Unexplained: the original's InterpCameraSky::step passes temporaries by
+  address to operator+ and has no cookie.
+- Padded functions in the original (create_number_with_digit,
+  create_stringf) keep the cookie at [ebp-8] with 4 free bytes above it:
+  LTCG knows esp mod 8 at each call site and aligns the 0x104-byte buffer.
+  Ours, when it knows the alignment, adds 8 bytes and keeps the cookie at
+  [ebp-4].
+- Dead doubles (the lasers technique) matched Stage::on_tick,
+  Stage::update_std_vms, Gui::show_lights_out and
+  Gui::show_stage_clear_bonus, but cost InterpCameraSky::step 3 points.
+  On other functions they had side effects: on_draw_2_body +13% but
+  create_number loses its match; HelpManual::on_tick_body +5% but
+  AnmManager::reload_texture -2.4; update_callout worse. Routing a callee
+  through a `static inline` helper did not stop the padding
+  (reload_texture, update_season_gauge's run calls).
+- A dead double in a HARNESS_CALLED AnmVm::run plus HARNESS_CALLED
+  update_std_vms (not committed): 8 matched (Stage::on_tick, update_std_vms,
+  anm_masked_effect_on_tick, collect_full_power, both laser initializers,
+  ReplayManager::begin_stage, interrupt_tree_and_run), 7 lost
+  (PosVel::step_from_center, start_std_vms, cancel_rectangle_as_bomb,
+  boss_timer_on_spell_start, Spellcard::end, start_dialogue,
+  Item::init_anm; they gain padded frames).
+- `char buf[3] = {0, 0, 0}` instead of three stores puts buf in another
+  variable's slot (draw_text). Indexing `anm_ids[last_used_index]` afresh
+  in each test instead of an `AnmId &` local puts `this` in ebx and spills
+  the index (EffectManager::next_index). In blur_alpha, offsets from the
+  global width keep `up = -width` its own variable; up_left must be
+  `-w - 1` to get `not`.
+- Operand order: `f32 r = rand(); ... r * PI / 40 + PI / 80 + wave_angle_b`
+  adds the member last (step_fog); `D3DXVECTOR3 *pos = &vertex->pos;
+  pos->y = pos->y + d.y` loads pos.y first. Each corner component written
+  as its own `center.x + size.x * 0.5f` (CSE merges them) schedules closer
+  than named bounds (StdObject::is_culled).
+- `(~(flags >> 5) & 1) && (~flags & 1)` gives Gui::on_tick_body's
+  `shr; not; test al, 1` sequence (same as Player::on_tick_body's).
+- Small inline helpers taking a `MenuHelper *` give HelpManual's
+  `[edi+4]` accesses.
+- build.py cannot parse `__declspec(...)` before an annotated definition;
+  put it on the declaration.
+- Dead ends: on_draw_03's pop and spill placement; show_boss_marker's
+  redundant `test` (about 12 forms); begin_score_entry's character offset
+  (always folded into the index); AsciiInf::tick shrink-wrap; PopupManager
+  loop base field; blur_alpha/bleed_color never using ebx (empty `__asm {}`
+  does nothing); Ending::initialize's stack slots; the CameraSky cookie
+  (non-array color struct, user constructor); a form of
+  Stage::start_std_vms that keeps its shrink-wrap whatever the caller's
+  alignment.

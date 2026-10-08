@@ -316,7 +316,11 @@ HARNESS_CALLED bool TextHelper::bleed_color(i32 rows)
     return true;
 }
 
-// TODO: the original indexes src with the precomputed -w and keeps ebx free; ours uses ebx.
+// Gives fully transparent pixels an alpha from their 8 neighbours (the 4
+// direct ones count twice, the sum divided by 14), soft text edges.
+// The neighbour offsets come from g_TextHelper.width each (up_left from w):
+// that keeps up = -width as its own variable, as in the original.
+// TODO: the original keeps dst and a 0xfff mask in stack slots and leaves ebx free; ours keeps dst in ebx.
 // FUNCTION: TH16 0x458af0
 HARNESS_CALLED bool TextHelper::blur_alpha(i32 rows)
 {
@@ -328,11 +332,11 @@ HARNESS_CALLED bool TextHelper::blur_alpha(i32 rows)
     u16 *copy = (u16 *)malloc(g_TextHelper.width * rows * 2 + 1);
     memcpy(copy, dst, g_TextHelper.width * rows * 2);
     i32 w = g_TextHelper.width;
-    i32 up = -w;
-    i32 up_right = 1 - w;
+    i32 up = -g_TextHelper.width;
+    i32 up_right = 1 - g_TextHelper.width;
     i32 up_left = -w - 1;
-    i32 down_right = w + 1;
-    i32 down_left = w - 1;
+    i32 down_right = g_TextHelper.width + 1;
+    i32 down_left = g_TextHelper.width - 1;
     u16 *src = copy + w;
     dst += w;
     for (i32 i = 0; i < (rows - 2) * g_TextHelper.width; i++, src++, dst++)
@@ -479,7 +483,6 @@ void create_fonts()
     }
 }
 
-// TODO: code matches; the original packs buf into the slot of text's spill ([ebp-0x18]), ours gives it its own (frame 0x3c vs 0x34).
 // FUNCTION: TH16 0x459240
 HARNESS_CALLED void __stdcall draw_text(RECT *dst_rect, i32 x, i32 font_height, D3DCOLOR color,
                                          D3DCOLOR shadow_color, const char *text,
@@ -547,10 +550,8 @@ HARNESS_CALLED void __stdcall draw_text(RECT *dst_rect, i32 x, i32 font_height, 
     }
     else
     {
-        char buf[3];
-        buf[0] = 0;
-        buf[1] = 0;
-        buf[2] = 0;
+        // An initializer, not three stores: it puts buf in text's stack slot.
+        char buf[3] = {0, 0, 0};
         for (i32 i = 0; i < len; i += 2)
         {
             buf[0] = text[i];

@@ -27,7 +27,7 @@ void read_resolution_dialog();
 INT_PTR CALLBACK resolution_dialog_proc(HWND dialog, UINT message, WPARAM wparam, LPARAM lparam);
 LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
 extern HANDLE g_app_mutex;
-extern D3DThreadInf g_D3DThreadInf;
+extern ThreadInf g_unused_thread;
 
 // Something WinMain allocates first and frees last; nothing else is known
 // to use it.
@@ -35,9 +35,11 @@ struct WinMainUnk
 {
     i32 value;
 
+    // The store goes through volatile: WinMain sets value to 0 again right
+    // after the new, and the original keeps both stores.
     WinMainUnk()
     {
-        value = 0;
+        ((volatile WinMainUnk *)this)->value = 0;
     }
 };
 
@@ -129,8 +131,9 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
 
 // Creates the device (or resets it) with the smallest back buffer that
 // holds the window. In full screen a mode that is not 60 Hz is only taken
-// on the second pass. 0 on success.
-// TODO: 91%; register allocation of the retry loop differs.
+// on the second pass. 0 on success. The release before trying the next
+// size is two nested ifs: with `!reset && device != NULL` the device load
+// moves after the reset test.
 // FUNCTION: TH16 0x45b530
 HARNESS_CALLED i32 create_d3d_device(i32 reset)
 {
@@ -189,10 +192,13 @@ retry:
         {
             if (!g_Supervisor.present_params.Windowed && !second_pass)
             {
-                if (!reset && g_Supervisor.d3d_device != NULL)
+                if (!reset)
                 {
-                    g_Supervisor.d3d_device->Release();
-                    g_Supervisor.d3d_device = NULL;
+                    if (g_Supervisor.d3d_device != NULL)
+                    {
+                        g_Supervisor.d3d_device->Release();
+                        g_Supervisor.d3d_device = NULL;
+                    }
                 }
                 continue;
             }
@@ -420,7 +426,9 @@ static inline void stop_sound_threads()
 // changed) starts over from creating Direct3D. On exit it saves th16.cfg
 // and log.txt and restores the screen saver settings.
 // WinMain has C linkage, so it is annotated by its linker symbol.
-// TODO: 80%; the critical section loops count differently and some blocks are laid out in another order.
+// TODO: 92%; the original keeps result in ecx as well as its stack slot
+// (ours reloads it), does not pad the loop heads with nops, and lays out
+// some blocks in another order.
 // SYNTHETIC: TH16 0x459830 SYMBOL
 // _WinMain@16
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_line, int show)
@@ -429,12 +437,18 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
     BYTE keys[256];
     char path[0x1000];
     HINSTANCE instance_copy = instance;
-    i32 result = 0;
+    // The original keeps result in a stack slot; volatile stands in for
+    // whatever spilled it there, and leaves edi free for PeekMessageA's
+    // address as in the original.
+    i32 volatile result = 0;
     g_GameWindow.instance = instance;
     timeBeginPeriod(1);
-    for (i32 i = 0; i < CS_COUNT; i++)
+    // Counted down: the original then reuses the counter's final 0 in edi.
+    CRITICAL_SECTION *cs = g_CriticalSections.cs;
+    for (i32 i = CS_COUNT; i != 0; i--)
     {
-        InitializeCriticalSection(&g_CriticalSections.cs[i]);
+        InitializeCriticalSection(cs);
+        cs++;
     }
     g_CriticalSections.enabled = true;
     g_unk_4a6d90 = new WinMainUnk;
@@ -553,7 +567,8 @@ create_d3d:
         goto shutdown;
     }
     g_Supervisor.init_input();
-    g_D3DThreadInf.join_if_running();
+    // The original joins g_unused_thread here, which nothing ever starts.
+    g_unused_thread.join_if_running();
     start_sound(g_GameWindow.window);
     if (init_d3d() != 0)
     {
@@ -570,7 +585,10 @@ create_d3d:
         SetCursor(NULL);
     }
     g_GameWindow.runtime_base = 0.0;
-    g_GameWindow.frame_start_time = g_GameWindow.last_frame_time = g_GameWindow.next_frame_time = get_runtime();
+    double now = get_runtime();
+    g_GameWindow.next_frame_time = now;
+    g_GameWindow.frame_start_time = now;
+    g_GameWindow.last_frame_time = now;
     g_GameWindow.present_time = g_GameWindow.sleep_start_time = get_runtime();
     SetForegroundWindow(g_GameWindow.window);
     result = g_Supervisor.initialize();
@@ -724,15 +742,16 @@ shutdown:
     }
     if (result == 2)
     {
+        // The log starts over with the restart message.
+        g_GameErrorContext.buffer_end = g_GameErrorContext.buffer;
+        g_GameErrorContext.buffer[0] = '\0';
         // 再起動を要するオプションが変更されたので再起動します
         g_GameErrorContext.log("\x8d\xc4\x8bN\x93\xae\x82\xf0\x97v\x82\xb7\x82\xe9\x83I\x83v\x83V\x83\x87\x83\x93\x82"
                                "\xaa\x95\xcf\x8dX\x82\xb3\x82\xea\x82\xbd\x82\xcc\x82\xc5\x8d\xc4\x8bN\x93\xae\x82\xb5"
                                "\x82\xdc\x82\xb7\r\n");
-        g_GameErrorContext.buffer_end = g_GameErrorContext.buffer;
-        g_GameErrorContext.buffer[0] = '\0';
         if (!g_Supervisor.present_params.Windowed)
         {
-            WINNLSEnableIME(NULL, FALSE);
+            WINNLSEnableIME(NULL, TRUE);
         }
         for (i32 i = 60; i != 0; i--)
         {
