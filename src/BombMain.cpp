@@ -385,9 +385,10 @@ static inline PosVel *orb_motion(BombReimuAOrb *orb)
     return &orb->motion;
 }
 
+// The timer ticks with tick_mixed (the unscaled path's own xmm0).
 // TODO: this is in esi where the original has edi (both save esi and edi and
-// leave the other unused), and the radial_dist update is scheduled into the
-// start_pos copy.
+// leave the other unused, so ours pops edi early in the tick), and the
+// radial_dist update is scheduled into the start_pos copy.
 // FUNCTION: TH16 0x410550
 void BombReimuAOrb::update()
 {
@@ -467,7 +468,7 @@ void BombReimuAOrb::update()
         vm->entity_pos = pos;
     }
     move = pos - old_pos;
-    timer.tick();
+    timer.tick_mixed();
 }
 
 // Not ZUN's: calling update through this keeps LTCG from realigning
