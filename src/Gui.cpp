@@ -1360,7 +1360,18 @@ static __forceinline AnmId find_child_id_inline_search(AnmId &id, i32 script)
 // Fills the season gauge bar towards the next level and shows the level
 // (interrupt 7 + level), switching the gauge's look (interrupt 2 or 3) when
 // the first level is reached or lost.
-// TODO: the original keeps g_AnmManager and then the level in ebx; ours spills both.
+// update_season_gauge runs the gauge VM through this helper's member pointer,
+// which the optimizer turns back into the original's direct call. With
+// direct calls to AnmVm::run in its call graph, ours realigned the frame
+// (ebx form); the original has an unrealigned frame.
+typedef i32 (AnmVm::*AnmVmRunFunc)();
+static inline AnmVmRunFunc anm_vm_run_func()
+{
+    return &AnmVm::run;
+}
+
+// TODO: the original keeps g_AnmManager and then the level in ebx (ours reloads
+// it and spills the level), and pads its frame for known alignment (push ecx).
 // FUNCTION: TH16 0x42c600
 void Gui::update_season_gauge()
 {
@@ -1377,7 +1388,7 @@ void Gui::update_season_gauge()
         if (gui->season_gauge_has_level == 1)
         {
             gauge->interrupt(3);
-            gauge->run();
+            (gauge->*anm_vm_run_func())();
         }
         gui->season_gauge_has_level = 0;
     }
@@ -1397,7 +1408,7 @@ void Gui::update_season_gauge()
         if (gui->season_gauge_has_level == 0)
         {
             gauge->interrupt(2);
-            gauge->run();
+            (gauge->*anm_vm_run_func())();
         }
         gui->season_gauge_has_level = 1;
     }
