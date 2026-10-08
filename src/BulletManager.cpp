@@ -1739,13 +1739,32 @@ void Bullet::release()
 // HARNESS_CALLED (its one caller is BulletManager::on_tick_body), like
 // step_ex_08: the 8-byte alignment step_ex_08's D3DXVECTOR2 wants then comes
 // from on_tick_body's realigned frame, and neither realigns its own.
-// TODO: the half-step moves are scheduled the other way round per case (the
+// The seven unused locals at the top are there for matching: MSVC's choice of
+// operand order and scheduling for the vector moves follows the function's
+// count of named variables modulo 8 (docs/findings.md, "Vector operand
+// order"), and seven more (one fewer, in effect) brings the half steps closer
+// to the original. Dropping the `vm` or `goal` local instead changes the code.
+// TODO: the half-step moves are still scheduled differently per case (the
 // original's spawning case computes all three components before storing, its
 // active case stores each in turn), and the hit case does not share the
 // cancelled case's tail.
 // FUNCTION: TH16 0x411e70
 HARNESS_CALLED i32 Bullet::on_tick()
 {
+    i32 unused_0 = 0;
+    (void)unused_0;
+    i32 unused_1 = 0;
+    (void)unused_1;
+    i32 unused_2 = 0;
+    (void)unused_2;
+    i32 unused_3 = 0;
+    (void)unused_3;
+    i32 unused_4 = 0;
+    (void)unused_4;
+    i32 unused_5 = 0;
+    (void)unused_5;
+    i32 unused_6 = 0;
+    (void)unused_6;
     time_alive.tick_nested();
     if (flags & BULLET_FLAG_DELETE)
     {
