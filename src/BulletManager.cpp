@@ -1737,7 +1737,7 @@ void Bullet::release()
 // FUNCTION: TH16 0x411e70
 i32 Bullet::on_tick()
 {
-    time_alive.tick();
+    time_alive.tick_nested();
     if (flags & BULLET_FLAG_DELETE)
     {
         release();
