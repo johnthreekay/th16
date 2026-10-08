@@ -2533,7 +2533,6 @@ static __forceinline f32 laser_mid_angle(f32 cur, f32 prev)
 // laser's width to each side across the segment's direction (averaged with
 // the previous segment's), with u running from 0 to 1 along the laser. The
 // origin VM sits on the last segment until the whole laser is out.
-// TODO: the original loads the segment z before adding the vertex z (operand order; += gets z right but y wrong, D3DXVec3Add or field-wise forms get z wrong).
 // FUNCTION: TH16 0x438750
 i32 LaserCurveInf::on_draw()
 {
@@ -2557,7 +2556,14 @@ i32 LaserCurveInf::on_draw()
             a = laser_mid_angle(cur, wrap_angle(segment[-1].angle + ZUN_PI / 2));
         }
         laser_sincosmul((Float3 *)&vertex->pos, a, inner.laser_new_arg_4 * 0.5f);
-        D3DXVec3Add((Float3 *)&vertex->pos, &segment->pos, (Float3 *)&vertex->pos);
+        // x and y as a vector add, z through a pointer to the segment's z
+        // (one per vertex): the original loads the segment's z and adds the
+        // vertex's.
+        D3DXVec2Add((Float2 *)&vertex->pos, (Float2 *)&segment->pos, (Float2 *)&vertex->pos);
+        {
+            f32 *segment_z = &segment->pos.z;
+            vertex->pos.z = *segment_z + vertex->pos.z;
+        }
         vertex->pos.x += (f32)g_game_2d_origin_x;
         vertex->pos.y += (f32)g_early_arcade_offset_y;
         vertex->pos.z = 0.0f;
@@ -2576,7 +2582,11 @@ i32 LaserCurveInf::on_draw()
             a = laser_mid_angle(cur, wrap_angle(segment[-1].angle - ZUN_PI / 2));
         }
         laser_sincosmul((Float3 *)&vertex->pos, a, inner.laser_new_arg_4 * 0.5f);
-        D3DXVec3Add((Float3 *)&vertex->pos, &segment->pos, (Float3 *)&vertex->pos);
+        D3DXVec2Add((Float2 *)&vertex->pos, (Float2 *)&segment->pos, (Float2 *)&vertex->pos);
+        {
+            f32 *segment_z = &segment->pos.z;
+            vertex->pos.z = *segment_z + vertex->pos.z;
+        }
         vertex->pos.x += (f32)g_game_2d_origin_x;
         vertex->pos.y += (f32)g_early_arcade_offset_y;
         vertex->pos.z = 0.0f;
