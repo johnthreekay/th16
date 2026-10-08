@@ -33,9 +33,10 @@ i32 __fastcall sht_on_init_sideways(PlayerBullet *bullet);
 i32 __fastcall sht_on_init_piercing(PlayerBullet *bullet);
 i32 __fastcall sht_on_init_spread(PlayerBullet *bullet);
 i32 __fastcall sht_on_tick_homing(PlayerBullet *bullet);
-i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet);
+// safebuffers: see sht_on_tick_laser and sht_on_tick_sideways.
+__declspec(safebuffers) i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet);
 i32 __fastcall sht_on_tick_accelerate(PlayerBullet *bullet);
-i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet);
+__declspec(safebuffers) i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet);
 i32 __fastcall sht_on_tick_accelerate_slow(PlayerBullet *bullet);
 i32 __fastcall sht_on_hit_spark_back(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius);
 i32 __fastcall sht_on_hit_laser(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius);
@@ -222,9 +223,12 @@ i32 __fastcall sht_on_init_sideways(PlayerBullet *bullet)
 // sideways. (The masks that clear the phase before setting it are ZUN's.)
 // `~flags & ENEMY_FLAG_NO_HURTBOX` keeps the original's separate
 // not/test al, 1 instead of merging the bit into the next mask test.
-// TODO: ours gets a /GS cookie (it goes away without the interrupt_tree
-// call; separate float copies of pos also avoid it, but the original keeps
-// pos in memory) and so swaps esi and edi.
+// Declared __declspec(safebuffers) (above): without it ours gets a /GS
+// cookie for pos (it goes away without the interrupt_tree call) that the
+// original does not have.
+// TODO: bullet and enemy swap esi and edi, 0.0f is put in xmm1 at the top
+// instead of in the angle ternary, and the enemy advance jumps out of the
+// loop on a NULL node instead of joining at the enemy test.
 // FUNCTION: TH16 0x4470f0
 i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet)
 {
@@ -505,8 +509,9 @@ static __forceinline i32 option_laser_index(ShtShooter *shooter, i32 shooter_ref
 // option is gone or the power level changed.
 // The VM fields are stored before their flag bits are set, which loads
 // the values ahead of the or like the original.
-// TODO: ours gets a /GS cookie (offset goes to the asm sincosmul) and no
-// 8-byte frame alignment.
+// Declared __declspec(safebuffers) (above): without it ours gets a /GS
+// cookie (offset goes to the asm sincosmul) the original does not have.
+// TODO: the original realigns its frame to 8 bytes (esp-relative locals).
 // FUNCTION: TH16 0x446260
 i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet)
 {
