@@ -183,9 +183,22 @@ void Globals::collect_bomb_fragment(i32 unused)
     g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
 }
 
-// TODO: the original realigns its frame through ebx (with a 4-byte slot and
-// esi saved up front), which LTCG adds for Gui::show_notice's sake; ours
-// does not realign.
+// The extend notice. The dead double is not ZUN's code: it stands in for
+// whatever made LTCG's stack alignment pass count Gui::show_notice as a
+// callee that wants an aligned frame. In an inline helper it belongs to the
+// helper's call graph node, so add_to_score realigns through ebx (with a
+// 4-byte slot and esi saved up front) like the original, while show_notice
+// and its other callers are left alone (a dead double in show_notice itself
+// costs Spellcard::end and Item::init_anm their matches).
+static inline void show_extend_notice()
+{
+    double unused = 0.0;
+    (void)unused;
+    g_Gui->show_notice(0, GUI_NOTICE_EXTEND);
+}
+
+// Adds to the score (in units of 10), with an extra life and its notice for
+// every extend score passed, up to the 9999999990 cap.
 // FUNCTION: TH16 0x43e080
 HARNESS_CALLED void Globals::add_to_score(i32 amount)
 {
@@ -195,7 +208,7 @@ HARNESS_CALLED void Globals::add_to_score(i32 amount)
         if (g_Globals.collect_extend(0))
         {
             g_SoundManager.play_sound_centered(SE_EXTEND, 0);
-            g_Gui->show_notice(0, GUI_NOTICE_EXTEND);
+            show_extend_notice();
         }
         g_Globals.next_score_extend_index++;
     }
