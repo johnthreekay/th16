@@ -692,7 +692,8 @@ static __forceinline i32 finish_user_section(u8 *section, char *end)
     return size;
 }
 
-// TODO: ours realigns its frame to 64 bytes (alignment spreading up from a callee) and allocates registers differently.
+// TODO: 76%; registers are allocated differently (the original keeps 0 in
+// ebx for the stage counters and spills path; ours keeps path in ebx).
 // FUNCTION: TH16 0x448400
 HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 unused, i32 add_end_marker)
 {
