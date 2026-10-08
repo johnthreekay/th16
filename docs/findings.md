@@ -1222,3 +1222,54 @@ ANM manager, callbacks, rendering and loaded ANMs:
   lookup; convert_texture (`row[x]` is worse). create_effect calls load
   g_EffectManager into ecx where the original uses eax (same open item as
   the menu functions).
+
+Collision, second pass over lasers, menus and system:
+- Collision rotations: writing `sinf`/`cosf` inside the 4-point rotation
+  loop keeps it rolled like the original (`mov eax, 4` counter, pointer
+  walk), the array in memory and the original's /GS cookie; with the calls
+  before the loop MSVC unrolls and scalarizes it (whether rotate_points is
+  forceinline, inline or takes a count). collision_test_points_in_rect
+  28.75 -> 97.50.
+- The original squares each corner offset again in every test. That comes
+  back when the squared length is read through a pointer:
+  `offset_length_sq(const Float3 *d)` returning `d->y*d->y + d->x*d->x`
+  (y term first gives the original's x-term accumulator). It must be a
+  Float3: an 8-byte Float2 local made LTCG realign the callers' frames
+  (cancel_rectangle_as_bomb lost its match). The plain expression and a
+  by-value helper get the squares shared. The helper in Collision.h also
+  helped the inlined copy in the three sum_rect_damage functions.
+- `fabsf(y) <= h * 0.5f` evaluates fabsf before the multiply like the
+  original; `h * 0.5f >= fabsf(y)` does not.
+- tick_goto matched ZunTimer::operator-= (the unscaled branch gets its own
+  load of current_f) and both step_ex_angle functions (effective).
+- Component pointers decide add operand order: `f32 *px = &position.x;
+  *px += offset.x;` loads position and adds the offset from memory
+  (LaserCurveInf::initialize). LaserCurveInf::on_draw matched with x and y
+  as `D3DXVec2Add` plus a block-scoped `f32 *segment_z =
+  &segment->pos.z; vertex->pos.z = *segment_z + vertex->pos.z;` (one
+  pointer shared by both vertices was worse). `&((T *)segments)[i - 1]`
+  instead of `&segment[-1]` loads segments before scaling i.
+- Menu states: writing `g_stage_data = &g_stage_table[stage]` before the
+  stage_num/weird_stage_num stores keeps `stage + 1` in ecx with the imul
+  hoisted (solves the open item; do_spell_practice_subseason and
+  do_spell_practice_difficulty matched). A clamp in place on the member
+  (`cfg.x += 5; if (cfg.x > 100) cfg.x = 100;`) gave do_options' al/ecx.
+- ~ReplayManager: the three unregister blocks written out instead of an
+  inline helper (+4.5). The original hoists EnterCriticalSection's address
+  into a register in some loops (ScorefileStatus::init, ~ReplayManager);
+  not reproduced.
+- Dead ends: draw_circle/draw_circle_outline/draw_ring's
+  `movaps xmm0, step; addss angle, xmm0` copy that pushes the angle add
+  past the stores (every loop and add form; the original's own
+  update_special_vertices has the same copy); draw_rect's cos/sin slot
+  order; ZunAngle::operator-'s PI/b register swap; the `* 1.0f` in
+  decrement (an out-of-line HARNESS_CALLED function with an i32 parameter
+  gets `ret 4` but folds; an f32 parameter goes in xmm1; a const reference,
+  an extern const, a never-written global all fold); the rotation loops'
+  store order; collision_segment_intersection's canonicalized operand
+  orders; do_key_config's byte load widened to a dword; the shared ascii
+  create_effect push order; do_spell_practice_row's base/index order;
+  CSound::Unpause's add order; SoundBufferEntry::play's merged SetVolume
+  calls; a dead double around interrupt_child_and_run's run() (cost two
+  cursor functions their matches); camera_update_2d calling zun_tanf
+  (zun_tanf becomes a jmp thunk and loses its match); lzss setup order.
