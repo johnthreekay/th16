@@ -316,7 +316,11 @@ HARNESS_CALLED bool TextHelper::bleed_color(i32 rows)
     return true;
 }
 
-// TODO: the original indexes src with the precomputed -w and keeps ebx free; ours uses ebx.
+// Gives fully transparent pixels an alpha from their 8 neighbours (the 4
+// direct ones count twice, the sum divided by 14), soft text edges.
+// The neighbour offsets come from g_TextHelper.width each (up_left from w):
+// that keeps up = -width as its own variable, as in the original.
+// TODO: the original keeps dst and a 0xfff mask in stack slots and leaves ebx free; ours keeps dst in ebx.
 // FUNCTION: TH16 0x458af0
 HARNESS_CALLED bool TextHelper::blur_alpha(i32 rows)
 {
@@ -328,11 +332,11 @@ HARNESS_CALLED bool TextHelper::blur_alpha(i32 rows)
     u16 *copy = (u16 *)malloc(g_TextHelper.width * rows * 2 + 1);
     memcpy(copy, dst, g_TextHelper.width * rows * 2);
     i32 w = g_TextHelper.width;
-    i32 up = -w;
-    i32 up_right = 1 - w;
+    i32 up = -g_TextHelper.width;
+    i32 up_right = 1 - g_TextHelper.width;
     i32 up_left = -w - 1;
-    i32 down_right = w + 1;
-    i32 down_left = w - 1;
+    i32 down_right = g_TextHelper.width + 1;
+    i32 down_left = g_TextHelper.width - 1;
     u16 *src = copy + w;
     dst += w;
     for (i32 i = 0; i < (rows - 2) * g_TextHelper.width; i++, src++, dst++)
