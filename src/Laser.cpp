@@ -3057,7 +3057,9 @@ i32 LaserLineInf::on_tick()
 // One frame: the et_ex steps, then each segment follows the node list to
 // its place at segment_timer minus its index (segments not out yet stay at the
 // start), leaving the screen once every segment is off it.
-// TODO: the original walks the segments with a pointer biased by -8 and keeps the constants 192 and 448 in swapped registers; it also keeps the * 1.0f of the inlined timer decrement.
+// The segments are indexed (segs[i], segs[i - 1]): the loop then walks them
+// with a pointer biased by -8 like the original's.
+// TODO: the original calls step_ex_accel through eax (ours edx), keeps 192 and 448 in swapped registers, adds the head offset onto the loaded position (operand order) and keeps the * 1.0f of the inlined timer decrements.
 // FUNCTION: TH16 0x4377d0
 i32 LaserCurveInf::on_tick()
 {
@@ -3126,19 +3128,21 @@ i32 LaserCurveInf::on_tick()
             ex_invuln_remaining_frames--;
         }
     } while (again != 0);
-    LaserCurveSegment *segment = (LaserCurveSegment *)segments;
+    LaserCurveSegment *segs = (LaserCurveSegment *)segments;
     if (!(flags_rest & 1))
     {
-        i32 placed = 0;
-        for (i32 i = 0; i < inner.segment_count; i++, segment++)
+        // volatile keeps the flag in its stack slot as in the original,
+        // where out_length holds the register ours would give it.
+        volatile i32 placed = 0;
+        for (i32 i = 0; i < inner.segment_count; i++)
         {
             f32 t = segment_timer.current_f - (f32)i;
             if (t >= 0.0f)
             {
-                f32 prev_length = segment[-1].length;
-                f32 prev_angle = segment[-1].angle;
-                f32 *out_length = &segment->length;
-                f32 *out_angle = &segment->angle;
+                f32 prev_length = segs[i - 1].length;
+                f32 prev_angle = segs[i - 1].angle;
+                f32 *out_length = &segs[i].length;
+                f32 *out_angle = &segs[i].angle;
                 LaserCurveNode *node;
                 for (node = &nodes; node != NULL; node = node->next)
                 {
@@ -3146,11 +3150,11 @@ i32 LaserCurveInf::on_tick()
                     {
                         if (!placed)
                         {
-                            node->get_state(&segment->pos, out_length, out_angle, t);
+                            node->get_state(&segs[i].pos, out_length, out_angle, t);
                         }
                         else
                         {
-                            node->step_back(&segment->pos, out_length, out_angle, &segment[-1].pos, prev_length,
+                            node->step_back(&segs[i].pos, out_length, out_angle, &segs[i - 1].pos, prev_length,
                                             prev_angle, t);
                         }
                         break;
@@ -3160,14 +3164,14 @@ i32 LaserCurveInf::on_tick()
             }
             else
             {
-                segment->pos = inner.start_pos;
-                *(Float3 *)segment->unk_c = g_zero_vec;
-                segment->angle = inner.ang_aim;
-                segment->length = inner.speed;
+                segs[i].pos = inner.start_pos;
+                *(Float3 *)segs[i].unk_c = g_zero_vec;
+                segs[i].angle = inner.ang_aim;
+                segs[i].length = inner.speed;
             }
         }
     }
-    segment = (LaserCurveSegment *)segments;
+    LaserCurveSegment *segment = (LaserCurveSegment *)segments;
     if (offscreen_grace.current > 0 || (ex_flags & BULLET_EX_OFFSCREEN))
     {
         offscreen_grace.decrement(1.0f);
