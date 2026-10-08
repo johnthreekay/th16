@@ -966,3 +966,69 @@ System files and MainMenu:
   loses edi shrink-wrapping). EnemyManager::allocate_new_enemy's dead
   parameter (junk third argument in begin_stage) needs it HARNESS_CALLED
   plus a harness caller with a second object.
+
+GUI, stage, effects, pause and help menus:
+- The open timer item (the original adds current_f from memory into the
+  speed's register) is solved by `ZunTimer::tick_goto`:
+  `if (speed == NULL) goto whole_frame; if (*speed > 0.99f && *speed <
+  1.01f) { whole_frame: cur++; current_f = current_f + 1.0f; } else {
+  current_f = *speed + current_f; cur = (i32)current_f; } current = cur;`
+  gives `addss xmm1, [current_f]`, a store in each branch and 1.01f kept in
+  a register (ScreenEffect::on_tick_flash, on_tick_hold and on_tick_shake
+  matched). Candidates elsewhere: the bullet ex steps, InterpFloat3::step,
+  Spellcard::on_tick_body, kill_all.
+- /GS cookies from struct temporaries: a plain `static inline` helper that
+  owns the Float3 temporary (LTCG inlines it) removes the cookie
+  (set_float3 in the GuiMsgVm constructor, set_entity_pos_xyz in
+  setup_stage_hud); `__forceinline` keeps it whenever the local stays in
+  memory, and LTCG does not inline plain helpers whose local's address
+  goes to a call. Even a dead Float3 local or a POD D3DVECTOR triggers the
+  cookie. `__declspec(safebuffers)` on the declaration removes it in
+  GuiMsgVm::run (a documented workaround) but not in InterpCameraSky::step.
+  Unexplained: the original's InterpCameraSky::step passes temporaries by
+  address to operator+ and has no cookie.
+- Padded functions in the original (create_number_with_digit,
+  create_stringf) keep the cookie at [ebp-8] with 4 free bytes above it:
+  LTCG knows esp mod 8 at each call site and aligns the 0x104-byte buffer.
+  Ours, when it knows the alignment, adds 8 bytes and keeps the cookie at
+  [ebp-4].
+- Dead doubles (the lasers technique) matched Stage::on_tick,
+  Stage::update_std_vms, Gui::show_lights_out and
+  Gui::show_stage_clear_bonus, but cost InterpCameraSky::step 3 points.
+  On other functions they had side effects: on_draw_2_body +13% but
+  create_number loses its match; HelpManual::on_tick_body +5% but
+  AnmManager::reload_texture -2.4; update_callout worse. Routing a callee
+  through a `static inline` helper did not stop the padding
+  (reload_texture, update_season_gauge's run calls).
+- A dead double in a HARNESS_CALLED AnmVm::run plus HARNESS_CALLED
+  update_std_vms (not committed): 8 matched (Stage::on_tick, update_std_vms,
+  anm_masked_effect_on_tick, collect_full_power, both laser initializers,
+  ReplayManager::begin_stage, interrupt_tree_and_run), 7 lost
+  (PosVel::step_from_center, start_std_vms, cancel_rectangle_as_bomb,
+  boss_timer_on_spell_start, Spellcard::end, start_dialogue,
+  Item::init_anm; they gain padded frames).
+- `char buf[3] = {0, 0, 0}` instead of three stores puts buf in another
+  variable's slot (draw_text). Indexing `anm_ids[last_used_index]` afresh
+  in each test instead of an `AnmId &` local puts `this` in ebx and spills
+  the index (EffectManager::next_index). In blur_alpha, offsets from the
+  global width keep `up = -width` its own variable; up_left must be
+  `-w - 1` to get `not`.
+- Operand order: `f32 r = rand(); ... r * PI / 40 + PI / 80 + wave_angle_b`
+  adds the member last (step_fog); `D3DXVECTOR3 *pos = &vertex->pos;
+  pos->y = pos->y + d.y` loads pos.y first. Each corner component written
+  as its own `center.x + size.x * 0.5f` (CSE merges them) schedules closer
+  than named bounds (StdObject::is_culled).
+- `(~(flags >> 5) & 1) && (~flags & 1)` gives Gui::on_tick_body's
+  `shr; not; test al, 1` sequence (same as Player::on_tick_body's).
+- Small inline helpers taking a `MenuHelper *` give HelpManual's
+  `[edi+4]` accesses.
+- build.py cannot parse `__declspec(...)` before an annotated definition;
+  put it on the declaration.
+- Dead ends: on_draw_03's pop and spill placement; show_boss_marker's
+  redundant `test` (about 12 forms); begin_score_entry's character offset
+  (always folded into the index); AsciiInf::tick shrink-wrap; PopupManager
+  loop base field; blur_alpha/bleed_color never using ebx (empty `__asm {}`
+  does nothing); Ending::initialize's stack slots; the CameraSky cookie
+  (non-array color struct, user constructor); a form of
+  Stage::start_std_vms that keeps its shrink-wrap whatever the caller's
+  alignment.
