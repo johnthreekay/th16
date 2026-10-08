@@ -1273,3 +1273,71 @@ Collision, second pass over lasers, menus and system:
   calls; a dead double around interrupt_child_and_run's run() (cost two
   cursor functions their matches); camera_update_2d calling zun_tanf
   (zun_tanf becomes a jmp thunk and loses its match); lzss setup order.
+
+Second pass over GUI, stage and GameThread:
+- Cutting a call-graph edge with a member function pointer: write the call
+  as `(obj->*f())()`, with `f` a small `static inline` helper returning
+  `&Class::method`. The optimizer turns it back into a direct call, but
+  LTCG's call graph has no edge, so an aligned caller's alignment does not
+  reach the callee. This resolved the GameThread trade-off (the bgm seek
+  inline in on_tick_body realigns it early; begin_stage calls
+  start_std_vms through the pointer, which keeps its shrink-wrapped edi):
+  GameThread::on_tick_body and ReplayManager::begin_stage matched.
+  Gui::on_draw_2_body realigns early (`and esp, -64` like the original)
+  while AsciiInf::create_number, called through the pointer, stays
+  unpadded; update_season_gauge stopped realigning once its AnmVm::run
+  calls went through it. An address-taken member keeps `this` in ecx, so
+  callees whose callers never set ecx must be `static` (`__stdcall static`
+  when the original ends in `ret N`).
+- /GS cookies come from `__forceinline` helpers: a forceinline helper
+  brings its own buffer check into the caller even when the caller is
+  `__declspec(safebuffers)` (documented MSVC behaviour). InterpCameraSky::step
+  lost its cookie once its sky_step_* helpers were
+  `static __declspec(safebuffers) __forceinline` (its CameraSky operators
+  need safebuffers too, or they are not inlined into them). safebuffers on
+  the declaration alone removed the extra cookies in StageInner::run_std
+  (+9) and HelpManual::on_tick_body (matched). Candidates with a cookie the
+  original lacks: AnmVm::world_pos, BombMarisaAInf::on_tick,
+  TitleInf::do_music_room, Player::update_options,
+  PlayerInner::repopulate_options, sht_on_tick_sideways, sht_on_tick_laser.
+- A dead double in a callee whose callers are aligned gives it known
+  alignment: Fog::Fog saves its registers up front with `this` in ebx, no
+  shrink-wrap, like the original (+43). It did nothing in
+  create_ui_effect, create_ui_vm, update_score or update_callout.
+- `Stage *stage = g_Stage2; if (stage != NULL && ...) delete g_Stage2;`
+  keeps the delete's own null test. Three separate `if (flag) return 3;`
+  keep three `test al, n` and the first return-3 epilogue at the top where
+  one `||` merges them into `test al, 0x70` (GameThread::on_tick_body). An
+  early `return` from find_child_id_inline_search for a missing parent
+  keeps the child search inline (setup_stage_hud +7).
+- run_std's entry loop test: `i32 now = time_in_stage.current; if
+  (ins->time > now) goto ticked; do {...} while (ins->time <= current);`
+  gives `mov eax, [cur]; cmp [esi], eax`.
+- Fog::Fog HARNESS_CALLED folds its two unused constant arguments, and the
+  callers push junk into those slots like the original.
+- `D3DXVec3Add(&pos, &a, &b); pos = pos + c;` adds every component in the
+  original's operand order where the operator+ chain swapped y and z
+  (GuiMsgVm::update_callout).
+- Loading `g_ending_files[i]` into a local before `strcpy(path, "");
+  strcat(path, file)` puts the path clear after the load
+  (Ending::initialize). A forceinline helper returning the AnmId makes the
+  caller read the id back from its stack slot (Fog::Fog).
+- PopupManager::on_tick wants the plain `tick()` in both loops; tick_goto
+  did not help run_std's or PauseMenu's ticks.
+- Cross-file, measured but not committed: a dead double plus
+  HARNESS_CALLED on AnmVm::run gained 4 matches and lost 9 (the
+  function-pointer trick at the losing call sites might keep them); a dead
+  double in Gui::show_notice gained collect_full_power and
+  Globals::add_power but lost Spellcard::end, Item::init_anm and
+  Globals::add_to_score. begin_stage and finish_stage_transition are now
+  blocked only by allocate_new_enemy's folded third argument.
+- Dead ends: Fog::set_rect's divss/cvt scheduling; begin_score_entry's
+  folded character offset; PauseMenu::on_tick's tick combinations;
+  show_boss_marker (the join gives cmov, `> -1` gives cmp/jle);
+  update_score and update_callout do not realign with a dead double;
+  open_game_over_menu realigns instead of padding; PopupManager::on_draw's
+  esi/edi swap; Gui::on_tick_body's `this` in esi not edi; AsciiInf::tick's
+  shrink-wrap is not from caller alignment; take_snapshot's dead
+  `test eax, eax` after the D3DX call; create_stringf and
+  create_number_with_digit put the padding above the cookie in the
+  original, between cookie and buffer in ours.
