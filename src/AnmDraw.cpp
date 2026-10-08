@@ -566,8 +566,10 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm_param)
 }
 #pragma warning(pop)
 
-// The differences assigned x, z, y give the original's registers for them.
-// TODO: the original subtracts y after x and sums x + y (ours y first, y + x); the loop end compares with g_sprite_temp_buffer's end, which our data layout follows with another global.
+// A while loop with the differences assigned x, y, z gives the original's
+// register and operand order for the distance (found by the vector order
+// research: the load order inside a loop follows the loop form).
+// TODO: 99%; the loop end compares with g_sprite_temp_buffer's end, which our data layout follows with another global.
 // FUNCTION: TH16 0x467200
 i32 AnmManager::draw_sprite_fog(AnmVm *vm)
 {
@@ -576,13 +578,14 @@ i32 AnmManager::draw_sprite_fog(AnmVm *vm)
     ZunColor color;
     color.d3d = (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d;
     D3DXVECTOR4 transformed[4];
-    for (i32 i = 0; i < 4; i++)
+    i32 i = 0;
+    while (i < 4)
     {
         D3DXVec3Transform(&transformed[i], &fog_unit_quad[i].pos, (D3DXMATRIX *)&current_world_matrix);
         D3DXVECTOR3 diff;
         diff.x = transformed[i].x - g_Supervisor.current_camera->position.x;
-        diff.z = transformed[i].z - g_Supervisor.current_camera->position.z;
         diff.y = transformed[i].y - g_Supervisor.current_camera->position.y;
+        diff.z = transformed[i].z - g_Supervisor.current_camera->position.z;
         f32 distance = D3DXVec3Length(&diff);
         ZunColor *diffuse = diffuse_of(i);
         if (distance > g_Supervisor.current_camera->sky.begin_distance)
@@ -605,6 +608,7 @@ i32 AnmManager::draw_sprite_fog(AnmVm *vm)
         {
             diffuse->d3d = color.d3d;
         }
+        i++;
     }
     i32 result = render_sprite_2d(vm, ANM_SPRITE_KEEP_COLORS);
     g_sprite_temp_buffer[0].pos.w = g_sprite_temp_buffer[1].pos.w = g_sprite_temp_buffer[2].pos.w =
