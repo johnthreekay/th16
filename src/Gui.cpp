@@ -8,6 +8,7 @@
 #include "Enemy.h"
 #include "EnemyManager.h"
 #include "GameThread.h"
+#include "MainMenu.h"
 #include "Input.h"
 #include "Laser.h"
 #include "Player.h"
@@ -1334,6 +1335,24 @@ static inline AnmId find_child_id_of(AnmManager *anm, AnmId &id, i32 script)
     return result;
 }
 
+// find_child_id_of as LTCG inlined it into setup_stage_hud, with the first
+// level of AnmVm::search_children inlined as well.
+static __forceinline AnmId find_child_id_inline_search(AnmId &id, i32 script)
+{
+    AnmVm *child;
+    if (get_vm_or_clear(id) == NULL)
+    {
+        child = NULL;
+    }
+    else
+    {
+        child = search_children_inline(get_vm_or_clear(id), script, 0);
+    }
+    AnmId result;
+    result.id = child != NULL ? child->id.id : 0;
+    return result;
+}
+
 // Fills the season gauge bar towards the next level and shows the level
 // (interrupt 7 + level), switching the gauge's look (interrupt 2 or 3) when
 // the first level is reached or lost.
@@ -1664,7 +1683,7 @@ static inline void set_entity_pos_xyz(AnmId id, f32 x, f32 y, f32 z)
 // Sets the HUD up for a stage: the life and bomb counters, the boss timer,
 // the stage logo, the demo and difficulty markers and the season gauge.
 // TODO: the original realigns its frame (and esp, -8; probably for AnmVm::run in the
-// inlined create_effect) and inlines the first level of search_children for the season gauge icon.
+// inlined create_effect) and lays the season gauge icon's child search out in line (ours moves it to the end).
 // FUNCTION: TH16 0x426d70
 void Gui::setup_stage_hud()
 {
@@ -1743,8 +1762,9 @@ void Gui::setup_stage_hud()
     {
         gui->release_ready = 0;
         gui->season_gauge_id = create_effect_inline(gui->front_anm, FRONT_ANM_SEASON_GAUGE, -1, NULL);
+        AnmId icon_id = find_child_id_inline_search(gui->season_gauge_id, FRONT_ANM_SEASON_GAUGE_ICON);
         AnmManager *anm = g_AnmManager;
-        AnmVm *vm = anm->get_vm_with_id(find_child_id_of(anm, gui->season_gauge_id, FRONT_ANM_SEASON_GAUGE_ICON));
+        AnmVm *vm = anm->get_vm_with_id(icon_id);
         if (vm != NULL)
         {
             anm->loaded_anms[vm->anm_loaded_index]->set_sprite(vm, g_Globals.subseason + FRONT_ANM_SPRITE_SUBSEASON);
