@@ -991,6 +991,7 @@ i32 TitleInf::on_tick()
                     break;
                 }
             }
+            // Stage table pointer first, for matching (see do_spell_practice_difficulty).
             g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;

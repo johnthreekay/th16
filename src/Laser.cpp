@@ -3036,6 +3036,9 @@ i32 LaserLineInf::on_tick()
     else
     {
         unk_7c += length * g_game_speed;
+        // position += tip_offset * g_game_speed, through a temporary and
+        // D3DXVec3Add with v first: g_game_speed is loaded once and the adds
+        // take the original's operand order.
         Float3 v = tip_offset * g_game_speed;
         D3DXVec3Add(&position, &v, &position);
         if (inner.laser_new_arg_3 > 0.0f && hit_length + unk_7c > inner.laser_new_arg_3)

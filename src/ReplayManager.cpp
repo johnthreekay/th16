@@ -466,9 +466,9 @@ void clear_input_state()
     g_InputState.input_held_long = 0;
 }
 
-// Each update function is unregistered with its own written-out block (as
-// UpdateFuncRegistry::unregister_locked, the registry read inside the null
-// check): an inline helper kept the function pointer in a stack slot.
+// Each update function is unregistered with its own written-out copy of
+// UpdateFuncRegistry::unregister_locked, with the registry read inside the
+// null check (the inline helper kept the function pointer in a stack slot).
 // TODO: the original keeps each func in ebx and EnterCriticalSection's address in eax (ours rereads the func and keeps the address in ebx), and our loops get alignment padding.
 // FUNCTION: TH16 0x447c80
 ReplayManager::~ReplayManager()

@@ -964,6 +964,7 @@ i32 TitleInf::do_practice_stage_select()
             set_state(TITLE_STATE_EXIT);
             i32 stage = menu.next_selection + 1;
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
+            // Stage table pointer first, for matching (see do_spell_practice_difficulty).
             g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
@@ -1624,6 +1625,7 @@ i32 TitleInf::do_replay_menu()
             set_state(TITLE_STATE_EXIT);
             i32 stage = replay_stage + 1;
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_START_REPLAY;
+            // Stage table pointer first, for matching (see do_spell_practice_difficulty).
             g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
@@ -2999,6 +3001,7 @@ i32 TitleInf::do_spell_practice_subseason()
             set_state(TITLE_STATE_EXIT);
             g_title_return_point = TITLE_RETURN_SPELL_PRACTICE;
             i32 stage = spell_stage + 1;
+            // Stage table pointer first, for matching (see do_spell_practice_difficulty).
             g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;

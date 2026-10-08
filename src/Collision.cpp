@@ -60,9 +60,10 @@ HARNESS_CALLED i32 __stdcall collision_test_circle_rect(f32 rect_x, f32 rect_y, 
 const i32 g_rect_edges[4][2] = {{0, 1}, {1, 2}, {2, 3}, {3, 0}};
 
 // Rotates four points about the origin. sinf and cosf are written inside
-// the loop: the calls keep MSVC from unrolling it (the hoisted calls leave
-// the original's rolled loop), and the array stays in memory with its /GS
-// cookie; with the calls before the loop it is unrolled and scalarized.
+// the loop: MSVC still hoists them (the original calls them once before the
+// loop) but keeps the loop rolled, with the array in memory and its /GS
+// cookie; with the calls written before the loop it unrolls and scalarizes
+// it.
 static __forceinline void rotate_points(Float2 *points, f32 angle)
 {
 #pragma loop(no_vector)
