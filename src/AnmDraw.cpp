@@ -349,7 +349,9 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
     a->z = b->z = c->z = d->z = vm->entity_pos.z + vm->pos.z + vm->pos_2.z;
 }
 
-// TODO: 74%; register allocation of the corner offsets differs.
+// Corners of a billboard: the VM's world position projected to the screen,
+// sized by how far the camera's right vector projects from it.
+// TODO: 83%; register allocation of the corner offsets differs.
 // FUNCTION: TH16 0x466390
 i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
 {
@@ -357,14 +359,12 @@ i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
     f32 sine;
     f32 cosine;
     ZUN_ASM_SINCOS(angle, sine, cosine);
-    D3DXVECTOR3 world_pos(vm->entity_pos.x + vm->pos.x + vm->pos_2.x, vm->entity_pos.y + vm->pos.y + vm->pos_2.y,
-                          vm->entity_pos.z + vm->pos.z + vm->pos_2.z);
+    D3DXVECTOR3 origin(0.0f, 0.0f, 0.0f);
     D3DXMATRIX world;
     D3DXMatrixIdentity(&world);
-    world._41 = world_pos.x;
-    world._42 = world_pos.y;
-    world._43 = world_pos.z;
-    D3DXVECTOR3 origin(0.0f, 0.0f, 0.0f);
+    world._41 = vm->entity_pos.x + vm->pos.x + vm->pos_2.x;
+    world._42 = vm->entity_pos.y + vm->pos.y + vm->pos_2.y;
+    world._43 = vm->entity_pos.z + vm->pos.z + vm->pos_2.z;
     D3DXVECTOR3 screen;
     Camera *camera = g_Supervisor.current_camera;
     D3DXVec3Project(&screen, &origin, &camera->viewport, (D3DXMATRIX *)&camera->projection_matrix, (D3DXMATRIX *)&camera->view_matrix, &world);
@@ -378,7 +378,10 @@ i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
                     &world);
     f32 x = screen.x;
     f32 y = screen.y;
-    D3DXVECTOR3 diff = screen_2 - screen;
+    D3DXVECTOR3 diff;
+    diff.y = screen_2.y - y;
+    diff.x = screen_2.x - x;
+    diff.z = screen_2.z - screen.z;
     f32 scale = D3DXVec3Length(&diff) * 0.5f;
     f32 width = vm->sprite_size.x * scale * vm->scale.x * vm->scale_2.x;
     f32 height = vm->sprite_size.y * scale * vm->scale.y * vm->scale_2.y;
