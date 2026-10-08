@@ -407,10 +407,8 @@ void Spellcard::measure_real_time()
     }
 }
 
-// TODO: the inlined timer tick keeps the frame in xmm0 (ours xmm1), the
-// boss smoothing is scheduled differently (boss_pos += (pos - boss_pos) *
-// 0.05f gives the original's code but a /GS cookie), and the original
-// duplicates the return.
+// TODO: the inlined timer tick keeps the frame in xmm0 (ours xmm1), and in the boss
+// smoothing x and the 0.05f constant trade xmm0 and xmm1 (x is loaded last).
 // FUNCTION: TH16 0x417930
 i32 Spellcard::on_tick_body()
 {
@@ -454,12 +452,16 @@ i32 Spellcard::on_tick_body()
         }
     }
     EnemyInf *boss = g_EnemyManager->find_enemy_by_id(g_EnemyManager->inner.boss_ids[0]);
-    f32 x = (boss->enemy.final_pos.pos.x - boss_pos.x) * 0.05f + boss_pos.x;
-    f32 y = (boss->enemy.final_pos.pos.y - boss_pos.y) * 0.05f + boss_pos.y;
-    f32 z = (boss->enemy.final_pos.pos.z - boss_pos.z) * 0.05f + boss_pos.z;
-    boss_pos.x = x;
-    boss_pos.y = y;
-    boss_pos.z = z;
+    // The boss marker follows the boss with 5% smoothing. Written back through
+    // a pointer of its own, so boss_pos is read again for the adds instead
+    // of reusing the loads of the subtractions (as in the original).
+    D3DXVECTOR3 *p = &boss_pos;
+    f32 dx = boss->enemy.final_pos.pos.x - boss_pos.x;
+    f32 dy = boss->enemy.final_pos.pos.y - boss_pos.y;
+    f32 dz = boss->enemy.final_pos.pos.z - boss_pos.z;
+    p->x = dx * 0.05f + p->x;
+    p->y = dy * 0.05f + p->y;
+    p->z = dz * 0.05f + p->z;
     AnmVm *vm = g_AnmManager->get_vm_with_id(boss_anm_id);
     if (vm != NULL)
     {
@@ -472,6 +474,8 @@ i32 Spellcard::on_tick_body()
             return 1;
         }
         flags &= ~SPELLCARD_EARLY_BOMB;
+        // A return of its own: the original does not merge it with the last.
+        return 1;
     }
     return 1;
 }
