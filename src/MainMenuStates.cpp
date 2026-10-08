@@ -502,11 +502,11 @@ static __forceinline void hide_tree_inline(AnmId id)
 
 // Picking the character. Extra only offers the characters that cleared the
 // main game; characters marked as cleared on this difficulty get a badge.
-// TODO: the original loads g_Scorefile before the difficulty for the clear badges.
+// TODO: the original keeps script in edi for the clear badges (ours keeps g_AnmManager there) and has the run(3) call twice, the copies cross-jumped; written twice, ours keeps &anm_ids[script] in a register for the whole state.
 // FUNCTION: TH16 0x4502c0
 i32 TitleInf::do_character_select()
 {
-    i32 script = (g_Globals.difficulty == DIFFICULTY_EXTRA) * 2 + 0x96;
+    i32 script = g_Globals.difficulty == DIFFICULTY_EXTRA ? 0x98 : 0x96;
     switch (substate)
     {
     case 0:
@@ -542,12 +542,8 @@ i32 TitleInf::do_character_select()
             AnmManager::interrupt_tree(anm_ids[script], 1);
             anm_ids[script].id = 0;
             anm_ids[script] = title_anm->create_effect(script, -1, NULL);
-            AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
         }
-        else
-        {
-            AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
-        }
+        AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
         AnmManager::interrupt_tree(anm_ids[script], (i16)(menu.next_selection + 7));
         set_substate(1);
         if (g_Scorefile->characters[0].clears[g_Globals.difficulty] == 0)
