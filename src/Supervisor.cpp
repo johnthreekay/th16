@@ -104,6 +104,12 @@ Supervisor g_Supervisor;
 // GLOBAL: TH16 0x4a52e4
 i16 g_pad_mapping[10] = {0, 1, 2, 5, -1, -1, -1, -1, -1, 3};
 
+// Adds the buttons and directions held on the first game controller (winmm
+// or DirectInput) to input. The Acquire retries are written like
+// get_controller_state's: that keeps the joyGetPosEx failure's return as
+// the shared copy the later returns jump to, as in the original.
+// TODO: 74%; the original loads some mapping words through ax and a 16-bit
+// stack temporary (ours: cx), and keeps input in a different stack slot.
 // FUNCTION: TH16 0x4018e0
 HARNESS_CALLED u32 Supervisor::read_joypad(u32 input)
 {
@@ -150,10 +156,16 @@ HARNESS_CALLED u32 Supervisor::read_joypad(u32 input)
 
     if (FAILED(g_Supervisor.joystick->Poll()))
     {
+        i32 retries = 0;
         HRESULT hr = g_Supervisor.joystick->Acquire();
-        for (i32 i = 0; hr == DIERR_INPUTLOST && i < 400; i++)
+        while (hr == DIERR_INPUTLOST)
         {
             hr = g_Supervisor.joystick->Acquire();
+            retries++;
+            if (retries >= 400)
+            {
+                return input;
+            }
         }
         return input;
     }
