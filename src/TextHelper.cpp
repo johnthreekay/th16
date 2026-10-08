@@ -479,7 +479,6 @@ void create_fonts()
     }
 }
 
-// TODO: code matches; the original packs buf into the slot of text's spill ([ebp-0x18]), ours gives it its own (frame 0x3c vs 0x34).
 // FUNCTION: TH16 0x459240
 HARNESS_CALLED void __stdcall draw_text(RECT *dst_rect, i32 x, i32 font_height, D3DCOLOR color,
                                          D3DCOLOR shadow_color, const char *text,
@@ -547,10 +546,8 @@ HARNESS_CALLED void __stdcall draw_text(RECT *dst_rect, i32 x, i32 font_height, 
     }
     else
     {
-        char buf[3];
-        buf[0] = 0;
-        buf[1] = 0;
-        buf[2] = 0;
+        // An initializer, not three stores: it puts buf in text's stack slot.
+        char buf[3] = {0, 0, 0};
         for (i32 i = 0; i < len; i += 2)
         {
             buf[0] = text[i];
