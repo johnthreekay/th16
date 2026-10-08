@@ -295,8 +295,11 @@ static_assert(offsetof(Bullet, state_time) == 0x144c, "Bullet layout");
 static_assert(offsetof(BulletManager, anm_ids) == 0x13ffc8c, "BulletManager layout");
 static_assert(offsetof(BulletManager, cancel_count) == 0x1403b14, "BulletManager layout");
 
-// Bullet::cancel's body, which clear_all has inlined.
-static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
+// Bullet::cancel's body, which clear_all has inlined. The half step the
+// bullet takes is written two ways: through a delta local in Bullet::cancel
+// and in one expression where clear_all inlines it; each matches its copy
+// (half_step_in_place is a constant at both call sites).
+static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode, BOOL half_step_in_place)
 {
     bullet->vm0.interrupt(1);
     bullet->vm0.run();
@@ -314,8 +317,15 @@ static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
         g_SoundManager.play_sound_at_position(SE_ETBREAK, bullet->pos.x);
         gen_items_from_cancel(&bullet->pos, mode);
     }
-    D3DXVECTOR3 delta = bullet->velocity * g_game_speed * 0.5f;
-    bullet->pos += delta;
+    if (half_step_in_place)
+    {
+        bullet->pos += bullet->velocity * g_game_speed * 0.5f;
+    }
+    else
+    {
+        D3DXVECTOR3 delta = bullet->velocity * g_game_speed * 0.5f;
+        bullet->pos += delta;
+    }
     bullet->state = BULLET_STATE_CANCELLED;
     bullet->state_time.reset();
     return 0;
@@ -324,11 +334,10 @@ static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
 // FUNCTION: TH16 0x416840
 i32 Bullet::cancel(i32 mode)
 {
-    return cancel_bullet(this, mode);
+    return cancel_bullet(this, mode, FALSE);
 }
 
-// TODO: the inlined cancel_bullet's velocity scaling and pos += delta differ in register
-// allocation and scheduling (the out-of-line Bullet::cancel matches).
+// TODO: in the inlined half step, x and y of the scaled velocity trade xmm1 and xmm2.
 // FUNCTION: TH16 0x416f40
 HARNESS_CALLED void BulletManager::clear_all(i32 unused)
 {
@@ -337,7 +346,7 @@ HARNESS_CALLED void BulletManager::clear_all(i32 unused)
     {
         if (bullet->state != BULLET_STATE_FREE && bullet->state != BULLET_STATE_HIT)
         {
-            cancel_bullet(bullet, 0);
+            cancel_bullet(bullet, 0, TRUE);
         }
     }
 }
