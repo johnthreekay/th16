@@ -469,9 +469,11 @@ static void __fastcall fan_sincosmul(Float3 *dst, f32 angle, f32 radius)
 // around the VM, moved by on_tick 4 and drawn by on_draw 6.
 // The speed is stored through `*(radius + 33)`: indexing (radius[33]) puts
 // the store after the radius's instead of between its multiply and add.
-// TODO: the original adds entity_pos.z + pos.z in the other order (every
-// operand order, D3DXVec3Add and field-wise temporary tried fixes x and y
-// or z, not both).
+// The loop is a do/while counting up: it compiles to the same down-counter
+// as `for (i = 31; i != 0; i--)`, but only this form loads entity_pos.z
+// before pos.z in the vertex sum like the original (which operand MSVC
+// loads first there follows its internal numbering, not the operand order;
+// see docs/findings.md).
 // FUNCTION: TH16 0x469e20
 int __fastcall anm_fan_init(AnmVm *vm)
 {
@@ -495,7 +497,8 @@ int __fastcall anm_fan_init(AnmVm *vm)
     data->vertices[0].uv.y = 0.5f;
     f32 speed = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 15.0f);
     f32 *radius = data->radius;
-    for (i32 i = 31; i != 0; i--)
+    i32 i = 0;
+    do
     {
         if (angle >= ZUN_PI)
         {
@@ -523,7 +526,7 @@ int __fastcall anm_fan_init(AnmVm *vm)
         angle += ZUN_2PI / 31.0f;
         vertex++;
         radius++;
-    }
+    } while (++i < 31);
     return 0;
 }
 
