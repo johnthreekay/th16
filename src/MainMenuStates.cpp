@@ -826,7 +826,7 @@ u8 g_practice_keys[0x100];
 i32 g_practice_lives_key;
 
 // Stage practice: picking the stage.
-// TODO: the original keeps both input words in registers for the cursor tests.
+// TODO: the constant 1 (the cmov and every return 1) lives in esi for the whole function; the original rematerializes it into edx at each use (its esi push is left unused) and stores lives_key = 1 as an immediate.
 // FUNCTION: TH16 0x450ef0
 i32 TitleInf::do_practice_stage_select()
 {
