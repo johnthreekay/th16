@@ -668,11 +668,13 @@ extern const char *g_stage_names[10];
 
 // Picking the subseason before a game (Extra has only one). In stage
 // practice this goes on to the stage select instead of starting.
-// TODO: the original spills script to the create_effect result slot and reloads it (ours keeps it in esi), and in case 3 lays out the now loading block before confirm (ours after).
+// TODO: in case 3 the original lays out the now loading block before confirm (ours after).
 // FUNCTION: TH16 0x450af0
 i32 TitleInf::do_subseason_select()
 {
-    i32 script = (g_Globals.difficulty == DIFFICULTY_EXTRA) * 2 + 0x97;
+    // A ternary: written as (difficulty == EXTRA) * 2 + 0x97, script stays
+    // in esi; this way the original's spill to a stack slot comes back.
+    i32 script = g_Globals.difficulty == DIFFICULTY_EXTRA ? 0x99 : 0x97;
     switch (substate)
     {
     case 0:
@@ -1904,7 +1906,6 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
 // The high score name entry after a game (score_not_ranked is set when the score
 // did not make the top ten), then on to saving the replay unless the game
 // was continued.
-// TODO: the original saves ebx (push ecx; push ebx) and keeps &replay_name in it for the score copy, and tests the pressed word in memory before the name entry.
 // FUNCTION: TH16 0x4532f0
 i32 TitleInf::do_score_name_entry()
 {
@@ -2063,12 +2064,16 @@ i32 TitleInf::do_score_name_entry()
                     strcpy(g_Scorefile->last_replay_name, replay_name);
                     set_substate(3);
                 }
+                // The sound in each branch (not once after the if/else):
+                // otherwise MSVC reuses the pressed word for the BOMB test
+                // below.
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
             }
             else
             {
                 set_substate(3);
+                g_SoundManager.play_sound_centered(SE_OK00, 0);
             }
-            g_SoundManager.play_sound_centered(SE_OK00, 0);
         }
         if (g_hardware_input_pressed & (INPUT_BOMB | INPUT_MENU))
         {
