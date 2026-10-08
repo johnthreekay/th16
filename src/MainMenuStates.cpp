@@ -2404,7 +2404,9 @@ static __forceinline void music_room_comment_step(TitleInf *menu)
 // The music room: the track list (ten rows shown, sliding in two at a time
 // at first) and the comment of the track last picked. Tracks not heard in
 // the game yet show as numbers, and playing one asks for a second press.
-// TODO: ours adds a /GS cookie for pos (a D3DXVECTOR3 in memory, see docs/findings.md) and keeps pos.x in memory in the scroll loop where the original uses xmm2.
+// TODO: in case 2 ours keeps &menu in a register (spilled) for the menu accesses; the original addresses [edi + 0x24] each time.
+// Declared __declspec(safebuffers) (MainMenu.h): without it ours adds a /GS
+// cookie for pos (a D3DXVECTOR3 in memory) that the original lacks.
 // FUNCTION: TH16 0x4546f0
 i32 TitleInf::do_music_room()
 {
