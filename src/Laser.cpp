@@ -1657,7 +1657,9 @@ i32 LaserCurveInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 // shortens the laser to nothing, otherwise it ends at the first hit run;
 // every later unhit run that starts on screen becomes a straight laser.
 // Returns the number of points hit.
-// TODO: the original zeroes i (ebx) before the memset and stores step.z first; the run loops' register use and the params copy differ.
+// i is zeroed before the memset, whose 0 then comes from i's register, and step.z
+// is stored before the sincosmul call, as in the original.
+// TODO: the original lays pos.z's shadow out after step in the frame; the run loops' register use and the params copy differ (g_LaserManager kept in a stack slot).
 // FUNCTION: TH16 0x436670
 i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln)
 {
@@ -1668,11 +1670,12 @@ i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode
     Float3 origin = position;
     i32 count = 0;
     f32 dist = 8.0f;
+    i32 i = 0;
     u8 hit[0x100];
     memset(hit, 0, sizeof(hit));
     Float3 step;
-    laser_sincosmul(&step, angle, 8.0f);
     step.z = 0.0f;
+    laser_sincosmul(&step, angle, 8.0f);
     Float3 pos;
     pos = position + step;
     pos.z = 0.0f;
@@ -1680,8 +1683,7 @@ i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode
     step.y += step.y;
     step.z += step.z;
     radius = radius * radius;
-    i32 i;
-    for (i = 0; hit_length > dist + 8.0f; i++)
+    for (; hit_length > dist + 8.0f; i++)
     {
         if (!((center->x - pos.x) * (center->x - pos.x) + (center->y - pos.y) * (center->y - pos.y) > radius))
         {
