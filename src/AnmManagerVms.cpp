@@ -878,14 +878,19 @@ HARNESS_CALLED AnmId AnmManager::load_vm_tree(AnmVm *src, AnmVm *parent, i32 *si
     return result;
 }
 
-// TODO: the original keeps src and src + 1 in stack slots (and a pointer to index_of_on_serialize); ours keeps src + 1 in edi.
+// Advancing the src parameter itself past the VM (with a copy for the
+// VM's fields) gives the original's stack slots: the copy in a local, the
+// extra data pointer in src's argument slot.
+// TODO: the original keeps the address of index_of_on_serialize in a local
+// slot; ours reuses size's argument slot for it.
 // FUNCTION: TH16 0x46ffb0
 HARNESS_CALLED void AnmVm::load_from(const AnmVm *src, i32 *size)
 {
-    memcpy(this, src, offsetof(AnmVm, id));
-    ZunTimer timer = src->script_time;
+    const AnmVm *vm = src;
+    memcpy(this, vm, offsetof(AnmVm, id));
+    ZunTimer timer = vm->script_time;
     script_time = timer.current;
-    timer = src->time_in_script;
+    timer = vm->time_in_script;
     time_in_script = timer.current;
     *size += sizeof(AnmVm);
     node_in_global_list.entry = this;
@@ -902,27 +907,28 @@ HARNESS_CALLED void AnmVm::load_from(const AnmVm *src, i32 *size)
     list_of_children.unk_c = NULL;
     next_in_layer = NULL;
     root_vm = NULL;
-    slowdown = src->slowdown;
-    entity_pos = src->entity_pos;
-    associated_game_entity = src->associated_game_entity;
-    index_of_sprite_mapping_func = src->index_of_sprite_mapping_func;
-    index_of_on_wait = src->index_of_on_wait;
-    index_of_on_tick = src->index_of_on_tick;
-    index_of_on_draw = src->index_of_on_draw;
-    index_of_on_destroy = src->index_of_on_destroy;
-    index_of_on_interrupt = src->index_of_on_interrupt;
-    index_of_on_copy = src->index_of_on_copy;
-    index_of_on_serialize = src->index_of_on_serialize;
-    const u8 *extra = (const u8 *)(src + 1);
-    if (src->extra_data != NULL)
+    slowdown = vm->slowdown;
+    entity_pos = vm->entity_pos;
+    associated_game_entity = vm->associated_game_entity;
+    index_of_sprite_mapping_func = vm->index_of_sprite_mapping_func;
+    index_of_on_wait = vm->index_of_on_wait;
+    index_of_on_tick = vm->index_of_on_tick;
+    index_of_on_draw = vm->index_of_on_draw;
+    index_of_on_destroy = vm->index_of_on_destroy;
+    index_of_on_interrupt = vm->index_of_on_interrupt;
+    index_of_on_copy = vm->index_of_on_copy;
+    index_of_on_serialize = vm->index_of_on_serialize;
+    // The extra data follows the VM.
+    src++;
+    if (vm->extra_data != NULL)
     {
-        extra_data_size = src->extra_data_size;
+        extra_data_size = vm->extra_data_size;
         extra_data = malloc(extra_data_size);
-        memcpy(extra_data, extra, extra_data_size);
-        if (src->index_of_on_serialize != 0)
+        memcpy(extra_data, src, extra_data_size);
+        if (vm->index_of_on_serialize != 0)
         {
             i32 read = 0;
-            g_anm_serialize_funcs[src->index_of_on_serialize](this, (u8 *)extra, &read, 1);
+            g_anm_serialize_funcs[vm->index_of_on_serialize](this, (u8 *)src, &read, 1);
             *size += read;
         }
         else
