@@ -78,11 +78,14 @@ int __fastcall PopupManager::on_draw_thunk(void *arg)
     return ((PopupManager *)arg)->on_draw();
 }
 
+// Both timers tick with tick_nested, which loads 1.0f into a register once
+// for the two loops like the original.
 // TODO: the original addresses each string through its timer's current
-// field (ours through speed_index), assigns the hoisted float constants to
-// other xmm registers and, in the second loop, adds current_f from memory
-// into the speed's register (every tick form tried loads it first or splits
-// the stores).
+// field (ours through speed_index; tick_in_place in the second loop gives
+// current there but reccmp rates it lower), assigns the hoisted float
+// constants to other xmm registers and, in the second loop, adds current_f
+// from memory into the speed's register (every tick form tried loads it
+// first or splits the stores).
 // FUNCTION: TH16 0x449ea0
 int PopupManager::on_tick()
 {
@@ -95,7 +98,7 @@ int PopupManager::on_tick()
             str->rise_speed *= 0.95f;
             // Through a timer pointer: closer to the original's addressing.
             ZunTimer *timer = &str->time;
-            timer->tick();
+            timer->tick_nested();
             if (timer->current > 60)
             {
                 str->active = 0;
@@ -106,7 +109,7 @@ int PopupManager::on_tick()
     {
         if (str->active)
         {
-            str->time.tick();
+            str->time.tick_nested();
             if (str->time.current > 60)
             {
                 i32 alpha = (str->color >> 24) - 4;
