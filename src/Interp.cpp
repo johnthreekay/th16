@@ -344,61 +344,65 @@ HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step()
     return current;
 }
 
-// TODO: the timer tick and the bezier terms differ in register allocation (1.0f lives in xmm5, the original's xmm6),
-// and the constant-acceleration case loads goal.x before bezier_2.x (goal + bezier_2 fixes x but not y and z).
+// The fields are read through a local copy of this: through this itself LTCG
+// gave the bezier terms other registers (1.0f in xmm5, the original's xmm6)
+// and took the operands of the adds in another order.
+// TODO: 93%; the timer tick adds current_f from memory into the speed's register and stores in each branch (tick() merges the stores but still adds into the speed's register), and the constant-acceleration case loads bezier_2.x before goal.x.
 // FUNCTION: TH16 0x406e10
 D3DXVECTOR3 InterpFloat3::step()
 {
-    if (end_time > 0)
+    InterpFloat3 *self = this;
+    if (self->end_time > 0)
     {
-        time.tick_mixed();
-        if (time.current >= end_time)
+        self->time.tick_mixed();
+        if (self->time.current >= self->end_time)
         {
-            time.set(end_time);
-            end_time = 0;
-            if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
+            self->time.set(self->end_time);
+            self->end_time = 0;
+            if (self->method == INTERP_CONSTANT_VELOCITY || self->method == INTERP_CONSTANT_ACCEL)
             {
-                return initial;
+                return self->initial;
             }
-            return goal;
+            return self->goal;
         }
     }
-    else if (end_time == 0)
+    else if (self->end_time == 0)
     {
-        if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
+        if (self->method == INTERP_CONSTANT_VELOCITY || self->method == INTERP_CONSTANT_ACCEL)
         {
-            return initial;
+            return self->initial;
         }
-        return goal;
+        return self->goal;
     }
-    if (method == INTERP_CONSTANT_VELOCITY)
+    if (self->method == INTERP_CONSTANT_VELOCITY)
     {
-        D3DXVECTOR3 tmp = initial;
-        initial = goal + tmp;
-        current = initial;
+        D3DXVECTOR3 tmp = self->initial;
+        self->initial = self->goal + tmp;
+        self->current = self->initial;
     }
-    else if (method == INTERP_CONSTANT_ACCEL)
+    else if (self->method == INTERP_CONSTANT_ACCEL)
     {
-        D3DXVECTOR3 tmp = initial;
-        initial = tmp + bezier_2;
-        bezier_2 = bezier_2 + goal;
-        current = initial;
+        D3DXVECTOR3 tmp = self->initial;
+        self->initial = tmp + self->bezier_2;
+        self->bezier_2 = self->bezier_2 + self->goal;
+        self->current = self->initial;
     }
-    else if (method == INTERP_BEZIER)
+    else if (self->method == INTERP_BEZIER)
     {
-        f32 t = time.current_f / (f32)end_time;
+        f32 t = self->time.current_f / (f32)self->end_time;
         f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
         f32 c_goal = t * t * (3.0f - 2.0f * t);
         f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
         f32 c_bezier_2 = (t - 1.0f) * t * t;
-        current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+        self->current = self->initial * c_initial + self->goal * c_goal + self->bezier_1 * c_bezier_1 +
+                        self->bezier_2 * c_bezier_2;
     }
     else
     {
-        f32 x = interp_common_methods(method, time.current_f, (f32)end_time);
-        current = (goal - initial) * x + initial;
+        f32 x = interp_common_methods(self->method, self->time.current_f, (f32)self->end_time);
+        self->current = (self->goal - self->initial) * x + self->initial;
     }
-    return current;
+    return self->current;
 }
 
 // TODO: same remaining differences as InterpFloat2::step, of which this is a second copy.
