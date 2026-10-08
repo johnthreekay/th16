@@ -290,16 +290,17 @@ i32 AnmManager::draw_vertex_fan(AnmVm *vm, RenderVertex144 *vertices, i32 vertex
 }
 
 // Draws count points, each center + offsets[i] in colors[i], as a line
-// strip (despite the name) from the primitive buffer.
-// TODO: ours never uses ebx (the original keeps count * 20 and center in it) and spills the loop counter.
+// strip (despite the name) from the primitive buffer. Always returns 0
+// (the original sets eax although its caller ignores it).
+// TODO: ours never uses ebx (the original keeps count * 20 and center in it) and spills the loop counter; the original's frame has known 8-byte alignment from its caller, which dead doubles here (each form tried) turn into an ebx-form realignment of its own instead.
 // FUNCTION: TH16 0x469890
-HARNESS_CALLED void AnmManager::draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors)
+HARNESS_CALLED i32 AnmManager::draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors)
 {
     AnmManager *mgr = g_AnmManager;
     RenderVertex044 *vertices = mgr->primitive_write_cursor;
     if (vertices + 1 + count >= mgr->primitive_vertex_data + 0x8000)
     {
-        return;
+        return 0;
     }
     mgr->flush_sprites();
     for (i32 i = 0; i < count; i++)
@@ -330,6 +331,7 @@ HARNESS_CALLED void AnmManager::draw_triangle_fan(i32 count, Float3 *center, Flo
                                              sizeof(RenderVertex044));
     mgr->primitive_write_cursor += count;
     mgr->stat_draw_calls++;
+    return 0;
 }
 
 // The extra data of VMs drawn by anm_on_draw_masked (ExpHP:
@@ -465,7 +467,11 @@ static void __fastcall fan_sincosmul(Float3 *dst, f32 angle, f32 radius)
 
 // Sets up render mode 10 (ANM instruction 302): a fan of random radii
 // around the VM, moved by on_tick 4 and drawn by on_draw 6.
-// TODO: the original keeps the angle in xmm4 and the radius speed in memory, storing the speed after the random call.
+// The speed is stored through `*(radius + 33)`: indexing (radius[33]) puts
+// the store after the radius's instead of between its multiply and add.
+// TODO: the original adds entity_pos.z + pos.z in the other order (every
+// operand order, D3DXVec3Add and field-wise temporary tried fixes x and y
+// or z, not both).
 // FUNCTION: TH16 0x469e20
 int __fastcall anm_fan_init(AnmVm *vm)
 {
@@ -482,12 +488,12 @@ int __fastcall anm_fan_init(AnmVm *vm)
     data->uv_speed = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);
     data->unk_4a8 = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);
     f32 angle = -ZUN_PI;
+    RenderVertex144 *vertex = &data->vertices[1];
     *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
     data->vertices[0].pos.w = 1.0f;
     data->vertices[0].uv.x = 0.5f;
     data->vertices[0].uv.y = 0.5f;
     f32 speed = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 15.0f);
-    RenderVertex144 *vertex = &data->vertices[1];
     f32 *radius = data->radius;
     for (i32 i = 31; i != 0; i--)
     {
@@ -501,9 +507,8 @@ int __fastcall anm_fan_init(AnmVm *vm)
         vertex->pos.z = 0.0f;
         vertex->uv.x = uv.x + 0.5f;
         vertex->uv.y = uv.y + 0.5f;
-        f32 r = g_replay_safe_rng.randf_neg_1_to_1() * 8.0f + 80.0f;
-        radius[33] = speed;
-        *radius = r;
+        *radius = g_replay_safe_rng.randf_neg_1_to_1() * 8.0f + 80.0f;
+        *(radius + 33) = speed;
         speed += g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 30.0f);
         if (speed < -(1.0f / 15.0f))
         {
@@ -514,9 +519,7 @@ int __fastcall anm_fan_init(AnmVm *vm)
             speed = 1.0f / 15.0f;
         }
         fan_sincosmul((Float3 *)&vertex->pos, angle, *radius);
-        vertex->pos.x = vertex->pos.x + (vm->entity_pos.x + vm->pos.x);
-        vertex->pos.y = vertex->pos.y + (vm->pos.y + vm->entity_pos.y);
-        vertex->pos.z = vertex->pos.z + (vm->entity_pos.z + vm->pos.z);
+        *(Float3 *)&vertex->pos += vm->pos + vm->entity_pos;
         angle += ZUN_2PI / 31.0f;
         vertex++;
         radius++;
@@ -551,45 +554,38 @@ static inline void fan_scroll_v(AnmFanData *data, RenderVertex144 *vertex)
 
 // The on_tick callback of the fan VMs: grows the points, scrolls the
 // texture and places the fan at the VM.
-// TODO: the original hoists the -pi, 0 and 1 constants into xmm4-6 at entry and walks the radii with ebx; scheduling differs.
+// The loop walks vertex and radius pointers and copies the first point to
+// the closing vertex through them, as the original's registers show.
+// TODO: the original adds uv.x + uv_speed (first vertex), uv.y + uv_speed
+// (in the loop) and entity_pos.z + pos.z with the operands the other way
+// round; operand order and pointer forms in the scroll helpers flip
+// several of these at once.
 // FUNCTION: TH16 0x46a0b0
 i32 __fastcall anm_on_tick_fan(AnmVm *vm)
 {
     AnmFanData *data = (AnmFanData *)vm->extra_data;
-    *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
-    data->vertices[0].uv.x += data->uv_speed;
-    if (data->vertices[0].uv.x < 0.0f)
-    {
-        for (i32 i = 0; i < 33; i++)
-        {
-            data->vertices[i].uv.x += 1.0f;
-        }
-    }
-    data->vertices[0].uv.y += data->uv_speed;
-    if (data->vertices[0].uv.y < 0.0f)
-    {
-        for (i32 i = 0; i < 33; i++)
-        {
-            data->vertices[i].uv.y += 1.0f;
-        }
-    }
-    data->vertices[0].diffuse = vm->color_1.d3d;
     f32 angle = -ZUN_PI;
-    for (i32 i = 0; i < 31; i++)
+    *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
+    fan_scroll_u(data, &data->vertices[0]);
+    fan_scroll_v(data, &data->vertices[0]);
+    data->vertices[0].diffuse = vm->color_1.d3d;
+    RenderVertex144 *first = &data->vertices[1];
+    RenderVertex144 *vertex = first;
+    f32 *radius = data->radius;
+    for (i32 i = 31; i != 0; i--)
     {
-        RenderVertex144 *vertex = &data->vertices[i + 1];
         fan_scroll_u(data, vertex);
         fan_scroll_v(data, vertex);
         vertex->diffuse = vm->color_1.d3d;
         ((ZunColor *)&vertex->diffuse)->a = 0;
-        data->radius[i] = data->radius_speed[i] + data->radius[i];
-        fan_sincosmul((Float3 *)&vertex->pos, angle, data->radius[i]);
+        *radius = *(radius + 33) + *radius;
+        fan_sincosmul((Float3 *)&vertex->pos, angle, *radius);
         angle += ZUN_2PI / 31.0f;
-        vertex->pos.x = vertex->pos.x + (vm->pos.x + vm->entity_pos.x);
-        vertex->pos.y = (vm->pos.y + vm->entity_pos.y) + vertex->pos.y;
-        vertex->pos.z = (vm->entity_pos.z + vm->pos.z) + vertex->pos.z;
+        *(Float3 *)&vertex->pos += vm->entity_pos + vm->pos;
+        vertex++;
+        radius++;
     }
-    data->vertices[32] = data->vertices[1];
+    *vertex = *first;
     return 0;
 }
 

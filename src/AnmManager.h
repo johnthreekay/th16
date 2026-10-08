@@ -547,7 +547,15 @@ struct AnmManager
     // 0x46f0b0. Sends an interrupt to the VM and its direct children.
     DECOMP_NOINLINE static void __stdcall interrupt_tree(AnmId id, i32 interrupt);
     // 0x46f130. Like interrupt_tree, also running each VM once.
-    DECOMP_NOINLINE static void __stdcall interrupt_tree_and_run(AnmId id, i32 interrupt);
+    DECOMP_NOINLINE static void __stdcall interrupt_tree_and_run_out_of_line(AnmId id, i32 interrupt);
+    // Callers reach interrupt_tree_and_run through this inline node. Its
+    // frame realignment (a dead double, see AnmManagerVms.cpp) would
+    // otherwise make every direct caller realign early, which the
+    // original's callers do not.
+    static inline void interrupt_tree_and_run(AnmId id, i32 interrupt)
+    {
+        interrupt_tree_and_run_out_of_line(id, interrupt);
+    }
     // 0x46d020. Loads an .anm file into a slot (or returns the one already
     // there) and waits for the loading thread to create its textures.
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *path);
@@ -623,7 +631,7 @@ struct AnmManager
     // 0x469890. Draws a triangle fan of count points around center, each
     // offset by offsets[i] and colored colors[i]. Every caller goes through
     // g_AnmManager, so LTCG dropped this.
-    HARNESS_CALLED void draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors);
+    HARNESS_CALLED i32 draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors);
     // 0x469a00. A circle outline of count segments around (x, y), from
     // angle on. draw_vm passes x, y and radius in xmm registers.
     HARNESS_CALLED i32 draw_circle_outline(f32 x, f32 y, f32 radius, f32 angle, i32 count, D3DCOLOR color);
