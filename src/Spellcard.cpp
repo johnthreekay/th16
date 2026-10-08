@@ -351,11 +351,12 @@ static_assert(offsetof(Spellcard, start_time) == 0x94, "Spellcard layout");
 static_assert(offsetof(Spellcard, time_code) == 0xa4, "Spellcard layout");
 static_assert(sizeof(Spellcard) == 0xbc, "Spellcard size");
 
-// TODO: ours aligns the frame to 64 bytes for the doubles (the original
-// does not), keeps the rounded time on the stack across floor instead of
+// HARNESS_CALLED: with every caller visible it no longer realigns its frame
+// to 64 bytes (found by the system agent).
+// TODO: ours keeps the rounded time on the stack across floor instead of
 // reloading it, and increments cards_in_stage through a register.
 // FUNCTION: TH16 0x417bc0
-void Spellcard::measure_real_time()
+HARNESS_CALLED void Spellcard::measure_real_time()
 {
     Spellcard *sc = g_Spellcard;
     if (sc->flags & SPELLCARD_ACTIVE)
