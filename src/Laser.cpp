@@ -2265,10 +2265,13 @@ i32 LaserInfiniteInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32
 
 // Sets the laser up from its parameters: the body and its origin VM, the
 // shot sound, and the start offset along the aim.
-// TODO: the original realigns the frame (and esp, -8); everything else matches. A dead double in a HARNESS_CALLED AnmVm::run matches it (see docs/findings.md).
+// The dead double is not ZUN's code: as in LaserLineInf::initialize, it
+// makes LTCG realign the frame (and esp, -8) like the original.
 // FUNCTION: TH16 0x435050
 i32 LaserInfiniteInf::initialize(void *params)
 {
+    double unused = 0.0;
+    (void)unused;
     inner = *(LaserInfiniteInner *)params;
     bullet_type = inner.type;
     state = LASER_STATE_WARNING;
