@@ -23,7 +23,8 @@ HARNESS_CALLED void anm_log(const char *fmt, ...)
 }
 
 // The entry index starts as 0 right after the null check (the original zeroes
-// ebx there and keeps this on the stack).
+// ebx there and keeps this on the stack) and counts up before the last-entry
+// test (inc ebx ahead of it).
 // TODO: the original keeps the entry count in edi and both sums on the stack (ours: the script sum in edi, the count on the stack) and tests entry against NULL on the first pass too.
 // FUNCTION: TH16 0x46cdd0
 i32 AnmLoaded::load(const char *path)
@@ -55,7 +56,7 @@ i32 AnmLoaded::load(const char *path)
     script_count = num_scripts;
     sprite_count = num_sprites;
     AnmRawEntry *entry = data;
-    for (;; i++)
+    for (;;)
     {
         if (entry == NULL)
         {
@@ -67,6 +68,7 @@ i32 AnmLoaded::load(const char *path)
         {
             break;
         }
+        i++;
         if (entry->offset_to_next == 0)
         {
             vms = (AnmVm *)malloc(num_scripts * sizeof(AnmVm));
