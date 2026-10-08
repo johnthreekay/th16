@@ -445,7 +445,14 @@ i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
     return 0;
 }
 
-// TODO: 46%; the original keeps the scaled color channels in dword stack slots.
+// The VM is read through a local copy of the pointer, as in
+// write_sprite_corners__without_rot. The color mode switch lists all four
+// values (a jump table like the original's; a default case compares
+// instead). Nothing follows it: a return after the switch changes the
+// layout, hence the C4715 pragma.
+// TODO: 85%; the original keeps the scaled color channels in dword stack slots and sums each position component in another order.
+#pragma warning(push)
+#pragma warning(disable : 4715)
 // FUNCTION: TH16 0x466820
 i32 AnmManager::draw_billboard_fog(AnmVm *vm_param)
 {
@@ -469,7 +476,7 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm_param)
     case 0:
     case 1: {
         ZunColor color;
-        color.d3d = (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d;
+        color.d3d = !(vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_1.d3d : vm->color_2.d3d;
         if (global_tint_enabled != 0)
         {
             color.r = color_mul(color.r, global_tint.r);
@@ -500,7 +507,8 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm_param)
         g_sprite_temp_buffer[3].diffuse = color.d3d;
         return render_sprite_2d(vm, ANM_SPRITE_KEEP_COLORS);
     }
-    default: {
+    case 2:
+    case 3: {
         ZunColor color_1 = vm->color_1;
         ZunColor color_2 = vm->color_2;
         if (global_tint_enabled != 0)
@@ -550,6 +558,7 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm_param)
     }
     }
 }
+#pragma warning(pop)
 
 // The differences assigned x, z, y give the original's registers for them.
 // TODO: the original subtracts y after x and sums x + y (ours y first, y + x); the loop end compares with g_sprite_temp_buffer's end, which our data layout follows with another global.
