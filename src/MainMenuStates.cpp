@@ -664,7 +664,6 @@ extern const char *g_stage_names[10];
 
 // Picking the subseason before a game (Extra has only one). In stage
 // practice this goes on to the stage select instead of starting.
-// TODO: in case 3 the original lays out the now loading block before confirm (ours after).
 // FUNCTION: TH16 0x450af0
 i32 TitleInf::do_subseason_select()
 {
@@ -740,15 +739,18 @@ i32 TitleInf::do_subseason_select()
     case 3:
         if (time_in_state.current == 10)
         {
-            if (g_Globals.game_mode != GAME_MODE_NORMAL)
+            // The goto start at the end of this branch puts the now loading
+            // block before confirm, like the original.
+            if (g_Globals.game_mode == GAME_MODE_NORMAL)
             {
-                goto confirm;
+                g_AsciiManager->show_now_loading(480.0f, 392.0f);
+                AnmId id;
+                id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
+                g_Supervisor.config.loading_effect_id = id.id;
+                AnmManager::interrupt_tree(id, 7);
+                goto start;
             }
-            g_AsciiManager->show_now_loading(480.0f, 392.0f);
-            AnmId id;
-            id = g_EffectManager->create_ui_effect(EFFECT_MASKED, NULL, NULL);
-            g_Supervisor.config.loading_effect_id = id.id;
-            AnmManager::interrupt_tree(id, 7);
+            goto confirm;
         }
         goto start;
     confirm:
