@@ -481,9 +481,12 @@ static DECOMP_NOINLINE void orb_update(BombReimuAOrb *orb)
 // Starts the orbs at frame 0, steps them, and bursts those whose damage
 // source has dealt 300 damage. All burst at frame 200; the bomb ends once
 // their VMs are gone.
-// TODO: same shape, different register allocation and block order (orb
-// loop, the damage source lookups); calls update through the orb_update
-// stand-in (see there).
+// The orb search jumps out with a goto, so the loop's normal exit is the
+// end of the bomb without a second test of the counter.
+// TODO: register allocation differs (orbs is read from its stack slot in
+// the original, the timer goes to edx, the loop counters swap stack
+// slots) and the radial_speed store comes before the damage source load;
+// calls update through the orb_update stand-in (see there).
 // FUNCTION: TH16 0x410de0
 i32 BombReimuAInf::on_tick()
 {
@@ -498,26 +501,23 @@ i32 BombReimuAInf::on_tick()
     }
     if (timer.current >= 120)
     {
-        i32 i;
         BombReimuAOrb *orb = orbs->orbs;
-        for (i = 0; i < 8; i++, orb++)
+        for (i32 i = 0; i < 8; i++, orb++)
         {
             if (get_vm_or_clear(orb->anm_id) != NULL)
             {
-                break;
+                goto orb_alive;
             }
         }
-        if (i == 8)
+        AnmManager::interrupt_tree(anm_id_secondary, 1);
+        if (reimu_orbs != NULL)
         {
-            AnmManager::interrupt_tree(anm_id_secondary, 1);
-            if (reimu_orbs != NULL)
-            {
-                free(reimu_orbs);
-                reimu_orbs = NULL;
-            }
-            return -1;
+            free(reimu_orbs);
+            reimu_orbs = NULL;
         }
+        return -1;
     }
+orb_alive:
     if (timer.current == 200)
     {
         orbs->finish_all();
