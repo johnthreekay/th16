@@ -3350,13 +3350,15 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
 
 // Sets the laser up from its parameters: the body, origin and tip VMs, the
 // delay timers, the shot sound and the start offset along the aim.
-// TODO: the original realigns the frame (and esp, -8); everything else matches. So do
-// the other set_vm_script callers, and set_vm_script has a padded frame there. A dead
-// double in a HARNESS_CALLED AnmVm::run matches it but loses other functions; one in
-// set_vm_script only makes set_vm_script realign itself (see docs/findings.md).
+// The dead double is not ZUN's code: it stands in for double math the
+// optimizer removed from his body. LTCG's double stack alignment pass sees it
+// at the IL level, so this function realigns its frame (and esp, -8) like the
+// original (see TitleInf::set_substate).
 // FUNCTION: TH16 0x431b30
 i32 LaserLineInf::initialize(void *params)
 {
+    double unused = 0.0;
+    (void)unused;
     inner = *(LaserLineInner *)params;
     bullet_type = inner.bullet_type;
     state = LASER_STATE_ACTIVE;
