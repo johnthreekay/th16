@@ -1203,7 +1203,7 @@ void __cdecl Supervisor::write_screenshot(void *arg)
 }
 
 // FUNCTION: TH16 0x43ba40
-int Supervisor::initialize()
+HARNESS_CALLED int Supervisor::initialize()
 {
     UpdateFunc *f;
     int result;

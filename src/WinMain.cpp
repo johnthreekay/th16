@@ -436,7 +436,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
     MSG msg;
     BYTE keys[256];
     char path[0x1000];
-    HINSTANCE instance_copy = instance;
+    // Kept on the stack and reloaded at each use in the original; volatile
+    // stands in for whatever spilled it there.
+    HINSTANCE volatile instance_copy = instance;
     i32 result = 0;
     g_GameWindow.instance = instance;
     timeBeginPeriod(1);
@@ -582,7 +584,10 @@ create_d3d:
         SetCursor(NULL);
     }
     g_GameWindow.runtime_base = 0.0;
-    g_GameWindow.frame_start_time = g_GameWindow.last_frame_time = g_GameWindow.next_frame_time = get_runtime();
+    double now = get_runtime();
+    g_GameWindow.next_frame_time = now;
+    g_GameWindow.frame_start_time = now;
+    g_GameWindow.last_frame_time = now;
     g_GameWindow.present_time = g_GameWindow.sleep_start_time = get_runtime();
     SetForegroundWindow(g_GameWindow.window);
     result = g_Supervisor.initialize();
