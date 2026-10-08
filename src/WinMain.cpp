@@ -426,9 +426,9 @@ static inline void stop_sound_threads()
 // changed) starts over from creating Direct3D. On exit it saves th16.cfg
 // and log.txt and restores the screen saver settings.
 // WinMain has C linkage, so it is annotated by its linker symbol.
-// TODO: 88%; the original hoists PeekMessageA's address into edi before
-// its loops, does not pad the loop heads with nops, and lays out some
-// blocks in another order.
+// TODO: 92%; the original keeps result in ecx as well as its stack slot
+// (ours reloads it), does not pad the loop heads with nops, and lays out
+// some blocks in another order.
 // SYNTHETIC: TH16 0x459830 SYMBOL
 // _WinMain@16
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_line, int show)
@@ -436,10 +436,11 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR command_li
     MSG msg;
     BYTE keys[256];
     char path[0x1000];
-    // Kept on the stack and reloaded at each use in the original; volatile
-    // stands in for whatever spilled it there.
-    HINSTANCE volatile instance_copy = instance;
-    i32 result = 0;
+    HINSTANCE instance_copy = instance;
+    // The original keeps result in a stack slot; volatile stands in for
+    // whatever spilled it there, and leaves edi free for PeekMessageA's
+    // address as in the original.
+    i32 volatile result = 0;
     g_GameWindow.instance = instance;
     timeBeginPeriod(1);
     // Counted down: the original then reuses the counter's final 0 in edi.
