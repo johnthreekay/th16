@@ -931,9 +931,9 @@ static __forceinline i32 is_off_screen(Float3 *pos)
 
 // The bullet pointer is advanced with the counter, and the off-screen test
 // is written as the negated comparisons, as the original's code shows.
-// TODO: the original's second pointer into the bullet points at
-// age.current (ours at age.speed_index), and the counter and the VM take
-// each other's stack slots.
+// The age ticks with tick_in_place (each branch updates the fields).
+// TODO: the tick stores previous before looking up the speed pointer and
+// current_f before current, where the original does the opposite.
 // FUNCTION: TH16 0x4456d0
 i32 Player::tick_bullets()
 {
@@ -997,7 +997,7 @@ i32 Player::tick_bullets()
             vm->rotation.z = bullet->pos.angle.value;
             vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         }
-        bullet->age.tick();
+        bullet->age.tick_in_place();
     }
     return 0;
 }
