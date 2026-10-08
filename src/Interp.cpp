@@ -288,60 +288,63 @@ i32 InterpInt::step()
     return current;
 }
 
-// TODO: ours aligns the frame (and esp, -8) and orders the bezier terms and the constant-acceleration adds differently.
+// The fields are read through a local copy of this, as in InterpFloat3::step.
+// TODO: 94%; the timer tick stores current_f in each branch (the original once after both), the constant-acceleration case loads bezier_2.x before goal.x and the bezier terms load bezier_2.x early.
 // FUNCTION: TH16 0x463d40
 HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step()
 {
-    if (end_time > 0)
+    InterpFloat2 *self = this;
+    if (self->end_time > 0)
     {
-        time.tick_mixed();
-        if (time.current >= end_time)
+        self->time.tick_mixed();
+        if (self->time.current >= self->end_time)
         {
-            time.set(end_time);
-            end_time = 0;
-            if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
+            self->time.set(self->end_time);
+            self->end_time = 0;
+            if (self->method == INTERP_CONSTANT_VELOCITY || self->method == INTERP_CONSTANT_ACCEL)
             {
-                return initial;
+                return self->initial;
             }
-            return goal;
+            return self->goal;
         }
     }
-    else if (end_time == 0)
+    else if (self->end_time == 0)
     {
-        if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
+        if (self->method == INTERP_CONSTANT_VELOCITY || self->method == INTERP_CONSTANT_ACCEL)
         {
-            return initial;
+            return self->initial;
         }
-        return goal;
+        return self->goal;
     }
-    if (method == INTERP_CONSTANT_VELOCITY)
+    if (self->method == INTERP_CONSTANT_VELOCITY)
     {
-        D3DXVECTOR2 tmp = initial;
-        initial = tmp + goal;
-        current = initial;
+        D3DXVECTOR2 tmp = self->initial;
+        self->initial = tmp + self->goal;
+        self->current = self->initial;
     }
-    else if (method == INTERP_CONSTANT_ACCEL)
+    else if (self->method == INTERP_CONSTANT_ACCEL)
     {
-        D3DXVECTOR2 tmp = initial;
-        initial = bezier_2 + tmp;
-        bezier_2 = bezier_2 + goal;
-        current = initial;
+        D3DXVECTOR2 tmp = self->initial;
+        self->initial = self->bezier_2 + tmp;
+        self->bezier_2 = self->bezier_2 + self->goal;
+        self->current = self->initial;
     }
-    else if (method == INTERP_BEZIER)
+    else if (self->method == INTERP_BEZIER)
     {
-        f32 t = time.current_f / (f32)end_time;
+        f32 t = self->time.current_f / (f32)self->end_time;
         f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
         f32 c_goal = t * t * (3.0f - 2.0f * t);
         f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
         f32 c_bezier_2 = (t - 1.0f) * t * t;
-        current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+        self->current = self->initial * c_initial + self->goal * c_goal + self->bezier_1 * c_bezier_1 +
+                        self->bezier_2 * c_bezier_2;
     }
     else
     {
-        f32 x = interp_common_methods(method, time.current_f, (f32)end_time);
-        current = (goal - initial) * x + initial;
+        f32 x = interp_common_methods(self->method, self->time.current_f, (f32)self->end_time);
+        self->current = (self->goal - self->initial) * x + self->initial;
     }
-    return current;
+    return self->current;
 }
 
 // The fields are read through a local copy of this: through this itself LTCG
@@ -405,60 +408,62 @@ D3DXVECTOR3 InterpFloat3::step()
     return self->current;
 }
 
-// TODO: same remaining differences as InterpFloat2::step, of which this is a second copy.
+// TODO: 94%; the same remaining differences as InterpFloat2::step, of which this is a second copy.
 // FUNCTION: TH16 0x425570
 HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step_radial_dist()
 {
-    if (end_time > 0)
+    InterpFloat2 *self = this;
+    if (self->end_time > 0)
     {
-        time.tick_mixed();
-        if (time.current >= end_time)
+        self->time.tick_mixed();
+        if (self->time.current >= self->end_time)
         {
-            time.set(end_time);
-            end_time = 0;
-            if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
+            self->time.set(self->end_time);
+            self->end_time = 0;
+            if (self->method == INTERP_CONSTANT_VELOCITY || self->method == INTERP_CONSTANT_ACCEL)
             {
-                return initial;
+                return self->initial;
             }
-            return goal;
+            return self->goal;
         }
     }
-    else if (end_time == 0)
+    else if (self->end_time == 0)
     {
-        if (method == INTERP_CONSTANT_VELOCITY || method == INTERP_CONSTANT_ACCEL)
+        if (self->method == INTERP_CONSTANT_VELOCITY || self->method == INTERP_CONSTANT_ACCEL)
         {
-            return initial;
+            return self->initial;
         }
-        return goal;
+        return self->goal;
     }
-    if (method == INTERP_CONSTANT_VELOCITY)
+    if (self->method == INTERP_CONSTANT_VELOCITY)
     {
-        D3DXVECTOR2 tmp = initial;
-        initial = tmp + goal;
-        current = initial;
+        D3DXVECTOR2 tmp = self->initial;
+        self->initial = tmp + self->goal;
+        self->current = self->initial;
     }
-    else if (method == INTERP_CONSTANT_ACCEL)
+    else if (self->method == INTERP_CONSTANT_ACCEL)
     {
-        D3DXVECTOR2 tmp = initial;
-        initial = bezier_2 + tmp;
-        bezier_2 = bezier_2 + goal;
-        current = initial;
+        D3DXVECTOR2 tmp = self->initial;
+        self->initial = self->bezier_2 + tmp;
+        self->bezier_2 = self->bezier_2 + self->goal;
+        self->current = self->initial;
     }
-    else if (method == INTERP_BEZIER)
+    else if (self->method == INTERP_BEZIER)
     {
-        f32 t = time.current_f / (f32)end_time;
+        f32 t = self->time.current_f / (f32)self->end_time;
         f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
         f32 c_goal = t * t * (3.0f - 2.0f * t);
         f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
         f32 c_bezier_2 = (t - 1.0f) * t * t;
-        current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+        self->current = self->initial * c_initial + self->goal * c_goal + self->bezier_1 * c_bezier_1 +
+                        self->bezier_2 * c_bezier_2;
     }
     else
     {
-        f32 x = interp_common_methods(method, time.current_f, (f32)end_time);
-        current = (goal - initial) * x + initial;
+        f32 x = interp_common_methods(self->method, self->time.current_f, (f32)self->end_time);
+        self->current = (self->goal - self->initial) * x + self->initial;
     }
-    return current;
+    return self->current;
 }
 
 // TODO: the per-axis constant acceleration loads bezier_2 before initial and stores current from xmm0 where the original copies it back through eax (`+=` and an int copy give that but swap esi and edi everywhere); the returned vector's z is loaded after x/y.
