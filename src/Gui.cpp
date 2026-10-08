@@ -1467,13 +1467,22 @@ void __fastcall anm_vm_interrupt_2_run(AnmVm *vm)
     vm->run();
 }
 
+// Sets a vector from a D3DXVECTOR3 temporary. Through this helper the
+// temporary belongs to its own call graph node: written in place, the
+// 12-byte temporaries give the caller a /GS cookie the original does not
+// have (GuiMsgVm's constructor).
+static inline void set_float3(Float3 *p, f32 x, f32 y, f32 z)
+{
+    *p = Float3(x, y, z);
+}
+
 // Starts a dialogue script: creates the text and furigana VMs (text.anm
 // scripts 0 and 1; the second of each gets interrupt 7, presumably to make
 // it the lower line),
 // clears bullets, lasers and enemies, and puts the bubble at its default
 // place.
-// TODO: ours gets a /GS cookie and keeps the create_effect results in a
-// local; the original has no cookie and reuses script's argument slot for them.
+// TODO: the original stores next_text_line to active_side before the side
+// text positions; ours after them, just before clear_all.
 // FUNCTION: TH16 0x429b20
 GuiMsgVm::GuiMsgVm(void *script)
 {
@@ -1513,10 +1522,10 @@ GuiMsgVm::GuiMsgVm(void *script)
     side_text_color_2 = 0;
     side_text_color_3 = 0;
     active_side = 0;
-    side_text_pos_0 = Float3(16.0f, 0.0f, 0.0f);
-    side_text_pos_1 = Float3(16.0f, 0.0f, 0.0f);
-    side_text_pos_2 = Float3(16.0f, 0.0f, 0.0f);
-    side_text_pos_3 = Float3(16.0f, 0.0f, 0.0f);
+    set_float3(&side_text_pos_0, 16.0f, 0.0f, 0.0f);
+    set_float3(&side_text_pos_1, 16.0f, 0.0f, 0.0f);
+    set_float3(&side_text_pos_2, 16.0f, 0.0f, 0.0f);
+    set_float3(&side_text_pos_3, 16.0f, 0.0f, 0.0f);
     // Dialogue starts on a clean screen.
     g_BulletManager->clear_all(0);
     // LaserManager::clear_all(0, 0), inlined.
