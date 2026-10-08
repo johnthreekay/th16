@@ -1032,3 +1032,72 @@ GUI, stage, effects, pause and help menus:
   (non-array color struct, user constructor); a form of
   Stage::start_std_vms that keeps its shrink-wrap whatever the caller's
   alignment.
+
+Bullets, enemies, ECL and spell cards:
+- An inline helper returning `c ? x->entry : NULL` lets MSVC jump straight
+  out of the caller's loop on the NULL branch; `T *b = c ? ... : NULL;
+  return b;` keeps the original's join and second test
+  (BulletManager::iter_first/iter_advance; matched the three cancel
+  functions).
+- `v <= -1 && v >= -100` on one variable merges into `lea; cmp; ja`;
+  reading the first bound from memory again (`ins->args[i].i <= -1 &&
+  value >= -100`) keeps the original's two signed compares (get_int_arg,
+  pop_int_arg). The given_value variants merge in the original too.
+- One result variable assigned on every path, then `return result`,
+  gives the original's type load into a register and a shared epilogue
+  (get_int_arg, pop_int_arg, pop_int_arg_given_value).
+- Reading a popped entry as `i32` and returning `*(f32 *)&item` fixes the
+  register swap in pop_float_arg and pop_float_arg_given_value (in
+  EclStack::pop_float it gave ecl_run +11%; the same form in pop_int made
+  ecl_run worse).
+- An inline `EclStack::local_ptr` that computes `data + base_offset` first
+  gives the original's add order and stops `(i32)value` being hoisted above
+  the sign test.
+- Reading fields through a pointer local of their own (`Float3 *to =
+  &...`) stops MSVC reusing earlier loads (EnemyInf::die reloads the
+  positions for atan2, Spellcard::on_tick_body reloads boss_pos).
+- 0x3d23d70b is `0.2f * 0.2f`, one ulp off `0.04f` (EnemyInf::die and the
+  die instruction in ecl_run_over_300).
+- `i32 fps = 60; x / fps; x % fps` keeps one `idiv` for both; two ternaries
+  give the clamp's cmovs; `break` instead of `return NULL` shares the NULL
+  exit (check_time_interrupts).
+- `u32 f = flags; if (f & A) { if (!((u8)f & B)) ... }` keeps
+  `test eax, A` and `test al, B` on one load (step_interpolators); the
+  bitfield and dword forms merge into and/cmp.
+- `node.init(this)` instead of four field stores moved the memset pushes
+  and matched EnemyInf::EnemyInf (the open "EnemyInf's memset pushes" item).
+- tick_goto can also flip LTCG to "load current_f into xmm0, add the
+  speed": it matched Bullet::step_ex_00, step_ex_04 and
+  EnemyManager::kill_all and fixed the tick in step_ex_17,
+  kill_all_in_group and EnemyManager::update. Try it on every tick
+  mismatch, whichever way it differs.
+- /GS cookies: a `__forceinline` helper owning the Float3 temporary removed
+  EnemyData::on_tick's cookie (the plain static inline one was not
+  inlined there); `__declspec(safebuffers)` removed step_logic's.
+- AnmId::find_or_clear HARNESS_CALLED instead of DECOMP_NOINLINE: with
+  every caller visible LTCG knows it leaves xmm1-xmm3 alone, so
+  EnemyData::on_tick keeps the summed position in registers across the
+  call like the original (matched, nothing else moved).
+- Smaller: Bullet::on_tick writes `release(); return -1;` at each site
+  instead of a goto (the original keeps the first copy inline at the top);
+  half steps as one expression `pos += velocity * g_game_speed * 0.5f` in
+  clear_all's inlined copy while Bullet::cancel keeps its delta local
+  (picked per copy by a constant flag on a forceinline helper); an `if`
+  instead of a ternary for `dealt` (step_logic); assigning `offset.y`
+  before `offset.x` (eject_extra_drops); a separate `return 1` on
+  Spellcard::on_tick_body's early-bomb path; ecl_run_over_300 can inline
+  new Fog, the four laser instructions and angleToPlayer again (+11%).
+- Dead ends: kill_all_no_set_death's tick (every tick form and goto
+  variant gives "load"; the original adds into the speed register);
+  Spellcard::on_tick_body's tick (every form gives "fold" where the
+  original loads); step_ex_08's realignment from its 8-byte D3DXVECTOR2
+  corner (a Float3 adds a cookie, a 2-float struct still realigns,
+  HARNESS_CALLED moves it into Bullet::on_tick); get_int_arg_given_value's
+  `+4` always folded into the displacement; EnemyManager::destroy_all
+  always counts down; BulletManager::destroy_all's padded ebp frame needs
+  known alignment from GameThread's callers; kill_all_in_group's `value`
+  stays in its slot; callee-saved permutations in load_ecl_data,
+  ecl_anm_vm_instr and Spellcard::start; call_sub's byte-offset argument
+  loop gives the original's instructions with permuted registers (net
+  -0.06); an out-of-line LaserInfiniteInner constructor costs
+  LaserInfiniteInf's constructor its match.
