@@ -1484,8 +1484,9 @@ HARNESS_CALLED EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, 
     return enemy;
 }
 
-// TODO: in the inlined current_instr the original loads the offset into ecx and the
-// subroutine index into edx; ours swaps them. The rest matches.
+// ECL enmCreate family: spawns a child enemy at the given position (relative
+// to this enemy and mirrored for the relative and mirrored opcodes) with this
+// enemy's ECL variables.
 // FUNCTION: TH16 0x423050
 int EnemyData::ecl_enm_create()
 {
@@ -1493,8 +1494,10 @@ int EnemyData::ecl_enm_create()
     {
         return 0;
     }
+    // The instruction is read through `full` before the `vm` copy exists:
+    // with the copy first, the inlined current_instr swaps ecx and edx.
+    EclRawInstr *instr = full->context.current_context->current_instr();
     EnemyInf *vm = full;
-    EclRawInstr *instr = vm->context.current_context->current_instr();
     i32 n = (instr->args[0].i + 4) / 4;
     EnemyCreateParams params;
     memset(&params, 0, sizeof(params));
