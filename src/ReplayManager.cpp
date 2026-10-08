@@ -399,8 +399,6 @@ HARNESS_CALLED void ReplayManager::start_stage()
     }
 }
 
-// TODO: the original realigns its frame through ebx (and esp, -8), most
-// likely for repopulate_options; the body matches.
 // FUNCTION: TH16 0x448eb0
 HARNESS_CALLED void ReplayManager::begin_stage()
 {
@@ -466,22 +464,10 @@ void clear_input_state()
     g_InputState.input_held_long = 0;
 }
 
-// UpdateFuncRegistry::unregister_locked with the registry read inside the
-// null check, as the destructor has it.
-static __forceinline void unregister_replay_func(UpdateFunc *f)
-{
-    if (f != NULL)
-    {
-        UpdateFuncRegistry *registry = g_UpdateFuncRegistry;
-        ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
-        registry->unregister(f);
-        LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
-    }
-}
-
-// TODO: 76%; the original keeps each func in ebx and EnterCriticalSection's
-// address in eax (ours: func spilled, the address in ebx), and our loops get
-// alignment padding the original lacks.
+// Each update function is unregistered with its own written-out copy of
+// UpdateFuncRegistry::unregister_locked, with the registry read inside the
+// null check (the inline helper kept the function pointer in a stack slot).
+// TODO: the original keeps each func in ebx and EnterCriticalSection's address in eax (ours rereads the func and keeps the address in ebx), and our loops get alignment padding.
 // FUNCTION: TH16 0x447c80
 ReplayManager::~ReplayManager()
 {
@@ -497,9 +483,27 @@ ReplayManager::~ReplayManager()
         delete (RpyGamestate *)stage_gamestate_snapshots[i];
         stage_gamestate_snapshots[i] = NULL;
     }
-    unregister_replay_func(on_tick_func);
-    unregister_replay_func(fast_forward_func);
-    unregister_replay_func(on_draw_func);
+    if (on_tick_func != NULL)
+    {
+        UpdateFuncRegistry *registry = g_UpdateFuncRegistry;
+        ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
+        registry->unregister(on_tick_func);
+        LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
+    }
+    if (fast_forward_func != NULL)
+    {
+        UpdateFuncRegistry *registry = g_UpdateFuncRegistry;
+        ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
+        registry->unregister(fast_forward_func);
+        LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
+    }
+    if (on_draw_func != NULL)
+    {
+        UpdateFuncRegistry *registry = g_UpdateFuncRegistry;
+        ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
+        registry->unregister(on_draw_func);
+        LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
+    }
     if (this == g_ReplayManager)
     {
         g_ReplayManager = NULL;

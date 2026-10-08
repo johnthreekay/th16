@@ -154,6 +154,8 @@ i32 LaserInfiniteInf::on_tick()
         }
         break;
     case LASER_STATE_EXPANDING:
+        // Written as >= with the else breaking for the original's case
+        // layout; the if branch falls through into ACTIVE.
         if (timer.current >= inner.expand_time)
         {
             timer.set_value(0);

@@ -190,11 +190,17 @@ static __forceinline i32 help_menu_moved(MenuHelper *m)
 // enter opens it, bomb or menu closes the manual), read its picture on the
 // worker thread, then show it (up and down turn the page, cancel goes back
 // to the list). Sounds 10, 7 and 9 are the cursor, select and cancel ones.
-// TODO: ours gets a /GS cookie where the original realigns the frame, and
-// reads the input globals in a different order.
+// safebuffers (on the declaration) drops the /GS cookie ours gets for pos,
+// whose address goes to create_ui_vm; the original has none. The timers are
+// the inlined reset and the tick_goto form, as the original inlines them.
 // FUNCTION: TH16 0x42eab0
 DECOMP_NOINLINE i32 HelpManual::on_tick_body()
 {
+    // A dead double: it makes LTCG realign this frame (and esp, -8) early,
+    // as the original does, which also gives create_ui_vm its padded frame.
+    // It stands in for AnmVm::run wanting an aligned stack (docs/findings.md).
+    double unused = 0.0;
+    (void)unused;
     D3DXVECTOR3 pos;
     pos.y = 0.0f;
     pos.z = 0.0f;
@@ -244,7 +250,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
                 help_hide_pages(this);
                 state = HELP_STATE_CLOSE;
                 substate = HELP_SUBSTATE_SETUP;
-                timer.reset();
+                timer.reset_inline();
             }
             break;
         case HELP_SUBSTATE_LOADING:
@@ -315,7 +321,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
         }
         break;
     }
-    timer.tick();
+    timer.tick_goto();
     return UPDATE_FUNC_CONTINUE;
 }
 
@@ -333,7 +339,8 @@ i32 __fastcall HelpManual::on_draw_callback(HelpManual *manual)
 
 // Creates a VM running script at pos in the UI list (like create_ui_effect,
 // with a position).
-// TODO: same frame difference as create_vm (4 more bytes, esi saved before the critical section).
+// TODO: the original frame has 4 more bytes: padded for the alignment its caller
+// provides, which needs AnmVm::run to want an aligned stack (see create_vm).
 // FUNCTION: TH16 0x42efb0
 HARNESS_CALLED AnmId AnmLoaded::create_ui_vm(i32 script, D3DXVECTOR3 *pos, i32 unused)
 {

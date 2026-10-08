@@ -8,6 +8,17 @@
 // first four float arguments arrive in xmm0-xmm3 (LTCG), the rest on the
 // stack, which the callee pops.
 
+// The squared length of an offset's x and y, y term first. Taking the
+// offset by pointer keeps each test's squares apart (the original squares
+// every corner offset again in each test, where plain expressions share
+// them), and the y term first gives the original's x-term accumulator. The
+// offset is a Float3 because an 8-byte local (a Float2) would make LTCG
+// realign the callers' frames (BulletManager::cancel_rectangle_as_bomb).
+inline f32 offset_length_sq(const Float3 *d)
+{
+    return d->y * d->y + d->x * d->x;
+}
+
 // 0x403d30. Whether a circle touches a rectangle of size w x h centered on
 // (rect_x, rect_y) and rotated by angle.
 HARNESS_CALLED i32 __stdcall collision_test_circle_rect(f32 rect_x, f32 rect_y, f32 w, f32 h, f32 angle, f32 circle_x,

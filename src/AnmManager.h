@@ -209,6 +209,35 @@ struct AnmLoaded
     void load_sprite(i32 index, AnmLoadedSprite *sprite);
 };
 
+// AnmLoaded::create_effect as a member function pointer. A call through it
+// compiles to the original's direct call, but is not an edge in LTCG's call
+// graph.
+typedef AnmId (AnmLoaded::*AnmLoadedCreateEffectFunc)(i32 script, i32 layer, AnmVm **out);
+static inline AnmLoadedCreateEffectFunc anm_create_effect_func()
+{
+    return &AnmLoaded::create_effect;
+}
+
+// anm->create_effect(script, layer, out), called through the member pointer.
+// Most of ZUN's call sites compile like this, in two ways that a plain call
+// (or an inline helper with a plain call) does not reproduce:
+// - The file pointer is loaded first: for g_AsciiManager->ascii_anm the
+//   original has g_AsciiManager in eax and the result slot in ecx (the menu
+//   states, Gui::show_notice, Spellcard::start).
+// - create_effect's wish for an 8-aligned stack (see its dead double) stays
+//   out of the caller: with direct calls, callers such as show_notice,
+//   Gui::on_tick_body, GuiMsgVm's constructor and TitleInf::on_tick realign
+//   their frames where the original does not.
+// The direct calls left are ones whose original shape needs the plain call:
+// PlayerBullet::create (its unseasoned shot hands the alignment on to
+// Player::do_shooting), Supervisor::create_fog_vm (it returns create_effect's
+// result in its own return slot), Fog's main VM, the ending script VM,
+// AnmId::replace_with_effect and the Player effects.
+static __forceinline AnmId create_effect_via_pointer(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out)
+{
+    return (anm->*anm_create_effect_func())(script, layer, out);
+}
+
 // A sprite as stored in an .anm entry.
 struct AnmRawSprite
 {
@@ -547,7 +576,15 @@ struct AnmManager
     // 0x46f0b0. Sends an interrupt to the VM and its direct children.
     DECOMP_NOINLINE static void __stdcall interrupt_tree(AnmId id, i32 interrupt);
     // 0x46f130. Like interrupt_tree, also running each VM once.
-    DECOMP_NOINLINE static void __stdcall interrupt_tree_and_run(AnmId id, i32 interrupt);
+    DECOMP_NOINLINE static void __stdcall interrupt_tree_and_run_out_of_line(AnmId id, i32 interrupt);
+    // Callers reach interrupt_tree_and_run through this inline node. Its
+    // frame realignment (a dead double, see AnmManagerVms.cpp) would
+    // otherwise make every direct caller realign early, which the
+    // original's callers do not.
+    static inline void interrupt_tree_and_run(AnmId id, i32 interrupt)
+    {
+        interrupt_tree_and_run_out_of_line(id, interrupt);
+    }
     // 0x46d020. Loads an .anm file into a slot (or returns the one already
     // there) and waits for the loading thread to create its textures.
     static AnmLoaded *__stdcall preload_anm(i32 slot, const char *path);
@@ -623,7 +660,7 @@ struct AnmManager
     // 0x469890. Draws a triangle fan of count points around center, each
     // offset by offsets[i] and colored colors[i]. Every caller goes through
     // g_AnmManager, so LTCG dropped this.
-    HARNESS_CALLED void draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors);
+    HARNESS_CALLED i32 draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors);
     // 0x469a00. A circle outline of count segments around (x, y), from
     // angle on. draw_vm passes x, y and radius in xmm registers.
     HARNESS_CALLED i32 draw_circle_outline(f32 x, f32 y, f32 radius, f32 angle, i32 count, D3DCOLOR color);

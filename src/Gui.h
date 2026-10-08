@@ -524,6 +524,16 @@ struct Gui
     }
 };
 
+// Gui::show_notice as a member function pointer: a call through it compiles
+// to the original's direct call but is not an edge in LTCG's call graph, so
+// show_notice's wish for an 8-aligned stack stays out of the caller (see
+// create_effect_via_pointer in AnmManager.h).
+typedef void (Gui::*GuiShowNoticeFunc)(i32 bonus, i32 kind);
+static inline GuiShowNoticeFunc gui_show_notice_func()
+{
+    return &Gui::show_notice;
+}
+
 static_assert(sizeof(GuiBossBar) == 0x54, "GuiBossBar size");
 static_assert(offsetof(Gui, chapter_percent) == 0x134, "Gui layout");
 static_assert(offsetof(Gui, chapter_result_duration) == 0x1c4, "Gui layout");

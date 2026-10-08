@@ -75,7 +75,10 @@ static __forceinline void gather_setup_child(AnmId *id, ZunColor color, AnmVm *v
     child->int_vars[0] = vm->int_vars[0];
 }
 
-// TODO: same operations, different stack slot layout and scheduling (the original's frame is 0x90 bytes, ours 0xa4).
+// The direction temporaries reuse offset, as the original's stack slots
+// show (it computes mid - start once for both normalizations).
+// TODO: different stack slot layout (the original's frame is 0x90 bytes,
+// ours 0xa8).
 // Spawns four child VMs per frame for 50 frames and flies each along two
 // bezier curves: out from a point that circles the VM to one that circles
 // it closer, then back to the VM.
@@ -96,10 +99,14 @@ int __fastcall anm_gather_effect_on_tick(AnmVm *vm)
     if (data->timer.current != data->timer.previous && data->timer.current < 50)
     {
         i32 n = data->timer.current * 4;
-        data->vm_ids[n] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
-        data->vm_ids[n + 1] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
-        data->vm_ids[n + 2] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
-        data->vm_ids[n + 3] = g_EffectManager->effect_anm->create_effect(EFFECT_SCRIPT_GATHER_PARTICLE_2, -1, NULL);
+        data->vm_ids[n] = create_effect_via_pointer(g_EffectManager->effect_anm,
+                                                    EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
+        data->vm_ids[n + 1] = create_effect_via_pointer(g_EffectManager->effect_anm,
+                                                        EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
+        data->vm_ids[n + 2] = create_effect_via_pointer(g_EffectManager->effect_anm,
+                                                        EFFECT_SCRIPT_GATHER_PARTICLE, -1, NULL);
+        data->vm_ids[n + 3] = create_effect_via_pointer(g_EffectManager->effect_anm,
+                                                        EFFECT_SCRIPT_GATHER_PARTICLE_2, -1, NULL);
         ZunColor color = vm->color_1;
         gather_setup_child(&data->vm_ids[n], color, vm);
         gather_setup_child(&data->vm_ids[n + 1], color, vm);
@@ -134,14 +141,17 @@ int __fastcall anm_gather_effect_on_tick(AnmVm *vm)
             Float3 bezier_2;
             Float3 bezier_1;
             // Out of the start towards the middle and on to the end.
-            D3DXVec3Normalize(&bezier_2, &(mid - start));
-            D3DXVec3Normalize(&bezier_1, &(data->end_center - mid));
+            offset = mid - start;
+            D3DXVec3Normalize(&bezier_2, &offset);
+            offset = data->end_center - mid;
+            D3DXVec3Normalize(&bezier_1, &offset);
             bezier_2 += bezier_1;
             f32 speed = g_replay_safe_rng.randf_0_to_1() * 200.0f + 200.0f;
             D3DXVec3Normalize(&bezier_2, &bezier_2);
             bezier_2 *= speed;
+            offset = mid - start;
             speed = g_replay_safe_rng.randf_0_to_1() * 100.0f + 100.0f;
-            D3DXVec3Normalize(&bezier_1, &(mid - start));
+            D3DXVec3Normalize(&bezier_1, &offset);
             bezier_1 *= speed;
             child->set_pos_bezier(vm->int_vars[0], &start, &bezier_1, &mid, &bezier_2);
             data->mids[i] = mid;
@@ -168,7 +178,7 @@ int __fastcall anm_gather_effect_on_tick(AnmVm *vm)
     {
         return -1;
     }
-    data->timer.tick_split();
+    data->timer.tick_goto();
     return 0;
 }
 
@@ -373,11 +383,19 @@ int __fastcall anm_jagged_line_on_tick(AnmVm *vm)
     return 1;
 }
 
-// TODO: the original aligns the frame to 8 bytes (and esp, -8) and adds
-// entity_pos.x + pos.x in the other order.
+// Draws the line as a strip through the stored offsets around the VM's
+// position. The dead double math is not ZUN's code: it is enough of it for
+// LTCG's double stack alignment pass to realign the frame (and esp, -8)
+// like the original, and it also gives entity_pos.x + pos.x the original's
+// operand order (one or two plain dead doubles fix only the order).
 // FUNCTION: TH16 0x406860
 int __fastcall anm_jagged_line_on_draw(AnmVm *vm)
 {
+    double unused = 0.0;
+    unused = unused * 2.0;
+    unused = unused * 2.0;
+    unused = unused * 2.0;
+    (void)unused;
     AnmJaggedLineData *data = (AnmJaggedLineData *)vm->extra_data;
     g_AnmManager->setup_render_state_for_vm(vm);
     Float3 pos;
@@ -461,10 +479,15 @@ int __fastcall anm_masked_effect_init(AnmVm *vm, D3DXVECTOR3 *pos)
     return 0;
 }
 
-// TODO: the original aligns its frame to 8 bytes (and esp, -8; not from AnmVm::run, whose other direct callers do not).
+// Steps the four mask VMs and, while any is still running, the overlay;
+// returns 1 once all four have finished.
+// The dead double is not ZUN's code: it makes LTCG realign the frame
+// (and esp, -8) like the original, which AnmVm::run alone does not.
 // FUNCTION: TH16 0x407330
 int __fastcall anm_masked_effect_on_tick(AnmVm *vm)
 {
+    double unused = 0.0;
+    (void)unused;
     AnmMaskedEffectData *data = (AnmMaskedEffectData *)vm->extra_data;
     i32 finished = 0;
     for (i32 i = 0; i < 4; i++)

@@ -340,6 +340,8 @@ int EnemyData::ecl_run_over_300()
         {
             f32 angle = -ZUN_PI / 2;
             Float3 *pos = &final_pos.pos;
+            // 0.2 squared: as a float product one ulp above 0.04f, as in the
+            // original (see EnemyInf::die).
             if (!(0.2f * 0.2f > (last_damage_pos.x - pos->x) * (last_damage_pos.x - pos->x) +
                               (last_damage_pos.y - pos->y) * (last_damage_pos.y - pos->y)))
             {

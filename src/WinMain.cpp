@@ -585,6 +585,7 @@ create_d3d:
         SetCursor(NULL);
     }
     g_GameWindow.runtime_base = 0.0;
+    // Through a local, stored in the original's order (matching).
     double now = get_runtime();
     g_GameWindow.next_frame_time = now;
     g_GameWindow.frame_start_time = now;
