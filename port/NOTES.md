@@ -555,15 +555,14 @@ For finding where a replay desyncs: `TH16_REPLAY_TEST_TRACE=N` logs the
 state every N frames, and `TH16_REPLAY_TEST_DUMP=FILE` writes every
 frame's g_Globals, replay RNG and player position as hex (with
 `TH16_REPLAY_TEST_ITEMS=FIRST:LAST`, also every active item in those
-frames). `port/tools/replay_reference.py record` writes the same dump for
-the original: it runs th16.exe under Wine (a scratch prefix given as
-WINEPREFIX, Wine's own d3dx9; the config set to a 640x480 window without
-the startup dialog), opens the replay through the menus with xdotool under
-Xvfb, and reads the same addresses from /proc/PID/mem every millisecond,
-keeping the last sample of each frame (g_Globals 0x4a5790,
+frames). `scripts/replay_trace.py record` (main's tracer, docs/workflow.md,
+"Replay check of the MSVC build") writes the same dump for the original:
+it runs th16.exe under Wine (a scratch prefix given as WINEPREFIX), opens
+the replay through the menus with xdotool under Xvfb, and reads the same
+state from /proc/PID/mem every millisecond (g_Globals 0x4a5790,
 g_replay_safe_rng 0x4a6d88, g_Player 0x4a6ef8 +0x61c, g_ReplayManager
 0x4a6f08: stage_num +0x214, frame_current +0xd8 + 0x28 * stage; items from
-g_ItemManager 0x4a6ddc + 0x14, 0xc78 bytes each). `replay_reference.py
+g_ItemManager 0x4a6ddc + 0x14, 0xc78 bytes each). `replay_trace.py
 compare` then prints the first frame where each field differs. With
 ptrace_scope 1 the script has to be the game's ancestor: Wine's launcher
 exits after starting th16.exe, so the script makes itself a child
@@ -619,7 +618,7 @@ all eight tests take 8.5 minutes with `ctest -j4`). `rpy_compare.py
 show FILE` prints a replay's header, info and stage snapshots.
 
 To check that the original accepts the port's replays, play one in
-th16.exe with `replay_reference.py record` and compare its dump with the
+th16.exe with `scripts/replay_trace.py record` and compare its dump with the
 port's (`TH16_REPLAY_TEST_DUMP` while `th16 --replay` plays the same
 file). Several reference runs at once each need their own WINEPREFIX and
 `--display N` (xvfb-run -a races when two start together).
