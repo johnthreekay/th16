@@ -67,13 +67,16 @@ __forceinline void BulletManager::reset_lists()
     head->unk_c = NULL;
     for (i32 i = 0; i < BULLET_COUNT; i++)
     {
+        // The free list node is cleared through bullets[i] before the local
+        // pointer exists: that keeps its first store on the loop pointer, and
+        // the tick node's entry is stored before its next, as in the original.
+        bullets[i].freelist_node.entry = NULL;
+        bullets[i].freelist_node.next = NULL;
+        bullets[i].freelist_node.prev = NULL;
+        bullets[i].freelist_node.unk_c = NULL;
         Bullet *b = &bullets[i];
-        b->freelist_node.entry = NULL;
-        b->freelist_node.next = NULL;
-        b->freelist_node.prev = NULL;
-        b->freelist_node.unk_c = NULL;
-        b->tick_list_node.next = NULL;
         b->tick_list_node.entry = b;
+        b->tick_list_node.next = NULL;
         b->tick_list_node.prev = NULL;
         b->tick_list_node.unk_c = NULL;
         b->index = i;
@@ -94,8 +97,6 @@ static inline UpdateFuncCallback bullet_on_tick_callback()
     return (UpdateFuncCallback)BulletManager::on_tick_callback;
 }
 
-// TODO: esi/edi get pushed after the early return, not at entry, and the
-// loop stores b->freelist_node.entry through b, not the loop pointer.
 // FUNCTION: TH16 0x411a30
 i32 BulletManager::initialize()
 {
@@ -125,8 +126,7 @@ i32 BulletManager::initialize()
     return 0;
 }
 
-// TODO: the original has an unused 4-byte frame, keeps mgr in ebx, and
-// stores the first loop field through the loop pointer.
+// TODO: the original has an unused 4-byte frame and keeps mgr in ebx.
 // FUNCTION: TH16 0x411b70
 void BulletManager::destroy_all()
 {
