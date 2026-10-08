@@ -1647,3 +1647,27 @@ before its final report, so this comes from its commits and messages):
 - Its alignment experiment (a dead double in show_notice) and its lead
   that the Item/Globals realignment cluster came from show_notice and
   create_effect started the cross-file alignment work above.
+
+Enemy-file sweep, second half:
+- Store before load: when the original stores a member and only then
+  loads another, but ours hoists the load above the store, do the store
+  through a pointer local to that member (`u32 *f = &flags; *f |= 2;`
+  matched EnemyManager::create exactly; `i32 *base = &base_offset;` did
+  the same for EclStack::enter). The pointer must hold the member whose
+  store has to come first or whose load has to come later; it did not
+  help step_ex_17's struct copy.
+- Reading `g_BulletManager->bullet_anm` into an `AnmLoaded *anm` local
+  before create_vm keeps the manager in eax and loads it before the pushes
+  (Bullet::check_player_collision 84.6 -> 90.0, Bullet::on_tick -> 82.2,
+  with its dead-local count kept the same modulo 8).
+- The named-variable lever does nothing for a scalar `*speed` in an inlined
+  tick (even with dead locals inside a local helper), for register swaps
+  (clear_all x/y, ecl_enm_create ecx/edx, call_sub), step_ex_12's constant
+  load order, step_logic's ternary or EclStack::enter. In clear_all, dead
+  locals inside the inlined cancel_bullet change Bullet::cancel's copy but
+  never clear_all's.
+- tick_goto and tick_split raise Spellcard::on_tick_body in quickdiff but
+  lower it in reccmp (85.03 -> 84.78).
+- Unfinished lead: Bullet::on_tick's active-case `pos += velocity *
+  g_game_speed` in a forceinline helper with two dead locals gave the best
+  quickdiff (80.1 vs 76.7); not yet confirmed in reccmp.
