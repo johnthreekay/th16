@@ -695,8 +695,8 @@ i32 __fastcall sht_on_hit_laser(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_s
         AnmVm *vm = g_AnmManager->get_vm_with_id(id);
         if (vm != NULL)
         {
-            vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
             vm->rotation.z = bullet->pos.angle.value;
+            vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         }
         g_AnmManager->get_vm_with_id(id)->set_pos_time(0x14, 4, &g_zero_vec, &velocity);
     }

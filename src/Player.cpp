@@ -926,21 +926,25 @@ HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f3
     return total;
 }
 
-// Whether a point lies inside the playfield.
-static __forceinline i32 is_on_screen(Float3 *pos)
+// Whether a point lies outside the playfield (written as the negated
+// tests, which the original's comparisons follow).
+static __forceinline i32 is_off_screen(Float3 *pos)
 {
-    return g_early_arcade_offset_x < pos->x && pos->x < g_early_arcade_offset_x + 384.0f &&
-           g_early_arcade_offset_y < pos->y && pos->y < g_early_arcade_offset_y + 448.0f;
+    return pos->x <= g_early_arcade_offset_x || pos->x >= g_early_arcade_offset_x + 384.0f ||
+           pos->y <= g_early_arcade_offset_y || pos->y >= g_early_arcade_offset_y + 448.0f;
 }
 
-// TODO: the original realigns its frame (ebx form) and reloads g_Player for
-// every bullet; ours keeps it in a register.
+// The bullet pointer is advanced with the counter, and the off-screen test
+// is written as the negated comparisons, as the original's code shows.
+// TODO: the original's second pointer into the bullet points at
+// age.current (ours at age.speed_index), and the counter and the VM take
+// each other's stack slots.
 // FUNCTION: TH16 0x4456d0
 i32 Player::tick_bullets()
 {
-    for (i32 i = 0; i < PLAYER_BULLET_COUNT; i++)
+    PlayerBullet *bullet = inner.bullets;
+    for (i32 i = 0; i < PLAYER_BULLET_COUNT; i++, bullet++)
     {
-        PlayerBullet *bullet = &inner.bullets[i];
         if (bullet->state == PLAYER_BULLET_FREE)
         {
             continue;
@@ -969,8 +973,8 @@ i32 Player::tick_bullets()
             vm->write_sprite_corners(corners);
             // Bullets (other than lasers) older than 15 frames go away once
         // their sprite is entirely off screen.
-        if (bullet->age.current >= 15 && !is_on_screen(&corners[0]) && !is_on_screen(&corners[1]) &&
-                !is_on_screen(&corners[2]) && !is_on_screen(&corners[3]))
+        if (bullet->age.current >= 15 && is_off_screen(&corners[0]) && is_off_screen(&corners[1]) &&
+                is_off_screen(&corners[2]) && is_off_screen(&corners[3]))
             {
                 {
                     delete_vm_and_clear(bullet->anm_id);
@@ -995,8 +999,8 @@ i32 Player::tick_bullets()
         vm->entity_pos = bullet->pos.pos;
         if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
         {
-            vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
             vm->rotation.z = bullet->pos.angle.value;
+            vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         }
         bullet->age.tick();
     }
