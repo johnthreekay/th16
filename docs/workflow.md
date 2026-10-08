@@ -237,7 +237,7 @@ Checked on 2026-10-08 (main 6d99888) with 71 replays recorded in 1.00a:
 the owner's three (two Reimu Extra clears, a Cirno Easy clear) and 68 1cc
 replays from Maribel Hearn's archive of the Royalflare scoreboard, one for
 each character, season and difficulty and an Extra clear for each
-character. Our build played every one like the original: both traces end
+character (tests/vendor, each credited in its README). Our build played every one like the original: both traces end
 on the replay's recorded score, and the about one million frames compared
 show no difference beyond the one-frame RNG step counter samples between
 stages.
