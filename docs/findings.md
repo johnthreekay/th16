@@ -1727,3 +1727,28 @@ Sweep of lasers, system and GUI-side files with the new levers:
   for(;;)+break compile like for).
 - Screening: insert N dead locals into every function at once and build
   once per N, then confirm each hit alone.
+
+Sweep of collision, primitives and menu states:
+- A signed pointer compare (`cmp esi, <table end>; jl`) means ZUN wrote an
+  index loop (`for (i = 0; i < 4; i++) ... g_rect_edges[i][0]`) that MSVC
+  strength-reduced; a pointer loop gives `jb`. This fixed the edge loops
+  in collision_line_rect (78.9 -> 83.5) and both nested loops of
+  collision_test_rect_rect. Worth a grep for `jl` against a table end.
+- `d0 < d1` and `d1 > d0` compile to the same compare, but the side written
+  first is computed first and takes the lower registers
+  (collision_line_rect's distance block).
+- D3DX operators make LTCG load a pointer parameter early:
+  `Float3 end = *pos + d; Float3 start = *pos - d;` loads pos into a
+  callee-saved register before the sinf/cosf calls like the original;
+  field-wise it is loaded after. Not committed (pos lands in edi, the
+  original's esi); the most promising lead for collision_line_rect.
+- Dead locals changed register and slot choices without any D3DX op (six
+  in collision_test_rect_rect +3.3; four in load_spell_list +0.2).
+- Neither loop forms nor dead locals inside rotate_points move the
+  rotation's y-first order; writing y first gets the schedule but copies
+  the registers for y instead of x (97.5 -> 94.4).
+- Dead locals 1-7 changed nothing in points_in_rect, circle_rect,
+  segment_intersection, ZunAngle::operator-, do_player_data,
+  do_difficulty_select, on_draw__replay, do_replay_save,
+  do_character_select, draw_spell_card_page, BombInf::draw, draw_rect and
+  draw_rect_outline, and made draw_ring and draw_circle_outline worse.
