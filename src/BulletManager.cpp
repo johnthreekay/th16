@@ -1651,8 +1651,10 @@ i32 Bullet::step_ex_17()
     return 0;
 }
 
-// TODO: the original keeps cancel_script in ecx and the manager in eax, puts goal
-// 4 bytes lower, and multiplies goal.x from a copy of the game speed.
+// The cancel VM's file is read into `anm` before the call, which keeps the
+// manager in eax and cancel_script in ecx like the original.
+// TODO: the original puts goal 4 bytes lower and multiplies goal.x from a copy
+// of the game speed.
 // FUNCTION: TH16 0x4124b0
 i32 Bullet::check_player_collision(i32 graze_only)
 {
@@ -1697,8 +1699,8 @@ i32 Bullet::check_player_collision(i32 graze_only)
                 }
                 if (cancel_script >= 0)
                 {
-                    BulletManager *mgr = g_BulletManager;
-                    AnmVm *vm = mgr->bullet_anm->create_vm(cancel_script, p, 0.0f, -1, 0).find_or_clear();
+                    AnmLoaded *anm = g_BulletManager->bullet_anm;
+                    AnmVm *vm = anm->create_vm(cancel_script, p, 0.0f, -1, 0).find_or_clear();
                     D3DXVECTOR3 goal = g_game_speed * velocity * 10.0f;
                     vm->set_pos_time(30, 6, &g_zero_vec, &goal);
                 }
