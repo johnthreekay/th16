@@ -1569,3 +1569,57 @@ Sweep of the enemy files with the vector-research levers (first half):
   check_player_collision gets worse at counts 4-6; step_interpolators'
   camera y add never flips (field-wise, pointer, D3DXVec3Add and operator+
   either way, an `f32 *` component pointer with counts 0-7).
+
+Third pass over menu states, collision and primitives:
+- ascii create_effect (the open menu item): `g_AsciiManager->get_anm()->
+  create_effect(...)` with an inline `AsciiInf::get_anm()` accessor; with
+  the object behind an inline call MSVC evaluates it after the arguments,
+  which gives g_AsciiManager in eax and the result slot in ecx. The
+  create_effect_via_pointer wrapper from the alignment work does the same;
+  both are in MainMenuStates.cpp now. The accessor also lifted
+  Spellcard::start and Gui::show_notice when tried there.
+- Many `return 1` vs one: with `return 1` at each exit the constant (shared
+  with a cmov) lived in esi for the whole function; leaving every path
+  through `break` to the single final `return 1` gives the original's
+  per-exit `mov edx, 1; mov eax, edx` (do_practice_stage_select matched).
+  This is the "push esi but esi unused" shape.
+- `script = diff == EXTRA ? 0x99 : 0x97` instead of `(diff == EXTRA) * 2 +
+  0x97` gives the original's spill of script to a stack slot
+  (do_subseason_select; in do_character_select it also stopped
+  `&anm_ids[script]` being kept as a pointer register). The row color as an
+  if/else instead of a ternary swapped edx/esi back
+  (on_draw__score_name_entry matched).
+- Tail statements, two opposite cases: the OK sound written in each branch
+  of the SHOT block stopped MSVC reusing the pressed word for the BOMB test
+  (do_score_name_entry matched); the gamemode store and `return 1` written
+  once after the stage 1/stage 7 if/else get duplicated into both branches
+  with immediate stores, while written in each branch MSVC hoisted them
+  (do_subseason_select matched). Try both.
+- `goto` into case 3's body reproduces the original's shared tail
+  (do_spell_practice_stage_select matched), against the general note that
+  shared tails come from duplicated statements.
+- Indexing with a named variable makes `this` the base (`[edi + idx +
+  disp]`): a byte-offset loop counter (do_spell_practice_row) or a local
+  copy of a member index (`i32 cursor = replay_name_cursor;`,
+  do_replay_save). The member itself or a strength-reduced counter puts the
+  index first.
+- Statement order: num_choices stored before wraps reuses the entry load
+  (do_difficulty_select); g_last_replay_slot read after the num_choices
+  store (do_replay_menu matched); menu.next_selection read into a local
+  before create_from_file flips do_replay_save's esi/edi (69.6 -> 95.5).
+- `i32 ten = 10;` as the divisor gives one `idiv` by a register for
+  `id % 10` and `id / 10` (draw_spell_card_page), like `fps = 60`.
+- `__declspec(safebuffers)` on do_music_room's declaration removed its
+  cookie (effective match); menu_save_selection(&menu) and
+  menu_selection_moved(&menu) stopped MSVC keeping &menu in a register.
+- draw_rect: the left pair before the right in the x switch and the bottom
+  pair first in the y switch (+6, +8). `g_Globals.subshot +
+  g_Globals.character` loads character first like the original.
+- Dead ends: do_player_data's vectorized OR order; on_draw__replay's setne
+  vs neg/sbb/and (more forms); do_difficulty_select's reload before pop;
+  ZunAngle::operator- (eight more forms); the collision rotation store
+  order; collision_test_circle_rect; draw_circle's angle add; draw_ring;
+  draw_rect's sin/cos slots (an f32[2] gets the order but moves to the
+  bottom of the frame); draw_rect_outline's movq copy; BombInf::draw's
+  `* 1.0f` (double literals keep the conversions but fold the multiply);
+  load_spell_list; draw_spell_card_page (quickdiff and reccmp disagreed).
