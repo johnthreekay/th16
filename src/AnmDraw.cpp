@@ -447,8 +447,9 @@ i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
 
 // TODO: 46%; the original keeps the scaled color channels in dword stack slots.
 // FUNCTION: TH16 0x466820
-i32 AnmManager::draw_billboard_fog(AnmVm *vm)
+i32 AnmManager::draw_billboard_fog(AnmVm *vm_param)
 {
+    AnmVm *vm = vm_param;
     if (write_billboard_corners(vm) != 0)
     {
         return -1;
