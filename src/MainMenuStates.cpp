@@ -2801,9 +2801,14 @@ i32 TitleInf::do_spell_practice_character()
     return 0;
 }
 
+// The id at a byte offset into an array of ids.
+static __forceinline AnmId id_at_offset(AnmId *ids, i32 offset)
+{
+    return *(AnmId *)((u8 *)ids + offset);
+}
+
 // Spell practice: picking the boss attack (the row of spell cards) of the
 // stage.
-// TODO: the two cleanup loops in case 4 address [esi + edi + disp] where the original has [edi + esi + disp] (this as the base register); not i[array] or (array + n)[i].
 // FUNCTION: TH16 0x455900
 i32 TitleInf::do_spell_practice_row()
 {
@@ -2896,13 +2901,15 @@ i32 TitleInf::do_spell_practice_row()
     case 4:
         if (time_in_state.current >= 6)
         {
-            for (i32 i = 0; i < 5; i++)
+            // Counting byte offsets (not indices) makes this the base
+            // register of the loads like the original ([edi + esi + disp]).
+            for (i32 offset = 0; offset < 5 * (i32)sizeof(AnmId); offset += sizeof(AnmId))
             {
-                AnmManager::interrupt_tree(text_row_ids[i], 1);
+                AnmManager::interrupt_tree(id_at_offset(text_row_ids, offset), 1);
             }
-            for (i32 i = 0; i < 7; i++)
+            for (i32 offset = 0; offset < 7 * (i32)sizeof(AnmId); offset += sizeof(AnmId))
             {
-                g_AnmManager->delete_vm(anm_ids[0x10d + i]);
+                g_AnmManager->delete_vm(id_at_offset(&anm_ids[0x10d], offset));
             }
             AnmManager::interrupt_tree(anm_ids[0x6b], 1);
             anm_ids[0x6b].id = 0;
