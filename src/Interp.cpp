@@ -479,8 +479,8 @@ HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step_radial_dist()
     return self->current;
 }
 
-// The per-axis loop is a do-while (the vector research agent): as a for loop the
-// constant acceleration case loaded bezier_2 before initial.
+// The per-axis loop is a do-while: as a for loop the constant acceleration
+// case loaded bezier_2 before initial (see docs/findings.md on loop forms).
 // TODO: 97%; that case stores current from xmm0 where the original copies initial back through eax (an int copy or a bezier_2 store before it gives that but swaps esi and edi everywhere), and the returned vector's z is loaded after x/y.
 // FUNCTION: TH16 0x4258b0
 D3DXVECTOR3 InterpStrange1::step()

@@ -430,7 +430,10 @@ assume is in [workflow.md](workflow.md).
   has the same callers realigning without that effect, so its decision
   came later. Not reproduced: the affected callers keep that double math
   in small DECOMP_NOINLINE helpers (seek_bgm_to_stage_time,
-  item_angle_to_player, draw_percentage) until it is understood. Moving
+  item_angle_to_player, draw_percentage) until it is understood. (Since
+  2026-10-08 the seek is written inline in GameThread::on_tick_body and
+  create_number is called through a function pointer; see "Second pass
+  over GUI, stage and GameThread" below.) Moving
   them out also costs matches that depend on the early alignment
   (Item::collect_full_power, the GameThread stage restart helpers).
   Bisecting by commenting out parts of the caller finds the culprit in a
@@ -832,6 +835,8 @@ assume is in [workflow.md](workflow.md).
 - seek_bgm_to_stage_time as a plain inline helper (not DECOMP_NOINLINE)
   gives GameThread::on_tick_body the original's late `and esp, -8`
   without padding sub_42dc50's callees; written out, it realigns early.
+  (Superseded: the seek is now written inline and begin_stage reaches
+  start_std_vms through a member pointer; see the 2026-10-08 notes.)
 - `test byte ptr [flags], 0x40` followed by a fresh dword load for the
   game_mode bitfield: a `*(u8 *)` cast and the bitfield view both share
   one load (`test al`); reading game_mode through

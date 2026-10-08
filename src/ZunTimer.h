@@ -271,8 +271,8 @@ struct ZunTimer
     // branch keeps its own stores. How the scaled branch adds depends on
     // the caller and can go either way: some get the original's
     // `addss xmm1, [current_f]` (ScreenEffect::on_tick_flash, on_tick_hold),
-    // others its load of current_f into xmm0 first (InterpInt3::step,
-    // Bullet::step_ex_00 and step_ex_04, EnemyManager::kill_all).
+    // others its load of current_f into xmm0 first (Bullet::step_ex_00 and
+    // step_ex_04, EnemyManager::kill_all).
     void tick_goto()
     {
         f32 *speed = this->speed();

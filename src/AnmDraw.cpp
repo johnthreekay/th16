@@ -350,6 +350,7 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm_param, Float3 *
         scale_x *= vm->parent_vm->scale_2.x * vm->parent_vm->scale.x;
         scale_y *= vm->parent_vm->scale_2.y * vm->parent_vm->scale.y;
     }
+    // y before x: the original's register order.
     for (i = 0; i < 4; i++)
     {
         ys[i] *= scale_y;
@@ -568,8 +569,8 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm_param)
 #pragma warning(pop)
 
 // A while loop with the differences assigned x, y, z gives the original's
-// register and operand order for the distance (found by the vector order
-// research: the load order inside a loop follows the loop form).
+// register and operand order for the distance (the load order inside a
+// loop follows the loop form; see docs/findings.md).
 // TODO: 99%; the loop end compares with g_sprite_temp_buffer's end, which our data layout follows with another global.
 // FUNCTION: TH16 0x467200
 i32 AnmManager::draw_sprite_fog(AnmVm *vm)
