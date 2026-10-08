@@ -27,8 +27,10 @@ struct AnmId
     }
 
     // 0x46f2e0 (ExpHP: anm_find_existing_or_clear_id). Looks the VM up and
-    // forgets the id if it is gone.
-    DECOMP_NOINLINE AnmVm *find_or_clear();
+    // forgets the id if it is gone. Called at all 25 original sites;
+    // HARNESS_CALLED rather than /INCLUDE'd so that LTCG knows which
+    // registers it leaves alone (EnemyData::on_tick keeps xmm1-xmm3 across).
+    HARNESS_CALLED AnmVm *find_or_clear();
     // 0x46f300 and 0x46f340. AnmVm::show_tree and hide_tree on the VM, if
     // it still exists.
     void show_tree();

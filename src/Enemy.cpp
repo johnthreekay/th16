@@ -1026,9 +1026,8 @@ static __forceinline void place_slot_vm(EnemyData *e, AnmVm *vm, i32 i)
     vm->entity_pos = pos;
 }
 
-// TODO: the original keeps the summed position in xmm1-xmm3 across find_or_clear as
-// well as in memory; ours spills them. With AnmId::find_or_clear HARNESS_CALLED instead of
-// DECOMP_NOINLINE (LTCG then knows it leaves them alone) this matches.
+// One frame of an enemy: interpolators, ECL, the ECL func set, logic, fog,
+// then the slot VMs follow it. Returns -1 when the enemy is to be deleted.
 // FUNCTION: TH16 0x41d2e0
 int EnemyData::on_tick()
 {
