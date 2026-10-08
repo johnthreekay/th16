@@ -461,10 +461,15 @@ int __fastcall anm_masked_effect_init(AnmVm *vm, D3DXVECTOR3 *pos)
     return 0;
 }
 
-// TODO: the original aligns its frame to 8 bytes (and esp, -8; not from AnmVm::run, whose other direct callers do not).
+// Steps the four mask VMs and, while any is still running, the overlay;
+// returns 1 once all four have finished.
+// The dead double is not ZUN's code: it makes LTCG realign the frame
+// (and esp, -8) like the original, which AnmVm::run alone does not.
 // FUNCTION: TH16 0x407330
 int __fastcall anm_masked_effect_on_tick(AnmVm *vm)
 {
+    double unused = 0.0;
+    (void)unused;
     AnmMaskedEffectData *data = (AnmMaskedEffectData *)vm->extra_data;
     i32 finished = 0;
     for (i32 i = 0; i < 4; i++)
