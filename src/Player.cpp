@@ -354,9 +354,15 @@ i32 __fastcall Player::on_tick_callback(Player *player)
     return player->on_tick_body();
 }
 
-// TODO: the original pads the draw_vm call with push ecx/pop ecx for 8-byte
-// alignment, like on_tick_callback; ours does not, most likely because LTCG
-// does not see draw_vm needing alignment early (draw_vm does not match yet).
+// The draw_vm call goes through an inline helper node: called directly,
+// LTCG does not pad on_draw_callback's frame (push ecx/pop ecx) for the call
+// the way the original does, although the callback is entered 8-aligned
+// (registered by Player::initialize, see on_tick_callback).
+static __forceinline i32 draw_player_vm(AnmVm *vm)
+{
+    return g_AnmManager->draw_vm(vm);
+}
+
 // Draws the player sprite, except while dead.
 // FUNCTION: TH16 0x443730
 i32 __fastcall Player::on_draw_callback(Player *player)
@@ -365,7 +371,7 @@ i32 __fastcall Player::on_draw_callback(Player *player)
     {
         player->vm.entity_pos = player->inner.pos;
         player->vm.flags_hi = (player->vm.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
-        g_AnmManager->draw_vm(&player->vm);
+        draw_player_vm(&player->vm);
     }
     return 1;
 }
