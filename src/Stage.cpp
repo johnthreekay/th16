@@ -443,7 +443,10 @@ i32 Stage::on_draw_06()
     return UPDATE_FUNC_CONTINUE;
 }
 
-// TODO: the float math and the corner stores are scheduled differently (the original reloads center.x and groups the stores by value).
+// Each corner written out with its own expressions (CSE merges them); named
+// half sizes and bounds schedule the math and the stores further from the
+// original.
+// TODO: the float math and the corner stores are still scheduled differently (the original computes z_max first and reloads center.x).
 // FUNCTION: TH16 0x40a7d0
 HARNESS_CALLED i32 StdObject::is_culled(D3DXVECTOR3 *pos, f32 max_distance_sq, Camera *camera)
 {
@@ -456,63 +459,54 @@ HARNESS_CALLED i32 StdObject::is_culled(D3DXVECTOR3 *pos, f32 max_distance_sq, C
     {
         return 1;
     }
-    f32 hx = size.x * 0.5f;
-    f32 hy = size.y * 0.5f;
-    f32 hz = size.z * 0.5f;
-    f32 x_max = center.x + hx;
-    f32 x_min = center.x - hx;
-    f32 y_max = center.y + hy;
-    f32 y_min = center.y - hy;
-    f32 z_max = center.z + hz;
-    f32 z_min = center.z - hz;
-    corners[0].x = x_max;
-    corners[0].y = y_max;
-    corners[0].z = z_max;
-    corners[1].x = x_max;
-    corners[1].y = y_max;
-    corners[1].z = z_min;
-    corners[2].x = x_max;
-    corners[2].y = y_min;
-    corners[2].z = z_max;
-    corners[3].x = x_max;
-    corners[3].y = y_min;
-    corners[3].z = z_min;
-    corners[4].x = x_min;
-    corners[4].y = y_max;
-    corners[4].z = z_max;
-    corners[5].x = x_min;
-    corners[5].y = y_max;
-    corners[5].z = z_min;
-    corners[6].x = x_min;
-    corners[6].y = y_min;
-    corners[6].z = z_max;
-    corners[7].x = x_min;
-    corners[7].y = y_min;
-    corners[7].z = z_min;
+    corners[0].x = center.x + size.x * 0.5f;
+    corners[0].y = center.y + size.y * 0.5f;
+    corners[0].z = center.z + size.z * 0.5f;
+    corners[1].x = center.x + size.x * 0.5f;
+    corners[1].y = center.y + size.y * 0.5f;
+    corners[1].z = center.z - size.z * 0.5f;
+    corners[2].x = center.x + size.x * 0.5f;
+    corners[2].y = center.y - size.y * 0.5f;
+    corners[2].z = center.z + size.z * 0.5f;
+    corners[3].x = center.x + size.x * 0.5f;
+    corners[3].y = center.y - size.y * 0.5f;
+    corners[3].z = center.z - size.z * 0.5f;
+    corners[4].x = center.x - size.x * 0.5f;
+    corners[4].y = center.y + size.y * 0.5f;
+    corners[4].z = center.z + size.z * 0.5f;
+    corners[5].x = center.x - size.x * 0.5f;
+    corners[5].y = center.y + size.y * 0.5f;
+    corners[5].z = center.z - size.z * 0.5f;
+    corners[6].x = center.x - size.x * 0.5f;
+    corners[6].y = center.y - size.y * 0.5f;
+    corners[6].z = center.z + size.z * 0.5f;
+    corners[7].x = center.x - size.x * 0.5f;
+    corners[7].y = center.y - size.y * 0.5f;
+    corners[7].z = center.z - size.z * 0.5f;
     corners[8].x = center.x;
-    corners[8].y = y_min;
-    corners[8].z = z_min;
+    corners[8].y = center.y - size.y * 0.5f;
+    corners[8].z = center.z - size.z * 0.5f;
     corners[9].x = center.x;
-    corners[9].y = y_max;
-    corners[9].z = z_min;
+    corners[9].y = center.y + size.y * 0.5f;
+    corners[9].z = center.z - size.z * 0.5f;
     corners[10].x = center.x;
-    corners[10].y = y_min;
-    corners[10].z = z_max;
+    corners[10].y = center.y - size.y * 0.5f;
+    corners[10].z = center.z + size.z * 0.5f;
     corners[11].x = center.x;
-    corners[11].y = y_max;
-    corners[11].z = z_max;
+    corners[11].y = center.y + size.y * 0.5f;
+    corners[11].z = center.z + size.z * 0.5f;
     corners[12].x = center.x;
-    corners[12].y = y_min;
+    corners[12].y = center.y - size.y * 0.5f;
     corners[12].z = center.z;
     corners[13].x = center.x;
-    corners[13].y = y_max;
+    corners[13].y = center.y + size.y * 0.5f;
     corners[13].z = center.z;
     corners[14].x = center.x;
-    corners[14].y = y_min;
-    corners[14].z = center.z - hz * 0.5f;
+    corners[14].y = center.y - size.y * 0.5f;
+    corners[14].z = center.z - (size.z * 0.5f) * 0.5f;
     corners[15].x = center.x;
-    corners[15].y = y_max;
-    corners[15].z = center.z + hz * 0.5f;
+    corners[15].y = center.y + size.y * 0.5f;
+    corners[15].z = center.z + (size.z * 0.5f) * 0.5f;
     D3DXMatrixIdentity(&world);
     D3DXMatrixTranslation(&world, pos->x, pos->y, pos->z);
     D3DXVec3ProjectArray(projected, sizeof(D3DXVECTOR3), corners, sizeof(D3DXVECTOR3), &camera->viewport,
