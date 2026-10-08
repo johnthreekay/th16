@@ -1221,9 +1221,11 @@ void EnemyManager::kill_all()
 }
 
 // kill_all for the enemies in the given kill_group (ECL 551).
-// TODO: register allocation: the original keeps value in ebx and spills next to the argument slot.
+// HARNESS_CALLED: its one caller is ecl_run_over_300 (ECL 551).
+// TODO: register allocation: the original keeps value in ebx and spills next to the argument
+// slot, and its timer tick shares one epilogue.
 // FUNCTION: TH16 0x41da30
-void __stdcall EnemyManager::kill_all_in_group(i32 value)
+HARNESS_CALLED void __stdcall EnemyManager::kill_all_in_group(i32 value)
 {
     EnemyManager *mgr = g_EnemyManager;
     EnemyList *node = mgr->active_enemy_list_head;
