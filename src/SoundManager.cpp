@@ -1156,11 +1156,12 @@ i32 SoundManager::update_sound_thread()
             }
             goto step;
         case BGM_FADE_OUT: {
+            f32 seconds = cmd->arg;
             CStreamingSound *stream = BGM_STREAM;
             if (stream != NULL)
             {
                 stream->m_fade_mode = 1;
-                i32 frames = cmd->arg * 60.0f;
+                i32 frames = seconds * 60.0f;
                 stream->m_fade_duration = stream->m_fade_time_left = frames;
             }
             goto pop;
