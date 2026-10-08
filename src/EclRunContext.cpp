@@ -421,20 +421,21 @@ HARNESS_CALLED EclRawInstr *EclRunContext::get_subroutine_ptr()
     return current_instr();
 }
 
-// TODO: the original stores stack_offset before loading base_offset (not
-// changed by a new_offset local, an inline push helper or a union store).
 // FUNCTION: TH16 0x474810
 HARNESS_CALLED i32 EclStack::enter(i32 size)
 {
+    // The frame base is read through a pointer of its own: that keeps its
+    // load after the new stack_offset is stored, as in the original.
+    i32 *base = &base_offset;
     i32 old_offset = stack_offset;
     if (size + stack_offset >= 0x1000)
     {
         return -1;
     }
     stack_offset += size;
-    *(i32 *)((u8 *)data + stack_offset) = base_offset;
+    *(i32 *)((u8 *)data + stack_offset) = *base;
     stack_offset += 4;
-    base_offset = old_offset;
+    *base = old_offset;
     return 0;
 }
 
