@@ -661,7 +661,7 @@ static inline void set_color_op_modulate()
 
 // HARNESS_CALLED: kept alive by draw_vm alone, it realigns to 8 (ebx form)
 // instead of 16.
-// TODO: 41%; the original does not realign at all (its frame is laid out for draw_vm's known 8-byte alignment), and the rotation order cases and the texture matrix copy are laid out differently.
+// TODO: 49%; the original does not realign at all (its frame is laid out for draw_vm's known 8-byte alignment), and the rotation order cases and the texture matrix copy are laid out differently.
 // FUNCTION: TH16 0x467410
 HARNESS_CALLED i32 AnmManager::draw_3d(AnmVm *vm)
 {
@@ -833,23 +833,23 @@ HARNESS_CALLED i32 AnmManager::draw_3d(AnmVm *vm)
     {
         flush_sprites();
         last_texture_factor = color.d3d;
-        g_Supervisor.d3d_device->SetRenderState(D3DRS_TEXTUREFACTOR, color.d3d);
+        supervisor_d3d_device()->SetRenderState(D3DRS_TEXTUREFACTOR, color.d3d);
     }
     world._43 = vm->entity_pos.z + vm->pos.z + vm->pos_2.z;
-    g_Supervisor.d3d_device->SetTransform(D3DTS_WORLD, &world);
+    supervisor_d3d_device()->SetTransform(D3DTS_WORLD, &world);
     AnmLoadedSprite *sprite = set_texture_of_vm(this, vm);
     set_texture_transform_of_vm(this, vm, sprite);
     if (last_vertex_setup != ANM_VERTEX_SETUP_3D_QUAD)
     {
-        g_Supervisor.d3d_device->SetStreamSource(0, vertex_buffer, 0, sizeof(RenderVertexXyzTex));
-        g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZ | D3DFVF_TEX1);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
+        supervisor_d3d_device()->SetStreamSource(0, vertex_buffer, 0, sizeof(RenderVertexXyzTex));
+        supervisor_d3d_device()->SetFVF(D3DFVF_XYZ | D3DFVF_TEX1);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
         last_vertex_setup = ANM_VERTEX_SETUP_3D_QUAD;
     }
     set_color_op_modulate();
     // The vertex buffer holds one quad per anchoring (setup_vertex_buffer).
-    g_Supervisor.d3d_device->DrawPrimitive(
+    supervisor_d3d_device()->DrawPrimitive(
         D3DPT_TRIANGLESTRIP,
         (((vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3) * 3 + ((vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3)) * 4, 2);
     return 0;
