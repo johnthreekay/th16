@@ -442,10 +442,7 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm)
     Camera *camera = g_Supervisor.current_camera;
     f32 fog_begin = camera->sky.begin_distance;
     f32 fog_range = fog_begin - camera->sky.end_distance;
-    D3DXVECTOR3 diff;
-    diff.x = vm->entity_pos.x + vm->pos.x + vm->pos_2.x - camera->position.x;
-    diff.y = vm->entity_pos.y + vm->pos.y + vm->pos_2.y - camera->position.y;
-    diff.z = vm->entity_pos.z + vm->pos.z + vm->pos_2.z - camera->position.z;
+    D3DXVECTOR3 diff = vm->entity_pos + vm->pos + vm->pos_2 - camera->position;
     if ((vm->flags_hi & ANM_VM_ORIGIN_MODE_MASK) && vm->parent_vm == NULL)
     {
         diff.x += g_resolution_x * 0.5f;
