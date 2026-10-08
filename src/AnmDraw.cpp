@@ -894,7 +894,14 @@ static __forceinline BOOL is_transparent(AnmVm *vm)
     return vm->color_1.a == 0 && vm->color_2.a == 0;
 }
 
-// TODO: 70%; ours adds a /GS cookie for pos and keeps the anchors in ebx across the shape cases.
+// A VM's horizontal and vertical anchoring (AnmAnchor). draw_vm reads them
+// at each call: as locals before the shape switch they were kept in ebx.
+#define ANM_VM_ANCHOR_X(vm) (((vm)->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3)
+#define ANM_VM_ANCHOR_Y(vm) (((vm)->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3)
+
+// Draws a VM by its render mode. The last rect case ends with a break
+// rather than a return, which lets the rotated rect case jump into its
+// call like the original.
 // FUNCTION: TH16 0x468490
 HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
 {
@@ -1028,50 +1035,51 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
             width = g_screen_coord_scale * 0.5f * width;
             height = g_screen_coord_scale * 0.5f * height;
         }
-        i32 anchor_x = (vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3;
-        i32 anchor_y = (vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3;
         switch ((vm->flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
         {
         case ANM_RENDER_LINE:
             draw_line(pos.x, pos.y, width, angle, vm->color_1.d3d,
-                      (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d, anchor_x, 0);
+                      (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d, ANM_VM_ANCHOR_X(vm),
+                      0);
             return 0;
         case ANM_RENDER_RECT:
-            draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d, anchor_x, anchor_y);
+            draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d, ANM_VM_ANCHOR_X(vm),
+                      ANM_VM_ANCHOR_Y(vm));
             return 0;
         case ANM_RENDER_RECT_BORDER:
             draw_rect_outline(pos.x, pos.y, width, height, angle, vm->color_1.d3d,
                               (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d,
-                              anchor_x, anchor_y);
+                              ANM_VM_ANCHOR_X(vm), ANM_VM_ANCHOR_Y(vm));
             return 0;
         case ANM_RENDER_RECT_GRAD:
-            draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d, anchor_x, anchor_y);
+            draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d, ANM_VM_ANCHOR_X(vm),
+                      ANM_VM_ANCHOR_Y(vm));
             return 0;
         case ANM_RENDER_RECT_ROT:
-            draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d, anchor_x,
-                               anchor_y);
+            draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d,
+                               ANM_VM_ANCHOR_X(vm), ANM_VM_ANCHOR_Y(vm));
             return 0;
         case ANM_RENDER_RECT_ROT_GRAD:
-            draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d, anchor_x,
-                               anchor_y);
-            return 0;
+            draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d,
+                               ANM_VM_ANCHOR_X(vm), ANM_VM_ANCHOR_Y(vm));
+            break;
         }
         break;
     }
     case ANM_RENDER_POLY:
     case ANM_RENDER_POLY_BORDER:
     case ANM_RENDER_RING: {
+        f32 angle = vm->rotation.z;
         f32 width;
         f32 height;
         width = vm->sprite_size.x * vm->scale.x;
         height = vm->sprite_size.y * vm->scale.y;
-        f32 angle = vm->rotation.z;
         Float3 pos;
         vm->get_own_transformed_pos(&pos);
         if (vm->parent_vm != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
         {
-            angle = vm->parent_vm->rotation.z + angle;
             width *= vm->parent_vm->scale.x;
+            angle = vm->parent_vm->rotation.z + angle;
             height *= vm->parent_vm->scale.y;
         }
         if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_SCALED)
