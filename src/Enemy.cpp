@@ -2162,15 +2162,23 @@ void EnemyData::ecl_anm_vm_instr()
         vm->rotation.z = full->context.current_context->get_float_arg(1);
         vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         break;
-    // anmScale(slot, x, y)
+    // anmScale(slot, x, y). Here and in anmScale2 the original reads y
+    // before x, as if the helper's arguments were evaluated right to left.
     case ECL_OP_ANM_SCALE:
-        anm_set_scale(vm, full->context.current_context->get_float_arg(1), full->context.current_context->get_float_arg(2));
+    {
+        f32 y = full->context.current_context->get_float_arg(2);
+        f32 x = full->context.current_context->get_float_arg(1);
+        anm_set_scale(vm, x, y);
         break;
+    }
     // anmScale2(slot, x, y)
     case ECL_OP_ANM_SCALE2:
-        anm_set_scale_2(vm, full->context.current_context->get_float_arg(1),
-                        full->context.current_context->get_float_arg(2));
+    {
+        f32 y = full->context.current_context->get_float_arg(2);
+        f32 x = full->context.current_context->get_float_arg(1);
+        anm_set_scale_2(vm, x, y);
         break;
+    }
     // anmScaleTime(slot, time, mode, x, y)
     case ECL_OP_ANM_SCALE_TIME:
         vm->scale_to(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
