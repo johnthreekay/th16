@@ -174,7 +174,7 @@ void AsciiInf::create_debug_stringf(Float3 *pos, const char *fmt, ...)
 }
 
 // FUNCTION: TH16 0x4082b0
-void AsciiInf::create_number(Float3 *pos, u32 value)
+void __stdcall AsciiInf::create_number(Float3 *pos, u32 value)
 {
     char buf[0x104];
     AsciiInf *ascii = g_AsciiManager;
@@ -200,7 +200,7 @@ void AsciiInf::create_number(Float3 *pos, u32 value)
 
 // TODO: the original frame has 4 more bytes above the buffer.
 // FUNCTION: TH16 0x4083b0
-void AsciiInf::create_number_with_digit(Float3 *pos, u32 value, u32 digit)
+HARNESS_CALLED void AsciiInf::create_number_with_digit(Float3 *pos, u32 value, u32 digit)
 {
     char buf[0x104];
     AsciiInf *ascii = g_AsciiManager;

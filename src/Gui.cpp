@@ -2274,20 +2274,24 @@ i32 Gui::on_tick_body()
     return UPDATE_FUNC_CONTINUE;
 }
 
-// The original formats the percentage inline. Written out in on_draw_2_body,
-// the double argument makes LTCG realign it early enough to pad the frame of
-// AsciiInf::create_number (0x4082b0); a plain inline helper keeps the double
-// in its own call graph node, as for CStreamingSound::get_play_time.
-static inline void draw_percentage(Float3 *pos, f32 percentage)
+// on_draw_2_body calls AsciiInf::create_number through this helper's
+// function pointer; the optimizer turns it back into the original's direct
+// calls. The percentage's double makes LTCG realign on_draw_2_body early,
+// like the original (and esp, -64), and a direct call edge would hand that
+// alignment down to create_number, which would get a padded frame;
+// create_number is a __stdcall static since an address-taken member keeps
+// this in ecx.
+typedef void(__stdcall *CreateNumberFunc)(Float3 *pos, u32 value);
+static inline CreateNumberFunc create_number_func()
 {
-    g_AsciiManager->create_stringf(pos, "%3.1f%%", (double)percentage);
+    return &AsciiInf::create_number;
 }
 
 // The HUD's text: the stage clear bonus, the chapter result, the spell
 // card's capture time and record, the score, hiscore, next extend, bomb
 // fragments, power, point item value and graze, the boss timer's
 // hundredths and the season level.
-// TODO: written for behaviour; the original aligns its frame to 64 bytes, and register allocation and the text-setting store order are not matched yet.
+// TODO: the original stores pos as immediates where ours builds it in xmm registers, and its stack slots and text-setting store order differ.
 // FUNCTION: TH16 0x428e70
 i32 Gui::on_draw_2_body()
 {
@@ -2307,7 +2311,7 @@ i32 Gui::on_draw_2_body()
         ascii->font_id = 4;
         ascii->align_h = 0;
         ascii->align_v = 0;
-        ascii->create_number(&pos, stage_clear_bonus);
+        create_number_func()(&pos, stage_clear_bonus);
         ascii = g_AsciiManager;
         ascii->color.a = 0xff;
         ascii->font_id = 0;
@@ -2335,7 +2339,7 @@ i32 Gui::on_draw_2_body()
             ascii->create_stringf(&pos, "%d", chapter_result_count);
             pos.x = 308.0f;
             pos.y = 246.0f;
-            draw_percentage(&pos, chapter_percent);
+            g_AsciiManager->create_stringf(&pos, "%3.1f%%", (double)chapter_percent);
             pos.x = 300.0f;
             pos.y = 266.0f;
             g_AsciiManager->create_stringf(&pos, "%3d", chapter_result_count_2);
@@ -2443,7 +2447,7 @@ i32 Gui::on_draw_2_body()
     ascii->scale.y = 0.6f;
     if ((u32)get_score_extend_quota() < 900000000)
     {
-        g_AsciiManager->create_number(&pos, get_score_extend_quota() * 10);
+        create_number_func()(&pos, get_score_extend_quota() * 10);
     }
 
     // Bomb fragments.
@@ -2496,12 +2500,12 @@ i32 Gui::on_draw_2_body()
     pos = Float3(620.0f, 204.0f, 0.0f);
     ascii->color.a = life_counter_vms[0]->color_1.a;
     i32 piv = g_Globals.piv / 100;
-    ascii->create_number(&pos, piv - piv % 10);
+    create_number_func()(&pos, piv - piv % 10);
     ascii = g_AsciiManager;
     ascii->color.d3d = 0xffffffff;
     pos.y = 226.0f;
     ascii->color.a = life_counter_vms[0]->color_1.a;
-    ascii->create_number(&pos, g_Globals.graze);
+    create_number_func()(&pos, g_Globals.graze);
     ascii = g_AsciiManager;
     ascii->color.d3d = 0xffffffff;
     ascii->align_h = 1;
@@ -2551,7 +2555,7 @@ i32 Gui::on_draw_2_body()
     ascii->font_id = 2;
     ascii->align_h = 0;
     ascii->align_v = 2;
-    ascii->create_number(&pos, g_Globals.season_level());
+    create_number_func()(&pos, g_Globals.season_level());
     ascii = g_AsciiManager;
     ascii->color.d3d = 0xffffffff;
     ascii->color.a = 0xff;

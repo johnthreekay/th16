@@ -132,10 +132,12 @@ class AsciiInf : public TaskInf
     void create_stringf(Float3 *pos, const char *fmt, ...);
     // The same in the debug font (ExpHP: AsciiManager::drawf_debug).
     void create_debug_stringf(Float3 *pos, const char *fmt, ...);
-    // Score-style number with thousands separators.
-    void create_number(Float3 *pos, u32 value);
+    // Score-style number with thousands separators. Static (it uses
+    // g_AsciiManager): Gui::on_draw_2_body calls it through a function
+    // pointer (see create_number_func in Gui.cpp).
+    static void __stdcall create_number(Float3 *pos, u32 value);
     // The same with a last digit drawn after the separators (value * 10 + digit).
-    void create_number_with_digit(Float3 *pos, u32 value, u32 digit);
+    HARNESS_CALLED void create_number_with_digit(Float3 *pos, u32 value, u32 digit);
     // Draws one string a glyph at a time with glyph_vm.
     void draw_string(AsciiStr *str);
     // Draws the strings of one render group, then makes camera 2 current.
