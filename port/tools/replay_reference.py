@@ -4,7 +4,7 @@ finding where the port desyncs (NOTES.md, Testing, "Replay sync tests").
 
     replay_reference.py record --game-dir DIR --replay FILE --out DUMP
                                [--items FIRST-LAST] [--stop-after FRAME]
-                               [--menu-downs N]
+                               [--menu-downs N] [--display N]
     replay_reference.py compare REFERENCE_DUMP PORT_DUMP
 
 record runs th16.exe under Wine (in $WINEPREFIX, which must be set: use a
@@ -27,6 +27,10 @@ compare prints, for each field, the first frame where the two dumps
 differ. time_in_stage and time_in_chapter are left out: the port's dump is
 taken after the game thread's tick (priority 0xf) of the next frame, so they
 are one ahead there.
+
+Several runs at once need a Wine prefix and an Xvfb display number
+(--display) each: xvfb-run's own choice of a free display races when two
+start together, and keys then go to the other game.
 
 Needs Wine, Xvfb (xvfb-run), xdotool and, with ptrace_scope 1, nothing
 else: Wine's launcher exits after starting the game, and the script makes
@@ -78,7 +82,10 @@ def write_save_folder(prefix, replay):
     open(os.path.join(save, 'th16.cfg'), 'wb').write(cfg)
 
 
-def find_game_pid():
+def find_game_pid(prefix):
+    # Only the game in this prefix: other copies (other prefixes) may run at
+    # the same time, and their memory cannot be read anyway.
+    tag = b'WINEPREFIX=' + prefix.encode() + b'\0'
     for _ in range(300):
         for name in os.listdir('/proc'):
             if not name.isdigit():
@@ -86,6 +93,8 @@ def find_game_pid():
             try:
                 cmd = open('/proc/%s/cmdline' % name, 'rb').read().rstrip(b'\0 ')
                 if not cmd.endswith(b'th16.exe') or b':\\' not in cmd:
+                    continue
+                if tag not in open('/proc/%s/environ' % name, 'rb').read():
                     continue
                 maps = open('/proc/%s/maps' % name).read()
             except OSError:
@@ -113,7 +122,8 @@ def record(args):
         raise SystemExit('set WINEPREFIX to a scratch Wine prefix')
     if 'DISPLAY' not in os.environ or not os.environ.get('REPLAY_REFERENCE_IN_XVFB'):
         env = dict(os.environ, REPLAY_REFERENCE_IN_XVFB='1')
-        os.execvpe('xvfb-run', ['xvfb-run', '-a', '-s', '-screen 0 1280x1024x24', sys.executable,
+        server = ['-n', str(args.display)] if args.display is not None else ['-a']
+        os.execvpe('xvfb-run', ['xvfb-run'] + server + ['-s', '-screen 0 1280x1024x24', sys.executable,
                                 os.path.abspath(__file__)] + sys.argv[1:], env)
     env = dict(os.environ, WINEDEBUG='-all', WINEDLLOVERRIDES='mscoree,mshtml=')
     if not os.path.isdir(os.path.join(prefix, 'drive_c', 'users')):
@@ -129,7 +139,7 @@ def record(args):
     log = open(args.out + '.wine.log', 'w')
     proc = subprocess.Popen(['wine', 'th16.exe'], cwd=game, env=env, stdout=log, stderr=log)
     try:
-        pid = find_game_pid()
+        pid = find_game_pid(prefix)
         # Ten seconds into the title menu: earlier, while the menu is still
         # coming in, key presses can get lost. The demo replay starts at 30.
         fd = os.open('/proc/%d/mem' % pid, os.O_RDONLY)
@@ -280,6 +290,7 @@ def main():
     rec.add_argument('--items')
     rec.add_argument('--stop-after', type=int)
     rec.add_argument('--menu-downs', type=int, default=3)
+    rec.add_argument('--display', type=int, help='the Xvfb display number (default: a free one)')
     rec.add_argument('--screenshots', help='save a screenshot of each menu step in this directory')
     cmp = sub.add_parser('compare')
     cmp.add_argument('reference')
