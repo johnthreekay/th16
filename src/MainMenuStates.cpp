@@ -826,7 +826,9 @@ u8 g_practice_keys[0x100];
 i32 g_practice_lives_key;
 
 // Stage practice: picking the stage.
-// TODO: the constant 1 (the cmov and every return 1) lives in esi for the whole function; the original rematerializes it into edx at each use (its esi push is left unused) and stores lives_key = 1 as an immediate.
+// Every path leaves through the break and the final return 1: with a
+// return 1 at each exit, the constant stayed in esi for the whole function
+// where the original rematerializes it at each one.
 // FUNCTION: TH16 0x450ef0
 i32 TitleInf::do_practice_stage_select()
 {
@@ -845,7 +847,7 @@ i32 TitleInf::do_practice_stage_select()
         if (time_in_state.current > 10)
         {
             set_substate(2);
-            return 1;
+            break;
         }
         break;
     case 2:
@@ -867,7 +869,7 @@ i32 TitleInf::do_practice_stage_select()
             set_substate(4);
             g_SoundManager.play_sound_centered(SE_CANCEL00, 0);
             g_practice_last_stage = menu.next_selection;
-            return 1;
+            break;
         }
         if (g_hardware_input_pressed & (INPUT_SHOT | INPUT_ENTER))
         {
@@ -876,7 +878,7 @@ i32 TitleInf::do_practice_stage_select()
                      .unlocked)
             {
                 g_SoundManager.play_sound_centered(SE_INVALID, 0);
-                return 1;
+                break;
             }
             set_substate(3);
             g_SoundManager.play_sound_centered(SE_OK00, 0);
@@ -962,7 +964,7 @@ i32 TitleInf::do_practice_stage_select()
                 }
             }
             g_Supervisor.fade_out_bgm(0.05f);
-            return 1;
+            break;
         }
         break;
     case 3:
@@ -986,7 +988,7 @@ i32 TitleInf::do_practice_stage_select()
             g_Globals.weird_stage_num = stage;
             g_title_return_point = TITLE_RETURN_PRACTICE;
             g_practice_last_stage = menu.next_selection;
-            return 1;
+            break;
         }
         break;
     case 4:
