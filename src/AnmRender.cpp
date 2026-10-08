@@ -467,10 +467,11 @@ static void __fastcall fan_sincosmul(Float3 *dst, f32 angle, f32 radius)
 
 // Sets up render mode 10 (ANM instruction 302): a fan of random radii
 // around the VM, moved by on_tick 4 and drawn by on_draw 6.
-// TODO: the original stores radius[33] between the multiply and the add of
-// the radius, and adds entity_pos.z + pos.z in the other order (every
-// operand order and field-wise temporary tried fixes x and y or z, not
-// both).
+// The speed is stored through `*(radius + 33)`: indexing (radius[33]) puts
+// the store after the radius's instead of between its multiply and add.
+// TODO: the original adds entity_pos.z + pos.z in the other order (every
+// operand order, D3DXVec3Add and field-wise temporary tried fixes x and y
+// or z, not both).
 // FUNCTION: TH16 0x469e20
 int __fastcall anm_fan_init(AnmVm *vm)
 {
@@ -507,7 +508,7 @@ int __fastcall anm_fan_init(AnmVm *vm)
         vertex->uv.x = uv.x + 0.5f;
         vertex->uv.y = uv.y + 0.5f;
         *radius = g_replay_safe_rng.randf_neg_1_to_1() * 8.0f + 80.0f;
-        radius[33] = speed;
+        *(radius + 33) = speed;
         speed += g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 30.0f);
         if (speed < -(1.0f / 15.0f))
         {
