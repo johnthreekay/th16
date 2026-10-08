@@ -292,8 +292,9 @@ class TitleInf : public TaskInf
     i32 do_player_data();
     // 0x4532f0 (ExpHP: do_menu_sub_4532f0). The high score name entry.
     i32 do_score_name_entry();
-    // 0x4546f0 (ExpHP: do_music_room).
-    i32 do_music_room();
+    // 0x4546f0 (ExpHP: do_music_room). Matching workaround: safebuffers
+    // drops the /GS cookie ours adds for its Float3 pos.
+    __declspec(safebuffers) i32 do_music_room();
     // 0x452c30. The spell card page of the player data.
     i32 draw_spell_card_page();
     // The row of replay_slot on its page of 25.

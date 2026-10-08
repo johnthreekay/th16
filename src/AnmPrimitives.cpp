@@ -14,7 +14,10 @@ static void __fastcall primitive_sincosmul(Float3 *dst, f32 angle, f32 radius)
 // A width x height rectangle at (x, y) rotated by angle, anchored by
 // anchor_x and anchor_y (0 center, 1 left/top, 2 right/bottom), colored
 // color_1 on the left and color_2 on the right.
-// TODO: the float register allocation of the corner coordinates differs (the original reuses height's stack slot).
+// The left corners are assigned before the right ones (and the bottom
+// before the top): the order moves the corner registers closer to the
+// original's.
+// TODO: the float register allocation of the corner coordinates still differs (the original reuses height's stack slot) and sine and cosine trade stack slots.
 // FUNCTION: TH16 0x468c70
 HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f32 angle, D3DCOLOR color_1,
                                          D3DCOLOR color_2, i32 anchor_x, i32 anchor_y)
@@ -34,16 +37,16 @@ HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f3
     switch (anchor_x)
     {
     case ANM_ANCHOR_CENTER:
-        x1 = x3 = width * 0.5f;
         x0 = x2 = width * -0.5f;
+        x1 = x3 = width * 0.5f;
         break;
     case ANM_ANCHOR_START:
-        x1 = x3 = width;
         x0 = x2 = 0.0f;
+        x1 = x3 = width;
         break;
     case ANM_ANCHOR_END:
-        x1 = x3 = 0.0f;
         x0 = x2 = -width;
+        x1 = x3 = 0.0f;
         break;
     }
     switch (anchor_y)
@@ -99,7 +102,7 @@ HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f3
 }
 
 // The outline of draw_rect's rectangle, as a line strip.
-// TODO: the float register allocation of the corner coordinates differs (the original reuses height's stack slot).
+// TODO: as in draw_rect, the corner registers and the sine and cosine stack slots differ, and the original copies the first corner to the closing vertex with one movq.
 // FUNCTION: TH16 0x468fc0
 HARNESS_CALLED i32 AnmManager::draw_rect_outline(f32 x, f32 y, f32 width, f32 height, f32 angle, D3DCOLOR color_1,
                                          D3DCOLOR color_2, i32 anchor_x, i32 anchor_y)
@@ -119,16 +122,16 @@ HARNESS_CALLED i32 AnmManager::draw_rect_outline(f32 x, f32 y, f32 width, f32 he
     switch (anchor_x)
     {
     case ANM_ANCHOR_CENTER:
-        x1 = x3 = width * 0.5f;
         x0 = x2 = width * -0.5f;
+        x1 = x3 = width * 0.5f;
         break;
     case ANM_ANCHOR_START:
-        x1 = x3 = width;
         x0 = x2 = 0.0f;
+        x1 = x3 = width;
         break;
     case ANM_ANCHOR_END:
-        x1 = x3 = 0.0f;
         x0 = x2 = -width;
+        x1 = x3 = 0.0f;
         break;
     }
     switch (anchor_y)
