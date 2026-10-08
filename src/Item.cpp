@@ -745,8 +745,9 @@ void Item::collect_full_power()
     }
 }
 
-// TODO: the original takes piv % 10 with idiv and keeps both roundings, and
-// realigns its frame to 8 bytes (see collect_full_power).
+// The piv rounding is written out as in collect_point (see there).
+// TODO: the original realigns its frame to 8 bytes (see
+// collect_full_power), and this and the value swap esi and edi.
 // FUNCTION: TH16 0x430100
 void Item::collect_power()
 {
@@ -757,8 +758,7 @@ void Item::collect_power()
         i32 line = item_collect_line();
         if ((f32)line >= player_y || state == ITEM_STATE_AUTOCOLLECT)
         {
-            value = g_Globals.piv / 100;
-            value -= value % 10;
+            value = g_Globals.piv / 100 - g_Globals.piv / 100 % 10;
             value = value / 10 * 10;
             if (value <= 0)
             {
@@ -772,9 +772,8 @@ void Item::collect_power()
         }
         else
         {
-            i32 base = g_Globals.piv / 100;
-            base -= base % 10;
-            value = base * 3 / 4 - base * 3 / 4 * ((i32)player_y - line) / 450;
+            value = (g_Globals.piv / 100 - g_Globals.piv / 100 % 10) * 3 / 4 -
+                    (g_Globals.piv / 100 - g_Globals.piv / 100 % 10) * 3 / 4 * ((i32)player_y - line) / 450;
             value = value / 10 * 10;
             if (value <= 0)
             {
