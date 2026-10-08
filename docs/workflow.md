@@ -187,6 +187,52 @@ with `g_stage_table` filled in in /GL code, LTCG ordered the operands of
 two AnmVm::write_sprite_corners multiplications differently, so it lives
 in Opaque.cpp. Check with check_unchanged.py after each table.
 
+## Replay check of the MSVC build
+
+build/th16.exe is a complete program: under Wine, next to the original's
+th16.dat and thbgm.dat, it is the game. A replay shows whether it plays
+like the original, including the functions that do not match yet:
+`scripts/replay_trace.py` plays a replay in a th16.exe under Wine (in
+Xvfb, through the menus with xdotool) and reads the game state from its
+memory every millisecond (g_Globals as replays store it, the replay RNG,
+the player's position), and `compare` gives the first frame where two
+traces part, per field.
+
+```sh
+GAME=~/"Touhou Project/(TH16) Touhou Tenkuushou ~ Hidden Star in Four Seasons"
+REPO=$PWD
+mkdir -p ~/.cache/claude-builds/trace && cd ~/.cache/claude-builds/trace
+cp $REPO/build/th16.exe $REPO/build/th16.map .   # so a rebuild cannot change them mid-run
+WINEPREFIX=$PWD/p0 $REPO/.venv/bin/python $REPO/scripts/replay_trace.py record --game-dir "$GAME" \
+    --replay R.rpy --out orig.dump --fast --display 120
+WINEPREFIX=$PWD/p1 $REPO/.venv/bin/python $REPO/scripts/replay_trace.py record --game-dir "$GAME" \
+    --replay R.rpy --out ours.dump --fast --display 121 --exe th16.exe --map th16.map
+$REPO/.venv/bin/python $REPO/scripts/replay_trace.py compare orig.dump ours.dump
+```
+
+- Each running game needs its own scratch Wine prefix (created on first
+  use; the script writes the save folder and the configuration there) and
+  its own `--display`: `xvfb-run -a` can give two runs started together
+  the same display, and then the menu keys reach only one of them.
+- `--map` reads the addresses of the globals from our map; struct layouts
+  are the original's, so field offsets need nothing.
+- `--fast` holds the shot key: the replay fast-forward, 8 ticks per drawn
+  frame. A sample counts only between two runs of the tick list
+  (`UpdateFuncRegistry::iter_next` is NULL), so with `--fast` mostly every
+  eighth frame is kept. An Extra replay takes about 3 minutes, a full game
+  about 7, with both games running at once.
+- `record` fails when the trace does not end on the score the replay's
+  own text gives: menu keys that got lost start the title's demo replay
+  instead.
+- `compare` sets aside a difference that is gone by the next frame both
+  traces have: between stages the loading thread
+  (`GameThread::thread_start`, which calls `ReplayManager::start_stage`)
+  changes state while the main loop runs, so the RNG's step counter can be
+  sampled just before its reset in one game and just after it in the
+  other.
+- The dumps are in the format of the port branch's `TH16_REPLAY_TEST_DUMP`
+  (port/NOTES.md), so port dumps compare against either exe.
+
 ## Known tooling gaps
 
 - Template members cannot be annotated: build.py's name parsing does not

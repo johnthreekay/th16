@@ -36,7 +36,10 @@ format of the port's TH16_REPLAY_TEST_DUMP (port branch, port/NOTES.md), so
 port dumps compare too.
 
 compare prints, for each field, the first frame where the two dumps differ,
-over the frames both have, and exits with 1 if any does.
+over the frames both have, and exits with 1 if any does. A difference gone
+by the next frame both have is listed apart and does not count: between
+stages the loading thread changes state while the main loop runs, so one
+sample can come just before such a change and the other just after it.
 time_in_stage and time_in_chapter are left out: the port's dump is taken
 after the game thread's tick (priority 0xf) of the next frame, so they are
 one ahead there.
@@ -159,8 +162,12 @@ def record(args):
         raise SystemExit('set WINEPREFIX to a scratch Wine prefix')
     if 'DISPLAY' not in os.environ or not os.environ.get('REPLAY_TRACE_IN_XVFB'):
         env = dict(os.environ, REPLAY_TRACE_IN_XVFB='1')
-        os.execvpe('xvfb-run', ['xvfb-run', '-a', '-s', '-screen 0 1280x1024x24', sys.executable,
-                                os.path.abspath(__file__)] + sys.argv[1:], env)
+        # xvfb-run -a races when several start at once (two can take the
+        # same display, and the keys then reach the other game): give each
+        # run its own --display.
+        display = ['-n', str(args.display)] if args.display else ['-a']
+        os.execvpe('xvfb-run', ['xvfb-run'] + display + ['-s', '-screen 0 1280x1024x24', sys.executable,
+                                                         os.path.abspath(__file__)] + sys.argv[1:], env)
     addrs = read_map(args.map) if args.map else ORIGINAL
     # One llvmpipe thread: several games run at once.
     env = dict(os.environ, WINEDEBUG='-all', WINEDLLOVERRIDES='mscoree,mshtml=', LP_NUM_THREADS='1')
@@ -205,11 +212,27 @@ def record(args):
             screenshot(args, '%d-after-z' % (i + 2))
         if args.fast:
             subprocess.run(['xdotool', 'keydown', 'z'], check=True)
-        sample(pid, addrs, args)
+        final_score = sample(pid, addrs, args)
     finally:
         subprocess.run(['wineserver', '-k'], env=env)
         proc.wait()
         shutil.rmtree(game)
+    # The replay's own text says what it ends with: a trace that does not
+    # reach that score did not play the replay (keys lost in the menus and
+    # the title's demo instead, or the game stopped).
+    recorded = recorded_score(args.replay)
+    print('final score %s, recorded %s' % (final_score, recorded))
+    if final_score != recorded:
+        raise SystemExit('the trace does not end with the replay\'s score')
+
+
+def recorded_score(replay):
+    # The USER section's text ("Score 10516147"), the score divided by 10
+    # as g_Globals keeps it.
+    data = open(replay, 'rb').read()
+    user = struct.unpack_from('<I', data, 0xc)[0]
+    m = re.search(rb'\nScore (\d+)', data[user:])
+    return int(m.group(1)) if m else None
 
 
 def sample(pid, addrs, args):
@@ -277,6 +300,10 @@ def sample(pid, addrs, args):
                                                        raw[base + 0xc08:base + 0xc28].hex(),
                                                        raw[base + 0xc5c:base + 0xc60].hex()))
     print('%d frames written to %s' % (len(frames), args.out))
+    if not frames:
+        return None
+    g = frames[max(frames)][0]
+    return struct.unpack_from('<i', g, 0x20)[0]
 
 
 FIELDS = [
@@ -321,11 +348,27 @@ def compare(args):
         raise SystemExit('the dumps have no frame in common')
     print('%d frames in common (stage %d frame %d to stage %d frame %d); %d and %d frames in the dumps' %
           ((len(common),) + common[0] + common[-1] + (len(a), len(b))))
+    # A difference counts when it is still there in the next frame both
+    # dumps have. One that is gone by then is a sample taken a moment
+    # earlier in one game than in the other: between stages the loading
+    # thread sets up the next stage while the main loop runs
+    # (GameThread::thread_start calls ReplayManager::start_stage, which
+    # zeroes the RNG's step counter), so a sample there can come before or
+    # after it.
     first = {}
-    for k in common:
+    passing = {}
+    for i, k in enumerate(common):
         for name, value in a[k].items():
-            if name not in SKIPPED and name not in first and b[k][name] != value:
+            if name in SKIPPED or name in first or b[k][name] == value:
+                continue
+            nxt = common[i + 1] if i + 1 < len(common) else None
+            if nxt is None or a[nxt][name] != b[nxt][name]:
                 first[name] = k
+            else:
+                passing.setdefault(name, []).append(k)
+    for name, ks in sorted(passing.items()):
+        print('%-30s differs for a single frame only (sampling), %d times: %s' % (
+            name, len(ks), ', '.join('stage %d frame %d' % k for k in ks[:4]) + (' ...' if len(ks) > 4 else '')))
     if not first:
         print('no differences')
         return 0
@@ -344,6 +387,7 @@ def main():
     rec.add_argument('--exe', help='the th16.exe to run (default: the one in --game-dir)')
     rec.add_argument('--map', help="the exe's linker map, for the addresses of the globals read")
     rec.add_argument('--fast', action='store_true', help='hold the shot key (8x fast-forward)')
+    rec.add_argument('--display', type=int, help='the Xvfb display number (default: the first free one)')
     rec.add_argument('--work', help='where the game folder of symlinks goes (default: the folder of --out)')
     rec.add_argument('--items')
     rec.add_argument('--stop-after', type=int)
