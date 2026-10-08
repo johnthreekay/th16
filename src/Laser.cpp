@@ -3252,8 +3252,10 @@ i32 LaserCurveInf::on_tick()
                 f32 prev_angle = segs[i - 1].angle;
                 f32 *out_length = &segs[i].length;
                 f32 *out_angle = &segs[i].angle;
-                LaserCurveNode *node;
-                for (node = &nodes; node != NULL; node = node->next)
+                // A do/while from the first node (never NULL) instead of a
+                // for loop: closer to the original's registers.
+                LaserCurveNode *node = &nodes;
+                do
                 {
                     if (t >= node->start_time && node->end_time > t)
                     {
@@ -3268,7 +3270,8 @@ i32 LaserCurveInf::on_tick()
                         }
                         break;
                     }
-                }
+                    node = node->next;
+                } while (node != NULL);
                 placed = 1;
             }
             else
