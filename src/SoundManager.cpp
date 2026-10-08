@@ -965,8 +965,8 @@ static inline IDirectSoundBuffer *bgm_buffer(CStreamingSound *sound)
 // Returns the BGM command now first in the queue.
 // The steps are if chains: as switches they become jump tables where the
 // original compares.
-// TODO: 67%; block order and tail sharing differ, and the pan sum is unrolled
-// by two.
+// TODO: 81%; the sound effect loop allocates registers differently and the
+// pan sum is unrolled by two.
 // FUNCTION: TH16 0x45e330
 i32 SoundManager::update_sound_thread()
 {
@@ -1155,11 +1155,12 @@ i32 SoundManager::update_sound_thread()
             }
             goto step;
         case BGM_FADE_OUT: {
-            i32 frames = cmd->arg * 60.0f;
-            if (BGM_STREAM != NULL)
+            CStreamingSound *stream = BGM_STREAM;
+            if (stream != NULL)
             {
-                BGM_STREAM->m_fade_mode = 1;
-                BGM_STREAM->m_fade_time_left = BGM_STREAM->m_fade_duration = frames;
+                stream->m_fade_mode = 1;
+                i32 frames = cmd->arg * 60.0f;
+                stream->m_fade_duration = stream->m_fade_time_left = frames;
             }
             goto pop;
         }
@@ -1191,16 +1192,17 @@ i32 SoundManager::update_sound_thread()
         }
     pop:
         // Drops the command; cmd moves along with the copy.
-        for (i32 i = 0; cmd->command != BGM_NONE;)
+        i32 i = 0;
+        do
         {
-            i++;
-            *cmd = cmd[1];
-            cmd++;
-            if (i >= BGM_QUEUE_SIZE)
+            if (cmd->command == BGM_NONE)
             {
                 break;
             }
-        }
+            i++;
+            *cmd = cmd[1];
+            cmd++;
+        } while (i < BGM_QUEUE_SIZE);
     } while (again);
     goto done;
 step:
