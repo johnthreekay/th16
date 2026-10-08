@@ -300,17 +300,19 @@ HARNESS_CALLED void Supervisor::swap_transform_matrices(Camera *camera)
 // The tanf from the CRT headers stays out of line (0x43dc90).
 DECOMP_NOINLINE float __CRTDECL tanf(float);
 
-// TODO: the original builds the three vectors after the tanf call (eye and at from one packed x, y); ours stores the constants up front.
+// TODO: the original keeps x and y in registers across the tanf call and
+// stores them to eye and at afterwards as one packed pair (unpcklps, movq);
+// ours stores eye.x and eye.y before the call.
 // FUNCTION: TH16 0x43c780
 void __stdcall camera_update_2d(Camera *camera)
 {
-    f32 x = camera->viewport.X + camera->viewport.Width * 0.5f;
-    f32 y = camera->viewport.Height * 0.5f + camera->viewport.Y;
+    D3DXVECTOR3 eye;
+    eye.x = camera->viewport.X + camera->viewport.Width * 0.5f;
+    eye.y = camera->viewport.Height * 0.5f + camera->viewport.Y;
     f32 half_height = camera->viewport.Height / 2;
-    f32 z = half_height / tanf(camera->field_of_view * 0.5f);
+    eye.z = half_height / tanf(camera->field_of_view * 0.5f);
     D3DXVECTOR3 up(0.0f, -1.0f, 0.0f);
-    D3DXVECTOR3 eye(x, y, z);
-    D3DXVECTOR3 at(x, y, 0.0f);
+    D3DXVECTOR3 at(eye.x, eye.y, 0.0f);
     D3DXMatrixLookAtLH((D3DXMATRIX *)&camera->view_matrix, &eye, &at, &up);
     D3DXMatrixPerspectiveFovLH((D3DXMATRIX *)&camera->projection_matrix, camera->field_of_view,
                                (f32)camera->viewport.Width / (f32)camera->viewport.Height, 1.0f, 10000.0f);
