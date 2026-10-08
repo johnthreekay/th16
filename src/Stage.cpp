@@ -1053,13 +1053,22 @@ void Stage::interrupt_vms(i32 n)
 // The stage script (STD) and the camera rocking patterns. The rocking code
 // calls the out-of-line sinf and cosf (0x405510, 0x4054f0), which LTCG
 // keeps out of line here (this function has an EH frame).
-// TODO: same ebx-frame realignment as the original (since Stage::on_tick
-// realigns early); register allocation and stack slots still differ.
+// safebuffers (on the declaration) drops the /GS cookie ours got for its
+// locals; the original only has the EH frame's. The first time check is
+// written separately from the loop's (current loaded first, as in the
+// original's entry test).
+// TODO: a few vector stores are scheduled around unpcklps differently, and
+// the final timer tick adds current_f from memory where the original loads it.
 // FUNCTION: TH16 0x40b3b0
 i32 StageInner::run_std()
 {
     StdInstr *ins = (StdInstr *)((u8 *)stage->script + cur_instr_offset);
-    while (ins->time <= time_in_stage.current)
+    i32 now = time_in_stage.current;
+    if (ins->time > now)
+    {
+        goto ticked;
+    }
+    do
     {
         switch (ins->opcode)
         {
@@ -1253,7 +1262,8 @@ i32 StageInner::run_std()
         }
         cur_instr_offset += ins->size;
         ins = (StdInstr *)((u8 *)stage->script + cur_instr_offset);
-    }
+    } while (ins->time <= time_in_stage.current);
+ticked:
     time_in_stage.tick();
 stopped:
     if (camera_facing_i.end_time != 0)

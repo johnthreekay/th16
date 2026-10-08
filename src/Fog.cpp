@@ -21,7 +21,7 @@ static_assert(sizeof(FogVertex) == 0x1c, "FogVertex size");
 // TODO: the original pops each malloc's argument right after the call
 // (ours merges them), keeps this in ebx and the loop index in memory.
 // FUNCTION: TH16 0x418c70
-Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
+HARNESS_CALLED Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
 {
     if (g_Supervisor.arcade_surface_0 == NULL)
     {
