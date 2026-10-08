@@ -1776,8 +1776,9 @@ i32 Player::on_tick_body()
                 vm.color_2.d3d = 0xffff0000;
                 vm.flags_lo = (vm.flags_lo & ~ANM_VM_COLOR_MODE_MASK) | ANM_VM_COLOR_MODE_1;
             }
-            // An afterimage with the player's current sprite.
-            i32 scripts[4] = {4, 4, 4, 4};
+            // An afterimage with the player's current sprite. The script
+            // differs per character (Reimu, Cirno, Aya, Marisa).
+            i32 scripts[4] = {10, 9, 13, 16};
             AnmId id = anm_file->create_vm(scripts[g_Globals.character], &inner.pos, 0.0f, -1, 0);
             anm_file->set_sprite(get_vm_or_clear(id), vm.sprite_id);
             g_AnmManager->get_vm_with_id(id)->color_1.d3d = 0xffff0000;
@@ -1789,7 +1790,7 @@ i32 Player::on_tick_body()
                 vm.color_2.d3d = 0xffffff00;
                 vm.flags_lo = (vm.flags_lo & ~ANM_VM_COLOR_MODE_MASK) | ANM_VM_COLOR_MODE_1;
             }
-            i32 scripts[4] = {4, 4, 4, 4};
+            i32 scripts[4] = {10, 9, 13, 16};
             AnmId id = anm_file->create_vm(scripts[g_Globals.character], &inner.pos, 0.0f, -1, 0);
             anm_file->set_sprite(g_AnmManager->get_vm_with_id(id), vm.sprite_id);
         }
