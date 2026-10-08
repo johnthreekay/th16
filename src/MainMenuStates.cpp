@@ -120,7 +120,10 @@ void TitleInf::load_replay_list()
 }
 
 // Saving the replay after a game: picking a slot, then entering the name.
-// TODO: the replay_name stores address [index + this] (the original [this + index]), the last_replay_name copy folds 0x19f8c into the store's displacement (the original adds it to the pointer), and g_stage_table[8] lands on another global here.
+// The name entry reads the cursor into a local first: indexing
+// replay_name with the member itself addresses [cursor + this] where the
+// original has [this + cursor].
+// TODO: the BOMB path's store still addresses [cursor + this], the last_replay_name copy folds 0x19f8c into the store's displacement (the original adds it to the pointer), and g_stage_table[8] lands on another global here.
 // FUNCTION: TH16 0x453c10
 i32 TitleInf::do_replay_save()
 {
@@ -236,9 +239,10 @@ i32 TitleInf::do_replay_save()
             i32 choice = name_entry_menu.next_selection;
             if (choice < NAME_ENTRY_CHAR_COUNT)
             {
-                if (replay_name_cursor < 8)
+                i32 cursor = replay_name_cursor;
+                if (cursor < 8)
                 {
-                    replay_name[replay_name_cursor] = g_name_entry_chars[choice];
+                    replay_name[cursor] = g_name_entry_chars[choice];
                     replay_name_cursor++;
                     if (replay_name_cursor >= 8)
                     {
@@ -247,14 +251,15 @@ i32 TitleInf::do_replay_save()
                 }
                 else
                 {
-                    replay_name[replay_name_cursor - 1] = g_name_entry_chars[choice];
+                    replay_name[cursor - 1] = g_name_entry_chars[choice];
                 }
             }
             else if (choice == NAME_ENTRY_SPACE)
             {
-                if (replay_name_cursor < 8)
+                i32 cursor = replay_name_cursor;
+                if (cursor < 8)
                 {
-                    replay_name[replay_name_cursor] = ' ';
+                    replay_name[cursor] = ' ';
                     replay_name_cursor++;
                     if (replay_name_cursor >= 8)
                     {
@@ -263,17 +268,19 @@ i32 TitleInf::do_replay_save()
                 }
                 else
                 {
-                    replay_name[replay_name_cursor - 1] = ' ';
+                    replay_name[cursor - 1] = ' ';
                 }
             }
             else if (choice == NAME_ENTRY_BACKSPACE)
             {
-                if (replay_name_cursor == 0)
+                i32 cursor = replay_name_cursor;
+                if (cursor == 0)
                 {
                     break;
                 }
-                replay_name_cursor--;
-                replay_name[replay_name_cursor] = ' ';
+                cursor--;
+                replay_name_cursor = cursor;
+                replay_name[cursor] = ' ';
             }
             else if (choice == NAME_ENTRY_END)
             {
