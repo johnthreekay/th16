@@ -169,10 +169,11 @@ class AsciiInf : public TaskInf
     }
 
     // The ASCII font's ANM file. Callers that create effects from it write
-    // `g_AsciiManager->get_anm()->create_effect(...)`: with the accessor the
-    // original evaluates the object after the arguments (g_AsciiManager in
-    // eax, the result slot in ecx, pushed before ascii_anm is loaded); the
-    // plain field access loads g_AsciiManager into ecx first.
+    // `g_AsciiManager->get_anm()->create_effect(...)`: with the accessor MSVC
+    // evaluates the object after the arguments, as in the original
+    // (g_AsciiManager in eax, the result slot in ecx, pushed before
+    // ascii_anm is loaded); the plain field access loads g_AsciiManager into
+    // ecx first.
     AnmLoaded *get_anm()
     {
         return ascii_anm;

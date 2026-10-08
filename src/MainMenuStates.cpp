@@ -548,6 +548,8 @@ i32 TitleInf::do_character_select()
         {
             AnmManager::interrupt_tree(anm_ids[script], 1);
             anm_ids[script].id = 0;
+            // A direct call, unlike the calls around it: it gives the
+            // original's registers here (for matching).
             anm_ids[script] = title_anm->create_effect(script, -1, NULL);
         }
         AnmManager::interrupt_tree_and_run(anm_ids[script], 3);
@@ -1507,6 +1509,7 @@ i32 TitleInf::do_replay_menu()
     case 0:
     {
         menu.num_choices = REPLAY_SLOTS;
+        // Read after the num_choices store, as the original does.
         i32 last = g_last_replay_slot;
         menu.set_cursor(last % REPLAY_SLOTS);
         page_menu.num_choices = 3;
@@ -2705,12 +2708,15 @@ i32 TitleInf::do_spell_practice_stage_select()
             g_spell_practice_last_stage = -1;
             spell_character_menu.wraps = 1;
             spell_character_menu.num_choices = 4;
+            // subshot + character loads character first, like the original.
             spell_character_menu.set_cursor(g_Globals.subshot + g_Globals.character);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 3);
             AnmManager::interrupt_tree_and_run(anm_ids[0xd7], (i16)(menu.next_selection + 7));
             AnmManager::interrupt_tree_and_run(anm_ids[0xd7], 6);
             AnmManager::interrupt_tree_and_run(anm_ids[0x11c], 3);
             AnmManager::interrupt_tree(anm_ids[0x11c], (i16)(spell_character_menu.next_selection + 7));
+            // goto into case 3's tail, not a copy of it: the original shares
+            // this tail (for matching).
             goto start_rows;
         }
         anm_ids[0x71] = create_effect_via_pointer(title_anm, 0x71, -1, NULL);

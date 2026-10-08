@@ -13,7 +13,8 @@
 // restart code in GameThread then leaves junk in that slot). Its real
 // callers all pass g_EnemyManager, which LTCG would then fold into `this`
 // as well; the original keeps `this` in ecx, and a call on another object
-// keeps it.
+// keeps it. It stands for the original's calls that keep `this` in ecx and
+// push 0 for the argument: EnemyData::ecl_enm_create's and Bullet::run_ex's.
 EnemyInf *harness_r3b_allocate_enemy(EnemyManager *manager, EnemyCreateParams *params)
 {
     return manager->allocate_new_enemy("main", params, 0);

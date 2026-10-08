@@ -222,6 +222,8 @@ i32 ItemManager::on_tick_body()
                 item->speed = 0.0f;
                 item->angle = ZUN_PI / 2;
                 item->speed_towards_player = player->sht_file->grazebox_radius;
+                // Written as `== 0 ? FALLING : AUTOCOLLECT` for the original's
+                // code (matching).
                 item->state = item->force_autocollect == 0 ? ITEM_STATE_FALLING : ITEM_STATE_AUTOCOLLECT;
                 goto state_1;
             }
@@ -392,6 +394,7 @@ i32 ItemManager::on_tick_body()
                 case 16:
                     if (g_Globals.collect_season_item(0))
                     {
+                        // Through the player local, not g_Player (matching).
                         player->inner.repopulate_options();
                         g_PopupManager->generate_small_score_popup(&item->position, -1, 0xffffff40);
                         g_SoundManager.play_sound_at_position(SE_LGODSGET, item->position.x);
@@ -847,9 +850,9 @@ void Item::collect_big_power()
 // The point values are get_piv_rounded() inlined, spelled out here: as an
 // expression of the global, `% 10` stays an idiv, and with the rounding
 // written twice (not a local) the two `* 3 / 4` are not merged, so the
-// subtraction becomes the original's add of a negated product. Once
-// get_piv_rounded has the same expression form (it then matches 0x42c860),
-// two get_piv_rounded() calls compile the same.
+// subtraction becomes the original's add of a negated product. It is the
+// same expression as get_piv_rounded (0x42c860), spelled out here so that
+// the form is visible.
 // TODO: the original's frame is 4 bytes larger (alignment padding).
 // FUNCTION: TH16 0x430620
 void Item::collect_point()

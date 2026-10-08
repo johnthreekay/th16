@@ -724,6 +724,7 @@ i32 __fastcall sht_on_hit_laser(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_s
         AnmVm *vm = g_AnmManager->get_vm_with_id(id);
         if (vm != NULL)
         {
+            // The rotation before its flag: the original's store order.
             vm->rotation.z = bullet->pos.angle.value;
             vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         }

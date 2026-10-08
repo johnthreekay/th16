@@ -268,6 +268,7 @@ i32 BombMarisaAInf::on_tick()
     {
         angle += 0.0026179939f;
     }
+    // Speed multiplier before the pos copy: the original's store order.
     player->inner.speed_multiplier = 0.2f;
     pos = player->inner.pos;
     if (timer.current != timer.previous && timer.current % 3 == 0)
@@ -515,10 +516,10 @@ static inline OrbUpdateFunc orb_update_func()
 // end of the bomb without a second test of the counter.
 // The orb update loop is a do/while counting down: it gives the original's
 // `sub esi, 1` loop test. Reading the damage source index into a local
-// before the radial_speed store loads it first, like the original.
+// before the radial_speed store loads it first, like the original. It calls
+// update through orb_update_func (see there).
 // TODO: register allocation differs (orbs is read from its stack slot in
-// the original, the timer goes to edx, the loop counters swap stack
-// slots); calls update through orb_update_func (see there).
+// the original, the timer goes to edx, the loop counters swap stack slots).
 // FUNCTION: TH16 0x410de0
 i32 BombReimuAInf::on_tick()
 {

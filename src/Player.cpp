@@ -997,6 +997,7 @@ i32 Player::tick_bullets()
         vm->entity_pos = bullet->pos.pos;
         if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
         {
+            // The rotation before its flag: the original's store order.
             vm->rotation.z = bullet->pos.angle.value;
             vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         }
@@ -1534,6 +1535,13 @@ static __forceinline void stop_sound_inline(i32 id)
     g_SoundManager.queued_counts[i] = -1;
 }
 
+// Runs the player for one frame: the state machine (normal, hit with its
+// deathbomb window, dead, state 3), the damage sources, the invincibility
+// flash and boost afterimages, the scaled hurtbox and item boxes, the timers,
+// shooting and the bullets.
+// For matching: the HIT case's inverted test, the `power` local, the damage
+// source pointer walk and the angle local before wrap_angle are the forms
+// that give the original's code.
 // TODO: functionally complete; block order and register allocation differ.
 // FUNCTION: TH16 0x442560
 i32 Player::on_tick_body()

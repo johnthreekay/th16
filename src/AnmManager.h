@@ -222,8 +222,9 @@ static inline AnmLoadedCreateEffectFunc anm_create_effect_func()
 // Most of ZUN's call sites compile like this, in two ways that a plain call
 // (or an inline helper with a plain call) does not reproduce:
 // - The file pointer is loaded first: for g_AsciiManager->ascii_anm the
-//   original has g_AsciiManager in eax and the result slot in ecx (the menu
-//   states, Gui::show_notice, Spellcard::start).
+//   original has g_AsciiManager in eax and the result slot in ecx
+//   (Gui::show_notice, Spellcard::start; the menu states get the same order
+//   from direct calls through AsciiInf::get_anm()).
 // - create_effect's wish for an 8-aligned stack (see its dead double) stays
 //   out of the caller: with direct calls, callers such as show_notice,
 //   Gui::on_tick_body, GuiMsgVm's constructor and TitleInf::on_tick realign
@@ -232,8 +233,9 @@ static inline AnmLoadedCreateEffectFunc anm_create_effect_func()
 // PlayerBullet::create (its unseasoned shot hands the alignment on to
 // Player::do_shooting), Supervisor::create_fog_vm (it returns create_effect's
 // result in its own return slot), Fog's main VM, the ending script VM,
-// AnmId::replace_with_effect, TitleInf::create_effect (MainMenu.h) and the
-// Player effects.
+// AnmId::replace_with_effect, TitleInf::create_effect (MainMenu.h), the menu
+// states' ascii effects (through AsciiInf::get_anm()), the script VM in
+// TitleInf::do_character_select and the Player effects.
 static __forceinline AnmId create_effect_via_pointer(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out)
 {
     return (anm->*anm_create_effect_func())(script, layer, out);
