@@ -11,8 +11,12 @@
 // FUNCTION: TH16 0x402220
 u8 *LTCG_FASTCALL zun_decrypt(u8 *data, i32 size, u8 key, u8 step, i32 block, i32 limit)
 {
-    u8 *out = data;
     i32 tail = size % block;
+    if (tail >= block / 4)
+    {
+        tail = 0;
+    }
+    u8 *out = data;
     i32 copy_size = limit > size ? size : limit;
     u8 *tmp = (u8 *)malloc(copy_size);
     if (tmp == NULL)
@@ -20,10 +24,6 @@ u8 *LTCG_FASTCALL zun_decrypt(u8 *data, i32 size, u8 key, u8 step, i32 block, i3
         return data;
     }
     memcpy(tmp, data, copy_size);
-    if (tail >= block / 4)
-    {
-        tail = 0;
-    }
     i32 remaining = (size & ~1) - tail;
 
     u8 *in = tmp;
@@ -58,8 +58,12 @@ u8 *LTCG_FASTCALL zun_decrypt(u8 *data, i32 size, u8 key, u8 step, i32 block, i3
 // FUNCTION: TH16 0x402330
 u8 *LTCG_FASTCALL zun_encrypt(u8 *data, i32 size, u8 key, u8 step, i32 block, i32 limit)
 {
-    u8 *out = data;
     i32 tail = size % block;
+    if (tail >= block / 4)
+    {
+        tail = 0;
+    }
+    u8 *out = data;
     i32 copy_size = limit > size ? size : limit;
     u8 *tmp = (u8 *)malloc(copy_size);
     if (tmp == NULL)
@@ -67,10 +71,6 @@ u8 *LTCG_FASTCALL zun_encrypt(u8 *data, i32 size, u8 key, u8 step, i32 block, i3
         return data;
     }
     memcpy(tmp, data, copy_size);
-    if (tail >= block / 4)
-    {
-        tail = 0;
-    }
     i32 remaining = (size & ~1) - tail;
 
     u8 *in = tmp;
