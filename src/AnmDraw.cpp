@@ -58,6 +58,11 @@ static inline ZunColor *diffuse_of(i32 i)
     return (ZunColor *)&g_sprite_temp_buffer[i].diffuse;
 }
 
+// The 0.5f render_sprite_2d's pixel snapping subtracts after rounding; a
+// constant of its own in the original, apart from the compiler's 0.5f.
+// GLOBAL: TH16 0x4941d8
+static const f32 g_pixel_center_offset = 0.5f;
+
 // The quad in g_sprite_temp_buffer, moved by the camera offset, rounded to
 // pixel centers if flags bit 0 is set, culled against the viewport and
 // colored by the VM's color mode unless flags bit 1 is set.
@@ -65,8 +70,6 @@ static inline ZunColor *diffuse_of(i32 i)
 // FUNCTION: TH16 0x465280
 i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
 {
-    static const f32 half = 0.5f;
-
     g_sprite_temp_buffer[0].pos.x += camera_2d_offset.x;
     g_sprite_temp_buffer[0].pos.y += camera_2d_offset.y;
     g_sprite_temp_buffer[1].pos.x += camera_2d_offset.x;
@@ -77,7 +80,7 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
     g_sprite_temp_buffer[3].pos.y += camera_2d_offset.y;
     if (flags & ANM_SPRITE_SNAP_TO_PIXELS)
     {
-        ZUN_ASM_SNAP_QUAD_TO_PIXEL_CENTERS(g_sprite_temp_buffer, half);
+        ZUN_ASM_SNAP_QUAD_TO_PIXEL_CENTERS(g_sprite_temp_buffer, g_pixel_center_offset);
     }
     vm->last_rendered_quad_in_surface_space[0] = *(Float3 *)&g_sprite_temp_buffer[0].pos;
     vm->last_rendered_quad_in_surface_space[1] = *(Float3 *)&g_sprite_temp_buffer[1].pos;
