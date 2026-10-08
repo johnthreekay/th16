@@ -561,13 +561,12 @@ struct Player
     HARNESS_CALLED i32 create_rect_damage_source(D3DXVECTOR3 *pos, f32 width, f32 height, f32 angle, i32 time,
                                                  i32 damage);
     // The damage source create_damage_source returned (index plus one).
+    // A ternary: the original folds the field offset of a lookup's use
+    // into both arms (NULL->damage_limit becomes the constant 0x7c), which
+    // the if/return form does not get (BombReimuAInf::on_tick).
     PlayerDamageSource *get_damage_source(i32 index)
     {
-        if (index == 0)
-        {
-            return NULL;
-        }
-        return &inner.damage_sources[index - 1];
+        return index == 0 ? NULL : &inner.damage_sources[index - 1];
     }
     // 0x440d50
     void set_shoot_key_short_timer(i32 time);

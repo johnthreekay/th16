@@ -222,7 +222,7 @@ i32 ItemManager::on_tick_body()
                 item->speed = 0.0f;
                 item->angle = ZUN_PI / 2;
                 item->speed_towards_player = player->sht_file->grazebox_radius;
-                item->state = item->force_autocollect != 0 ? ITEM_STATE_AUTOCOLLECT : ITEM_STATE_FALLING;
+                item->state = item->force_autocollect == 0 ? ITEM_STATE_FALLING : ITEM_STATE_AUTOCOLLECT;
                 goto state_1;
             }
             if (!item_offscreen(item))
@@ -392,7 +392,7 @@ i32 ItemManager::on_tick_body()
                 case 16:
                     if (g_Globals.collect_season_item(0))
                     {
-                        g_Player->inner.repopulate_options();
+                        player->inner.repopulate_options();
                         g_PopupManager->generate_small_score_popup(&item->position, -1, 0xffffff40);
                         g_SoundManager.play_sound_at_position(SE_LGODSGET, item->position.x);
                     }
@@ -754,7 +754,9 @@ void Item::collect_full_power()
     }
 }
 
-// TODO: the original takes piv % 10 with idiv and keeps both roundings.
+// The piv rounding is written out as in collect_point (see there).
+// TODO: the original realigns its frame to 8 bytes (see
+// collect_full_power), and this and the value swap esi and edi.
 // FUNCTION: TH16 0x430100
 void Item::collect_power()
 {
@@ -765,8 +767,7 @@ void Item::collect_power()
         i32 line = item_collect_line();
         if ((f32)line >= player_y || state == ITEM_STATE_AUTOCOLLECT)
         {
-            value = g_Globals.piv / 100;
-            value -= value % 10;
+            value = g_Globals.piv / 100 - g_Globals.piv / 100 % 10;
             value = value / 10 * 10;
             if (value <= 0)
             {
@@ -780,9 +781,8 @@ void Item::collect_power()
         }
         else
         {
-            i32 base = g_Globals.piv / 100;
-            base -= base % 10;
-            value = base * 3 / 4 - base * 3 / 4 * ((i32)player_y - line) / 450;
+            value = (g_Globals.piv / 100 - g_Globals.piv / 100 % 10) * 3 / 4 -
+                    (g_Globals.piv / 100 - g_Globals.piv / 100 % 10) * 3 / 4 * ((i32)player_y - line) / 450;
             value = value / 10 * 10;
             if (value <= 0)
             {
@@ -844,8 +844,13 @@ void Item::collect_big_power()
     }
 }
 
-// TODO: the original takes piv % 10 with idiv and keeps both roundings
-// (ours folds them into one division), so registers differ.
+// The point values are get_piv_rounded() inlined, spelled out here: as an
+// expression of the global, `% 10` stays an idiv, and with the rounding
+// written twice (not a local) the two `* 3 / 4` are not merged, so the
+// subtraction becomes the original's add of a negated product. Once
+// get_piv_rounded has the same expression form (it then matches 0x42c860),
+// two get_piv_rounded() calls compile the same.
+// TODO: the original's frame is 4 bytes larger (alignment padding).
 // FUNCTION: TH16 0x430620
 void Item::collect_point()
 {
@@ -854,8 +859,7 @@ void Item::collect_point()
     i32 value;
     if ((f32)line >= player->inner.pos.y || state == ITEM_STATE_AUTOCOLLECT)
     {
-        value = g_Globals.piv / 100;
-        value -= value % 10;
+        value = g_Globals.piv / 100 - g_Globals.piv / 100 % 10;
         value = value / 10 * 10;
         if (value <= 0)
         {
@@ -868,9 +872,8 @@ void Item::collect_point()
     }
     else
     {
-        i32 base = g_Globals.piv / 100;
-        base -= base % 10;
-        value = base * 3 / 4 - base * 3 / 4 * ((i32)player->inner.pos.y - line) / 450;
+        value = (g_Globals.piv / 100 - g_Globals.piv / 100 % 10) * 3 / 4 -
+                (g_Globals.piv / 100 - g_Globals.piv / 100 % 10) * 3 / 4 * ((i32)player->inner.pos.y - line) / 450;
         value = value / 10 * 10;
         if (value <= 0)
         {

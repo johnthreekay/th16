@@ -28,7 +28,13 @@ void PosVel::update_secondary_fields()
     }
 }
 
-// TODO: adds pos+velocity the other way round and misses a tail merge.
+// The angle difference is read through the operator's returned pointer
+// (a temporary, not a named ZunAngle) and rotated.y is assigned before
+// rotated.x, as the original's register use shows.
+// TODO: the x sums of the circle and wave cases load the offset first
+// (offset.x + velocity.x, offset.x + center.x) while the y sums load the
+// member first; ours loads the member first in both. The written operand
+// order, D3DXVECTOR3 temporaries and explicit components all compile alike.
 // FUNCTION: TH16 0x403110
 void PosVel::step()
 {
@@ -48,14 +54,13 @@ void PosVel::step()
     case POSVEL_MODE_ELLIPSE:
     {
         Float3 offset;
-        ZunAngle a = angle - ellipse_angle;
-        from_polar(&offset, normalize_angle(a.value), radial_dist);
+        from_polar(&offset, normalize_angle((angle - ellipse_angle).value), radial_dist);
         f32 x = ellipse_ratio * offset.x;
         f32 s = zun_sinf(ellipse_angle.value);
         f32 c = zun_cosf(ellipse_angle.value);
         Float3 rotated;
-        rotated.x = c * x - offset.y * s;
         rotated.y = offset.y * c + s * x;
+        rotated.x = c * x - offset.y * s;
         rotated.z = 0.0f;
         pos = velocity + rotated;
         break;

@@ -180,14 +180,17 @@ HARNESS_CALLED f32 Player::angle_to_player(Float3 *pos)
     return (f32)atan2((double)dy, (double)dx);
 }
 
+// lo is computed before hi for the original's lo.y/hi.y registers.
 // TODO: register allocation: the original keeps size in ecx and the player
-// in edx (moving it to ecx for die), and lo.y/hi.y in xmm5/xmm2.
+// in edx (moving it to ecx for die) and interleaves the half size products
+// with the position loads. Neither a Player local nor g_Player-> instead
+// of the folded this reproduces it.
 // FUNCTION: TH16 0x4438c0
 HARNESS_CALLED i32 Player::check_hit_rect(Float3 *pos, Float3 *size, i32 graze_only)
 {
     D3DXVECTOR3 half = *size * 0.5f;
-    D3DXVECTOR3 hi = *pos + half;
     D3DXVECTOR3 lo = *pos - half;
+    D3DXVECTOR3 hi = *pos + half;
     if (hurtbox.min_pos.x > hi.x || hurtbox.min_pos.y > hi.y || lo.x > hurtbox.max_pos.x ||
         lo.y > hurtbox.max_pos.y)
     {
@@ -354,9 +357,15 @@ i32 __fastcall Player::on_tick_callback(Player *player)
     return player->on_tick_body();
 }
 
-// TODO: the original pads the draw_vm call with push ecx/pop ecx for 8-byte
-// alignment, like on_tick_callback; ours does not, most likely because LTCG
-// does not see draw_vm needing alignment early (draw_vm does not match yet).
+// The draw_vm call goes through an inline helper node: called directly,
+// LTCG does not pad on_draw_callback's frame (push ecx/pop ecx) for the call
+// the way the original does, although the callback is entered 8-aligned
+// (registered by Player::initialize, see on_tick_callback).
+static __forceinline i32 draw_player_vm(AnmVm *vm)
+{
+    return g_AnmManager->draw_vm(vm);
+}
+
 // Draws the player sprite, except while dead.
 // FUNCTION: TH16 0x443730
 i32 __fastcall Player::on_draw_callback(Player *player)
@@ -365,7 +374,7 @@ i32 __fastcall Player::on_draw_callback(Player *player)
     {
         player->vm.entity_pos = player->inner.pos;
         player->vm.flags_hi = (player->vm.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
-        g_AnmManager->draw_vm(&player->vm);
+        draw_player_vm(&player->vm);
     }
     return 1;
 }
@@ -760,8 +769,9 @@ HARNESS_CALLED void Player::do_graze(Float3 *pos)
                               1.9f, 0, 0);
 }
 
-// TODO: d.x and d.y take swapped stack slots and the scaled hurtbox bounds
-// are computed in a different order (frame and convention match).
+// r.y is assigned before r.x (that decides the stack slots of d and the
+// registers of r), and the unscaled box adds r to the half size, which
+// leaves hi.x in r.x's register like the original.
 // FUNCTION: TH16 0x443af0
 HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only)
 {
@@ -769,7 +779,10 @@ HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 wi
     D3DXVECTOR3 d = inner.pos - *pos;
     f32 s = zun_sinf(neg_angle);
     f32 c = zun_cosf(neg_angle);
-    D3DXVECTOR3 r(d.x * c - d.y * s, d.y * c + d.x * s, 0.0f);
+    D3DXVECTOR3 r;
+    r.y = d.y * c + d.x * s;
+    r.x = d.x * c - d.y * s;
+    r.z = 0.0f;
     D3DXVECTOR3 lo = r - hurtbox_halfsize * 16.0f;
     D3DXVECTOR3 hi = r + hurtbox_halfsize * 16.0f;
     if (lo.x > length || lo.y > width * 0.5f || 0.0f > hi.x || width * -0.5f > hi.y)
@@ -777,7 +790,7 @@ HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 wi
         return 0;
     }
     lo = r - hurtbox_halfsize;
-    hi = r + hurtbox_halfsize;
+    hi = hurtbox_halfsize + r;
     if (lo.x > length || lo.y > width * 0.5f || 0.0f > hi.x || width * -0.5f > hi.y)
     {
         return 2;
@@ -908,21 +921,25 @@ HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f3
     return total;
 }
 
-// Whether a point lies inside the playfield.
-static __forceinline i32 is_on_screen(Float3 *pos)
+// Whether a point lies outside the playfield (written as the negated
+// tests, which the original's comparisons follow).
+static __forceinline i32 is_off_screen(Float3 *pos)
 {
-    return g_early_arcade_offset_x < pos->x && pos->x < g_early_arcade_offset_x + 384.0f &&
-           g_early_arcade_offset_y < pos->y && pos->y < g_early_arcade_offset_y + 448.0f;
+    return pos->x <= g_early_arcade_offset_x || pos->x >= g_early_arcade_offset_x + 384.0f ||
+           pos->y <= g_early_arcade_offset_y || pos->y >= g_early_arcade_offset_y + 448.0f;
 }
 
-// TODO: the original realigns its frame (ebx form) and reloads g_Player for
-// every bullet; ours keeps it in a register.
+// The bullet pointer is advanced with the counter, and the off-screen test
+// is written as the negated comparisons, as the original's code shows.
+// TODO: the original's second pointer into the bullet points at
+// age.current (ours at age.speed_index), and the counter and the VM take
+// each other's stack slots.
 // FUNCTION: TH16 0x4456d0
 i32 Player::tick_bullets()
 {
-    for (i32 i = 0; i < PLAYER_BULLET_COUNT; i++)
+    PlayerBullet *bullet = inner.bullets;
+    for (i32 i = 0; i < PLAYER_BULLET_COUNT; i++, bullet++)
     {
-        PlayerBullet *bullet = &inner.bullets[i];
         if (bullet->state == PLAYER_BULLET_FREE)
         {
             continue;
@@ -951,8 +968,8 @@ i32 Player::tick_bullets()
             vm->write_sprite_corners(corners);
             // Bullets (other than lasers) older than 15 frames go away once
         // their sprite is entirely off screen.
-        if (bullet->age.current >= 15 && !is_on_screen(&corners[0]) && !is_on_screen(&corners[1]) &&
-                !is_on_screen(&corners[2]) && !is_on_screen(&corners[3]))
+        if (bullet->age.current >= 15 && is_off_screen(&corners[0]) && is_off_screen(&corners[1]) &&
+                is_off_screen(&corners[2]) && is_off_screen(&corners[3]))
             {
                 {
                     delete_vm_and_clear(bullet->anm_id);
@@ -977,8 +994,8 @@ i32 Player::tick_bullets()
         vm->entity_pos = bullet->pos.pos;
         if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
         {
-            vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
             vm->rotation.z = bullet->pos.angle.value;
+            vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         }
         bullet->age.tick();
     }
@@ -1568,7 +1585,11 @@ i32 Player::on_tick_body()
     case PLAYER_STATE_HIT:
         // Hit: 8 frames to bomb out of it (a deathbomb); then the life is
         // lost and the player is dead.
-        if (inner.time_in_state.current < 8)
+        if (inner.time_in_state.current >= 8)
+        {
+            lose_life();
+        }
+        else
         {
             if (g_MainBomb != NULL && (g_InputState.input_rising & INPUT_BOMB) && g_MainBomb->can_activate())
             {
@@ -1583,14 +1604,12 @@ i32 Player::on_tick_body()
             }
             break;
         }
-        lose_life();
     case PLAYER_STATE_DEAD:
         if (inner.time_in_state.current == 3)
         {
             // Drop half a power level as items, spread toward the top.
-            g_Globals.power = g_Globals.power - g_Globals.power_per_level / 2 < g_Globals.power_per_level
-                                  ? g_Globals.power_per_level
-                                  : g_Globals.power - g_Globals.power_per_level / 2;
+            i32 power = g_Globals.power - g_Globals.power_per_level / 2;
+            g_Globals.power = power < g_Globals.power_per_level ? g_Globals.power_per_level : power;
             f32 dx = 0.0f - inner.pos.x;
             f32 dy = inner.pos.y - 224.0f - inner.pos.y;
             f32 angle;
@@ -1655,9 +1674,9 @@ i32 Player::on_tick_body()
         break;
     }
     // Move, grow, turn and age the damage sources.
-    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++)
+    PlayerDamageSource *source = inner.damage_sources;
+    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++, source++)
     {
-        PlayerDamageSource *source = &inner.damage_sources[i];
         if (!(source->flags & DAMAGE_SOURCE_ACTIVE))
         {
             continue;
@@ -1665,10 +1684,9 @@ i32 Player::on_tick_body()
         source->pos.update_secondary_fields();
         source->pos.step();
         source->radius += source->radius_growth;
-        // TODO: written as += for the original's load order (angular_speed
-        // first), which adds a store of the unwrapped angle it does not have.
-        source->angle += source->angular_speed;
-        source->angle = wrap_angle(source->angle);
+        f32 angle = source->angle;
+        angle += source->angular_speed;
+        source->angle = wrap_angle(angle);
         source->last_enemy_id = 0;
         source->lifetime.decrement(1.0f);
         if (source->lifetime.current <= 0)
