@@ -1486,3 +1486,56 @@ Second pass over bullets, enemies, ECL and spell cards:
   every form); check_player_collision; step_logic's cmov reuses damage's
   register; Spellcard::start's esi/edi; a volatile
   EclRunContextHolder::current_context (cost 4 functions and SptInf::run_ecl).
+
+Second pass over ANM VM, loader, drawing and interpolation:
+- `__restrict` on a pointer parameter that every caller fills with a
+  local's address lets loads move above stores: AnmLoaded::load_sprite's
+  struct copy then loads its last dword before the first movups store, as
+  in the original (matched). HARNESS_CALLED alone gave LTCG no such alias
+  knowledge.
+- Reading through a local copy of a pointer parameter or of `this`
+  (`AnmVm *vm = vm_param;`, `InterpFloat3 *self = this;`) changes the
+  operand order of the SSE math (write_sprite_corners__without_rot and
+  with_z_rot, draw_billboard_fog, InterpFloat3::step 76 -> 97,
+  InterpFloat2::step and step_radial_dist 93 -> 99). Combined with dead
+  named locals (one for InterpFloat3, four for InterpFloat2); without the
+  `self` copy the dead locals did nothing there. tick_nested plus three
+  dead locals made InterpInt3::step exact.
+- AnmVm::transform_coords matches through any copy of `pos`, but that form
+  gives every function passing a local through get_own_transformed_pos a
+  /GS cookie (draw_vm and write_sprite_corners lose their matches), so it
+  stays as it is.
+- 16-byte struct locals in vectorized loops make LTCG realign to 16
+  (with_z_rot's AnmAnchorCorners locals gave `and esp, -16`); `f32[4]`
+  arrays filled element by element keep the original's /GS cookie and
+  unaligned frame (51.6 -> 74.2). A struct copy or memcpy into the arrays
+  is promoted to registers and loses the cookie.
+- Behaviour bug fixed: `D3DXMatrixIdentity(&vm->sprite_matrix);
+  vm->world_matrix = vm->sprite_matrix;` lost all 16 identity stores in our
+  build (draw_3d_vertex_strip). Copying from the return value
+  (`world_matrix = *D3DXMatrixIdentity(&sprite_matrix)`), a pointer local,
+  or explicit field stores keeps them, in the original's order.
+- draw_3d: HARNESS_CALLED turns its 16-byte realignment into the 8-byte
+  ebx form; a dead double in draw_vm aligns draw_vm early but costs 7
+  matches up the chain (StageInner::draw_vms, BulletManager's on_draw body
+  and callback, ItemManager::on_draw_body, both laser on_draws,
+  render_layer).
+- AnmLoaded::load: declaring `i32 i = 0;` right after the null check
+  (where ZUN zeroes it) gives the early `xor ebx, ebx` and keeps `this` on
+  the stack. draw_billboard_fog: `case 2: case 3:` instead of `default:`
+  restores the jump table (with a C4715 pragma: any return after the
+  switch costs 0.6), `!(flags & mask) ? color_1 : color_2`, and the
+  "declared, then assigned" vector form `D3DXVECTOR3 diff; diff = ...`.
+- reccmp does not name the original's strings at 0x494210, 0x49422c and
+  0x494244 (preload_anm, setup_entry); the Shift-JIS string before them
+  may be sized wrong and overlap them.
+- Dead ends: create_vm_front (callers in other files); InterpStrange1's
+  esi/edi swap (loop forms, switch, locals, helpers, pointers, dead locals
+  1-7); the InterpFloat2/3 tick ("load, add, store once" in no tick form);
+  write_billboard_corners (all field orders, operator-, Vec3Subtract,
+  sqrtf orders); preload_anm/load_texture_from_data as HARNESS_CALLED
+  members (code identical to the static form); reload_texture,
+  render_sprite_2d, update_special_vertices (anm_sincosmul `__stdcall` cost
+  a match); AnmVm::run (`fenv_access(on)` took it 92 -> 79);
+  draw_3d_vertex_strip's rotation matrix as D3DMATRIX or f32[16] still
+  realigns to 16.
