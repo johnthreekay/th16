@@ -964,10 +964,10 @@ i32 TitleInf::do_practice_stage_select()
             set_state(TITLE_STATE_EXIT);
             i32 stage = menu.next_selection + 1;
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
+            g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
             g_title_return_point = TITLE_RETURN_PRACTICE;
-            g_stage_data = &g_stage_table[stage];
             g_practice_last_stage = menu.next_selection;
             return 1;
         }
@@ -1473,7 +1473,7 @@ i32 g_last_replay_slot;
 
 // The replay menu: picking a replay (pages of 25) while the list loads on
 // the menu's thread, then the stage to start from.
-// TODO: register allocation: this moves through eax around the first slot % 25, the ascii create_effect loads g_AsciiManager into ecx, and stage + 1 stays in eax (as in do_spell_practice_difficulty).
+// TODO: register allocation: this moves through eax around the first slot % 25 and the ascii create_effect loads g_AsciiManager into ecx.
 // FUNCTION: TH16 0x451750
 i32 TitleInf::do_replay_menu()
 {
@@ -1624,9 +1624,9 @@ i32 TitleInf::do_replay_menu()
             set_state(TITLE_STATE_EXIT);
             i32 stage = replay_stage + 1;
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_START_REPLAY;
+            g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
-            g_stage_data = &g_stage_table[stage];
             strcpy(g_current_replay_filename, replays[replay_slot]->filename);
             RpyInfo *info = replays[replay_slot]->info;
             g_Globals.character = info->character;
@@ -2929,7 +2929,6 @@ i32 g_spell_practice_last_stage = -1;
 i32 g_practice_last_stage = -1;
 
 // Spell practice: picking the subseason, then starting the game.
-// TODO: as do_spell_practice_difficulty, the original keeps stage + 1 in ecx and computes the stage table pointer before the two stage number stores.
 // FUNCTION: TH16 0x455d50
 i32 TitleInf::do_spell_practice_subseason()
 {
@@ -3000,9 +2999,9 @@ i32 TitleInf::do_spell_practice_subseason()
             set_state(TITLE_STATE_EXIT);
             g_title_return_point = TITLE_RETURN_SPELL_PRACTICE;
             i32 stage = spell_stage + 1;
+            g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
-            g_stage_data = &g_stage_table[stage];
             g_Globals.spell_id = spell_ids[spell_index];
             g_Globals.character = spell_character_menu.next_selection;
             g_Globals.subshot = 0;
@@ -3032,7 +3031,7 @@ i32 TitleInf::do_spell_practice_subseason()
 
 // Spell practice: picking the spell card (the difficulty row). Extra stage
 // cards start the game right away; the others go on to the subseason.
-// TODO: the original keeps stage + 1 in ecx and computes the stage table pointer before the two stage number stores (ours eax, after; not with a pointer local or reading g_Globals.stage_num back).
+// The stage table pointer is assigned before the two stage numbers: that keeps stage + 1 in ecx with the multiply ahead of the stores, as in the original.
 // FUNCTION: TH16 0x456a20
 i32 TitleInf::do_spell_practice_difficulty()
 {
@@ -3114,9 +3113,9 @@ i32 TitleInf::do_spell_practice_difficulty()
                 set_state(TITLE_STATE_EXIT);
                 g_title_return_point = TITLE_RETURN_SPELL_PRACTICE;
                 i32 stage = spell_stage + 1;
+                g_stage_data = &g_stage_table[stage];
                 g_Globals.stage_num = stage;
                 g_Globals.weird_stage_num = stage;
-                g_stage_data = &g_stage_table[stage];
                 g_Globals.spell_id = spell_ids[menu.next_selection];
                 g_Globals.character = spell_character_menu.next_selection;
                 g_Globals.subshot = 0;

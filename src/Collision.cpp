@@ -3,8 +3,9 @@
 #include "Collision.h"
 #include "ZunMath.h"
 
-// TODO: same operations, different register and stack slot choices (the
-// original keeps 0.5 and the two offsets in registers).
+// Whether a circle touches a w x h rectangle centered on (rect_x, rect_y)
+// and rotated by angle: the edges first, then the corners.
+// TODO: the rotation multiplies into the sine and cosine registers with the circle offsets from memory (the original loads the offsets), and the stack slots differ.
 // FUNCTION: TH16 0x403d30
 HARNESS_CALLED i32 __stdcall collision_test_circle_rect(f32 rect_x, f32 rect_y, f32 w, f32 h, f32 angle, f32 circle_x,
                                                         f32 circle_y, f32 radius)
@@ -18,45 +19,57 @@ HARNESS_CALLED i32 __stdcall collision_test_circle_rect(f32 rect_x, f32 rect_y, 
     f32 x = circle_x * c - circle_y * s;
     f32 y = circle_x * s + circle_y * c;
     f32 half_w = w * 0.5f;
-    f32 half_h = h * 0.5f;
     f32 abs_x = fabsf(x);
-    if (half_w + radius >= abs_x && half_h >= fabsf(y))
+    if (half_w + radius >= abs_x && fabsf(y) <= h * 0.5f)
     {
         return 1;
     }
-    if (half_w >= abs_x && half_h + radius >= fabsf(y))
+    if (half_w >= abs_x && fabsf(y) <= h * 0.5f + radius)
     {
         return 1;
     }
     // Then the corners.
+    f32 half_h = h * 0.5f;
     f32 radius_sq = radius * radius;
-    if (radius_sq > (x - half_w) * (x - half_w) + (y - half_h) * (y - half_h))
+    Float3 d;
+    d.x = x - half_w;
+    d.y = y - half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    if (radius_sq > (x + half_w) * (x + half_w) + (y - half_h) * (y - half_h))
+    d.x = x + half_w;
+    d.y = y - half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    if (radius_sq > (x - half_w) * (x - half_w) + (y + half_h) * (y + half_h))
+    d.x = x - half_w;
+    d.y = y + half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    return radius_sq > (x + half_w) * (x + half_w) + (y + half_h) * (y + half_h);
+    d.x = x + half_w;
+    d.y = y + half_h;
+    return radius_sq > offset_length_sq(&d);
 }
 
 // The corners each edge of a rectangle joins.
 // GLOBAL: TH16 0x490e90
 const i32 g_rect_edges[4][2] = {{0, 1}, {1, 2}, {2, 3}, {3, 0}};
 
-// Rotates four points about the origin.
+// Rotates four points about the origin. sinf and cosf are written inside
+// the loop: the calls keep MSVC from unrolling it (the hoisted calls leave
+// the original's rolled loop), and the array stays in memory with its /GS
+// cookie; with the calls before the loop it is unrolled and scalarized.
 static __forceinline void rotate_points(Float2 *points, f32 angle)
 {
-    f32 s = sinf(angle);
-    f32 c = cosf(angle);
 #pragma loop(no_vector)
     for (i32 i = 0; i < 4; i++, points++)
     {
+        f32 s = sinf(angle);
+        f32 c = cosf(angle);
         f32 x = points->x;
         f32 y = points->y;
         points->x = x * c - y * s;
@@ -134,7 +147,7 @@ static __forceinline i32 segments_cross(f32 x1, f32 y1, f32 x2, f32 y2, f32 x3, 
     return !(c3 * c4 > 0.0f);
 }
 
-// TODO: ours unrolls the rotation loop (the original keeps it rolled, eax counting 4) and lays the points out differently on the stack.
+// TODO: the rotation loop computes and stores the new x before the new y; the original computes y first and stores it first.
 // FUNCTION: TH16 0x403a90
 HARNESS_CALLED i32 __stdcall collision_test_points_in_rect(f32 x, f32 y, f32 w, f32 h, f32 angle, Float2 *points)
 {
@@ -150,19 +163,19 @@ HARNESS_CALLED i32 __stdcall collision_test_points_in_rect(f32 x, f32 y, f32 w, 
         rotate_points(p, angle);
     }
     f32 half_w = w * 0.5f;
-    if (half_w >= fabsf(p[0].x) && h * 0.5f >= fabsf(p[0].y))
+    if (half_w >= fabsf(p[0].x) && fabsf(p[0].y) <= h * 0.5f)
     {
         return 1;
     }
-    if (half_w >= fabsf(p[1].x) && h * 0.5f >= fabsf(p[1].y))
+    if (half_w >= fabsf(p[1].x) && fabsf(p[1].y) <= h * 0.5f)
     {
         return 1;
     }
-    if (half_w >= fabsf(p[2].x) && h * 0.5f >= fabsf(p[2].y))
+    if (half_w >= fabsf(p[2].x) && fabsf(p[2].y) <= h * 0.5f)
     {
         return 1;
     }
-    if (half_w >= fabsf(p[3].x) && h * 0.5f >= fabsf(p[3].y))
+    if (half_w >= fabsf(p[3].x) && fabsf(p[3].y) <= h * 0.5f)
     {
         return 1;
     }
@@ -309,7 +322,7 @@ HARNESS_CALLED i32 __stdcall collision_line_intersection(f32 *out_x, f32 *out_y,
     return 1;
 }
 
-// TODO: same logic; the corner setup, rotation loop unrolling and register allocation differ.
+// TODO: same logic; the rotation loop stores x before y and the register allocation after the rotation differs.
 // FUNCTION: TH16 0x404600
 HARNESS_CALLED i32 __stdcall collision_line_rect(Float2 *near_point, Float2 *far_point, Float3 *pos, f32 line_angle,
                                                  f32 rect_x, f32 rect_y, f32 w, f32 h, f32 rect_angle)
@@ -381,7 +394,7 @@ HARNESS_CALLED i32 __stdcall collision_line_rect(Float2 *near_point, Float2 *far
     return 1;
 }
 
-// TODO: same logic; ours unrolls the rotation loops and allocates the corner arrays and registers differently.
+// TODO: same logic; the corner arrays and registers are allocated differently and the rotation loops store x before y.
 // FUNCTION: TH16 0x4049c0
 HARNESS_CALLED i32 __stdcall collision_test_rect_rect(f32 x1, f32 y1, f32 w1, f32 h1, f32 angle1, f32 x2, f32 y2,
                                                       f32 w2, f32 h2, f32 angle2)
