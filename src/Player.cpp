@@ -1677,9 +1677,9 @@ i32 Player::on_tick_body()
         break;
     }
     // Move, grow, turn and age the damage sources.
-    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++)
+    PlayerDamageSource *source = inner.damage_sources;
+    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++, source++)
     {
-        PlayerDamageSource *source = &inner.damage_sources[i];
         if (!(source->flags & DAMAGE_SOURCE_ACTIVE))
         {
             continue;
