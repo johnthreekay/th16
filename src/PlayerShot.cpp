@@ -402,16 +402,14 @@ i32 __fastcall sht_on_hit_spark(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_s
 
 // Bursts into a damage source that grows and moves on with the bullet for
 // 20 frames.
-// TODO: register allocation: the original keeps the player in edi and the
-// bullet in esi throughout (with an unused stack slot); ours reloads the
-// player for create_damage_source.
+// g_Player is named at each use (a Player local is reloaded for
+// create_damage_source) and the lookup goes through get_damage_source.
 // FUNCTION: TH16 0x446f80
 i32 __fastcall sht_on_hit_burst(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius)
 {
-    Player *player = g_Player;
-    i32 damage = player->get_shooter(bullet->shooter_ref)->damage;
-    i32 index = player->create_damage_source(&bullet->pos.pos, 24.0f, 2.0f, 0x14, damage);
-    PlayerDamageSource *source = index != 0 ? &player->inner.damage_sources[index - 1] : NULL;
+    i32 damage = g_Player->get_shooter(bullet->shooter_ref)->damage;
+    PlayerDamageSource *source =
+        g_Player->get_damage_source(g_Player->create_damage_source(&bullet->pos.pos, 24.0f, 2.0f, 0x14, damage));
     source->hit_interval = 4;
     AnmManager::interrupt_tree(bullet->anm_id, 1);
     bullet->state = PLAYER_BULLET_HIT;
