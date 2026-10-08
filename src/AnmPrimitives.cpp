@@ -34,31 +34,31 @@ HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f3
     switch (anchor_x)
     {
     case ANM_ANCHOR_CENTER:
-        x1 = x3 = width * 0.5f;
         x0 = x2 = width * -0.5f;
+        x1 = x3 = width * 0.5f;
         break;
     case ANM_ANCHOR_START:
-        x1 = x3 = width;
         x0 = x2 = 0.0f;
+        x1 = x3 = width;
         break;
     case ANM_ANCHOR_END:
-        x1 = x3 = 0.0f;
         x0 = x2 = -width;
+        x1 = x3 = 0.0f;
         break;
     }
     switch (anchor_y)
     {
     case ANM_ANCHOR_CENTER:
-        y2 = y3 = height * 0.5f;
         y0 = y1 = height * -0.5f;
+        y2 = y3 = height * 0.5f;
         break;
     case ANM_ANCHOR_START:
-        y2 = y3 = height;
         y0 = y1 = 0.0f;
+        y2 = y3 = height;
         break;
     case ANM_ANCHOR_END:
-        y2 = y3 = 0.0f;
         y0 = y1 = -height;
+        y2 = y3 = 0.0f;
         break;
     }
     vertices[0].pos.x = x0 * c - y0 * s + x;
@@ -119,31 +119,31 @@ HARNESS_CALLED i32 AnmManager::draw_rect_outline(f32 x, f32 y, f32 width, f32 he
     switch (anchor_x)
     {
     case ANM_ANCHOR_CENTER:
-        x1 = x3 = width * 0.5f;
         x0 = x2 = width * -0.5f;
+        x1 = x3 = width * 0.5f;
         break;
     case ANM_ANCHOR_START:
-        x1 = x3 = width;
         x0 = x2 = 0.0f;
+        x1 = x3 = width;
         break;
     case ANM_ANCHOR_END:
-        x1 = x3 = 0.0f;
         x0 = x2 = -width;
+        x1 = x3 = 0.0f;
         break;
     }
     switch (anchor_y)
     {
     case ANM_ANCHOR_CENTER:
-        y2 = y3 = height * 0.5f;
         y0 = y1 = height * -0.5f;
+        y2 = y3 = height * 0.5f;
         break;
     case ANM_ANCHOR_START:
-        y2 = y3 = height;
         y0 = y1 = 0.0f;
+        y2 = y3 = height;
         break;
     case ANM_ANCHOR_END:
-        y2 = y3 = 0.0f;
         y0 = y1 = -height;
+        y2 = y3 = 0.0f;
         break;
     }
     vertices[0].pos.x = x0 * c - y0 * s + x;
