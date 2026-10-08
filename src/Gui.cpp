@@ -1659,8 +1659,11 @@ void Gui::start_dialogue(i32 script)
     }
 }
 
-// AnmLoaded::create_effect as LTCG inlined it into setup_stage_hud.
-static __forceinline AnmId create_effect_inline(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out)
+// AnmLoaded::create_effect as LTCG inlined it into setup_stage_hud. The
+// script is base + index: with the index passed on its own, the add happens
+// at the copy_vm call, after the index was spilled across allocate_vm, as in
+// the original (written as one argument, it was added before the spill).
+static __forceinline AnmId create_effect_inline(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out, i32 index = 0)
 {
     ENTER_CS(CS_ANM_MANAGER);
     anm->vm_count++;
@@ -1669,7 +1672,7 @@ static __forceinline AnmId create_effect_inline(AnmLoaded *anm, i32 script, i32 
     {
         *out = vm;
     }
-    anm->copy_vm(vm, script);
+    anm->copy_vm(vm, index + script);
     vm->flags_hi |= ANM_VM_CREATED_BY_GAME;
     if (layer >= 0)
     {
@@ -1721,9 +1724,9 @@ static inline void set_entity_pos_xyz(AnmId id, f32 x, f32 y, f32 z)
 
 // Sets the HUD up for a stage: the life and bomb counters, the boss timer,
 // the stage logo, the demo and difficulty markers and the season gauge.
-// TODO: the original adds the difficulty scripts' base at the copy_vm call (ours
-// before spilling the script); after the icon search it shares the g_AnmManager reload
-// between the found and not-found exits, and has no nop before the search loop.
+// TODO: after the icon search the original shares the g_AnmManager reload between
+// the found and not-found exits (ours loads it in each), and has no nop before the
+// search loop.
 // FUNCTION: TH16 0x426d70
 void Gui::setup_stage_hud()
 {
@@ -1792,10 +1795,10 @@ void Gui::setup_stage_hud()
     }
     if (g_Supervisor.new_game_started != 0)
     {
-        gui->id_104 = create_effect_inline(gui->front_anm, g_Globals.difficulty + FRONT_ANM_DIFFICULTY_2, -1, NULL);
+        gui->id_104 = create_effect_inline(gui->front_anm, FRONT_ANM_DIFFICULTY_2, -1, NULL, g_Globals.difficulty);
         AnmManager::interrupt_tree(gui->id_104, 3);
     }
-    gui->difficulty_id = create_effect_inline(gui->front_anm, g_Globals.difficulty + FRONT_ANM_DIFFICULTY, -1, NULL);
+    gui->difficulty_id = create_effect_inline(gui->front_anm, FRONT_ANM_DIFFICULTY, -1, NULL, g_Globals.difficulty);
     interrupt_tree_inline(gui->id_104, 3);
     gui->boss_star_count = 0;
     for (i32 i = 0; i < 3; i++)
