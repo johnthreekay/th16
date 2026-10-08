@@ -355,7 +355,7 @@ static_assert(offsetof(Spellcard, time_code) == 0xa4, "Spellcard layout");
 static_assert(sizeof(Spellcard) == 0xbc, "Spellcard size");
 
 // HARNESS_CALLED: with every caller visible it no longer realigns its frame
-// to 64 bytes (found by the system agent).
+// to 64 bytes (the original does not).
 // fenv_access(on) because the original reloads real_time_taken after the floor
 // call: without it MSVC treats floor as pure and keeps the value across the call.
 // Only this function is compiled with it.
