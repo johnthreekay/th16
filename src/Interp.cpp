@@ -344,8 +344,8 @@ HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step()
     return current;
 }
 
-// TODO: the timer tick and the bezier terms differ in register allocation,
-// and the constant-acceleration case loads goal.x before bezier_2.x.
+// TODO: the timer tick and the bezier terms differ in register allocation (1.0f lives in xmm5, the original's xmm6),
+// and the constant-acceleration case loads goal.x before bezier_2.x (goal + bezier_2 fixes x but not y and z).
 // FUNCTION: TH16 0x406e10
 D3DXVECTOR3 InterpFloat3::step()
 {
@@ -391,7 +391,7 @@ D3DXVECTOR3 InterpFloat3::step()
         f32 c_goal = t * t * (3.0f - 2.0f * t);
         f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
         f32 c_bezier_2 = (t - 1.0f) * t * t;
-        current = goal * c_goal + initial * c_initial + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+        current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
     }
     else
     {
