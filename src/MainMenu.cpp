@@ -268,6 +268,21 @@ i32 __fastcall TitleInf::on_draw_thunk(void *arg)
 
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 
+// input_pressed_or_repeating as the key config screen inlines it: the
+// original tests the low bytes of both input words (mov cl/al, byte ptr).
+static __forceinline i32 key_config_pressed_or_repeating(u8 mask)
+{
+    if (*(u8 *)&g_hardware_input_pressed & mask)
+    {
+        return 1;
+    }
+    if (*(u8 *)&g_hardware_input_repeat & mask)
+    {
+        return 1;
+    }
+    return 0;
+}
+
 // TODO: the volume clamps use al/ecx where ours uses cl/eax (also with an if instead of the ternary).
 // FUNCTION: TH16 0x44c570
 i32 TitleInf::do_options()
@@ -543,7 +558,9 @@ void TitleInf::update_options_sprites()
     }
 }
 
-// TODO: for the up/down tests the original loads the pressed and repeat words as bytes (mov cl/al); ours loads dwords (byte casts only narrow the repeat load).
+// TODO: for the up/down tests the original loads the pressed word as a byte
+// (mov cl, byte ptr); ours loads the dword (the byte reads only narrow the
+// repeat load).
 // FUNCTION: TH16 0x44e930
 i32 TitleInf::do_key_config()
 {
@@ -573,11 +590,11 @@ i32 TitleInf::do_key_config()
     case 2:
     {
         menu.current_selection = menu.next_selection;
-        if (input_pressed_or_repeating(INPUT_UP))
+        if (key_config_pressed_or_repeating(INPUT_UP))
         {
             menu.move_cursor(-1);
         }
-        if (input_pressed_or_repeating(INPUT_DOWN))
+        if (key_config_pressed_or_repeating(INPUT_DOWN))
         {
             menu.move_cursor(1);
         }
