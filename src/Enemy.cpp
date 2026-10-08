@@ -295,8 +295,8 @@ HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
     }
 }
 
-// TODO: register allocation differs in the inlined ZunTimer::tick: the original loads 1.0f into
-// xmm2 at the damage_multiplier store and keeps 1.01f in xmm1 (tick_mixed does not change it).
+// TODO: the original loads 1.0f into xmm2 at the damage_multiplier store and adds it
+// from there in the inlined tick (tick_goto gives the rest of the tick's registers).
 // FUNCTION: TH16 0x41b3d0
 int EnemyManager::update()
 {
@@ -324,7 +324,7 @@ int EnemyManager::update()
         g_Player->inner.flags &= ~PLAYER_FLAG_DAMAGE_BOOSTED;
     }
     g_Player->damage_multiplier = 1.0f;
-    inner.time_in_stage.tick();
+    inner.time_in_stage.tick_goto();
     return UPDATE_FUNC_CONTINUE;
 }
 
