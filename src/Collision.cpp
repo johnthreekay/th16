@@ -3,17 +3,6 @@
 #include "Collision.h"
 #include "ZunMath.h"
 
-// The squared length of an offset's x and y, y term first. Taking the
-// offset by pointer keeps each test's squares apart (the original squares
-// every corner offset again in each test, where plain expressions share
-// them), and the y term first gives the original's x-term accumulator. The
-// offset is a Float3 because an 8-byte local (a Float2) would make LTCG
-// realign the callers' frames (BulletManager::cancel_rectangle_as_bomb).
-static inline f32 offset_length_sq(const Float3 *d)
-{
-    return d->y * d->y + d->x * d->x;
-}
-
 // Whether a circle touches a w x h rectangle centered on (rect_x, rect_y)
 // and rotated by angle: the edges first, then the corners.
 // TODO: the rotation multiplies into the sine and cosine registers with the circle offsets from memory (the original loads the offsets), and the stack slots differ.

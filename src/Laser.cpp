@@ -1381,30 +1381,39 @@ static __forceinline i32 test_circle_rect_inline(f32 rect_x, f32 rect_y, f32 w, 
     f32 y = circle_x * s + circle_y * c;
     f32 half_w = w * 0.5f;
     f32 abs_x = fabsf(x);
-    if (half_w + radius >= abs_x && h * 0.5f >= fabsf(y))
+    if (half_w + radius >= abs_x && fabsf(y) <= h * 0.5f)
     {
         return 1;
     }
-    if (half_w >= abs_x && h * 0.5f + radius >= fabsf(y))
+    if (half_w >= abs_x && fabsf(y) <= h * 0.5f + radius)
     {
         return 1;
     }
     // Then the corners.
     f32 half_h = h * 0.5f;
     f32 radius_sq = radius * radius;
-    if (radius_sq > (x - half_w) * (x - half_w) + (y - half_h) * (y - half_h))
+    Float3 d;
+    d.x = x - half_w;
+    d.y = y - half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    if (radius_sq > (x + half_w) * (x + half_w) + (y - half_h) * (y - half_h))
+    d.x = x + half_w;
+    d.y = y - half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    if (radius_sq > (x - half_w) * (x - half_w) + (y + half_h) * (y + half_h))
+    d.x = x - half_w;
+    d.y = y + half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    if (radius_sq > (x + half_w) * (x + half_w) + (y + half_h) * (y + half_h))
+    d.x = x + half_w;
+    d.y = y + half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
@@ -1430,6 +1439,7 @@ static_assert(offsetof(EnemyInf, enemy.anm_ids) == 0x1330, "EnemyInf::enemy.anm_
 // Never called. LaserInfiniteInf::sum_rect_damage for a straight laser: the boss
 // is only tested when it exists, and the damage per point also depends on
 // the laser's length, as in LaserCurveInf::sum_rect_damage.
+// TODO: register allocation differs as in LaserInfiniteInf::sum_rect_damage (the original keeps this in edi, size in esi).
 // FUNCTION: TH16 0x434010
 i32 LaserLineInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 {
@@ -1515,7 +1525,7 @@ i32 LaserLineInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 // g_LaserManager->rect_damage_sum. Its own points move only 8 units per step in
 // the rectangle's frame. The parameters are pos, size, rect_angle, unused,
 // e (skip while ex_invuln_remaining_frames runs) and boss_hit.
-// TODO: register allocation differs (the original keeps this in edi, size in esi); it multiplies the sprite sizes before zun_sinf and squares each corner distance again, as in collision_test_circle_rect.
+// TODO: register allocation differs (the original keeps this in edi, size in esi); it multiplies the sprite sizes before zun_sinf.
 // FUNCTION: TH16 0x436010
 i32 LaserInfiniteInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 {
