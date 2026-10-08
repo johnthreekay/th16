@@ -1049,6 +1049,14 @@ void Gui::update_score()
 // FUNCTION: TH16 0x42bcf0
 HARNESS_CALLED void Gui::show_notice(i32 bonus, i32 kind)
 {
+    // A dead double, not ZUN's code: LTCG then counts show_notice as wanting
+    // an 8-aligned stack, and its callers realign (the Item::collect_*
+    // functions through ebx, ItemManager::on_tick_body) or are padded for it
+    // (Globals::add_power) as in the original. The create_effect calls go
+    // through create_effect_via_pointer: direct, create_effect's own wish
+    // adds up with this one and show_notice realigns itself.
+    double unused = 0.0;
+    (void)unused;
     switch (kind)
     {
     case GUI_NOTICE_SPELL_BONUS:

@@ -66,10 +66,8 @@ HARNESS_CALLED i32 score_extend_quota_out_of_line()
 // Adds power up to the maximum (with the full power notice when it gets
 // there). The dead double is not ZUN's code: it stands in for whatever made
 // LTCG's stack alignment pass treat the show_notice call as wanting an
-// aligned stack, and gives the original's esi saved up front.
-// TODO: the original also reserves a 4-byte slot (push ecx): its frame is
-// padded for known alignment from its callers, which an /INCLUDE'd function
-// never gets.
+// aligned stack. With it and the one in Gui::show_notice the frame is
+// padded like the original's (esi saved up front, a 4-byte slot).
 // FUNCTION: TH16 0x43ddf0
 i32 Globals::add_power(i32 amount)
 {
@@ -192,14 +190,15 @@ void Globals::collect_bomb_fragment(i32 unused)
 // whatever made LTCG's stack alignment pass count Gui::show_notice as a
 // callee that wants an aligned frame. In an inline helper it belongs to the
 // helper's call graph node, so add_to_score realigns through ebx (with a
-// 4-byte slot and esi saved up front) like the original, while show_notice
-// and its other callers are left alone (a dead double in show_notice itself
-// costs Spellcard::end and Item::init_anm their matches).
+// 4-byte slot and esi saved up front) like the original. show_notice is
+// called through its member pointer: as a direct call, show_notice's own
+// dead double adds up with this one and add_to_score realigns with
+// `and esp, -8` instead.
 static inline void show_extend_notice()
 {
     double unused = 0.0;
     (void)unused;
-    g_Gui->show_notice(0, GUI_NOTICE_EXTEND);
+    (g_Gui->*gui_show_notice_func())(0, GUI_NOTICE_EXTEND);
 }
 
 // Adds to the score (in units of 10), with an extra life and its notice for

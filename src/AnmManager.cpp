@@ -35,10 +35,22 @@ D3DXVECTOR3 AnmVm::world_pos()
     return result;
 }
 
-// TODO: the original realigns the frame (and esp, -8; sub esp, 0x10) and so saves esi in the prologue; ours pushes esi after entering the critical section.
+// The original realigns this frame (and esp, -8) and passes the wish for
+// an aligned stack on to the callers that call it directly
+// (PlayerBullet::create and through it Player::do_shooting); most callers
+// go through create_effect_via_pointer, which keeps it from them.
 // FUNCTION: TH16 0x406380
 DECOMP_NOINLINE AnmId AnmLoaded::create_effect(i32 script, i32 layer, AnmVm **out)
 {
+    // Dead double math, not ZUN's code: it stands in for whatever made LTCG's
+    // double alignment pass count this function as wanting an 8-aligned
+    // stack. It takes three multiplies to realign the frame itself; with
+    // fewer, only the callers realign.
+    double unused = 0.0;
+    unused = unused * 2.0;
+    unused = unused * 2.0;
+    unused = unused * 2.0;
+    (void)unused;
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;
     AnmVm *vm = g_AnmManager->allocate_vm();

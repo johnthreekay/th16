@@ -219,11 +219,20 @@ static inline AnmLoadedCreateEffectFunc anm_create_effect_func()
 }
 
 // anm->create_effect(script, layer, out), called through the member pointer.
-// Most of ZUN's call sites compile like this and not like a plain call: the
-// file pointer is loaded first, so for g_AsciiManager->ascii_anm the
-// original has g_AsciiManager in eax and the result slot in ecx (the menu
-// states, Gui::show_notice). An inline helper with a plain call does not do
-// it.
+// Most of ZUN's call sites compile like this, in two ways that a plain call
+// (or an inline helper with a plain call) does not reproduce:
+// - The file pointer is loaded first: for g_AsciiManager->ascii_anm the
+//   original has g_AsciiManager in eax and the result slot in ecx (the menu
+//   states, Gui::show_notice, Spellcard::start).
+// - create_effect's wish for an 8-aligned stack (see its dead double) stays
+//   out of the caller: with direct calls, callers such as show_notice,
+//   Gui::on_tick_body, GuiMsgVm's constructor and TitleInf::on_tick realign
+//   their frames where the original does not.
+// The direct calls left are ones whose original shape needs the plain call:
+// PlayerBullet::create (its unseasoned shot hands the alignment on to
+// Player::do_shooting), Supervisor::create_fog_vm (it returns create_effect's
+// result in its own return slot), Fog's main VM, the ending script VM,
+// AnmId::replace_with_effect and the Player effects.
 static __forceinline AnmId create_effect_via_pointer(AnmLoaded *anm, i32 script, i32 layer, AnmVm **out)
 {
     return (anm->*anm_create_effect_func())(script, layer, out);

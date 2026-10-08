@@ -21,21 +21,27 @@ static __forceinline AnmId fog_create_main_vm()
     return g_Supervisor.text_anm->create_effect(FOG_TEXT_ANM_SCRIPT, 0x22, NULL);
 }
 
+// A dead double, not ZUN's code: LTCG then treats Fog's constructor as
+// wanting an aligned stack, which its (aligned) callers give it. With that
+// known alignment it saves its registers up front and pops each malloc
+// argument right after the call, as the original does. In this helper the
+// double belongs to a call graph node of its own: written in the
+// constructor, it adds up with the alignment create_fog_vm passes on from
+// AnmLoaded::create_effect, and the constructor realigns its frame.
+static inline void fog_want_aligned_stack()
+{
+    double unused_double = 0.0;
+    (void)unused_double;
+}
+
 // Allocates the grid and creates the VMs (the main VM on layer 0x22,
 // drawing through anm_effect_4_on_draw). Without the arcade surface to
 // sample there is no mesh. The id and VM pointer arrays are allocated one
 // byte short of 17 entries, room for the 16 strips.
-// TODO: the original pops each malloc's argument right after the call
-// (ours merges the four pops).
 // FUNCTION: TH16 0x418c70
 HARNESS_CALLED Fog::Fog(i32 unused_0, i32 points_per_strip, i32 unused_2)
 {
-    // A dead double: LTCG then treats the constructor as wanting an aligned
-    // stack, which its (aligned) callers give it. With that known alignment
-    // it saves its registers up front and pops each malloc argument right
-    // after the call, as the original does.
-    double unused_double = 0.0;
-    (void)unused_double;
+    fog_want_aligned_stack();
     if (g_Supervisor.arcade_surface_0 == NULL)
     {
         memset(this, 0, sizeof(Fog));

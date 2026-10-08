@@ -190,7 +190,10 @@ AnmId EffectManager::create_effect(i32 effect, D3DXVECTOR3 *pos, AnmVm *vm)
     }
     if (vm == NULL)
     {
-        id = (&effect_anm)[data->anm_index]->create_effect(data->script, -1, NULL);
+        // Through the member pointer (see create_effect_via_pointer), which
+        // keeps the original's shrink-wrapped edi; the helper itself loads
+        // the table index in another order here.
+        id = ((&effect_anm)[data->anm_index]->*anm_create_effect_func())(data->script, -1, NULL);
         vm = get_vm_or_clear(id);
     }
     else
