@@ -1486,11 +1486,20 @@ void __fastcall anm_vm_interrupt_2(AnmVm *vm)
     vm->interrupt(2);
 }
 
-// TODO: same frame difference as create_vm (4 more bytes, esi saved
-// before the critical section).
+// A dead double, not ZUN's code, as in create_vm (AnmManager.cpp): it
+// stands in for AnmVm::run wanting an aligned stack, and as its own call
+// graph node it gives create_ui_effect known alignment from its aligned
+// callers (the original's 4 unused frame bytes) without a realignment.
+static inline void create_ui_effect_want_aligned_stack()
+{
+    double unused_double = 0.0;
+    (void)unused_double;
+}
+
 // FUNCTION: TH16 0x42c920
 HARNESS_CALLED AnmId AnmLoaded::create_ui_effect(i32 script, i32 unused, AnmVm **out)
 {
+    create_ui_effect_want_aligned_stack();
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;
     AnmVm *vm = g_AnmManager->allocate_vm();

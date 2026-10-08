@@ -79,9 +79,21 @@ DECOMP_NOINLINE AnmId AnmLoaded::create_effect(i32 script, i32 layer, AnmVm **ou
     return id;
 }
 
+// A dead double, not ZUN's code: it stands in for AnmVm::run wanting an
+// aligned stack (docs/findings.md). In this plain inline helper it is a call
+// graph node of its own, so create_vm does not realign itself; its callers
+// are all aligned and visible (HARNESS_CALLED), so it gets known alignment
+// and its frame has the original's 4 unused bytes.
+static inline void create_vm_want_aligned_stack()
+{
+    double unused_double = 0.0;
+    (void)unused_double;
+}
+
 // FUNCTION: TH16 0x40e5c0
 HARNESS_CALLED AnmId AnmLoaded::create_vm(i32 script, D3DXVECTOR3 *pos, f32 rotation, i32 layer, i32 unused)
 {
+    create_vm_want_aligned_stack();
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;
     AnmVm *vm = g_AnmManager->allocate_vm();
