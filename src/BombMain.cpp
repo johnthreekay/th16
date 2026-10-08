@@ -511,6 +511,8 @@ static DECOMP_NOINLINE void orb_update(BombReimuAOrb *orb)
 // their VMs are gone.
 // The orb search jumps out with a goto, so the loop's normal exit is the
 // end of the bomb without a second test of the counter.
+// The orb update loop is a do/while counting down: it gives the original's
+// `sub esi, 1` loop test.
 // TODO: register allocation differs (orbs is read from its stack slot in
 // the original, the timer goes to edx, the loop counters swap stack
 // slots) and the radial_speed store comes before the damage source load;
@@ -569,24 +571,25 @@ orb_alive:
         }
     }
     BombReimuAOrb *orb = orbs->orbs;
-    for (i32 i = 8; i != 0; i--, orb++)
+    i32 i = 8;
+    do
     {
-        if (!orb->active)
+        if (orb->active)
         {
-            continue;
+            orb_update(orb);
+            if (g_Player->get_damage_source(orb->damage_source)->total_damage_dealt >= 300)
+            {
+                orb->finish();
+                g_SoundManager.play_sound_at_position(SE_TAN00_3, orb->pos.x);
+                ScreenEffect::create_inline(SCREEN_EFFECT_SHAKE, 8, 6, 6, 0, 0);
+            }
+            else
+            {
+                g_Player->get_damage_source(orb->damage_source)->pos.pos = orb->pos;
+            }
         }
-        orb_update(orb);
-        if (g_Player->get_damage_source(orb->damage_source)->total_damage_dealt >= 300)
-        {
-            orb->finish();
-            g_SoundManager.play_sound_at_position(SE_TAN00_3, orb->pos.x);
-            ScreenEffect::create_inline(SCREEN_EFFECT_SHAKE, 8, 6, 6, 0, 0);
-        }
-        else
-        {
-            g_Player->get_damage_source(orb->damage_source)->pos.pos = orb->pos;
-        }
-    }
+        orb++;
+    } while (--i != 0);
     cancel_bullets();
     return 0;
 }
