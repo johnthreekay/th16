@@ -236,9 +236,9 @@ static inline EnemyInf *advance_enemy_iter(EnemyManager *mgr)
 // cookie for pos (it goes away without the interrupt_tree call) that the
 // original does not have.
 // pos is copied before the iteration starts, and the enemy advance goes
-// through advance_enemy_iter: both give the original's registers.
-// TODO: ours puts 0.0f in xmm1 at the top instead of in the angle ternary
-// and pads the loop head with a nop.
+// through advance_enemy_iter: both give the original's registers. A call
+// in each branch for the dash angle (not a ternary argument) keeps 0.0f
+// from being hoisted to the top.
 // FUNCTION: TH16 0x4470f0
 i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet)
 {
@@ -279,7 +279,14 @@ i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet)
     {
         if (bullet->phase_timer.current == 4)
         {
-            bullet->pos.set_angle(bullet->pos.pos.x > bullet->target_pos.x ? -ZUN_PI : 0.0f);
+            if (bullet->pos.pos.x > bullet->target_pos.x)
+            {
+                bullet->pos.set_angle(-ZUN_PI);
+            }
+            else
+            {
+                bullet->pos.set_angle(0.0f);
+            }
             bullet->pos.speed = 14.0f;
             bullet->flags = (bullet->flags & ~0x34) | PLAYER_BULLET_PHASE_DASHING;
         }
