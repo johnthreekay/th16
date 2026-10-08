@@ -120,7 +120,7 @@ void TitleInf::load_replay_list()
 }
 
 // Saving the replay after a game: picking a slot, then entering the name.
-// TODO: this lives in esi (the original edi, spilled), the ascii create_effect pattern (see docs/findings.md), and g_stage_table[8] lands on another global here.
+// TODO: this lives in esi (the original edi, spilled), and g_stage_table[8] lands on another global here.
 // FUNCTION: TH16 0x453c10
 i32 TitleInf::do_replay_save()
 {
@@ -330,7 +330,7 @@ i32 g_last_difficulty = DIFFICULTY_NORMAL;
 i32 g_last_character;
 
 // Picking the difficulty, or confirming Extra.
-// TODO: the original reuses g_Globals.difficulty from the entry in ecx for num_choices (reloading it after the ascii create_effect); ours compares memory; plus the ascii create_effect pattern (see docs/findings.md).
+// TODO: the original reuses g_Globals.difficulty from the entry in ecx for num_choices (reloading it after the ascii create_effect); ours compares memory.
 // FUNCTION: TH16 0x44fe20
 i32 TitleInf::do_difficulty_select()
 {
@@ -340,7 +340,7 @@ i32 TitleInf::do_difficulty_select()
     case 0:
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->get_anm()->create_effect(0x13, -1, NULL);
         }
         menu.wraps = 0;
         menu.num_choices = g_Globals.difficulty < DIFFICULTY_EXTRA ? 4 : 1;
@@ -1008,7 +1008,7 @@ u8 g_cheat_prev_keys[0x100];
 // The player data screen: difficulty (player_data_difficulty_menu) and character (menu)
 // records, and pages of spell cards (page_menu, 0 for none). On Extra with
 // the fourth character selected it also reads the unlock cheat.
-// TODO: the ascii create_effect call loads g_AsciiManager into ecx (the original eax, with the result slot in ecx), and the vectorized OR loads the second 16 key bytes first (the original the first; not the operand order, the accumulator type or a reversed loop).
+// TODO: the vectorized OR loads the second 16 key bytes first (the original the first; not the operand order, the accumulator type or a reversed loop).
 // FUNCTION: TH16 0x452330
 i32 TitleInf::do_player_data()
 {
@@ -1025,7 +1025,7 @@ i32 TitleInf::do_player_data()
         page_menu.wraps = 1;
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->get_anm()->create_effect(0x13, -1, NULL);
         }
         anm_ids[0x6d] = title_anm->create_effect(0x6d, -1, NULL);
         set_substate(1);
@@ -1474,7 +1474,7 @@ i32 g_last_replay_slot;
 
 // The replay menu: picking a replay (pages of 25) while the list loads on
 // the menu's thread, then the stage to start from.
-// TODO: register allocation: this moves through eax around the first slot % 25 and the ascii create_effect loads g_AsciiManager into ecx.
+// TODO: register allocation: this moves through eax around the first slot % 25.
 // FUNCTION: TH16 0x451750
 i32 TitleInf::do_replay_menu()
 {
@@ -1491,7 +1491,7 @@ i32 TitleInf::do_replay_menu()
         g_last_replay_slot = 0;
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->get_anm()->create_effect(0x13, -1, NULL);
         }
         anm_ids[0x6c] = title_anm->create_effect(0x6c, -1, NULL);
         set_substate(1);
@@ -1889,7 +1889,7 @@ HARNESS_CALLED i32 TitleInf::on_draw__player_data()
 // The high score name entry after a game (score_not_ranked is set when the score
 // did not make the top ten), then on to saving the replay unless the game
 // was continued.
-// TODO: the original saves ebx (push ecx; push ebx) and keeps &replay_name in it for the score copy, tests the pressed word in memory before the name entry, and has the ascii create_effect pattern (see docs/findings.md).
+// TODO: the original saves ebx (push ecx; push ebx) and keeps &replay_name in it for the score copy, and tests the pressed word in memory before the name entry.
 // FUNCTION: TH16 0x4532f0
 i32 TitleInf::do_score_name_entry()
 {
@@ -1902,7 +1902,7 @@ i32 TitleInf::do_score_name_entry()
         g_Supervisor.play_bgm(0, 0x11);
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->get_anm()->create_effect(0x13, -1, NULL);
         }
         create_effect(0x6f);
         set_substate(1);
@@ -2306,7 +2306,6 @@ HARNESS_CALLED i32 TitleInf::on_draw__replay_save()
 }
 
 // The manual (help.anm), shown until HelpManual says it is done.
-// TODO: the first create_effect call swaps eax and ecx (g_AsciiManager and the result slot).
 // FUNCTION: TH16 0x4545a0
 i32 TitleInf::do_manual()
 {
@@ -2315,7 +2314,7 @@ i32 TitleInf::do_manual()
     case 0:
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->get_anm()->create_effect(0x13, -1, NULL);
         }
         anm_ids[0x72] = title_anm->create_effect(0x72, -1, NULL);
         HelpManual::create();
@@ -2404,7 +2403,7 @@ i32 TitleInf::do_music_room()
             menu.set_cursor(0);
             if (submenu_ascii_id.id == 0)
             {
-                submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+                submenu_ascii_id = g_AsciiManager->get_anm()->create_effect(0x13, -1, NULL);
             }
             create_effect(0x6e);
             i32 count = 0;
@@ -2651,7 +2650,7 @@ i32 TitleInf::do_spell_practice_stage_select()
     case 0:
         if (submenu_ascii_id.id == 0)
         {
-            submenu_ascii_id = g_AsciiManager->ascii_anm->create_effect(0x13, -1, NULL);
+            submenu_ascii_id = g_AsciiManager->get_anm()->create_effect(0x13, -1, NULL);
         }
         menu.num_choices = 7;
         if (g_AnmManager->get_vm_with_id(anm_ids[0x11c]) == NULL)

@@ -168,6 +168,16 @@ class AsciiInf : public TaskInf
         now_loading_id.id = 0;
     }
 
+    // The ASCII font's ANM file. Callers that create effects from it write
+    // `g_AsciiManager->get_anm()->create_effect(...)`: with the accessor the
+    // original evaluates the object after the arguments (g_AsciiManager in
+    // eax, the result slot in ecx, pushed before ascii_anm is loaded); the
+    // plain field access loads g_AsciiManager into ecx first.
+    AnmLoaded *get_anm()
+    {
+        return ascii_anm;
+    }
+
     // UpdateFunc callbacks; the argument is the AsciiInf. on_tick (priority
     // 4) ages the strings; the draw callbacks draw group 0 at priority 0x51,
     // group 1 at 0x35 (draw_group_1) and group 2 at 0x42 with camera 0.
