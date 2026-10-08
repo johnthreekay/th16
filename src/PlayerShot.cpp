@@ -318,22 +318,21 @@ i32 __fastcall sht_on_init_spread(PlayerBullet *bullet)
     return 0;
 }
 
-// TODO: the original computes the shooter twice from scratch (keeping ref in
-// ebx); ours shares the common parts and spills them.
 // A player bullet's damage source hit an enemy: the shooter's on_hit, or
-// PlayerBullet::hit.
+// PlayerBullet::hit. Reading shooter_ref through the bullet at each lookup
+// (not into a local) makes the shooter be computed twice from scratch, as
+// in the original.
 // FUNCTION: TH16 0x445d40
 i32 __fastcall damage_source_on_hit_bullet(PlayerDamageSource *source, i32 enemy_pos, i32 enemy_size, f32 rotation,
                                            f32 radius)
 {
     Player *player = g_Player;
-    i32 ref = player->inner.bullets[source->bullet_index].shooter_ref;
-    if (player->get_shooter(ref)->func_on_hit != NULL)
+    PlayerBullet *bullet = &player->inner.bullets[source->bullet_index];
+    if (player->get_shooter(bullet->shooter_ref)->func_on_hit != NULL)
     {
-        return player->get_shooter(ref)->func_on_hit(&player->inner.bullets[source->bullet_index], enemy_pos,
-                                                      enemy_size, rotation, radius);
+        return player->get_shooter(bullet->shooter_ref)->func_on_hit(bullet, enemy_pos, enemy_size, rotation, radius);
     }
-    return player->inner.bullets[source->bullet_index].hit();
+    return bullet->hit();
 }
 
 // FUNCTION: TH16 0x445e20
