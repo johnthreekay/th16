@@ -771,8 +771,9 @@ HARNESS_CALLED void Player::do_graze(Float3 *pos)
                               1.9f, 0, 0);
 }
 
-// TODO: d.x and d.y take swapped stack slots and the scaled hurtbox bounds
-// are computed in a different order (frame and convention match).
+// r.y is assigned before r.x (that decides the stack slots of d and the
+// registers of r), and the unscaled box adds r to the half size, which
+// leaves hi.x in r.x's register like the original.
 // FUNCTION: TH16 0x443af0
 HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only)
 {
@@ -780,7 +781,10 @@ HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 wi
     D3DXVECTOR3 d = inner.pos - *pos;
     f32 s = zun_sinf(neg_angle);
     f32 c = zun_cosf(neg_angle);
-    D3DXVECTOR3 r(d.x * c - d.y * s, d.y * c + d.x * s, 0.0f);
+    D3DXVECTOR3 r;
+    r.y = d.y * c + d.x * s;
+    r.x = d.x * c - d.y * s;
+    r.z = 0.0f;
     D3DXVECTOR3 lo = r - hurtbox_halfsize * 16.0f;
     D3DXVECTOR3 hi = r + hurtbox_halfsize * 16.0f;
     if (lo.x > length || lo.y > width * 0.5f || 0.0f > hi.x || width * -0.5f > hi.y)
@@ -788,7 +792,7 @@ HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 wi
         return 0;
     }
     lo = r - hurtbox_halfsize;
-    hi = r + hurtbox_halfsize;
+    hi = hurtbox_halfsize + r;
     if (lo.x > length || lo.y > width * 0.5f || 0.0f > hi.x || width * -0.5f > hi.y)
     {
         return 2;
