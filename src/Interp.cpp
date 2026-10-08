@@ -546,13 +546,13 @@ D3DXVECTOR3 InterpStrange1::step()
     return current;
 }
 
-// TODO: the timer tick: with tick() the stores match, but the result goes to the speed's xmm1 (the original loads current_f into xmm0, see docs/findings.md); the constant acceleration's bezier_2 + goal gets x or y/z operand order right, never both; one lea swaps its operands.
+// TODO: the timer tick's scaled sum goes to the speed's xmm1 (the original loads current_f into xmm0, see docs/findings.md; InterpStrange1::step gets it right with the same tick()); one lea swaps its operands.
 // FUNCTION: TH16 0x464590
 HARNESS_CALLED Int3 InterpInt3::step()
 {
     if (end_time > 0)
     {
-        time.tick_mixed();
+        time.tick();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -582,7 +582,7 @@ HARNESS_CALLED Int3 InterpInt3::step()
     {
         Int3 tmp = initial;
         initial = tmp + bezier_2;
-        bezier_2 = bezier_2 + goal;
+        bezier_2 = goal + bezier_2;
         current = initial;
     }
     else if (method == INTERP_BEZIER)
