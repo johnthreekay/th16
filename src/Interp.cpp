@@ -466,7 +466,9 @@ HARNESS_CALLED D3DXVECTOR2 InterpFloat2::step_radial_dist()
     return self->current;
 }
 
-// TODO: the per-axis constant acceleration loads bezier_2 before initial and stores current from xmm0 where the original copies it back through eax (`+=` and an int copy give that but swap esi and edi everywhere); the returned vector's z is loaded after x/y.
+// The per-axis loop is a do-while (the vector research agent): as a for loop the
+// constant acceleration case loaded bezier_2 before initial.
+// TODO: 97%; that case stores current from xmm0 where the original copies initial back through eax (an int copy or a bezier_2 store before it gives that but swaps esi and edi everywhere), and the returned vector's z is loaded after x/y.
 // FUNCTION: TH16 0x4258b0
 D3DXVECTOR3 InterpStrange1::step()
 {
@@ -524,7 +526,8 @@ D3DXVECTOR3 InterpStrange1::step()
     }
     else
     {
-        for (i32 i = 0; i < 3; i++)
+        i32 i = 0;
+        do
         {
             if (methods_1d[i] == INTERP_CONSTANT_VELOCITY)
             {
@@ -552,7 +555,7 @@ D3DXVECTOR3 InterpStrange1::step()
                 f32 x = interp_common_methods(methods_1d[i], time.current_f, (f32)end_time);
                 current[i] = (goal[i] - initial[i]) * x + initial[i];
             }
-        }
+        } while (++i < 3);
     }
     return current;
 }
