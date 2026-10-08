@@ -426,8 +426,8 @@ static inline void stop_sound_threads()
 // changed) starts over from creating Direct3D. On exit it saves th16.cfg
 // and log.txt and restores the screen saver settings.
 // WinMain has C linkage, so it is annotated by its linker symbol.
-// TODO: 87%; the original hoists PeekMessageA's address into edi, stores the
-// log reset before the restart message's log call, and lays out some
+// TODO: 88%; the original hoists PeekMessageA's address into edi before
+// its loops, does not pad the loop heads with nops, and lays out some
 // blocks in another order.
 // SYNTHETIC: TH16 0x459830 SYMBOL
 // _WinMain@16
@@ -735,15 +735,16 @@ shutdown:
     }
     if (result == 2)
     {
+        // The log starts over with the restart message.
+        g_GameErrorContext.buffer_end = g_GameErrorContext.buffer;
+        g_GameErrorContext.buffer[0] = '\0';
         // 再起動を要するオプションが変更されたので再起動します
         g_GameErrorContext.log("\x8d\xc4\x8bN\x93\xae\x82\xf0\x97v\x82\xb7\x82\xe9\x83I\x83v\x83V\x83\x87\x83\x93\x82"
                                "\xaa\x95\xcf\x8dX\x82\xb3\x82\xea\x82\xbd\x82\xcc\x82\xc5\x8d\xc4\x8bN\x93\xae\x82\xb5"
                                "\x82\xdc\x82\xb7\r\n");
-        g_GameErrorContext.buffer_end = g_GameErrorContext.buffer;
-        g_GameErrorContext.buffer[0] = '\0';
         if (!g_Supervisor.present_params.Windowed)
         {
-            WINNLSEnableIME(NULL, FALSE);
+            WINNLSEnableIME(NULL, TRUE);
         }
         for (i32 i = 60; i != 0; i--)
         {
