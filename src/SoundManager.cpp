@@ -963,8 +963,10 @@ static inline IDirectSoundBuffer *bgm_buffer(CStreamingSound *sound)
 // Runs the first queued BGM command one step further (commands take several
 // calls, counted in step) and plays or stops the queued sound effects.
 // Returns the BGM command now first in the queue.
-// TODO: 55%; the step switches become jump tables where the original
-// compares, and the pan sum is unrolled by two.
+// The steps are if chains: as switches they become jump tables where the
+// original compares.
+// TODO: 67%; block order and tail sharing differ, and the pan sum is unrolled
+// by two.
 // FUNCTION: TH16 0x45e330
 i32 SoundManager::update_sound_thread()
 {
@@ -1002,15 +1004,16 @@ i32 SoundManager::update_sound_thread()
         case BGM_PLAY:
             if ((g_Supervisor.config.flags & CONFIG_BGM_IN_MEMORY) && cmd->arg >= 0)
             {
-                switch (cmd->step)
+                if (cmd->step == 0)
                 {
-                case 0:
                     if (g_SoundManager.play_preloaded_bgm(cmd->arg) == 0)
                     {
                         goto step;
                     }
                     goto pop;
-                case 2:
+                }
+                else if (cmd->step == 2)
+                {
                     if (BGM_STREAM == NULL)
                     {
                         goto step;
@@ -1020,7 +1023,9 @@ i32 SoundManager::update_sound_thread()
                         goto step;
                     }
                     goto pop;
-                case 5: {
+                }
+                else if (cmd->step == 5)
+                {
                     IDirectSoundBuffer *buffer = bgm_buffer(BGM_STREAM);
                     cmd->arg = BGM_STREAM->m_pWaveFile->m_track->total_size != 0;
                     if (BGM_STREAM->FillBufferWithSound(buffer, cmd->arg, 0) >= 0)
@@ -1029,7 +1034,8 @@ i32 SoundManager::update_sound_thread()
                     }
                     goto pop;
                 }
-                case 7:
+                else if (cmd->step == 7)
+                {
                     BGM_STREAM->Play(0, DSBPLAY_LOOPING, 0);
                     goto step;
                 }
@@ -1043,12 +1049,13 @@ i32 SoundManager::update_sound_thread()
             {
                 goto pop;
             }
-            switch (cmd->step)
+            if (cmd->step == 0)
             {
-            case 0:
                 BGM_STREAM->Stop(FALSE);
                 goto step;
-            case 1: {
+            }
+            else if (cmd->step == 1)
+            {
                 if (BGM_STREAM->m_refilling)
                 {
                     goto done;
@@ -1059,10 +1066,13 @@ i32 SoundManager::update_sound_thread()
                 BGM_STREAM->recreate_buffers(&g_SoundManager.bgm_format[cmd->arg]);
                 goto step;
             }
-            case 2:
+            else if (cmd->step == 2)
+            {
                 BGM_STREAM->m_pWaveFile->open_bgm(&g_SoundManager.bgm_format[cmd->arg], 0);
                 goto step;
-            case 3: {
+            }
+            else if (cmd->step == 3)
+            {
                 IDirectSoundBuffer *buffer = bgm_buffer(BGM_STREAM);
                 BGM_STREAM->Reset(0);
                 cmd->arg = BGM_STREAM->m_pWaveFile->m_track->total_size != 0;
@@ -1072,7 +1082,8 @@ i32 SoundManager::update_sound_thread()
                 }
                 goto pop;
             }
-            case 4:
+            else if (cmd->step == 4)
+            {
                 BGM_STREAM->Play(0, DSBPLAY_LOOPING, 0);
                 goto step;
             }
@@ -1086,19 +1097,22 @@ i32 SoundManager::update_sound_thread()
             {
                 goto pop;
             }
-            switch (cmd->step)
+            if (cmd->step == 0)
             {
-            case 0:
                 BGM_STREAM->Stop(TRUE);
                 goto step;
-            case 1:
+            }
+            else if (cmd->step == 1)
+            {
                 if (g_SoundManager.bgm_thread == NULL)
                 {
                     goto pop;
                 }
                 PostThreadMessageA(g_SoundManager.bgm_thread_id, WM_QUIT, 0, 0);
                 goto step;
-            case 2:
+            }
+            else if (cmd->step == 2)
+            {
                 if (WaitForSingleObject(g_SoundManager.bgm_thread, 0x100) != WAIT_OBJECT_0)
                 {
                     PostThreadMessageA(g_SoundManager.bgm_thread_id, WM_QUIT, 0, 0);
@@ -1107,7 +1121,9 @@ i32 SoundManager::update_sound_thread()
                 }
                 g_SoundManager.bgm_thread = NULL;
                 goto step;
-            case 3:
+            }
+            else if (cmd->step == 3)
+            {
                 CloseHandle(g_SoundManager.bgm_thread);
                 CloseHandle(g_SoundManager.bgm_event);
                 g_SoundManager.bgm_thread = NULL;
@@ -1117,7 +1133,9 @@ i32 SoundManager::update_sound_thread()
                 }
                 g_SoundManager.bgm_stream = NULL;
                 goto step;
-            case 10:
+            }
+            else if (cmd->step == 10)
+            {
                 goto pop;
             }
             goto step;
@@ -1126,12 +1144,13 @@ i32 SoundManager::update_sound_thread()
             {
                 goto pop;
             }
-            switch (cmd->step)
+            if (cmd->step == 0)
             {
-            case 0:
                 BGM_STREAM->Stop(TRUE);
                 goto step;
-            case 1:
+            }
+            else if (cmd->step == 1)
+            {
                 goto pop;
             }
             goto step;
