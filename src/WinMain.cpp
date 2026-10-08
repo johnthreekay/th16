@@ -129,8 +129,9 @@ HARNESS_CALLED i32 create_game_window(HINSTANCE instance)
 
 // Creates the device (or resets it) with the smallest back buffer that
 // holds the window. In full screen a mode that is not 60 Hz is only taken
-// on the second pass. 0 on success.
-// TODO: 91%; register allocation of the retry loop differs.
+// on the second pass. 0 on success. The release before trying the next
+// size is two nested ifs: with `!reset && device != NULL` the device load
+// moves after the reset test.
 // FUNCTION: TH16 0x45b530
 HARNESS_CALLED i32 create_d3d_device(i32 reset)
 {
@@ -189,10 +190,13 @@ retry:
         {
             if (!g_Supervisor.present_params.Windowed && !second_pass)
             {
-                if (!reset && g_Supervisor.d3d_device != NULL)
+                if (!reset)
                 {
-                    g_Supervisor.d3d_device->Release();
-                    g_Supervisor.d3d_device = NULL;
+                    if (g_Supervisor.d3d_device != NULL)
+                    {
+                        g_Supervisor.d3d_device->Release();
+                        g_Supervisor.d3d_device = NULL;
+                    }
                 }
                 continue;
             }
