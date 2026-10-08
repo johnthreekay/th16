@@ -290,7 +290,15 @@ i32 ItemManager::on_tick_body()
         {
             if (inner.slowdown < 1.0f)
             {
+#ifdef TH16_PORT
+                // y first, as MSVC evaluates the constructor's arguments
+                // (right to left; Clang goes left to right).
+                f32 y = g_replay_unsafe_rng.randf_neg_1_to_1();
+                f32 x = g_replay_unsafe_rng.randf_neg_1_to_1();
+                item->vm.pos = Float3(x, y, 0.0f);
+#else
                 item->vm.pos = Float3(g_replay_unsafe_rng.randf_neg_1_to_1(), g_replay_unsafe_rng.randf_neg_1_to_1(), 0.0f);
+#endif
                 item->vm.color_1.g = 0xa0;
                 item->vm.color_1.r = 0xff;
             }

@@ -711,8 +711,18 @@ int EnemyData::step_logic()
                 while (drop_season.damage_accounted_for_season_drops < life.total_damage_including_ignored)
                 {
                     drop_season.damage_accounted_for_season_drops += drop_season.damage_per_season_drop;
+#ifdef TH16_PORT
+                    // MSVC evaluates the arguments right to left, so the
+                    // speed takes the first random number; Clang goes left
+                    // to right, which desyncs replays (port/NOTES.md,
+                    // "Argument evaluation order").
+                    f32 speed = g_replay_safe_rng.randf_0_to_1() + 1.2f;
+                    f32 angle = g_replay_safe_rng.randf_neg_pi_to_pi();
+                    g_ItemManager->spawn_item(ITEM_SEASON, &final_pos.pos, 0, angle, speed, 0, 0);
+#else
                     g_ItemManager->spawn_item(ITEM_SEASON, &final_pos.pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
                                               g_replay_safe_rng.randf_0_to_1() + 1.2f, 0, 0);
+#endif
                 }
             }
             damaged_timer.set_value(30);
@@ -929,8 +939,15 @@ void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
         {
             for (i32 j = 0; j < extra_counts[15]; j++)
             {
+#ifdef TH16_PORT
+                // The speed first, as MSVC evaluates the arguments (see above).
+                f32 speed = g_replay_safe_rng.randf_0_to_1() * 1.9f + 0.2f;
+                f32 angle = g_replay_safe_rng.randf_neg_pi_to_pi();
+                g_ItemManager->spawn_item(ITEM_SEASON, pos, 0, angle, speed, 0, 0);
+#else
                 g_ItemManager->spawn_item(ITEM_SEASON, pos, 0, g_replay_safe_rng.randf_neg_pi_to_pi(),
                                           g_replay_safe_rng.randf_0_to_1() * 1.9f + 0.2f, 0, 0);
+#endif
             }
         }
     }

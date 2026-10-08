@@ -14,6 +14,7 @@
 #include "port_replay_test.h"
 
 #include "Globals.h"
+#include "Item.h"
 #include "Player.h"
 #include "ReplayManager.h"
 #include "Rng.h"
@@ -43,6 +44,10 @@ int g_trace_every = 0;
 // TH16_REPLAY_TEST_DUMP: every frame's g_Globals (the part replays store),
 // replay RNG and player position, as hex, for comparing with the original.
 FILE *g_dump = NULL;
+// TH16_REPLAY_TEST_ITEMS=FIRST:LAST: also every active item of those frames
+// (lines starting with "I").
+int g_items_first = -1;
+int g_items_last = -1;
 int g_failures = 0;
 int g_stages_checked = 0;
 
@@ -203,6 +208,11 @@ bool port_replay_test_init(const char *file, const char *save_dir)
     g_fast_forward = speed == NULL || strcmp(speed, "0") != 0;
     const char *trace = getenv("TH16_REPLAY_TEST_TRACE");
     g_trace_every = trace != NULL ? atoi(trace) : 0;
+    const char *items = getenv("TH16_REPLAY_TEST_ITEMS");
+    if (items != NULL)
+    {
+        sscanf(items, "%d:%d", &g_items_first, &g_items_last);
+    }
     const char *dump = getenv("TH16_REPLAY_TEST_DUMP");
     if (dump != NULL && dump[0] != '\0')
     {
@@ -284,6 +294,24 @@ void port_replay_test_frame(const ReplayManager *replay)
                       g_Player != NULL ? g_Player->inner.pos_subpixel.y : 0};
         dump_hex(pos, sizeof(pos));
         fputc('\n', g_dump);
+        if (frame >= g_items_first && frame <= g_items_last && g_ItemManager != NULL)
+        {
+            const Item *items = g_ItemManager->inner.items;
+            for (int i = 0; i < (int)(sizeof(g_ItemManager->inner.items) / sizeof(Item)); i++)
+            {
+                const Item *item = &items[i];
+                if (item->state == 0)
+                {
+                    continue;
+                }
+                fprintf(g_dump, "I %d %d %d %d %d ", frame, i, item->state, item->item_type, item->time.current);
+                const f32 *f = &item->position.x;
+                dump_hex(f, 8 * sizeof(f32));
+                fputc(' ', g_dump);
+                dump_hex(&item->speed_towards_player, sizeof(f32));
+                fputc('\n', g_dump);
+            }
+        }
     }
     if (g_trace_every <= 0)
     {
@@ -327,7 +355,11 @@ void port_replay_test_stage_start(const ReplayManager *replay, const RpyGamestat
     report("stage %d -> %d: score %u (recorded %u), stage %d took %d frames (recorded %d), rng steps %u", prev, stage,
            g_Globals.score * 10, ((const Globals *)recorded->globals)->score * 10, prev, frame, recorded_frames,
            g_replay_safe_rng.generation_count);
-    check(frame == recorded_frames, "frames in the previous stage", prev, frame, recorded_frames, frame, true);
+    // Not a sync check: the recording keeps adding frames to a stage until
+    // the next one has loaded (begin_stage), while playback moves on when it
+    // starts loading (start_stage), so the difference is the original's
+    // loading time (about 145 frames in the replays tested).
+    check(frame == recorded_frames, "frames in the previous stage", prev, frame, recorded_frames, frame, false);
     check(g_replay_safe_rng.seed == (u16)recorded->rng_state, "replay RNG seed", stage, frame, (u16)recorded->rng_state,
           g_replay_safe_rng.seed, true);
     const u8 *live = (const u8 *)&g_Globals;

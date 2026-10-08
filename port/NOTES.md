@@ -219,7 +219,23 @@ SDK's, so code and data that use them keep their meaning.
   D3DX used SSE code paths: results can differ in the last bit. The game
   uses D3DX mostly for drawing, but D3DXVec2Normalize is also used by
   bullet code (BulletManager.cpp:1937-1952), which matters for replay
-  compatibility.
+  compatibility. The CRT's sinf, cosf, tanf and atan2f (statically linked
+  in th16.exe) widen to double, call the double function and round
+  (0x405510, 0x4054f0, 0x43dc90, 0x4052a0); glibc's float functions can
+  round the last bit differently. The replays tested stay in sync without
+  emulating either difference (Testing, "Replay sync tests"), so the port
+  does neither for now.
+- Argument evaluation order. C++ leaves the order of a call's arguments
+  unspecified; MSVC (and GCC on x86-64) evaluates them right to left,
+  Clang left to right. Where two arguments draw from the replay RNGs, the
+  order decides which value goes where: the season items an enemy drops
+  (Enemy.cpp, both spawn_item calls) took the angle and speed the other way
+  round in Clang builds, and replays recorded in the original desynced
+  within seconds. Those calls and the one other such site (Item.cpp, an
+  item's jitter offset) draw into locals in MSVC's order under
+  `TH16_PORT`. A search for calls with two or more RNG draws or ECL stack
+  pops among their arguments finds no other site; anything new of that
+  shape needs the same treatment.
 - `CRITICAL_SECTION` keeps its x86 layout (24 bytes, an array of them sits in
   `CriticalSections`). The implementation keeps a heap mutex pointer in
   `LockSemaphore`.
@@ -502,6 +518,60 @@ lives) and the continue menu once they run out. The straight-edged fog
 area at the bottom of the playfield before the midboss (around stage
 frame 2300) looks the same in the build from before the merge at the same
 stage time.
+
+#### Replay sync tests
+
+`th16 --replay FILE` (port/src/replay_test.cpp, port_replay_test.h) plays a
+replay recorded in the original game, fast-forwarded (the game's own replay
+fast-forward, 8 ticks per frame), and checks it, then exits: 0 in sync, 1
+desync, 2 the replay did not play to its end (a game over or the stage end
+menu, which a clear replay never reaches). Replays store, for each stage,
+the original's g_Globals (score, lives, bombs, power, graze, season
+power, ...) and the replay RNG's seed when the stage began, and playback
+restores them at every stage; the test compares the state the port reached
+with them just before, and at the end the score with the recorded final
+score. The player position and each stage's frame count are reported but
+not checked: the recording keeps adding frames to a stage while the next
+one loads, so they depend on the original's loading time (about 145
+frames per stage, and 380 after a clear).
+
+The replays in port/tests/replays are the owner's, recorded in TH16 1.00a:
+two Extra clears with Reimu and an Easy all clear with
+Cirno (six stages, five transitions). ctest runs them through
+tests/run_replay_test.sh when `TH16_DATA_DIR` points at the game's data and
+skips them otherwise; in a null renderer build they need no display:
+
+```
+cmake -S port -B build-port/null64 -G Ninja -DCMAKE_CXX_COMPILER=clang++ -DTH16_NULL_RENDERER=ON
+cmake --build build-port/null64
+(cd build-port/null64 && TH16_DATA_DIR=~/"Touhou Project/(TH16) ..." ctest -j3)
+```
+
+That takes about 80 s per Extra replay and 3.5 min for the Easy run. All
+three play in sync with Clang and GCC builds (64-bit, checked on the merge
+of main 67fb187).
+
+For finding where a replay desyncs: `TH16_REPLAY_TEST_TRACE=N` logs the
+state every N frames, and `TH16_REPLAY_TEST_DUMP=FILE` writes every
+frame's g_Globals, replay RNG and player position as hex (with
+`TH16_REPLAY_TEST_ITEMS=FIRST:LAST`, also every active item in those
+frames). The original's side of the comparison came from th16.exe itself
+under Wine (a fresh prefix, Wine's own d3dx9; the config set to a 640x480
+window without the startup dialog), started on the replay through the
+menus with xdotool under Xvfb, by a script that reads the same addresses
+from /proc/PID/mem every millisecond and keeps the last sample of each
+frame (g_Globals 0x4a5790, g_replay_safe_rng 0x4a6d88, g_Player 0x4a6ef8
++0x61c, g_ReplayManager 0x4a6f08: stage_num +0x214, frame_current
++0xd8 + 0x28 * stage; items from g_ItemManager 0x4a6ddc + 0x14, 0xc78
+bytes each). With ptrace_scope 1 the script has to be the game's ancestor:
+Wine's launcher exits after starting th16.exe, so the script makes itself a
+child subreaper (prctl PR_SET_CHILD_SUBREAPER) to inherit it. The two
+dumps are a phase apart (the port's is taken after GameThread's priority
+0xf tick, so time_in_stage is one ahead); everything else matched frame
+for frame once the evaluation order was fixed. The first difference before
+that was the season items' launch angles at frame 250 of the Extra stage,
+then item collection a few frames apart, and the first extra death at
+frame 6929.
 
 ### Not done
 

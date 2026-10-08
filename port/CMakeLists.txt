@@ -286,7 +286,7 @@ endif()
 # recorded in the original game, played back headless in th16 itself. They
 # need the game's data in $TH16_DATA_DIR and are skipped without it. A
 # null renderer build (TH16_NULL_RENDERER) runs them without any display.
-foreach(replay extra_clear_reimu easy_clear_cirno)
+foreach(replay extra_clear_reimu extra_clear_reimu_2 easy_clear_cirno)
     add_test(NAME replay_${replay}
              COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_replay_test.sh $<TARGET_FILE:th16>
                      ${CMAKE_CURRENT_SOURCE_DIR}/tests/replays/${replay}.rpy ${CMAKE_CURRENT_BINARY_DIR}/replay_test)
