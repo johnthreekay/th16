@@ -126,11 +126,12 @@ AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *path)
     return anm;
 }
 
-// TODO: code matches; our frame leaves 8 unused bytes between buf and the /GS cookie (0x124 vs 0x11c).
+// Reads the image file of one entry of an ANM file, unless the file has
+// the image data inline or the entry names a render target.
 // FUNCTION: TH16 0x46d0c0
 i32 AnmLoaded::load_entry(i32 index, AnmRawEntry *entry)
 {
-    char buf[0x10c];
+    char buf[MAX_PATH];
     i32 size;
     if (entry->version != 8)
     {

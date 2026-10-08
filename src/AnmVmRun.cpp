@@ -245,6 +245,9 @@ static void __fastcall anm_sincosmul(Float3 *dst, f32 angle, f32 radius)
 // extra_data: a ring strip around the VM (9), an arc of it (13,
 // 14) and an upright cylinder band (24, 25), int_vars[0] steps around
 // with the texture's u spread over int_vars[1].
+// The screen-space vertices add pos with D3DXVECTOR3's +=, which keeps the
+// original's store of z = 0 and its reload; written per field, the z sum
+// was folded.
 // TODO: register allocation differs (the original keeps this in edi and the vertex cursor on the stack in mode 9).
 // FUNCTION: TH16 0x4632f0
 void AnmVm::update_special_vertices()
@@ -288,9 +291,7 @@ void AnmVm::update_special_vertices()
             vertex->uv.y = uv_scroll_pos.y + v;
             anm_sincosmul((Float3 *)&vertex->pos, angle, outer);
             vertex->pos.z = 0.0f;
-            vertex->pos.x = vertex->pos.x + pos.x;
-            vertex->pos.y = pos.y + vertex->pos.y;
-            vertex->pos.z = vertex->pos.z + pos.z;
+            *(Float3 *)&vertex->pos += pos;
             vertex++;
             vertex->pos.w = 1.0f;
             vertex->diffuse = color_inner;
@@ -298,9 +299,7 @@ void AnmVm::update_special_vertices()
             vertex->uv.y = uv_scroll_pos.y + v;
             anm_sincosmul((Float3 *)&vertex->pos, angle, inner);
             vertex->pos.z = 0.0f;
-            vertex->pos.x = vertex->pos.x + pos.x;
-            vertex->pos.y = pos.y + vertex->pos.y;
-            vertex->pos.z = vertex->pos.z + pos.z;
+            *(Float3 *)&vertex->pos += pos;
             v += v_step;
             angle += angle_step;
             vertex++;
@@ -360,18 +359,14 @@ void AnmVm::update_special_vertices()
             vertex[0].uv.y = uv_scroll_pos.y + v;
             anm_sincosmul((Float3 *)&vertex[0].pos, angle, outer);
             vertex[0].pos.z = 0.0f;
-            vertex[0].pos.x = pos.x + vertex[0].pos.x;
-            vertex[0].pos.y = vertex[0].pos.y + pos.y;
-            vertex[0].pos.z = pos.z + vertex[0].pos.z;
+            *(Float3 *)&vertex[0].pos += pos;
             vertex[1].pos.w = 1.0f;
             vertex[1].diffuse = color;
             vertex[1].uv.x = uv_quad_of_sprite[1].x + uv_scroll_pos.x;
             vertex[1].uv.y = uv_scroll_pos.y + v;
             anm_sincosmul((Float3 *)&vertex[1].pos, angle, inner);
             vertex[1].pos.z = 0.0f;
-            vertex[1].pos.x = pos.x + vertex[1].pos.x;
-            vertex[1].pos.y = vertex[1].pos.y + pos.y;
-            vertex[1].pos.z = pos.z + vertex[1].pos.z;
+            *(Float3 *)&vertex[1].pos += pos;
             vertex += 2;
             v = v_step + v;
             angle += angle_step;
@@ -1351,7 +1346,10 @@ done:
     }
     if (flags_lo & ANM_VM_FOLLOW_CAMERA)
     {
-        entity_pos += g_Supervisor.cameras[3].position_delta;
+        // Through D3DXVec3Add and a pointer, for the original's operand
+        // order in each component.
+        Float3 *p = &entity_pos;
+        D3DXVec3Add(p, p, &g_Supervisor.cameras[3].position_delta);
     }
     if (flags_hi & ANM_VM_UV_QUAD_FROM_CORNERS)
     {
@@ -1374,7 +1372,7 @@ done:
 
 // Steps the VM by one frame, at the game speed scaled down by the
 // slowdown of the VM (or its root). 1 once the VM should be deleted.
-// TODO: same cases and layout; differs in: 106/112 keep the store pointer in ecx (original eax), 121 stores the fmod result before the pointer test so 123 cross-jumps into its tail, 130/131 register use (the lerp multiplies t from memory), the GameThread check's branch sense, case 2 clearing eax itself instead of jumping to the final return 0, and the camera add's operand order (y, z).
+// TODO: same cases and layout; differs in: 106/112 keep the store pointer in ecx (original eax), 121 stores the fmod result before the pointer test so 123 cross-jumps into its tail, 130/131 register use (the lerp multiplies t from memory), the GameThread check's branch sense and case 2 clearing eax itself instead of jumping to the final return 0.
 // FUNCTION: TH16 0x45f980
 i32 AnmVm::run()
 {
@@ -1446,30 +1444,45 @@ void AnmVm::set_alpha2_time(i32 end_time, i32 method, u8 initial, u8 goal)
     flags_lo = flags_lo & ~ANM_VM_COLOR_MODE_MASK | ANM_VM_COLOR_MODE_1;
 }
 
-// TODO: the original loads both colors before storing either (y, z, x order) and keeps this in edi.
+// Starts interpolating color_2 from initial to goal (blue, green, red as
+// x, y, z), and switches the VM to the two-color mode.
 // FUNCTION: TH16 0x464b40
 void AnmVm::set_rgb2_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal)
 {
     rgb2_i.end_time = end_time;
     rgb2_i.bezier_2 = rgb2_i.bezier_1 = Int3(0, 0, 0);
     rgb2_i.method = method;
-    Int3 a(initial->b, initial->g, initial->r);
-    Int3 b(goal->b, goal->g, goal->r);
+    // Filled in y, z, x order: the original loads green, red, then blue.
+    Int3 a;
+    a.y = initial->g;
+    a.z = initial->r;
+    a.x = initial->b;
+    Int3 b;
+    b.y = goal->g;
+    b.z = goal->r;
+    b.x = goal->b;
     rgb2_i.initial = a;
     rgb2_i.goal = b;
     rgb2_i.time = 0;
     flags_lo = flags_lo & ~ANM_VM_COLOR_MODE_MASK | ANM_VM_COLOR_MODE_1;
 }
 
-// TODO: same color load order difference as set_rgb2_time.
+// Starts interpolating color_1 from initial to goal.
 // FUNCTION: TH16 0x464c60
 void AnmVm::set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal)
 {
     rgb1_i.end_time = end_time;
     rgb1_i.bezier_2 = rgb1_i.bezier_1 = Int3(0, 0, 0);
     rgb1_i.method = method;
-    Int3 a(initial->b, initial->g, initial->r);
-    Int3 b(goal->b, goal->g, goal->r);
+    // Filled in y, z, x order: the original loads green, red, then blue.
+    Int3 a;
+    a.y = initial->g;
+    a.z = initial->r;
+    a.x = initial->b;
+    Int3 b;
+    b.y = goal->g;
+    b.z = goal->r;
+    b.x = goal->b;
     rgb1_i.initial = a;
     rgb1_i.goal = b;
     rgb1_i.time = 0;
