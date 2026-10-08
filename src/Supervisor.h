@@ -449,6 +449,15 @@ enum SupervisorGameMode
 
 extern Supervisor g_Supervisor;
 
+// Reads g_Supervisor.d3d_device for a call through it. LTCG leaves ebx
+// unused in a whole function as soon as it calls a method written directly
+// as g_Supervisor.d3d_device->X(...); the original has functions of both
+// kinds, so the ones that use ebx call through this getter.
+static inline IDirect3DDevice9 *supervisor_d3d_device()
+{
+    return g_Supervisor.d3d_device;
+}
+
 // strcat(path, ".wav") as play_bgm_wav and Gui::start_dialogue have it:
 // strlen, then ".wav" stored as one immediate and the terminator from the
 // zero the loop ended on. strcat, or strcpy/memcpy of the literal, copy it
