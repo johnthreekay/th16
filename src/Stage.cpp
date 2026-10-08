@@ -443,9 +443,11 @@ i32 Stage::on_draw_06()
     return UPDATE_FUNC_CONTINUE;
 }
 
-// Each corner written out with its own expressions (CSE merges them); named
-// half sizes and bounds schedule the math and the stores further from the
-// original.
+// 1 when the object placed at pos is farther than the draw distance from the
+// camera, or when none of its box corners (and edge midpoints) projects into
+// the game area. Each corner component is written out as its own
+// expression (CSE merges them): named half sizes and bounds schedule the
+// math and the stores further from the original.
 // TODO: the float math and the corner stores are still scheduled differently (the original computes z_max first and reloads center.x).
 // FUNCTION: TH16 0x40a7d0
 HARNESS_CALLED i32 StdObject::is_culled(D3DXVECTOR3 *pos, f32 max_distance_sq, Camera *camera)
