@@ -63,10 +63,13 @@ HARNESS_CALLED i32 score_extend_quota_out_of_line()
     return get_score_extend_quota();
 }
 
-// TODO: the original reserves an unused stack slot (push ecx) and saves esi
-// up front, probably stack alignment for Gui::show_notice (see add_to_score).
 // Adds power up to the maximum (with the full power notice when it gets
-// there).
+// there). The dead double is not ZUN's code: it stands in for whatever made
+// LTCG's stack alignment pass treat the show_notice call as wanting an
+// aligned stack, and gives the original's esi saved up front.
+// TODO: the original also reserves a 4-byte slot (push ecx): its frame is
+// padded for known alignment from its callers, which an /INCLUDE'd function
+// never gets.
 // FUNCTION: TH16 0x43ddf0
 i32 Globals::add_power(i32 amount)
 {
@@ -78,6 +81,8 @@ i32 Globals::add_power(i32 amount)
     if (power > max_power)
     {
         power = max_power;
+        double unused = amount;
+        (void)unused;
         g_Gui->show_notice(0, GUI_NOTICE_FULL_POWER);
     }
     return (power - amount) / power_per_level != power / power_per_level;
