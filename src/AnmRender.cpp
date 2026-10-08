@@ -511,6 +511,7 @@ int __fastcall anm_fan_init(AnmVm *vm)
         vertex->uv.x = uv.x + 0.5f;
         vertex->uv.y = uv.y + 0.5f;
         *radius = g_replay_safe_rng.randf_neg_1_to_1() * 8.0f + 80.0f;
+        // radius + 33 is radius_speed[i] (it follows radius[33]); the pointer form gives the original's store order.
         *(radius + 33) = speed;
         speed += g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 30.0f);
         if (speed < -(1.0f / 15.0f))
@@ -581,6 +582,7 @@ i32 __fastcall anm_on_tick_fan(AnmVm *vm)
         fan_scroll_v(data, vertex);
         vertex->diffuse = vm->color_1.d3d;
         ((ZunColor *)&vertex->diffuse)->a = 0;
+        // radius + 33 is radius_speed[i] (it follows radius[33]); the pointer form gives the original's store order.
         *radius = *(radius + 33) + *radius;
         fan_sincosmul((Float3 *)&vertex->pos, angle, *radius);
         angle += ZUN_2PI / 31.0f;
