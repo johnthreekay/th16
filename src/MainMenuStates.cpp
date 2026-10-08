@@ -330,7 +330,7 @@ i32 g_last_difficulty = DIFFICULTY_NORMAL;
 i32 g_last_character;
 
 // Picking the difficulty, or confirming Extra.
-// TODO: the original reuses g_Globals.difficulty from the entry in ecx for num_choices (reloading it after the ascii create_effect); ours compares memory.
+// TODO: in case 4's main game branch the original reloads menu.next_selection as [esi + 0x24] after the g_Globals store; ours through ecx, the menu pointer for pop.
 // FUNCTION: TH16 0x44fe20
 i32 TitleInf::do_difficulty_select()
 {
@@ -342,8 +342,10 @@ i32 TitleInf::do_difficulty_select()
         {
             submenu_ascii_id = g_AsciiManager->get_anm()->create_effect(0x13, -1, NULL);
         }
-        menu.wraps = 0;
+        // num_choices before wraps: the original reuses the difficulty
+        // loaded on entry (reloading it into ecx after the ascii effect).
         menu.num_choices = g_Globals.difficulty < DIFFICULTY_EXTRA ? 4 : 1;
+        menu.wraps = 0;
         AnmManager::interrupt_tree(anm_ids[script], 1);
         anm_ids[script].id = 0;
         anm_ids[script] = title_anm->create_effect(script, -1, NULL);
