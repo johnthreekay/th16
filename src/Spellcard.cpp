@@ -353,8 +353,10 @@ static_assert(sizeof(Spellcard) == 0xbc, "Spellcard size");
 
 // HARNESS_CALLED: with every caller visible it no longer realigns its frame
 // to 64 bytes (found by the system agent).
-// TODO: ours keeps the rounded time on the stack across floor instead of
-// reloading it (a pointer of its own for the second read does not change it).
+// fenv_access(on) because the original reloads real_time_taken after the floor
+// call: without it MSVC treats floor as pure and keeps the value across the call.
+// Only this function is compiled with it.
+#pragma fenv_access(on)
 // FUNCTION: TH16 0x417bc0
 HARNESS_CALLED void Spellcard::measure_real_time()
 {
@@ -380,7 +382,10 @@ HARNESS_CALLED void Spellcard::measure_real_time()
     {
         sc->real_time_taken += 0.0167;
     }
-    double whole = floor(sc->real_time_taken);
+    // The rounded time goes to floor through a local: the original loads it
+    // into xmm0 and moves it to the x87 stack instead of loading it there.
+    double rounded = sc->real_time_taken;
+    double whole = floor(rounded);
     i32 seconds = (i32)whole;
     double fraction = sc->real_time_taken - whole;
     if (seconds >= 1000)
@@ -406,6 +411,7 @@ HARNESS_CALLED void Spellcard::measure_real_time()
     }
     sc->cards_in_stage++;
 }
+#pragma fenv_access(off)
 
 // TODO: the inlined timer tick keeps the frame in xmm0 (ours xmm1), and in the boss
 // smoothing x and the 0.05f constant trade xmm0 and xmm1 (x is loaded last).
