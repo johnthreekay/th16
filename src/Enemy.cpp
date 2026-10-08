@@ -662,7 +662,13 @@ int EnemyData::step_logic()
         {
             damage /= 5;
         }
-        i32 dealt = g_Gui->msg == NULL ? damage : 0;
+        // No damage while a dialogue is shown. Written as an if: the
+        // ternary gave damage and dealt each other's registers.
+        i32 dealt = 0;
+        if (g_Gui->msg == NULL)
+        {
+            dealt = damage;
+        }
         if (dealt > 0)
         {
             if (hit)
