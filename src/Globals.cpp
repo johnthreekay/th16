@@ -58,13 +58,9 @@ void Globals::reset_for_new_game()
 }
 
 // FUNCTION: TH16 0x43ddd0
-i32 get_score_extend_quota()
+HARNESS_CALLED i32 score_extend_quota_out_of_line()
 {
-    if (g_Globals.difficulty == DIFFICULTY_EXTRA)
-    {
-        return g_score_extend_quotas_extra[g_Globals.next_score_extend_index];
-    }
-    return g_score_extend_quotas_standard[g_Globals.next_score_extend_index];
+    return get_score_extend_quota();
 }
 
 // TODO: the original reserves an unused stack slot (push ecx) and saves esi
@@ -187,13 +183,14 @@ void Globals::collect_bomb_fragment(i32 unused)
     g_Gui->update_bombs(g_Globals.bombs, g_Globals.bomb_fragments);
 }
 
-// TODO: the original aligns its frame to 8 bytes (and esp, -8), which LTCG
-// adds for Gui::show_notice's sake; ours does not, so registers differ too.
+// TODO: the original realigns its frame through ebx (with a 4-byte slot and
+// esi saved up front), which LTCG adds for Gui::show_notice's sake; ours
+// does not realign.
 // FUNCTION: TH16 0x43e080
 HARNESS_CALLED void Globals::add_to_score(i32 amount)
 {
     g_Globals.score += amount / 10;
-    while (g_Globals.score >= get_score_extend_quota())
+    while (g_Globals.score >= score_extend_quota_out_of_line())
     {
         if (g_Globals.collect_extend(0))
         {
