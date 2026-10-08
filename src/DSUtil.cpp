@@ -732,7 +732,7 @@ HRESULT CSound::Pause()
     return hr;
 }
 
-// TODO: the original adds m_paused_total from memory and has a 4-byte frame.
+// TODO: the original adds m_paused_total from memory (addsd xmm0, [m_paused_total]); ours loads it into xmm1.
 // FUNCTION: TH16 0x471380
 HRESULT CSound::Unpause()
 {
