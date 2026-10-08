@@ -258,9 +258,9 @@ void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_i
     flags &= ~SPELLCARD_EARLY_BOMB;
     ticks = 1;
     flags &= ~SPELLCARD_TIMING;
-    text_anm_ids[0] = g_AsciiManager->ascii_anm->create_effect(0, -1, NULL);
-    text_anm_ids[1] = g_Supervisor.text_anm->create_effect(2, -1, NULL);
-    text_anm_ids[2] = g_AsciiManager->ascii_anm->create_effect(1, -1, NULL);
+    text_anm_ids[0] = create_effect_via_pointer(g_AsciiManager->ascii_anm, 0, -1, NULL);
+    text_anm_ids[1] = create_effect_via_pointer(g_Supervisor.text_anm, 2, -1, NULL);
+    text_anm_ids[2] = create_effect_via_pointer(g_AsciiManager->ascii_anm, 1, -1, NULL);
     AnmManager *anm = g_AnmManager;
 #ifdef TH16_PORT
     // thcrap's spell_name: the translated name is only shown (the score
@@ -271,7 +271,7 @@ void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_i
     g_AnmManager->draw_text_right(get_vm_or_clear(text_anm_ids[1]), 0xffffff, 0, 0, 0, name);
 #endif
     g_SoundManager.play_sound_centered(SE_CAT00, 0);
-    boss_anm_id = g_EffectManager->effect_anm->create_effect(0xd, -1, NULL);
+    boss_anm_id = create_effect_via_pointer(g_EffectManager->effect_anm, 0xd, -1, NULL);
     EnemyInf *boss = NULL;
     i32 boss_id = g_EnemyManager->inner.boss_ids[0];
     if (boss_id != 0)
@@ -297,19 +297,22 @@ void Spellcard::start(i32 spell_id, const char *name, i32 time_limit, i32 boss_i
     i32 bonuses[5] = {500000, 1000000, 1500000, 2000000, 1000000};
     bonus = bonuses[g_Globals.difficulty] * g_Globals.stage_num;
     bonus_max = bonus >= 1000000000 ? 999999999 : bonus;
-    g_EffectManager->effect_anm->create_effect(0x14, -1, NULL);
+    create_effect_via_pointer(g_EffectManager->effect_anm, 0x14, -1, NULL);
     StageBoss *stage_boss = &g_stage_data->bosses[g_Globals.chapter < 43 && g_stage_data->bosses[1].spell_bg_anm_slot != -1];
-    background_anm_id = g_EnemyManager->anim_statement_anms[stage_boss->spell_bg_anm_slot]->create_effect(
-        stage_boss->spell_bg_script, -1, NULL);
+    background_anm_id = create_effect_via_pointer(g_EnemyManager->anim_statement_anms[stage_boss->spell_bg_anm_slot],
+                                                  stage_boss->spell_bg_script, -1, NULL);
     flags = (flags & ~SPELLCARD_FLAG_200) | ((stage_boss->spell_flag_200 << 9) & SPELLCARD_FLAG_200);
     stage_boss = &g_stage_data->bosses[boss_index];
     if (stage_boss->spell_anm_slot != -1)
     {
-        g_EnemyManager->anim_statement_anms[stage_boss->spell_anm_slot]->create_effect(stage_boss->spell_script, -1,
-                                                                                       NULL);
+        create_effect_via_pointer(g_EnemyManager->anim_statement_anms[stage_boss->spell_anm_slot],
+                                  stage_boss->spell_script, -1, NULL);
     }
 }
 
+// show_notice is called through its member pointer (gui_show_notice_func):
+// as direct calls, show_notice's wish for an aligned stack makes this
+// function realign its frame, which the original does not.
 // FUNCTION: TH16 0x4182f0
 HARNESS_CALLED void Spellcard::end()
 {
@@ -329,7 +332,7 @@ HARNESS_CALLED void Spellcard::end()
     if (flags & SPELLCARD_CAPTURABLE)
     {
         g_Globals.add_to_score(bonus);
-        g_Gui->show_notice(bonus, GUI_NOTICE_SPELL_BONUS);
+        (g_Gui->*gui_show_notice_func())(bonus, GUI_NOTICE_SPELL_BONUS);
         if (g_ReplayManager->mode != 1)
         {
             i32 practice = g_Globals.game_mode == GAME_MODE_SPELL_PRACTICE;
@@ -348,7 +351,7 @@ HARNESS_CALLED void Spellcard::end()
     }
     else
     {
-        g_Gui->show_notice(0, GUI_NOTICE_BONUS_FAILED);
+        (g_Gui->*gui_show_notice_func())(0, GUI_NOTICE_BONUS_FAILED);
     }
     if (flags & SPELLCARD_TIMED_OUT)
     {
@@ -362,11 +365,14 @@ static_assert(offsetof(Spellcard, start_time) == 0x94, "Spellcard layout");
 static_assert(offsetof(Spellcard, time_code) == 0xa4, "Spellcard layout");
 static_assert(sizeof(Spellcard) == 0xbc, "Spellcard size");
 
-// TODO: ours aligns the frame to 64 bytes for the doubles (the original
-// does not), keeps the rounded time on the stack across floor instead of
-// reloading it, and increments cards_in_stage through a register.
+// HARNESS_CALLED: with every caller visible it no longer realigns its frame
+// to 64 bytes (the original does not).
+// fenv_access(on) because the original reloads real_time_taken after the floor
+// call: without it MSVC treats floor as pure and keeps the value across the call.
+// Only this function is compiled with it.
+#pragma fenv_access(on)
 // FUNCTION: TH16 0x417bc0
-void Spellcard::measure_real_time()
+HARNESS_CALLED void Spellcard::measure_real_time()
 {
     Spellcard *sc = g_Spellcard;
     if (sc->flags & SPELLCARD_ACTIVE)
@@ -390,7 +396,10 @@ void Spellcard::measure_real_time()
     {
         sc->real_time_taken += 0.0167;
     }
-    double whole = floor(sc->real_time_taken);
+    // The rounded time goes to floor through a local: the original loads it
+    // into xmm0 and moves it to the x87 stack instead of loading it there.
+    double rounded = sc->real_time_taken;
+    double whole = floor(rounded);
     i32 seconds = (i32)whole;
     double fraction = sc->real_time_taken - whole;
     if (seconds >= 1000)
@@ -405,7 +414,6 @@ void Spellcard::measure_real_time()
     {
         ((RpyGamestate *)g_ReplayManager->stage_gamestate_snapshots[g_Globals.stage_num])
             ->spell_time_codes[sc->cards_in_stage] = sc->time_code;
-        sc->cards_in_stage++;
     }
     else
     {
@@ -414,14 +422,13 @@ void Spellcard::measure_real_time()
         {
             sc->time_code = 0x6ad1584;
         }
-        sc->cards_in_stage++;
     }
+    sc->cards_in_stage++;
 }
+#pragma fenv_access(off)
 
-// TODO: the inlined timer tick keeps the frame in xmm0 (ours xmm1), the
-// boss smoothing is scheduled differently (boss_pos += (pos - boss_pos) *
-// 0.05f gives the original's code but a /GS cookie), and the original
-// duplicates the return.
+// TODO: the inlined timer tick keeps the frame in xmm0 (ours xmm1), and in the boss
+// smoothing x and the 0.05f constant trade xmm0 and xmm1 (x is loaded last).
 // FUNCTION: TH16 0x417930
 i32 Spellcard::on_tick_body()
 {
@@ -465,12 +472,16 @@ i32 Spellcard::on_tick_body()
         }
     }
     EnemyInf *boss = g_EnemyManager->find_enemy_by_id(g_EnemyManager->inner.boss_ids[0]);
-    f32 x = (boss->enemy.final_pos.pos.x - boss_pos.x) * 0.05f + boss_pos.x;
-    f32 y = (boss->enemy.final_pos.pos.y - boss_pos.y) * 0.05f + boss_pos.y;
-    f32 z = (boss->enemy.final_pos.pos.z - boss_pos.z) * 0.05f + boss_pos.z;
-    boss_pos.x = x;
-    boss_pos.y = y;
-    boss_pos.z = z;
+    // The boss marker follows the boss with 5% smoothing. Written back through
+    // a pointer of its own, so boss_pos is read again for the adds instead
+    // of reusing the loads of the subtractions (as in the original).
+    D3DXVECTOR3 *p = &boss_pos;
+    f32 dx = boss->enemy.final_pos.pos.x - boss_pos.x;
+    f32 dy = boss->enemy.final_pos.pos.y - boss_pos.y;
+    f32 dz = boss->enemy.final_pos.pos.z - boss_pos.z;
+    p->x = dx * 0.05f + p->x;
+    p->y = dy * 0.05f + p->y;
+    p->z = dz * 0.05f + p->z;
     AnmVm *vm = g_AnmManager->get_vm_with_id(boss_anm_id);
     if (vm != NULL)
     {
@@ -483,6 +494,8 @@ i32 Spellcard::on_tick_body()
             return 1;
         }
         flags &= ~SPELLCARD_EARLY_BOMB;
+        // A return of its own: the original does not merge it with the last.
+        return 1;
     }
     return 1;
 }

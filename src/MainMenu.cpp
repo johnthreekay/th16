@@ -268,7 +268,21 @@ i32 __fastcall TitleInf::on_draw_thunk(void *arg)
 
 i32 __stdcall input_pressed_or_repeating(u32 mask);
 
-// TODO: the volume clamps use al/ecx where ours uses cl/eax (also with an if instead of the ternary).
+// input_pressed_or_repeating as the key config screen inlines it: the
+// original tests the low bytes of both input words (mov cl/al, byte ptr).
+static __forceinline i32 key_config_pressed_or_repeating(u8 mask)
+{
+    if (*(u8 *)&g_hardware_input_pressed & mask)
+    {
+        return 1;
+    }
+    if (*(u8 *)&g_hardware_input_repeat & mask)
+    {
+        return 1;
+    }
+    return 0;
+}
+
 // FUNCTION: TH16 0x44c570
 i32 TitleInf::do_options()
 {
@@ -277,7 +291,7 @@ i32 TitleInf::do_options()
     case 0:
         menu.num_choices = OPTIONS_ITEM_COUNT;
         menu.set_cursor(0);
-        anm_ids[1] = title_anm->create_effect(1, -1, NULL);
+        anm_ids[1] = create_effect_via_pointer(title_anm, 1, -1, NULL);
         update_options_sprites();
         set_substate(1);
     case 1:
@@ -357,19 +371,21 @@ i32 TitleInf::do_options()
             switch (menu.next_selection)
             {
             case OPTIONS_ITEM_BGM_VOLUME:
-            {
-                i8 volume = g_Supervisor.config.bgm_volume + 5;
-                g_Supervisor.config.bgm_volume = volume > 100 ? 100 : volume;
+                g_Supervisor.config.bgm_volume += 5;
+                if (g_Supervisor.config.bgm_volume > 100)
+                {
+                    g_Supervisor.config.bgm_volume = 100;
+                }
                 update_options_sprites();
                 break;
-            }
             case OPTIONS_ITEM_SE_VOLUME:
-            {
-                i8 volume = g_Supervisor.config.se_volume + 5;
-                g_Supervisor.config.se_volume = volume > 100 ? 100 : volume;
+                g_Supervisor.config.se_volume += 5;
+                if (g_Supervisor.config.se_volume > 100)
+                {
+                    g_Supervisor.config.se_volume = 100;
+                }
                 update_options_sprites();
                 break;
-            }
             }
         }
         if (g_hardware_input_pressed & (INPUT_ENTER | INPUT_SHOT))
@@ -543,7 +559,9 @@ void TitleInf::update_options_sprites()
     }
 }
 
-// TODO: for the up/down tests the original loads the pressed and repeat words as bytes (mov cl/al); ours loads dwords (byte casts only narrow the repeat load).
+// TODO: for the up/down tests the original loads the pressed word as a byte
+// (mov cl, byte ptr); ours loads the dword (the byte reads only narrow the
+// repeat load).
 // FUNCTION: TH16 0x44e930
 i32 TitleInf::do_key_config()
 {
@@ -552,7 +570,7 @@ i32 TitleInf::do_key_config()
     case 0:
         menu.num_choices = KEY_CONFIG_COUNT;
         menu.set_cursor(0);
-        anm_ids[2] = title_anm->create_effect(2, -1, NULL);
+        anm_ids[2] = create_effect_via_pointer(title_anm, 2, -1, NULL);
         set_substate(1);
         key_config[KEY_CONFIG_SHOT] = g_pad_mapping[PAD_SHOT];
         key_config[KEY_CONFIG_BOMB] = g_pad_mapping[PAD_BOMB];
@@ -573,11 +591,11 @@ i32 TitleInf::do_key_config()
     case 2:
     {
         menu.current_selection = menu.next_selection;
-        if (input_pressed_or_repeating(INPUT_UP))
+        if (key_config_pressed_or_repeating(INPUT_UP))
         {
             menu.move_cursor(-1);
         }
-        if (input_pressed_or_repeating(INPUT_DOWN))
+        if (key_config_pressed_or_repeating(INPUT_DOWN))
         {
             menu.move_cursor(1);
         }
@@ -869,7 +887,11 @@ char *__fastcall skip_line(char *p, i32 *remaining)
 
 // Copies the line starting at src into dst and returns the start of the
 // next line.
-// TODO: ours pads the second loop's head with a nop to 16 bytes; the original does not align it.
+// The line break loop reads the next character and stores the count both
+// before the loop and at the end of its body: the compiler merges the two
+// copies and jumps back to the one before the loop, which is not the loop
+// head it would pad to a 16-byte boundary (written as one loop, ours got a
+// nop there).
 // FUNCTION: TH16 0x455370
 char *__fastcall read_line(char *dst, char *src, i32 *remaining)
 {
@@ -891,19 +913,19 @@ char *__fastcall read_line(char *dst, char *src, i32 *remaining)
     *p = '\0';
     strcpy(dst, src);
     p++;
-    for (i32 n = left - 1;; n--)
+    i32 n = left - 1;
+    char c = *p;
+    *remaining = n;
+    while (c == '\n' || c == '\r')
     {
-        char c = *p;
-        *remaining = n;
-        if (c != '\n' && c != '\r')
-        {
-            break;
-        }
         if (n == 0)
         {
             return p;
         }
         p++;
+        n--;
+        c = *p;
+        *remaining = n;
     }
     return p;
 }
@@ -945,14 +967,16 @@ const char *const g_demo_replay_names[3] = {"demo/demo1.rpy", "demo/demo2.rpy", 
 
 // Plays a demo replay after 30 idle seconds on the title screen, starts the
 // title BGM a few frames after it appears, and runs the current screen.
-// TODO: the original computes the demo index as x % -3 would (imul 0x55555555; sub; sar 1); ours uses idiv, or the /3 magic through a local (also with % -3); it also calls the Supervisor members without this and keeps the replay info in ecx.
+// The input test masks the low word (a u16 cast compares the word in
+// memory) and the timer ticks as tick_mixed.
+// TODO: the original computes the demo index as x % -3 would (imul 0x55555555; sub; sar 1); ours uses idiv, or the /3 magic through a local (also with % -3, x / -3 * 3, or % through an inline helper); it also calls the Supervisor members without this and keeps the replay info in ecx.
 // FUNCTION: TH16 0x44af80
 i32 TitleInf::on_tick()
 {
     if (state == TITLE_STATE_MAIN)
     {
         g_title_idle_frames++;
-        if ((u16)g_hardware_input != 0)
+        if (g_hardware_input & 0xffff)
         {
             g_title_idle_frames = 0;
         }
@@ -971,11 +995,12 @@ i32 TitleInf::on_tick()
                     break;
                 }
             }
+            // Stage table pointer first, for matching (see do_spell_practice_difficulty).
+            g_stage_data = &g_stage_table[stage];
             g_Globals.stage_num = stage;
             g_Globals.weird_stage_num = stage;
             g_Supervisor.gamemode_to_switch_to = GAMEMODE_START_REPLAY;
             RpyInfo *info = replay->info;
-            g_stage_data = &g_stage_table[stage];
             g_Globals.character = info->character;
             g_Globals.subshot = info->subshot;
             g_Globals.subseason = info->subseason;
@@ -1080,7 +1105,7 @@ i32 TitleInf::on_tick()
         else if (g_title_return_point == TITLE_RETURN_SPELL_PRACTICE)
         {
             ScreenEffect::create(SCREEN_EFFECT_HOLD, 30, 0, 0, 0, 0x54);
-            anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
+            anm_ids[0x61] = create_effect_via_pointer(title_anm, 0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             set_state(TITLE_STATE_SPELL_PRACTICE_STAGE_SELECT);
             g_title_return_point = TITLE_RETURN_MAIN;
@@ -1090,7 +1115,7 @@ i32 TitleInf::on_tick()
         else if (g_title_return_point == TITLE_RETURN_PRACTICE)
         {
             ScreenEffect::create(SCREEN_EFFECT_HOLD, 30, 0, 0, 0, 0x54);
-            anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
+            anm_ids[0x61] = create_effect_via_pointer(title_anm, 0x61, -1, NULL);
             AnmManager::interrupt_tree_and_run(anm_ids[0x61], 3);
             set_state(TITLE_STATE_DIFFICULTY_SELECT);
             on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
@@ -1167,7 +1192,7 @@ i32 TitleInf::on_tick()
         do_replay_save();
         break;
     }
-    time_in_state.tick();
+    time_in_state.tick_mixed();
     return 1;
 }
 
@@ -1179,6 +1204,22 @@ extern i32 g_last_character;
 static __forceinline void title_interrupt_child(TitleInf *menu, i32 script, i32 interrupt)
 {
     AnmVm *vm = find_child_of(menu->anm_ids[0], script);
+    vm->interrupt(interrupt);
+}
+
+// title_interrupt_child with search_children inlined too, as for the
+// greyed out Extra Start items.
+static __forceinline void title_interrupt_child_inline(TitleInf *menu, i32 script, i32 interrupt)
+{
+    AnmVm *vm;
+    if (get_vm_or_clear(menu->anm_ids[0]) == NULL)
+    {
+        vm = NULL;
+    }
+    else
+    {
+        vm = search_children_inline(get_vm_or_clear(menu->anm_ids[0]), script, 0);
+    }
     vm->interrupt(interrupt);
 }
 
@@ -1207,7 +1248,8 @@ static __forceinline void title_highlight_inline(TitleInf *menu)
     }
 }
 
-// TODO: functionally complete; register allocation and the choice of inlined vs called menu highlight copies differ in places.
+// The first "no clear" greying inlines search_children, the second calls it.
+// TODO: 92%; some locals sit 4 bytes off the original's stack slots.
 // FUNCTION: TH16 0x44b5f0
 i32 TitleInf::do_title_screen()
 {
@@ -1233,20 +1275,20 @@ i32 TitleInf::do_title_screen()
         set_substate(1);
         if (menu_flags & TITLE_FIRST_SHOW)
         {
-            anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
-            anm_ids[0x65] = title_anm->create_effect(0x65, -1, NULL);
+            anm_ids[0x61] = create_effect_via_pointer(title_anm, 0x61, -1, NULL);
+            anm_ids[0x65] = create_effect_via_pointer(title_anm, 0x65, -1, NULL);
             menu_flags &= ~TITLE_FIRST_SHOW;
         }
         else
         {
             if (g_AnmManager->get_vm_with_id(anm_ids[0x61]) == NULL)
             {
-                anm_ids[0x61] = title_anm->create_effect(0x61, -1, NULL);
+                anm_ids[0x61] = create_effect_via_pointer(title_anm, 0x61, -1, NULL);
                 AnmManager::interrupt_tree_and_run(anm_ids[0x61], 2);
             }
             if (g_AnmManager->get_vm_with_id(anm_ids[0x65]) == NULL)
             {
-                anm_ids[0x65] = title_anm->create_effect(0x65, -1, NULL);
+                anm_ids[0x65] = create_effect_via_pointer(title_anm, 0x65, -1, NULL);
                 AnmManager::interrupt_tree_and_run(anm_ids[0x65], 2);
             }
             if (prev_state != TITLE_STATE_OPTIONS)
@@ -1258,10 +1300,10 @@ i32 TitleInf::do_title_screen()
     case 1:
         if (time_in_state.current == 120)
         {
-            anm_ids[0] = title_anm->create_effect(0, -1, NULL);
+            anm_ids[0] = create_effect_via_pointer(title_anm, 0, -1, NULL);
             if (get_vm_or_clear(comment_line_ids[8]) == NULL)
             {
-                comment_line_ids[8] = title_v_anm->create_effect(0, -1, NULL);
+                comment_line_ids[8] = create_effect_via_pointer(title_v_anm, 0, -1, NULL);
             }
             i32 i;
             for (i = 0; i < menu.next_selection; i++)
@@ -1289,8 +1331,8 @@ i32 TitleInf::do_title_screen()
             title_highlight_inline(this);
             if (!g_Scorefile->any_cleared())
             {
-                title_interrupt_child(this, 4, TITLE_INTERRUPT_DISABLED);
-                title_interrupt_child(this, 14, TITLE_INTERRUPT_DISABLED);
+                title_interrupt_child_inline(this, 4, TITLE_INTERRUPT_DISABLED);
+                title_interrupt_child_inline(this, 14, TITLE_INTERRUPT_DISABLED);
             }
         }
         break;

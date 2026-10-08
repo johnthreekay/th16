@@ -198,7 +198,11 @@ struct GuiMsgVm
     HARNESS_CALLED void set_textbox_width(f32 width, i32 kind);
     // 0x42a1d0. Runs the instructions whose time has come and advances the
     // script time; -1 once the script has ended.
-    HARNESS_CALLED i32 run();
+    // Matching workaround: safebuffers drops the /GS cookie ours gets for
+    // the Float3 copies of the bubble position kept in memory; the original
+    // has none, for reasons not understood yet (docs/findings.md). Remove it
+    // once the cause is known.
+    __declspec(safebuffers) HARNESS_CALLED i32 run();
 
     MsgRawInstr *instr()
     {
@@ -519,6 +523,16 @@ struct Gui
         boss_bars[boss].life_markers[index].color = color;
     }
 };
+
+// Gui::show_notice as a member function pointer: a call through it compiles
+// to the original's direct call but is not an edge in LTCG's call graph, so
+// show_notice's wish for an 8-aligned stack stays out of the caller (see
+// create_effect_via_pointer in AnmManager.h).
+typedef void (Gui::*GuiShowNoticeFunc)(i32 bonus, i32 kind);
+static inline GuiShowNoticeFunc gui_show_notice_func()
+{
+    return &Gui::show_notice;
+}
 
 static_assert(sizeof(GuiBossBar) == 0x54, "GuiBossBar size");
 static_assert(offsetof(Gui, chapter_percent) == 0x134, "Gui layout");

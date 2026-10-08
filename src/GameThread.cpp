@@ -607,21 +607,10 @@ DECOMP_NOINLINE GameThread::~GameThread()
     g_Supervisor.background_color = (GLOBALS_FLAGS_45C & GLOBALS_SAME_STAGE_AGAIN) ? 0 : 0xff000000;
 }
 
-// The original seeks inline in on_tick_body. Written out there, the double
-// math makes LTCG realign on_tick_body early enough to hand the alignment
-// down to begin_stage's callees (Stage::start_std_vms, 0x40add0, loses its
-// shrink-wrapped edi); in a plain inline helper the double belongs to the
-// helper's node, and on_tick_body realigns late like the original.
-static inline void seek_bgm_to_stage_time()
-{
-    ((CStreamingSound *)g_SoundManager.bgm_stream)->seek(g_Globals.time_in_stage / 60.0);
-}
-
 // One frame of a game: the ending fade, the stage start and transition,
 // the demo's end, the music restart and the timers. UPDATE_FUNC_BREAK
 // skips the rest of the frame's on_tick functions: that is how a menu or a
 // music restart stops the game.
-// TODO: the original keeps the return 3 epilogue at the top and a second null test around the inlined delete of g_Stage2.
 // FUNCTION: TH16 0x42d7b0
 HARNESS_CALLED i32 GameThread::on_tick_body()
 {
@@ -681,7 +670,10 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         finish_stage_transition();
     }
     // The previous stage's background goes once it has faded out.
-    if (g_Stage2 != NULL && (g_Stage2->stage_flags & STAGE_DISABLED))
+    // Tested through a local, deleted through the global: the delete keeps
+    // its own null test, as in the original.
+    Stage *stage = g_Stage2;
+    if (stage != NULL && (stage->stage_flags & STAGE_DISABLED))
     {
         delete g_Stage2;
     }
@@ -715,8 +707,17 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         }
     }
     Gui::update_score();
-    if ((GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_IN_MENU) || (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_5) ||
-        (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_6))
+    // Three separate tests, as in the original (one || condition merges
+    // them into a single test of the three bits).
+    if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_IN_MENU)
+    {
+        return UPDATE_FUNC_BREAK;
+    }
+    if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_5)
+    {
+        return UPDATE_FUNC_BREAK;
+    }
+    if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_6)
     {
         return UPDATE_FUNC_BREAK;
     }
@@ -746,9 +747,13 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
                 {
                 }
             }
+            // Seeking here, with the double math in this function, makes
+            // LTCG realign it early, which gives begin_stage,
+            // finish_stage_transition and ReplayManager::begin_stage the
+            // original's frames (see start_std_vms_func for its one cost).
             if (g_Globals.chapter < 0x2b)
             {
-                seek_bgm_to_stage_time();
+                ((CStreamingSound *)g_SoundManager.bgm_stream)->seek(g_Globals.time_in_stage / 60.0);
             }
             GAME_THREAD_FLAG_WORD(this) &= ~GAME_THREAD_MUSIC_RESTART;
             music_restart_time = 0;
@@ -904,9 +909,23 @@ static __forceinline void restart_stage_objects()
     }
 }
 
-// TODO: the original realigns the frame (ebx frame, and esp, -8), has 4
-// more bytes of locals, and folds allocate_new_enemy's unused argument
-// (push ecx).
+// begin_stage calls Stage::start_std_vms through this helper's function
+// pointer, which the optimizer turns back into the original's direct call.
+// LTCG builds its call graph before that, so it sees no call edge from the
+// realigned begin_stage, and start_std_vms keeps its shrink-wrapped edi; a
+// direct call (even from an inline helper) gives it known alignment and
+// loses it. start_std_vms is static (it reads g_Stage itself) because an
+// address-taken member keeps `this` in ecx.
+typedef void (*StageFunc)();
+static inline StageFunc start_std_vms_func()
+{
+    return &Stage::start_std_vms;
+}
+
+// allocate_new_enemy's third argument is unused, and LTCG drops it once it
+// sees every caller (HARNESS_CALLED, see src/harness/r3b.cpp).
+// TODO: the original fills the dropped argument's slot with `push ecx`;
+// ours leaves memset's last argument there, as finish_stage_transition does.
 // FUNCTION: TH16 0x42dc50
 HARNESS_CALLED i32 GameThread::begin_stage()
 {
@@ -917,7 +936,7 @@ HARNESS_CALLED i32 GameThread::begin_stage()
         g_Supervisor.gamemode_to_switch_to = (~(g_Supervisor.flags >> 13) & 1) | 2;
         return 1;
     }
-    g_Stage->start_std_vms();
+    start_std_vms_func()();
     if (g_Stage2 != NULL)
     {
         g_Stage2->start_exit();
@@ -938,9 +957,10 @@ HARNESS_CALLED i32 GameThread::begin_stage()
     return 0;
 }
 
-// TODO: the original saves esi in the prologue, has 4 more bytes of locals,
-// leaves memset's last argument as allocate_new_enemy's unused one, and
-// indexes bgm_unlocked as [esi + eax].
+// memset's last argument stays on the stack as allocate_new_enemy's dropped
+// third one, as in the original.
+// TODO: effective match only: the original indexes bgm_unlocked as
+// [esi + eax] (base and index swapped; no source form found).
 // FUNCTION: TH16 0x42dee0
 i32 GameThread::finish_stage_transition()
 {

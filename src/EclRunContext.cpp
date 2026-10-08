@@ -13,7 +13,6 @@
 static_assert(sizeof(EclRunContext) == 0x11e8, "EclRunContext size");
 
 // The current instruction's integer argument index, resolving variables.
-// TODO: the original checks the stack range with two compares and loads the entry value before its type.
 // FUNCTION: TH16 0x473c90
 i32 EclRunContext::get_int_arg(int index)
 {
@@ -25,20 +24,29 @@ i32 EclRunContext::get_int_arg(int index)
         {
             return *(i32 *)((u8 *)stack.data + stack.base_offset + value);
         }
-        if (value <= -1 && value >= -100)
+        // The first bound reads the argument again: on the same variable
+        // both bounds merge into one unsigned range check, while the
+        // original compares twice. The result variable, assigned on every
+        // path, keeps the type in a register as in the original.
+        if (ins->args[index].i <= -1 && value >= -100)
         {
             EclStackEntry *entry = (EclStackEntry *)((u8 *)stack.data + stack.stack_offset) + value;
             EclStackItem item = entry->value;
             char type = entry->type;
+            i32 result;
             if (type == 'f')
             {
-                return (i32)item.f;
+                result = (i32)item.f;
             }
             else if (type == 'i')
             {
-                return item.i;
+                result = item.i;
             }
-            return item.i;
+            else
+            {
+                result = item.i;
+            }
+            return result;
         }
         return vm->get_int_global(value);
     }
@@ -73,7 +81,8 @@ HARNESS_CALLED f32 EclRunContext::get_float_arg(int index)
     return ins->args[index].f;
 }
 
-// TODO: the original adds the frame base to the stack address first and loads the entry value before its type.
+// TODO: the original computes the entry's value offset (value * 8 + 4) on its own and
+// addresses the type 4 bytes below it; ours folds the 4 into the displacement.
 // FUNCTION: TH16 0x473e40
 i32 EclRunContext::get_int_arg_given_value(int index, i32 value)
 {
@@ -82,22 +91,28 @@ i32 EclRunContext::get_int_arg_given_value(int index, i32 value)
     {
         if (value >= 0)
         {
-            return *(i32 *)((u8 *)stack.data + stack.base_offset + value);
+            return *stack.local_ptr(value);
         }
         if (value <= -1 && value >= -100)
         {
             EclStackEntry *entry = (EclStackEntry *)((u8 *)stack.data + stack.stack_offset) + value;
             EclStackItem item = entry->value;
             char type = entry->type;
+            // As in get_int_arg (matching).
+            i32 result;
             if (type == 'f')
             {
-                return (i32)item.f;
+                result = (i32)item.f;
             }
             else if (type == 'i')
             {
-                return item.i;
+                result = item.i;
             }
-            return item.i;
+            else
+            {
+                result = item.i;
+            }
+            return result;
         }
         return vm->get_int_global(value);
     }
@@ -131,7 +146,6 @@ HARNESS_CALLED f32 EclRunContext::get_float_arg_given_value(int index, f32 value
 }
 
 // get_int_arg, popping a stack reference.
-// TODO: register allocation and the stack range check differ (two compares in the original).
 // FUNCTION: TH16 0x473fe0
 HARNESS_CALLED i32 EclRunContext::pop_int_arg(int index)
 {
@@ -143,21 +157,28 @@ HARNESS_CALLED i32 EclRunContext::pop_int_arg(int index)
         {
             return *(i32 *)((u8 *)stack.data + stack.base_offset + value);
         }
-        if (value <= -1 && value >= -100)
+        // As in get_int_arg (matching).
+        if (ins->args[index].i <= -1 && value >= -100)
         {
             stack.stack_offset -= 4;
             EclStackItem item = *(EclStackItem *)((u8 *)stack.data + stack.stack_offset);
             stack.stack_offset -= 4;
             char type = *((char *)stack.data + stack.stack_offset);
+            // As in get_int_arg (matching).
+            i32 result;
             if (type == 'f')
             {
-                return (i32)item.f;
+                result = (i32)item.f;
             }
             else if (type == 'i')
             {
-                return item.i;
+                result = item.i;
             }
-            return item.i;
+            else
+            {
+                result = item.i;
+            }
+            return result;
         }
         return vm->get_int_global(value);
     }
@@ -165,7 +186,6 @@ HARNESS_CALLED i32 EclRunContext::pop_int_arg(int index)
 }
 
 // get_float_arg, popping a stack reference.
-// TODO: register allocation differs around the popped entry.
 // FUNCTION: TH16 0x474090
 HARNESS_CALLED f32 EclRunContext::pop_float_arg(int index)
 {
@@ -179,22 +199,22 @@ HARNESS_CALLED f32 EclRunContext::pop_float_arg(int index)
         }
         if (value <= -1.0f && value >= -100.0f)
         {
+            // Read as an int, as in pop_float_arg_given_value.
             stack.stack_offset -= 4;
-            EclStackItem item = *(EclStackItem *)((u8 *)stack.data + stack.stack_offset);
+            i32 item = *(i32 *)((u8 *)stack.data + stack.stack_offset);
             stack.stack_offset -= 4;
             char type = *((char *)stack.data + stack.stack_offset);
             if (type != 'f' && type == 'i')
             {
-                return (f32)item.i;
+                return (f32)item;
             }
-            return item.f;
+            return *(f32 *)&item;
         }
         return vm->get_float_global((i32)value);
     }
     return ins->args[index].f;
 }
 
-// TODO: the original adds the frame base to the stack address first; registers differ around the pops.
 // FUNCTION: TH16 0x474180
 i32 EclRunContext::pop_int_arg_given_value(int index, i32 value)
 {
@@ -203,7 +223,7 @@ i32 EclRunContext::pop_int_arg_given_value(int index, i32 value)
     {
         if (value >= 0)
         {
-            return *(i32 *)((u8 *)stack.data + stack.base_offset + value);
+            return *stack.local_ptr(value);
         }
         if (value <= -1 && value >= -100)
         {
@@ -211,22 +231,27 @@ i32 EclRunContext::pop_int_arg_given_value(int index, i32 value)
             EclStackItem item = *(EclStackItem *)((u8 *)stack.data + stack.stack_offset);
             stack.stack_offset -= 4;
             char type = *((char *)stack.data + stack.stack_offset);
+            // As in get_int_arg (matching).
+            i32 result;
             if (type == 'f')
             {
-                return (i32)item.f;
+                result = (i32)item.f;
             }
             else if (type == 'i')
             {
-                return item.i;
+                result = item.i;
             }
-            return item.i;
+            else
+            {
+                result = item.i;
+            }
+            return result;
         }
         return vm->get_int_global(value);
     }
     return value;
 }
 
-// TODO: eax and ecx swapped around the popped entry.
 // FUNCTION: TH16 0x474240
 HARNESS_CALLED f32 EclRunContext::pop_float_arg_given_value(int index, f32 value)
 {
@@ -239,15 +264,17 @@ HARNESS_CALLED f32 EclRunContext::pop_float_arg_given_value(int index, f32 value
         }
         if (value <= -1.0f && value >= -100.0f)
         {
+            // The entry is read as an int and reinterpreted for the float
+            // return; through EclStackItem the registers come out swapped.
             stack.stack_offset -= 4;
-            EclStackItem item = *(EclStackItem *)((u8 *)stack.data + stack.stack_offset);
+            i32 item = *(i32 *)((u8 *)stack.data + stack.stack_offset);
             stack.stack_offset -= 4;
             char type = *((char *)stack.data + stack.stack_offset);
             if (type != 'f' && type == 'i')
             {
-                return (f32)item.i;
+                return (f32)item;
             }
-            return item.f;
+            return *(f32 *)&item;
         }
         return vm->get_float_global((i32)value);
     }
@@ -271,8 +298,6 @@ HARNESS_CALLED i32 *EclRunContext::get_int_arg_ptr(int index)
     return NULL;
 }
 
-// TODO: ours hoists (i32)value above the sign test (both paths convert it); the original
-// converts in each path and adds the frame base before the stack address.
 // FUNCTION: TH16 0x4743a0
 f32 *EclRunContext::get_float_arg_ptr(int index)
 {
@@ -282,7 +307,7 @@ f32 *EclRunContext::get_float_arg_ptr(int index)
         f32 value = ins->args[index].f;
         if (value >= 0.0f)
         {
-            return (f32 *)((u8 *)stack.data + stack.base_offset + (i32)value);
+            return (f32 *)stack.local_ptr((i32)value);
         }
         return vm->get_float_global_ptr((i32)value);
     }
@@ -310,9 +335,11 @@ int SptResourceInf::load_ecl_data(void *data)
     }
     u32 *offsets = (u32 *)((u8 *)file + sizeof(EclRawFile) + file->include_length);
     char *name = (char *)(offsets + file->sub_count);
-    subroutine_count += file->sub_count;
+    // The new count is computed in a register and also gives the size.
+    i32 total = subroutine_count + file->sub_count;
+    subroutine_count = total;
     EclSubroutinePtrs *old = subroutines;
-    subroutines = (EclSubroutinePtrs *)malloc(subroutine_count * sizeof(EclSubroutinePtrs));
+    subroutines = (EclSubroutinePtrs *)malloc(total * sizeof(EclSubroutinePtrs));
     if (old == NULL)
     {
         for (i32 i = 0; i < subroutine_count; i++)
@@ -394,20 +421,21 @@ HARNESS_CALLED EclRawInstr *EclRunContext::get_subroutine_ptr()
     return current_instr();
 }
 
-// TODO: the original stores stack_offset before loading base_offset (not
-// changed by a new_offset local, an inline push helper or a union store).
 // FUNCTION: TH16 0x474810
 HARNESS_CALLED i32 EclStack::enter(i32 size)
 {
+    // The frame base is read through a pointer of its own: that keeps its
+    // load after the new stack_offset is stored, as in the original.
+    i32 *base = &base_offset;
     i32 old_offset = stack_offset;
     if (size + stack_offset >= 0x1000)
     {
         return -1;
     }
     stack_offset += size;
-    *(i32 *)((u8 *)data + stack_offset) = base_offset;
+    *(i32 *)((u8 *)data + stack_offset) = *base;
     stack_offset += 4;
-    base_offset = old_offset;
+    *base = old_offset;
     return 0;
 }
 

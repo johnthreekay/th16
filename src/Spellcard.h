@@ -97,7 +97,7 @@ struct Spellcard
     // the card runs, then turns the time into the tamper-checked
     // time_code and records it in (or, during playback, reads it from) the
     // replay. Called once per presented frame.
-    static void measure_real_time();
+    HARNESS_CALLED static void measure_real_time();
 };
 #pragma pack(pop)
 

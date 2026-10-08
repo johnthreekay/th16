@@ -50,8 +50,9 @@ EnemyData::EnemyData()
 {
 }
 
-// TODO: drops.reset()'s memset arguments (push 0, lea esi, push esi) are scheduled a few
-// stores later in the original; ours pushes them right after push 0x50.
+// Sets up a new enemy running the ECL sub of the given name. The list node is
+// set with ZunList::init: written field by field, the scheduler moved the
+// pushes of drops.reset()'s memset ahead of the stores.
 // FUNCTION: TH16 0x41b580
 EnemyInf::EnemyInf(const char *sub_name)
 {
@@ -77,10 +78,7 @@ EnemyInf::EnemyInf(const char *sub_name)
     enemy.hitbox_size.y = 24.0f;
     enemy.rotation = 0.0f;
     enemy.own_boss_id = -1;
-    enemy.node_in_global_storage.entry = this;
-    enemy.node_in_global_storage.next = NULL;
-    enemy.node_in_global_storage.prev = NULL;
-    enemy.node_in_global_storage.unk_c = NULL;
+    enemy.node_in_global_storage.init(this);
     enemy.drops.reset();
     enemy.time_in_ecl = 0;
     enemy.time_alive = 0;
@@ -297,8 +295,6 @@ HARNESS_CALLED void EnemyManager::remove_from_active_list(EnemyInf *enemy)
     }
 }
 
-// TODO: register allocation differs in the inlined ZunTimer::tick: the original loads 1.0f into
-// xmm2 at the damage_multiplier store and keeps 1.01f in xmm1 (tick_mixed does not change it).
 // FUNCTION: TH16 0x41b3d0
 int EnemyManager::update()
 {
@@ -326,7 +322,7 @@ int EnemyManager::update()
         g_Player->inner.flags &= ~PLAYER_FLAG_DAMAGE_BOOSTED;
     }
     g_Player->damage_multiplier = 1.0f;
-    inner.time_in_stage.tick();
+    inner.time_in_stage.tick_nested();
     return UPDATE_FUNC_CONTINUE;
 }
 
@@ -471,8 +467,6 @@ HARNESS_CALLED EnemyRef EnemyManager::find_closest(D3DXVECTOR3 *pos, f32 max_dis
 
 // ECL funcset 1 (the snowman card): cancels the bullets within
 // ecl_float_vars[0] of the player.
-// TODO: ours jumps straight out of the loop when iter_current is NULL; the original goes through
-// the "entry or NULL" join and tests again.
 // FUNCTION: TH16 0x4252d0
 int __fastcall ecl_funcset_cancel_near_player(EnemyData *enemy)
 {
@@ -581,6 +575,10 @@ static inline void enemy_play_hit_sound(EnemyData *enemy, i32 low_life_spell, i3
 // FUNCTION: TH16 0x41c330
 int EnemyData::step_logic()
 {
+    // A dead double: LTCG then realigns the frame (and esp, -8) like the
+    // original's.
+    double unused = 0.0;
+    (void)unused;
     if ((flags_low & ENEMY_FLAG_BOMBSHIELD) && (g_MainBomb->in_use == 1 || g_SubseasonBomb->in_use == 1) &&
         !(flags_low & ENEMY_FLAG_BOMBSHIELD_UP))
     {
@@ -660,7 +658,13 @@ int EnemyData::step_logic()
         {
             damage /= 5;
         }
-        i32 dealt = g_Gui->msg == NULL ? damage : 0;
+        // No damage while a dialogue is shown. Written as an if: the
+        // ternary gave damage and dealt each other's registers.
+        i32 dealt = 0;
+        if (g_Gui->msg == NULL)
+        {
+            dealt = damage;
+        }
         if (dealt > 0)
         {
             if (hit)
@@ -892,7 +896,9 @@ void EnemyDrop::eject_all_drops(D3DXVECTOR3 *pos)
 }
 
 // TODO: the original multiplies x as dist * x with dist loaded into a register; ours loads x
-// (the operand order in the source does not change it).
+// early (operand order, declaration order, indexing, D3DX operators and inline helpers do not
+// change it). reccmp also shows the 1.9f as <OFFSET>: its string scan reads the original's
+// constant at 0x494548 (33 33 f3 3f 00) as the string "33\xf3?", so it never names it a float.
 // FUNCTION: TH16 0x41d700
 void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
 {
@@ -906,7 +912,12 @@ void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
                 Float3 item_pos;
                 sincosmul_ellipse(&item_pos, angle, area.x, area.y);
                 f32 dist = g_replay_safe_rng.randf_0_to_1() * 0.5f + 0.5f;
-                Float3 offset(item_pos.x * dist, dist * item_pos.y, 0.0f);
+                // y is scaled first: the order of these assignments decides
+                // which product loads its operand early.
+                Float3 offset;
+                offset.y = item_pos.y * dist;
+                offset.x = item_pos.x * dist;
+                offset.z = 0.0f;
                 item_pos.x = pos->x + offset.x;
                 item_pos.y = pos->y + offset.y;
                 item_pos.z = pos->z + offset.z;
@@ -998,10 +1009,33 @@ int EnemyInf::on_tick()
     return result;
 }
 
-// TODO: ours realigns the frame (and esp, -8) because of the direct zun_atan2f call; the
-// original calls it without realigning (GameThread::thread_start's aligned
-// EnemyManager::create call and HARNESS_CALLED update/on_tick do not change it). Separate float
-// locals for the summed position keep it in registers and avoid a /GS cookie.
+// The direction of a velocity. An inline helper node of its own: calling
+// zun_atan2f directly made EnemyData::on_tick realign its frame early.
+static inline f32 heading_of(D3DXVECTOR3 *v)
+{
+    return zun_atan2f(v->y, v->x);
+}
+
+// Places the VM of an animation slot at the enemy's position plus the
+// slot's offset (plus its parent slot VM's position). A forceinline helper
+// owning the position temporary: written in on_tick, the memory-resident
+// Float3 gave it a /GS cookie.
+static __forceinline void place_slot_vm(EnemyData *e, AnmVm *vm, i32 i)
+{
+    Float3 pos = e->anm_pos_array[i] + e->final_pos.pos;
+    if (e->anm_parent_slot[i] >= 0)
+    {
+        AnmVm *base = e->anm_ids[e->anm_parent_slot[i]].find_or_clear();
+        if (base != NULL)
+        {
+            D3DXVec3Add(&pos, &pos, &base->pos);
+        }
+    }
+    vm->entity_pos = pos;
+}
+
+// One frame of an enemy: interpolators, ECL, the ECL func set, logic, fog,
+// then the slot VMs follow it. Returns -1 when the enemy is to be deleted.
 // FUNCTION: TH16 0x41d2e0
 int EnemyData::on_tick()
 {
@@ -1036,25 +1070,10 @@ int EnemyData::on_tick()
             {
                 continue;
             }
-            f32 x = anm_pos_array[i].x + final_pos.pos.x;
-            f32 y = anm_pos_array[i].y + final_pos.pos.y;
-            f32 z = anm_pos_array[i].z + final_pos.pos.z;
-            if (anm_parent_slot[i] >= 0)
-            {
-                AnmVm *base = anm_ids[anm_parent_slot[i]].find_or_clear();
-                if (base != NULL)
-                {
-                    x += base->pos.x;
-                    y += base->pos.y;
-                    z += base->pos.z;
-                }
-            }
-            vm->entity_pos.x = x;
-            vm->entity_pos.y = y;
-            vm->entity_pos.z = z;
+            place_slot_vm(this, vm, i);
             if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
             {
-                vm->rotation.z = zun_atan2f(final_pos.velocity.y, final_pos.velocity.x);
+                vm->rotation.z = heading_of(&final_pos.velocity);
                 vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
                 rotation = vm->rotation.z;
             }
@@ -1117,8 +1136,6 @@ void EnemyData::update_final_pos()
     }
 }
 
-// TODO: ours saves ebx/esi after the death sound (shrink-wrapped) and reuses the loaded
-// positions for the atan2 arguments; the original reloads them.
 // FUNCTION: TH16 0x41d520
 int EnemyInf::die()
 {
@@ -1130,13 +1147,19 @@ int EnemyInf::die()
     {
         f32 angle = -ZUN_PI / 2;
         Float3 *pos = &enemy.final_pos.pos;
-        if (!(0.04f > (enemy.last_damage_pos.x - pos->x) * (enemy.last_damage_pos.x - pos->x) +
+        // The angle is computed through pointers of its own (from, to), so
+        // the positions are loaded again rather than reused from the
+        // distance test, as in the original. The threshold is 0.2 squared
+        // (as a float product it is one ulp above 0.04f).
+        Float3 *from = &enemy.last_damage_pos;
+        if (!(0.2f * 0.2f > (enemy.last_damage_pos.x - pos->x) * (enemy.last_damage_pos.x - pos->x) +
                           (enemy.last_damage_pos.y - pos->y) * (enemy.last_damage_pos.y - pos->y)))
         {
-            angle = zun_atan2f(pos->y - enemy.last_damage_pos.y, pos->x - enemy.last_damage_pos.x);
+            Float3 *to = &enemy.final_pos.pos;
+            angle = zun_atan2f(to->y - from->y, to->x - from->x);
         }
-        g_EffectManager->track_inline(g_EnemyManager->anim_statement_anms[enemy.death_anm_index]->create_vm(
-            enemy.death_anm_script, pos, angle, 3, 0));
+        AnmLoaded *anm = g_EnemyManager->anim_statement_anms[enemy.death_anm_index];
+        g_EffectManager->track_inline(anm->create_vm(enemy.death_anm_script, pos, angle, 3, 0));
     }
     if (enemy.drop_season.bonus_timer.current <= 0)
     {
@@ -1174,7 +1197,7 @@ int EnemyInf::die()
 
 // Kills every enemy not protected by ENEMY_FLAGS_SURVIVE_KILL_ALL: death
 // effects, drops and set_death, then ENEMY_FLAG_DELETE.
-// TODO: the inlined tick (tick_mixed) adds speed and current_f the other way round (register choice).
+// The stage timer ticks with tick_goto, which gives the original's registers.
 // FUNCTION: TH16 0x41d900
 void EnemyManager::kill_all()
 {
@@ -1194,13 +1217,15 @@ void EnemyManager::kill_all()
             enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
         }
     }
-    mgr->inner.time_in_stage.tick_mixed();
+    mgr->inner.time_in_stage.tick_goto();
 }
 
 // kill_all for the enemies in the given kill_group (ECL 551).
-// TODO: register allocation: the original keeps value in ebx and spills next to the argument slot.
+// HARNESS_CALLED: its one caller is ecl_run_over_300 (ECL 551).
+// TODO: register allocation: the original keeps value in ebx and spills next to the argument
+// slot, and its timer tick shares one epilogue.
 // FUNCTION: TH16 0x41da30
-void __stdcall EnemyManager::kill_all_in_group(i32 value)
+HARNESS_CALLED void __stdcall EnemyManager::kill_all_in_group(i32 value)
 {
     EnemyManager *mgr = g_EnemyManager;
     EnemyList *node = mgr->active_enemy_list_head;
@@ -1219,11 +1244,12 @@ void __stdcall EnemyManager::kill_all_in_group(i32 value)
         }
         node = next;
     }
-    mgr->inner.time_in_stage.tick();
+    mgr->inner.time_in_stage.tick_goto();
 }
 
 // TODO: in the inlined tick the original adds current_f into the speed's xmm1; ours loads
-// current_f into xmm0 and adds the speed, the opposite of kill_all (tick or tick_mixed alike).
+// current_f into xmm0 and adds the speed, the opposite of kill_all (tick, tick_mixed,
+// tick_goto, tick_nested and tick_in_place alike).
 // FUNCTION: TH16 0x41db70
 void EnemyManager::kill_all_no_set_death()
 {
@@ -1279,8 +1305,8 @@ const char *EnemyInf::check_life_interrupts()
     return NULL;
 }
 
-// TODO: the original divides by 60 with one idiv (quotient and remainder) and keeps i in a stack
-// slot; ours strength-reduces the division.
+// Updates the boss timer display and fires the first time interrupt whose
+// time has come; returns its sub name (NULL if none is due).
 // FUNCTION: TH16 0x425010
 const char *EnemyInf::check_time_interrupts()
 {
@@ -1293,19 +1319,19 @@ const char *EnemyInf::check_time_interrupts()
         if (enemy.flags_low & ENEMY_FLAG_BOSS)
         {
             i32 remaining = enemy.interrupts[i].time - enemy.time_in_ecl.current;
-            i32 seconds = remaining / 60;
-            i32 hundredths = remaining % 60 * 100 / 60;
-            if (seconds > 99)
-            {
-                seconds = 99;
-                hundredths = 99;
-            }
-            g_Gui->boss_timer_seconds = seconds;
-            g_Gui->boss_timer_hundredths = hundredths;
+            // Dividing by a variable keeps the original's single idiv for
+            // the quotient and the remainder; the clamps are cmovs.
+            i32 fps = 60;
+            i32 seconds = remaining / fps;
+            i32 hundredths = remaining % fps * 100 / 60;
+            g_Gui->boss_timer_seconds = seconds > 99 ? 99 : seconds;
+            g_Gui->boss_timer_hundredths = seconds > 99 ? 99 : hundredths;
         }
+        // Not yet: leaves the loop to share its NULL return (a return here
+        // gets a copy of its own, and esi is then pushed later).
         if (enemy.time_in_ecl.current < enemy.interrupts[i].time)
         {
-            return NULL;
+            break;
         }
         enemy.life.current = enemy.interrupts[i].life;
         enemy.interrupts[i].life = -1;
@@ -1376,7 +1402,7 @@ int EnemyData::ecl_anm_set_sprite()
 }
 
 // FUNCTION: TH16 0x41aa70
-EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, EnemyCreateParams *params, i32 unused)
+HARNESS_CALLED EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, EnemyCreateParams *params, i32 unused)
 {
     EnemyInf *enemy = new EnemyInf(sub_name);
     enemy->enemy.abs_pos.pos = params->pos;
@@ -1458,8 +1484,9 @@ EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, EnemyCreatePara
     return enemy;
 }
 
-// TODO: in the inlined current_instr the original loads the offset into ecx and the
-// subroutine index into edx; ours swaps them. The rest matches.
+// ECL enmCreate family: spawns a child enemy at the given position (relative
+// to this enemy and mirrored for the relative and mirrored opcodes) with this
+// enemy's ECL variables.
 // FUNCTION: TH16 0x423050
 int EnemyData::ecl_enm_create()
 {
@@ -1467,8 +1494,10 @@ int EnemyData::ecl_enm_create()
     {
         return 0;
     }
+    // The instruction is read through `full` before the `vm` copy exists:
+    // with the copy first, the inlined current_instr swaps ecx and edx.
+    EclRawInstr *instr = full->context.current_context->current_instr();
     EnemyInf *vm = full;
-    EclRawInstr *instr = vm->context.current_context->current_instr();
     i32 n = (instr->args[0].i + 4) / 4;
     EnemyCreateParams params;
     memset(&params, 0, sizeof(params));
@@ -2137,15 +2166,23 @@ void EnemyData::ecl_anm_vm_instr()
         vm->rotation.z = full->context.current_context->get_float_arg(1);
         vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         break;
-    // anmScale(slot, x, y)
+    // anmScale(slot, x, y). Here and in anmScale2 the original reads y
+    // before x, as if the helper's arguments were evaluated right to left.
     case ECL_OP_ANM_SCALE:
-        anm_set_scale(vm, full->context.current_context->get_float_arg(1), full->context.current_context->get_float_arg(2));
+    {
+        f32 y = full->context.current_context->get_float_arg(2);
+        f32 x = full->context.current_context->get_float_arg(1);
+        anm_set_scale(vm, x, y);
         break;
+    }
     // anmScale2(slot, x, y)
     case ECL_OP_ANM_SCALE2:
-        anm_set_scale_2(vm, full->context.current_context->get_float_arg(1),
-                        full->context.current_context->get_float_arg(2));
+    {
+        f32 y = full->context.current_context->get_float_arg(2);
+        f32 x = full->context.current_context->get_float_arg(1);
+        anm_set_scale_2(vm, x, y);
         break;
+    }
     // anmScaleTime(slot, time, mode, x, y)
     case ECL_OP_ANM_SCALE_TIME:
         vm->scale_to(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
@@ -2188,8 +2225,10 @@ void EnemyData::ecl_anm_vm_instr()
     // anmPosTime(slot, time, mode, x, y)
     case ECL_OP_ANM_POS_TIME:
     {
-        Float3 goal(full->context.current_context->get_float_arg(3), full->context.current_context->get_float_arg(4),
-                    0.0f);
+        // y is read before x as in the original (random variables draw from the replay RNG).
+        f32 y = full->context.current_context->get_float_arg(4);
+        f32 x = full->context.current_context->get_float_arg(3);
+        Float3 goal(x, y, 0.0f);
         vm->set_pos_time(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
                          &anm_ids[full->context.current_context->get_int_arg(0)].find_or_clear()->entity_pos, &goal);
         break;
@@ -2205,8 +2244,10 @@ void EnemyData::ecl_anm_vm_instr()
     }
 }
 
-// TODO: frame layout (the original keeps the zero vector higher up), &rel_pos stays in esi, and
-// ours combines the two flag tests of the vertical off-screen check.
+// TODO: frame layout (the original keeps the zero vector in a slot of its own at the top
+// of a frame 16 bytes bigger), the directional VM sits in edx, and the camera's y is added
+// the other way round. reccmp also shows the +-0.03f constants as <OFFSET>: it only
+// names constants an x87 instruction somewhere references.
 // FUNCTION: TH16 0x41bb50
 int EnemyData::step_interpolators()
 {
@@ -2260,18 +2301,16 @@ int EnemyData::step_interpolators()
     abs_pos.step();
     if (flags_low & ENEMY_FLAG_4000000)
     {
-        rel_pos.pos.x += g_Supervisor.cameras[0].position_delta.x;
-        rel_pos.pos.y += g_Supervisor.cameras[0].position_delta.y;
-        rel_pos.pos.z += g_Supervisor.cameras[0].position_delta.z;
+        rel_pos.pos += g_Supervisor.cameras[0].position_delta;
     }
     rel_pos.step();
     update_final_pos();
     if (((EnemyFlagsLow *)&flags_low)->directional_anm)
     {
+        i32 script_offset = 0;
         i32 dir = -0.03f > final_pos.velocity.x ? -1 : final_pos.velocity.x > 0.03f;
         if (anm_direction != dir)
         {
-            i32 script_offset = 0;
             switch (anm_direction)
             {
             case -1:
@@ -2286,16 +2325,11 @@ int EnemyData::step_interpolators()
             }
             AnmVm *vm = get_vm_or_clear(anm_ids[0]);
             AnmLoaded *file = g_EnemyManager->anim_statement_anms[anm_slot_0_anm_index];
-            Float3 zero(0.0f, 0.0f, 0.0f);
-            Float3 pos;
+            Float3 pos(0.0f, 0.0f, 0.0f);
             if (vm != NULL)
             {
                 pos = vm->pos;
                 delete_vm_and_clear(anm_ids[0]);
-            }
-            else
-            {
-                pos = zero;
             }
             i32 layer = anm_layers + 7;
             i32 script = anm_set_main + script_offset;
@@ -2344,9 +2378,13 @@ int EnemyData::step_interpolators()
         half = final_sprite_size.y * 0.5f;
         if (0.0f > final_pos.pos.y + half || final_pos.pos.y - half > 448.0f)
         {
-            if (flags->was_on_screen)
+            // The flags are read once and the second bit is tested on the
+            // low byte, which keeps the two tests apart as in the original
+            // (on the dword they merge into one and/cmp).
+            u32 f = flags_low;
+            if (f & ENEMY_FLAG_WAS_ON_SCREEN)
             {
-                if (!flags->no_offscreen_delete_y)
+                if (!((u8)f & ENEMY_FLAG_OFFSCREEN_Y))
                 {
                     return -1;
                 }

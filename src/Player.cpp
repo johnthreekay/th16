@@ -180,14 +180,17 @@ HARNESS_CALLED f32 Player::angle_to_player(Float3 *pos)
     return (f32)atan2((double)dy, (double)dx);
 }
 
+// lo is computed before hi for the original's lo.y/hi.y registers.
 // TODO: register allocation: the original keeps size in ecx and the player
-// in edx (moving it to ecx for die), and lo.y/hi.y in xmm5/xmm2.
+// in edx (moving it to ecx for die) and interleaves the half size products
+// with the position loads. Neither a Player local nor g_Player-> instead
+// of the folded this reproduces it.
 // FUNCTION: TH16 0x4438c0
 HARNESS_CALLED i32 Player::check_hit_rect(Float3 *pos, Float3 *size, i32 graze_only)
 {
     D3DXVECTOR3 half = *size * 0.5f;
-    D3DXVECTOR3 hi = *pos + half;
     D3DXVECTOR3 lo = *pos - half;
+    D3DXVECTOR3 hi = *pos + half;
     if (hurtbox.min_pos.x > hi.x || hurtbox.min_pos.y > hi.y || lo.x > hurtbox.max_pos.x ||
         lo.y > hurtbox.max_pos.y)
     {
@@ -221,9 +224,11 @@ HARNESS_CALLED i32 Player::check_hit_rect(Float3 *pos, Float3 *size, i32 graze_o
     return 1;
 }
 
-// TODO: the original loads inner.pos.y first and sums x*x + y*y (ours
-// y*y + x*x, swapped registers), and puts the return 0 for an open dialogue
-// right after its test.
+// g_Gui is read into a local: that gives the distance its original
+// registers.
+// TODO: the original loads inner.pos.y before x, and puts the return 0 for
+// an open dialogue right after its test (a goto from the state test into it
+// changed nothing).
 // FUNCTION: TH16 0x4439e0
 HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_only)
 {
@@ -245,7 +250,8 @@ HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_o
         }
         return 2;
     }
-    if (g_Gui != NULL && g_Gui->msg != NULL)
+    Gui *gui = g_Gui;
+    if (gui != NULL && gui->msg != NULL)
     {
         return 0;
     }
@@ -354,9 +360,15 @@ i32 __fastcall Player::on_tick_callback(Player *player)
     return player->on_tick_body();
 }
 
-// TODO: the original pads the draw_vm call with push ecx/pop ecx for 8-byte
-// alignment, like on_tick_callback; ours does not, most likely because LTCG
-// does not see draw_vm needing alignment early (draw_vm does not match yet).
+// The draw_vm call goes through an inline helper node: called directly,
+// LTCG does not pad on_draw_callback's frame (push ecx/pop ecx) for the call
+// the way the original does, although the callback is entered 8-aligned
+// (registered by Player::initialize, see on_tick_callback).
+static __forceinline i32 draw_player_vm(AnmVm *vm)
+{
+    return g_AnmManager->draw_vm(vm);
+}
+
 // Draws the player sprite, except while dead.
 // FUNCTION: TH16 0x443730
 i32 __fastcall Player::on_draw_callback(Player *player)
@@ -365,7 +377,7 @@ i32 __fastcall Player::on_draw_callback(Player *player)
     {
         player->vm.entity_pos = player->inner.pos;
         player->vm.flags_hi = (player->vm.flags_hi & ~ANM_VM_ORIGIN_HUD) | ANM_VM_ORIGIN_GAME;
-        g_AnmManager->draw_vm(&player->vm);
+        draw_player_vm(&player->vm);
     }
     return 1;
 }
@@ -666,8 +678,6 @@ HARNESS_CALLED void Player::reset()
     damage_multiplier = 1.0f;
 }
 
-// TODO: the original clears eax before the pops in both early returns; ours
-// does it after popping edi and esi.
 // FUNCTION: TH16 0x445360
 i32 Player::shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner)
 {
@@ -701,8 +711,8 @@ i32 Player::shoot_one_bullet(i32 shooter_ref, i32 time, PlayerInner *inner)
     return bullet->create(shooter_ref, time, inner) != 0 ? -1 : 0;
 }
 
-// TODO: the original realigns its frame (ebx form); the body matches. Not
-// for PlayerBullet::create (real code now, no realignment of its own).
+// Realigns its frame through ebx: AnmLoaded::create_effect wants an aligned
+// stack and PlayerBullet::create (through shoot_one_bullet) passes that on.
 // FUNCTION: TH16 0x445470
 i32 Player::do_shooting(i32 short_time, i32 long_time)
 {
@@ -752,9 +762,6 @@ i32 Player::do_shooting(i32 short_time, i32 long_time)
     return 0;
 }
 
-// TODO: the original saves ecx and edi on entry (most likely an LTCG
-// convention asked for by its caller, on_tick_body, which does not match
-// either); ours saves edi only around the short timer part.
 // FUNCTION: TH16 0x4455d0
 i32 Player::tick_shooting_state()
 {
@@ -840,8 +847,9 @@ HARNESS_CALLED void Player::do_graze(Float3 *pos)
                               1.9f, 0, 0);
 }
 
-// TODO: d.x and d.y take swapped stack slots and the scaled hurtbox bounds
-// are computed in a different order (frame and convention match).
+// r.y is assigned before r.x (that decides the stack slots of d and the
+// registers of r), and the unscaled box adds r to the half size, which
+// leaves hi.x in r.x's register like the original.
 // FUNCTION: TH16 0x443af0
 HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 width, f32 length, i32 graze_only)
 {
@@ -849,7 +857,10 @@ HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 wi
     D3DXVECTOR3 d = inner.pos - *pos;
     f32 s = zun_sinf(neg_angle);
     f32 c = zun_cosf(neg_angle);
-    D3DXVECTOR3 r(d.x * c - d.y * s, d.y * c + d.x * s, 0.0f);
+    D3DXVECTOR3 r;
+    r.y = d.y * c + d.x * s;
+    r.x = d.x * c - d.y * s;
+    r.z = 0.0f;
     D3DXVECTOR3 lo = r - hurtbox_halfsize * 16.0f;
     D3DXVECTOR3 hi = r + hurtbox_halfsize * 16.0f;
     if (lo.x > length || lo.y > width * 0.5f || 0.0f > hi.x || width * -0.5f > hi.y)
@@ -857,7 +868,7 @@ HARNESS_CALLED i32 Player::check_hit_rotated_rect(Float3 *pos, f32 angle, f32 wi
         return 0;
     }
     lo = r - hurtbox_halfsize;
-    hi = r + hurtbox_halfsize;
+    hi = hurtbox_halfsize + r;
     if (lo.x > length || lo.y > width * 0.5f || 0.0f > hi.x || width * -0.5f > hi.y)
     {
         return 2;
@@ -988,21 +999,25 @@ HARNESS_CALLED i32 Player::compute_damage_to_enemy(Float3 *pos, Float3 *size, f3
     return total;
 }
 
-// Whether a point lies inside the playfield.
-static __forceinline i32 is_on_screen(Float3 *pos)
+// Whether a point lies outside the playfield (written as the negated
+// tests, which the original's comparisons follow).
+static __forceinline i32 is_off_screen(Float3 *pos)
 {
-    return g_early_arcade_offset_x < pos->x && pos->x < g_early_arcade_offset_x + 384.0f &&
-           g_early_arcade_offset_y < pos->y && pos->y < g_early_arcade_offset_y + 448.0f;
+    return pos->x <= g_early_arcade_offset_x || pos->x >= g_early_arcade_offset_x + 384.0f ||
+           pos->y <= g_early_arcade_offset_y || pos->y >= g_early_arcade_offset_y + 448.0f;
 }
 
-// TODO: the original realigns its frame (ebx form) and reloads g_Player for
-// every bullet; ours keeps it in a register.
+// The bullet pointer is advanced with the counter, and the off-screen test
+// is written as the negated comparisons, as the original's code shows.
+// The age ticks with tick_in_place (each branch updates the fields).
+// TODO: the tick stores previous before looking up the speed pointer and
+// current_f before current, where the original does the opposite.
 // FUNCTION: TH16 0x4456d0
 i32 Player::tick_bullets()
 {
-    for (i32 i = 0; i < PLAYER_BULLET_COUNT; i++)
+    PlayerBullet *bullet = inner.bullets;
+    for (i32 i = 0; i < PLAYER_BULLET_COUNT; i++, bullet++)
     {
-        PlayerBullet *bullet = &inner.bullets[i];
         if (bullet->state == PLAYER_BULLET_FREE)
         {
             continue;
@@ -1031,8 +1046,8 @@ i32 Player::tick_bullets()
             vm->write_sprite_corners(corners);
             // Bullets (other than lasers) older than 15 frames go away once
         // their sprite is entirely off screen.
-        if (bullet->age.current >= 15 && !is_on_screen(&corners[0]) && !is_on_screen(&corners[1]) &&
-                !is_on_screen(&corners[2]) && !is_on_screen(&corners[3]))
+        if (bullet->age.current >= 15 && is_off_screen(&corners[0]) && is_off_screen(&corners[1]) &&
+                is_off_screen(&corners[2]) && is_off_screen(&corners[3]))
             {
                 {
                     delete_vm_and_clear(bullet->anm_id);
@@ -1057,10 +1072,11 @@ i32 Player::tick_bullets()
         vm->entity_pos = bullet->pos.pos;
         if (vm->flags_hi & ANM_VM_AUTO_ROTATE)
         {
-            vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
+            // The rotation before its flag: the original's store order.
             vm->rotation.z = bullet->pos.angle.value;
+            vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         }
-        bullet->age.tick();
+        bullet->age.tick_in_place();
     }
     return 0;
 }
@@ -1226,8 +1242,8 @@ static __forceinline void player_set_script(Player *player, i32 script)
     player->vm.run();
 }
 
-// TODO: the original realigns its frame (and esp, -8) and keeps 1.0f in
-// xmm2; register allocation differs.
+// TODO: the original keeps 1.0f in xmm2; register allocation differs (the
+// frame already realigns with and esp, -8 like the original's).
 // FUNCTION: TH16 0x441cf0
 i32 Player::move()
 {
@@ -1453,9 +1469,10 @@ static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
     }
 }
 
-// TODO: ours gets a /GS cookie for the zero position passed to
-// create_vm_inline; the original zeroes one local before the loops and
-// aligns its frame.
+// Declared __declspec(safebuffers) (Player.h): without it ours gets a /GS
+// cookie for the zero position passed to create_vm_inline.
+// TODO: the original zeroes one local before the loops and aligns its
+// frame.
 // FUNCTION: TH16 0x4440e0
 void PlayerInner::repopulate_options()
 {
@@ -1593,6 +1610,13 @@ static __forceinline void stop_sound_inline(i32 id)
     g_SoundManager.queued_counts[i] = -1;
 }
 
+// Runs the player for one frame: the state machine (normal, hit with its
+// deathbomb window, dead, state 3), the damage sources, the invincibility
+// flash and boost afterimages, the scaled hurtbox and item boxes, the timers,
+// shooting and the bullets.
+// For matching: the HIT case's inverted test, the `power` local, the damage
+// source pointer walk and the angle local before wrap_angle are the forms
+// that give the original's code.
 // TODO: functionally complete; block order and register allocation differ.
 // FUNCTION: TH16 0x442560
 i32 Player::on_tick_body()
@@ -1648,7 +1672,11 @@ i32 Player::on_tick_body()
     case PLAYER_STATE_HIT:
         // Hit: 8 frames to bomb out of it (a deathbomb); then the life is
         // lost and the player is dead.
-        if (inner.time_in_state.current < 8)
+        if (inner.time_in_state.current >= 8)
+        {
+            lose_life();
+        }
+        else
         {
             if (g_MainBomb != NULL && (g_InputState.input_rising & INPUT_BOMB) && g_MainBomb->can_activate())
             {
@@ -1663,14 +1691,12 @@ i32 Player::on_tick_body()
             }
             break;
         }
-        lose_life();
     case PLAYER_STATE_DEAD:
         if (inner.time_in_state.current == 3)
         {
             // Drop half a power level as items, spread toward the top.
-            g_Globals.power = g_Globals.power - g_Globals.power_per_level / 2 < g_Globals.power_per_level
-                                  ? g_Globals.power_per_level
-                                  : g_Globals.power - g_Globals.power_per_level / 2;
+            i32 power = g_Globals.power - g_Globals.power_per_level / 2;
+            g_Globals.power = power < g_Globals.power_per_level ? g_Globals.power_per_level : power;
             f32 dx = 0.0f - inner.pos.x;
             f32 dy = inner.pos.y - 224.0f - inner.pos.y;
             f32 angle;
@@ -1735,9 +1761,9 @@ i32 Player::on_tick_body()
         break;
     }
     // Move, grow, turn and age the damage sources.
-    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++)
+    PlayerDamageSource *source = inner.damage_sources;
+    for (i32 i = 0; i < PLAYER_DAMAGE_SOURCE_COUNT; i++, source++)
     {
-        PlayerDamageSource *source = &inner.damage_sources[i];
         if (!(source->flags & DAMAGE_SOURCE_ACTIVE))
         {
             continue;
@@ -1745,10 +1771,9 @@ i32 Player::on_tick_body()
         source->pos.update_secondary_fields();
         source->pos.step();
         source->radius += source->radius_growth;
-        // TODO: written as += for the original's load order (angular_speed
-        // first), which adds a store of the unwrapped angle it does not have.
-        source->angle += source->angular_speed;
-        source->angle = wrap_angle(source->angle);
+        f32 angle = source->angle;
+        angle += source->angular_speed;
+        source->angle = wrap_angle(angle);
         source->last_enemy_id = 0;
         source->lifetime.decrement(1.0f);
         if (source->lifetime.current <= 0)
@@ -1862,10 +1887,10 @@ i32 Player::on_tick_body()
         item_attract_box_unfocused.min_pos = inner.pos - item_attract_box_unfocused_halfsize;
         item_attract_box_unfocused.max_pos = inner.pos + item_attract_box_unfocused_halfsize;
     }
-    // tick_split stores current_f in each branch like the original.
-    inner.time_in_state.tick_split();
-    inner.time_in_stage.tick_split();
-    inner.shot_time_in_stage.tick_split();
+    // tick_nested: the original keeps 1.0f in a register for the ticks.
+    inner.time_in_state.tick_nested();
+    inner.time_in_stage.tick_nested();
+    inner.shot_time_in_stage.tick_nested();
     // Shooting: not during dialogue or before the stage's enemies run.
     if (g_Gui->msg == NULL && g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 &&
         !(*(u32 *)&g_GameThread->flags & GAME_THREAD_GAME_CLEARED) && inner.shot_time_in_stage.current >= 20 &&

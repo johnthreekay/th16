@@ -116,8 +116,9 @@ static __forceinline f32 angle_to_player_inline(Float3 *pos)
 }
 
 // The original calls Player::angle_to_player in state 5 and has it inlined
-// in state 4. Either form makes LTCG realign on_tick_body early enough to
-// give Item::init_anm (0x430c90) a padded frame in our build, so both go
+// in state 4. Written that way, on_tick_body compiles further from the
+// original (58.6% against 64.5%; it once also gave Item::init_anm a padded
+// frame, which the member pointer call below now prevents), so both go
 // through these out-of-line helpers until that is understood.
 static DECOMP_NOINLINE f32 item_angle_to_player(Float3 *pos)
 {
@@ -127,6 +128,16 @@ static DECOMP_NOINLINE f32 item_angle_to_player(Float3 *pos)
 static DECOMP_NOINLINE f32 item_angle_to_player_4(Float3 *pos)
 {
     return angle_to_player_inline(pos);
+}
+
+// Item::init_anm as a member function pointer. ItemManager::on_tick_body
+// calls it through this: the call compiles to the original's direct call
+// but is not an edge in LTCG's call graph, so on_tick_body's early
+// realignment does not give init_anm a padded frame.
+typedef i32 (Item::*ItemInitAnmFunc)();
+static inline ItemInitAnmFunc item_init_anm_func()
+{
+    return &Item::init_anm;
 }
 
 // Whether an item has left the bottom or a side of the play area.
@@ -139,7 +150,7 @@ static __forceinline i32 item_offscreen(Item *item)
 // items rising before they fall (2), season items (3), items flying to the
 // player (4: auto-collected, 5: attracted), then collection, attraction and
 // the sprite VMs.
-// TODO: the original realigns its frame (and esp, -8); register allocation and the order of the position updates differ.
+// TODO: register allocation and the order of the position updates differ.
 // FUNCTION: TH16 0x42f4e0
 i32 ItemManager::on_tick_body()
 {
@@ -159,7 +170,7 @@ i32 ItemManager::on_tick_body()
             {
                 continue;
             }
-            item->init_anm();
+            (item->*item_init_anm_func())();
             player = g_Player;
             continue;
         }
@@ -211,7 +222,9 @@ i32 ItemManager::on_tick_body()
                 item->speed = 0.0f;
                 item->angle = ZUN_PI / 2;
                 item->speed_towards_player = player->sht_file->grazebox_radius;
-                item->state = item->force_autocollect != 0 ? ITEM_STATE_AUTOCOLLECT : ITEM_STATE_FALLING;
+                // Written as `== 0 ? FALLING : AUTOCOLLECT` for the original's
+                // code (matching).
+                item->state = item->force_autocollect == 0 ? ITEM_STATE_FALLING : ITEM_STATE_AUTOCOLLECT;
                 goto state_1;
             }
             if (!item_offscreen(item))
@@ -381,7 +394,8 @@ i32 ItemManager::on_tick_body()
                 case 16:
                     if (g_Globals.collect_season_item(0))
                     {
-                        g_Player->inner.repopulate_options();
+                        // Through the player local, not g_Player (matching).
+                        player->inner.repopulate_options();
                         g_PopupManager->generate_small_score_popup(&item->position, -1, 0xffffff40);
                         g_SoundManager.play_sound_at_position(SE_LGODSGET, item->position.x);
                     }
@@ -721,8 +735,6 @@ HARNESS_CALLED Item *ItemManager::spawn_item(i32 type, Float3 *pos, i32 unk_3, f
     return item;
 }
 
-// TODO: the original realigns its frame to 8 bytes (ebx frame, 8 bytes of
-// locals), like add_power's other callers; see Globals::add_to_score.
 // FUNCTION: TH16 0x4303a0
 void Item::collect_full_power()
 {
@@ -745,8 +757,9 @@ void Item::collect_full_power()
     }
 }
 
-// TODO: the original takes piv % 10 with idiv and keeps both roundings, and
-// realigns its frame to 8 bytes (see collect_full_power).
+// The piv rounding is written out as in collect_point (see there).
+// TODO: register allocation: this and the value swap esi and edi (the frame
+// already realigns in the ebx form, as in the original).
 // FUNCTION: TH16 0x430100
 void Item::collect_power()
 {
@@ -757,8 +770,7 @@ void Item::collect_power()
         i32 line = item_collect_line();
         if ((f32)line >= player_y || state == ITEM_STATE_AUTOCOLLECT)
         {
-            value = g_Globals.piv / 100;
-            value -= value % 10;
+            value = g_Globals.piv / 100 - g_Globals.piv / 100 % 10;
             value = value / 10 * 10;
             if (value <= 0)
             {
@@ -772,9 +784,8 @@ void Item::collect_power()
         }
         else
         {
-            i32 base = g_Globals.piv / 100;
-            base -= base % 10;
-            value = base * 3 / 4 - base * 3 / 4 * ((i32)player_y - line) / 450;
+            value = (g_Globals.piv / 100 - g_Globals.piv / 100 % 10) * 3 / 4 -
+                    (g_Globals.piv / 100 - g_Globals.piv / 100 % 10) * 3 / 4 * ((i32)player_y - line) / 450;
             value = value / 10 * 10;
             if (value <= 0)
             {
@@ -803,7 +814,8 @@ void Item::collect_power()
     }
 }
 
-// TODO: the original realigns its frame to 8 bytes (see collect_full_power).
+// TODO: effective match: in the inlined add_power the original adds
+// power_per_level from ecx, ours from its copy in esi.
 // FUNCTION: TH16 0x4304a0
 void Item::collect_big_power()
 {
@@ -835,8 +847,13 @@ void Item::collect_big_power()
     }
 }
 
-// TODO: the original takes piv % 10 with idiv and keeps both roundings
-// (ours folds them into one division), so registers differ.
+// The point values are get_piv_rounded() inlined, spelled out here: as an
+// expression of the global, `% 10` stays an idiv, and with the rounding
+// written twice (not a local) the two `* 3 / 4` are not merged, so the
+// subtraction becomes the original's add of a negated product. It is the
+// same expression as get_piv_rounded (0x42c860), spelled out here so that
+// the form is visible.
+// TODO: the original's frame is 4 bytes larger (alignment padding).
 // FUNCTION: TH16 0x430620
 void Item::collect_point()
 {
@@ -845,8 +862,7 @@ void Item::collect_point()
     i32 value;
     if ((f32)line >= player->inner.pos.y || state == ITEM_STATE_AUTOCOLLECT)
     {
-        value = g_Globals.piv / 100;
-        value -= value % 10;
+        value = g_Globals.piv / 100 - g_Globals.piv / 100 % 10;
         value = value / 10 * 10;
         if (value <= 0)
         {
@@ -859,9 +875,8 @@ void Item::collect_point()
     }
     else
     {
-        i32 base = g_Globals.piv / 100;
-        base -= base % 10;
-        value = base * 3 / 4 - base * 3 / 4 * ((i32)player->inner.pos.y - line) / 450;
+        value = (g_Globals.piv / 100 - g_Globals.piv / 100 % 10) * 3 / 4 -
+                (g_Globals.piv / 100 - g_Globals.piv / 100 % 10) * 3 / 4 * ((i32)player->inner.pos.y - line) / 450;
         value = value / 10 * 10;
         if (value <= 0)
         {

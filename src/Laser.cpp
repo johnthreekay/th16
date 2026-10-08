@@ -827,10 +827,23 @@ i32 LaserManager::cancel_all()
     return 0;
 }
 
-// TODO: the original has an 8-byte frame (sub esp, 8) where ours has 4.
+// A dead double, not ZUN's code: it stands in for a callee wanting an aligned
+// stack (docs/findings.md). In this plain inline helper it is a call graph
+// node of its own, so cancel_in_radius pads its frame (toward the original's
+// 8-byte sub esp) without realigning.
+static inline void cancel_in_radius_want_aligned_stack()
+{
+    double unused_double = 0.0;
+    (void)unused_double;
+}
+
+// TODO: edi is pushed before the empty-list test; the original pushes it after.
 // FUNCTION: TH16 0x431a70
 HARNESS_CALLED i32 LaserManager::cancel_in_radius(Float3 *pos, f32 radius, i32 mode, i32 skip_invuln)
 {
+    // Called twice: one call's wish is not enough to pad the frame.
+    cancel_in_radius_want_aligned_stack();
+    cancel_in_radius_want_aligned_stack();
     LaserManager *mgr = g_LaserManager;
     LaserDataInf *laser = mgr->list_head.next;
     LaserDataInf *next;
@@ -1077,7 +1090,7 @@ i32 LaserLineInf::step_ex_bounce()
 }
 
 // The same et_ex step for straight lasers.
-// TODO: as LaserCurveInf::step_ex_angle: the new angle in xmm0 (ours xmm1), ints[2] incremented later, current_f added into the speed register.
+// Effective match: as in LaserCurveInf::step_ex_angle, only the ints[2] increment is scheduled differently.
 // FUNCTION: TH16 0x432c20
 i32 LaserLineInf::step_ex_angle()
 {
@@ -1096,7 +1109,7 @@ i32 LaserLineInf::step_ex_angle()
         ex_state[3].timer.reset();
         if (ex_state[3].ints[2] >= ex_state[3].ints[1])
         {
-            laser_sincosmul(&tip_offset, a, len);
+            laser_sincosmul(&tip_offset, angle, len);
             ex_flags &= ~BULLET_EX_ANGLE;
             return 1;
         }
@@ -1106,13 +1119,17 @@ i32 LaserLineInf::step_ex_angle()
         len = length - ex_state[3].timer.current_f * length / ex_state[3].ints[0];
     }
     laser_sincosmul(&tip_offset, angle, len);
-    ex_state[3].timer.tick();
+    ex_state[3].timer.tick_goto();
     return 0;
 }
 
 // An et_ex step: retracts the curve over ex_state[3]'s time, then turns it
 // and gives it a new length; after ints[1] rounds the step ends.
-// TODO: the original keeps the new angle in xmm0 (ours xmm1), increments ints[2] later and adds current_f into the speed register in the timer tick.
+// The final turn's tip reads angle back from the member (not the local a):
+// that keeps a in xmm0 like the original.
+// tick_goto gives the timer tick's add of current_f into the speed register.
+// Effective match: the original increments ints[2] after loading floats[0]
+// (statement order does not move it).
 // FUNCTION: TH16 0x4392c0
 i32 LaserCurveInf::step_ex_angle()
 {
@@ -1131,7 +1148,7 @@ i32 LaserCurveInf::step_ex_angle()
         ex_state[3].timer.reset();
         if (ex_state[3].ints[2] >= ex_state[3].ints[1])
         {
-            laser_sincosmul(&tip_offset, a, len);
+            laser_sincosmul(&tip_offset, angle, len);
             ex_flags &= ~BULLET_EX_ANGLE;
             return 1;
         }
@@ -1141,7 +1158,7 @@ i32 LaserCurveInf::step_ex_angle()
         len = length - ex_state[3].timer.current_f * length / ex_state[3].ints[0];
     }
     laser_sincosmul(&tip_offset, angle, len);
-    ex_state[3].timer.tick();
+    ex_state[3].timer.tick_goto();
     return 0;
 }
 
@@ -1155,6 +1172,15 @@ i32 LaserLineInf::cancel(i32 mode, i32 skip_invuln)
     {
         return 0;
     }
+    // Three dead named locals, as in LaserInfiniteInf::cancel: the count of
+    // named variables decides MSVC's choices here (docs/findings.md), and
+    // these come closer to the original. Matching only.
+    i32 unused_a = 0;
+    i32 unused_b = 0;
+    i32 unused_c = 0;
+    (void)unused_a;
+    (void)unused_b;
+    (void)unused_c;
     f32 dist = 8.0f;
     i32 count = 0;
     Float3 step;
@@ -1191,7 +1217,6 @@ i32 LaserLineInf::cancel(i32 mode, i32 skip_invuln)
 
 // Cancels the laser like LaserLineInf::cancel, but only the points on screen
 // get an effect and items.
-// TODO: the original copies step.x and adds position.x from memory (ours loads position.x first; swapping the operands or step += step does not help) and stores step.z = 0 late from a second zero register.
 // FUNCTION: TH16 0x436c70
 i32 LaserInfiniteInf::cancel(i32 mode, i32 skip_invuln)
 {
@@ -1199,6 +1224,15 @@ i32 LaserInfiniteInf::cancel(i32 mode, i32 skip_invuln)
     {
         return 0;
     }
+    // Three dead named locals: MSVC orders the x component's load by the
+    // function's count of named variables (period 8; docs/findings.md), and
+    // these give the original's order. Matching only.
+    i32 unused_a = 0;
+    i32 unused_b = 0;
+    i32 unused_c = 0;
+    (void)unused_a;
+    (void)unused_b;
+    (void)unused_c;
     f32 dist = 8.0f;
     i32 count = 0;
     Float3 step;
@@ -1238,7 +1272,9 @@ i32 LaserInfiniteInf::cancel(i32 mode, i32 skip_invuln)
 // laser: a hit head moves its start forward, the first hit run ends it, and
 // every later unhit run becomes a new laser. Returns the number of points
 // hit.
-// TODO: register allocation differs throughout (the original keeps center in ebx and count in memory) and the run loops are laid out differently.
+// As in LaserInfiniteInf::cancel_as_bomb_circle, i is zeroed before the memset
+// and step.z is stored before the sincosmul call.
+// TODO: register allocation differs (the original keeps center in ebx and count in memory) and the run loops are laid out differently.
 // FUNCTION: TH16 0x434730
 i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln)
 {
@@ -1246,14 +1282,20 @@ i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i3
     {
         return 0;
     }
+    // A dead named local: MSVC's register choices here follow the function's
+    // count of named variables (docs/findings.md, vector operand order), and
+    // one more gives the original's. Matching only.
+    i32 unused_a = 0;
+    (void)unused_a;
     Float3 origin = position;
     i32 count = 0;
     f32 dist = 8.0f;
+    i32 i = 0;
     u8 hit[0x100];
     memset(hit, 0, sizeof(hit));
     Float3 step;
-    laser_sincosmul(&step, angle, 8.0f);
     step.z = 0.0f;
+    laser_sincosmul(&step, angle, 8.0f);
     Float3 pos;
     pos = position + step;
     pos.z = 0.0f;
@@ -1261,8 +1303,7 @@ i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i3
     step.y += step.y;
     step.z += step.z;
     radius = radius * radius;
-    i32 i;
-    for (i = 0; hit_length >= dist + 8.0f; i++)
+    for (; hit_length >= dist + 8.0f; i++)
     {
         if (!((center->x - pos.x) * (center->x - pos.x) + (center->y - pos.y) * (center->y - pos.y) > radius))
         {
@@ -1377,30 +1418,39 @@ static __forceinline i32 test_circle_rect_inline(f32 rect_x, f32 rect_y, f32 w, 
     f32 y = circle_x * s + circle_y * c;
     f32 half_w = w * 0.5f;
     f32 abs_x = fabsf(x);
-    if (half_w + radius >= abs_x && h * 0.5f >= fabsf(y))
+    if (half_w + radius >= abs_x && fabsf(y) <= h * 0.5f)
     {
         return 1;
     }
-    if (half_w >= abs_x && h * 0.5f + radius >= fabsf(y))
+    if (half_w >= abs_x && fabsf(y) <= h * 0.5f + radius)
     {
         return 1;
     }
     // Then the corners.
     f32 half_h = h * 0.5f;
     f32 radius_sq = radius * radius;
-    if (radius_sq > (x - half_w) * (x - half_w) + (y - half_h) * (y - half_h))
+    Float3 d;
+    d.x = x - half_w;
+    d.y = y - half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    if (radius_sq > (x + half_w) * (x + half_w) + (y - half_h) * (y - half_h))
+    d.x = x + half_w;
+    d.y = y - half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    if (radius_sq > (x - half_w) * (x - half_w) + (y + half_h) * (y + half_h))
+    d.x = x - half_w;
+    d.y = y + half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    if (radius_sq > (x + half_w) * (x + half_w) + (y + half_h) * (y + half_h))
+    d.x = x + half_w;
+    d.y = y + half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
@@ -1426,9 +1476,27 @@ static_assert(offsetof(EnemyInf, enemy.anm_ids) == 0x1330, "EnemyInf::enemy.anm_
 // Never called. LaserInfiniteInf::sum_rect_damage for a straight laser: the boss
 // is only tested when it exists, and the damage per point also depends on
 // the laser's length, as in LaserCurveInf::sum_rect_damage.
+// The seven dead locals are not ZUN's: the count of named variables decides
+// MSVC's register choices here (period 8; docs/findings.md), and seven more
+// come closest to the original. Matching only.
+// TODO: register allocation differs as in LaserInfiniteInf::sum_rect_damage (the original keeps this in edi, size in esi).
 // FUNCTION: TH16 0x434010
 i32 LaserLineInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 {
+    i32 unused_a = 0;
+    i32 unused_b = 0;
+    i32 unused_c = 0;
+    i32 unused_d = 0;
+    i32 unused_e = 0;
+    i32 unused_f = 0;
+    i32 unused_g = 0;
+    (void)unused_a;
+    (void)unused_b;
+    (void)unused_c;
+    (void)unused_d;
+    (void)unused_e;
+    (void)unused_f;
+    (void)unused_g;
     Float3 *pos = (Float3 *)a;
     Float3 *size = (Float3 *)b;
     f32 rect_angle = *(f32 *)&c;
@@ -1439,27 +1507,26 @@ i32 LaserLineInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
     }
     f32 dist = 8.0f;
     i32 count = 0;
-    f32 dx = position.x - pos->x;
-    f32 dy = position.y - pos->y;
+    Float3 diff = position - *pos;
     f32 s = zun_sinf(rect_angle);
     f32 cs = zun_cosf(rect_angle);
-    f32 rx = dx * cs - dy * s;
-    f32 ry = dx * s + dy * cs;
+    f32 rx = diff.x * cs - diff.y * s;
+    f32 ry = diff.y * cs + diff.x * s;
     Float3 local_step;
     laser_sincosmul(&local_step, wrap_angle(angle + rect_angle), 8.0f);
-    f32 local_x = local_step.x + rx;
-    f32 local_y = local_step.y + ry;
-    local_step.z = 0.0f;
     f32 half_w = size->x * 0.5f;
+    local_step.z = 0.0f;
     f32 half_h = size->y * 0.5f;
+    f32 local_x = local_step.x + rx;
     local_step.x += local_step.x;
+    f32 local_y = local_step.y + ry;
     local_step.y += local_step.y;
     Float3 step;
     laser_sincosmul(&step, angle, 8.0f);
-    f32 world_x = position.x + step.x;
     f32 world_y = position.y + step.y;
-    step.x += step.x;
+    f32 world_x = position.x + step.x;
     step.y += step.y;
+    step.x += step.x;
     step.z = 0.0f;
     u8 hit[0x100];
     u8 *h = hit;
@@ -1512,7 +1579,7 @@ i32 LaserLineInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 // g_LaserManager->rect_damage_sum. Its own points move only 8 units per step in
 // the rectangle's frame. The parameters are pos, size, rect_angle, unused,
 // e (skip while ex_invuln_remaining_frames runs) and boss_hit.
-// TODO: register allocation differs (the original keeps this in edi, size in esi); it multiplies the sprite sizes before zun_sinf and squares each corner distance again, as in collision_test_circle_rect.
+// TODO: register allocation differs (the original keeps this in edi, size in esi); it multiplies the sprite sizes before zun_sinf.
 // FUNCTION: TH16 0x436010
 i32 LaserInfiniteInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 {
@@ -1526,25 +1593,24 @@ i32 LaserInfiniteInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
     }
     f32 dist = 8.0f;
     i32 count = 0;
-    f32 dx = position.x - pos->x;
-    f32 dy = position.y - pos->y;
+    Float3 diff = position - *pos;
     f32 s = zun_sinf(rect_angle);
     f32 cs = zun_cosf(rect_angle);
-    f32 rx = dx * cs - dy * s;
-    f32 ry = dx * s + dy * cs;
+    f32 rx = diff.x * cs - diff.y * s;
+    f32 ry = diff.y * cs + diff.x * s;
     Float3 local_step;
     laser_sincosmul(&local_step, wrap_angle(angle + rect_angle), 8.0f);
     f32 local_x = local_step.x + rx;
     f32 local_y = local_step.y + ry;
-    local_step.z = 0.0f;
     f32 half_w = size->x * 0.5f;
     f32 half_h = size->y * 0.5f;
+    local_step.z = 0.0f;
     Float3 step;
     laser_sincosmul(&step, angle, 8.0f);
-    f32 world_x = position.x + step.x;
     f32 world_y = position.y + step.y;
-    step.x += step.x;
+    f32 world_x = position.x + step.x;
     step.y += step.y;
+    step.x += step.x;
     step.z = 0.0f;
     u8 hit[0x100];
     u8 *h = hit;
@@ -1655,7 +1721,9 @@ i32 LaserCurveInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 // shortens the laser to nothing, otherwise it ends at the first hit run;
 // every later unhit run that starts on screen becomes a straight laser.
 // Returns the number of points hit.
-// TODO: the original zeroes i (ebx) before the memset and stores step.z first; the run loops' register use and the params copy differ.
+// i is zeroed before the memset, whose 0 then comes from i's register, and step.z
+// is stored before the sincosmul call, as in the original.
+// TODO: the original lays pos.z's shadow out after step in the frame; the run loops' register use and the params copy differ (g_LaserManager kept in a stack slot).
 // FUNCTION: TH16 0x436670
 i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln)
 {
@@ -1666,11 +1734,12 @@ i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode
     Float3 origin = position;
     i32 count = 0;
     f32 dist = 8.0f;
+    i32 i = 0;
     u8 hit[0x100];
     memset(hit, 0, sizeof(hit));
     Float3 step;
-    laser_sincosmul(&step, angle, 8.0f);
     step.z = 0.0f;
+    laser_sincosmul(&step, angle, 8.0f);
     Float3 pos;
     pos = position + step;
     pos.z = 0.0f;
@@ -1678,8 +1747,7 @@ i32 LaserInfiniteInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode
     step.y += step.y;
     step.z += step.z;
     radius = radius * radius;
-    i32 i;
-    for (i = 0; hit_length > dist + 8.0f; i++)
+    for (; hit_length > dist + 8.0f; i++)
     {
         if (!((center->x - pos.x) * (center->x - pos.x) + (center->y - pos.y) * (center->y - pos.y) > radius))
         {
@@ -1960,13 +2028,12 @@ i32 LaserLineInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32 rec
     f32 dist = 8.0f;
     u8 hit[0x100];
     memset(hit, 0, sizeof(hit));
-    f32 dx = position.x - center->x;
-    f32 dy = position.y - center->y;
+    Float3 diff = position - *center;
     f32 neg_angle = -rect_angle;
     f32 s = zun_sinf(neg_angle);
     f32 c = zun_cosf(neg_angle);
-    f32 local_x = dx * c - dy * s;
-    f32 local_y = dy * c + dx * s;
+    f32 local_y = diff.y * c + diff.x * s;
+    f32 local_x = diff.x * c - diff.y * s;
     i32 n = 0;
     f32 local_angle = angle - rect_angle;
     while (local_angle > ZUN_PI)
@@ -2265,10 +2332,13 @@ i32 LaserInfiniteInf::cancel_as_bomb_rectangle(Float3 *center, Float3 *size, f32
 
 // Sets the laser up from its parameters: the body and its origin VM, the
 // shot sound, and the start offset along the aim.
-// TODO: the original realigns the frame (and esp, -8); everything else matches. A dead double in a HARNESS_CALLED AnmVm::run matches it (see docs/findings.md).
+// The dead double is not ZUN's code: as in LaserLineInf::initialize, it
+// makes LTCG realign the frame (and esp, -8) like the original.
 // FUNCTION: TH16 0x435050
 i32 LaserInfiniteInf::initialize(void *params)
 {
+    double unused = 0.0;
+    (void)unused;
     inner = *(LaserInfiniteInner *)params;
     bullet_type = inner.type;
     state = LASER_STATE_WARNING;
@@ -2350,7 +2420,7 @@ i32 LaserBeamInf::initialize(void *params)
 // aim, and the node list: a copy of the source laser's when a bomb split
 // this one off (et_ex then skipped), else one straight node. Then places
 // the segments for the starting time.
-// TODO: the original adds the offset onto the loaded position (operand order), reloads angle for the straight node's velocity, and loads segments before scaling i.
+// Effective match: the original stores inner.distance = 0 between the position's x add and its store.
 // FUNCTION: TH16 0x4370a0
 i32 LaserCurveInf::initialize(void *params)
 {
@@ -2396,8 +2466,12 @@ i32 LaserCurveInf::initialize(void *params)
     {
         Float3 offset;
         laser_sincosmul(&offset, inner.ang_aim, inner.distance);
-        position.x += offset.x;
-        position.y += offset.y;
+        // Through pointers to the components: the adds then load the
+        // position and add the offset from memory, as in the original.
+        f32 *px = &position.x;
+        *px += offset.x;
+        f32 *py = &position.y;
+        *py += offset.y;
         inner.start_pos = position;
         inner.distance = 0.0f;
     }
@@ -2434,7 +2508,10 @@ i32 LaserCurveInf::initialize(void *params)
     {
         nodes.next = NULL;
         nodes.speed = length;
-        nodes.angle = wrap_angle(angle);
+        // Stored through a pointer so that angle is loaded again for the
+        // velocity below, as in the original.
+        f32 *node_angle = &nodes.angle;
+        *node_angle = wrap_angle(angle);
         laser_sincosmul(&nodes.velocity, angle, 1.0f);
         nodes.start_pos = position;
         nodes.velocity.z = 0.0f;
@@ -2446,8 +2523,10 @@ i32 LaserCurveInf::initialize(void *params)
     *(Float3 *)((LaserCurveSegment *)segments)->unk_c = tip_offset;
     for (i32 i = 0; i < inner.segment_count; i++)
     {
+        // prev_pos indexed from segments again (not segment[-1]): segments is
+        // then loaded before i is scaled, as in the original.
         LaserCurveSegment *segment = &((LaserCurveSegment *)segments)[i];
-        Float3 *prev_pos = &segment[-1].pos;
+        Float3 *prev_pos = &((LaserCurveSegment *)segments)[i - 1].pos;
         f32 *out_length = &segment->length;
         f32 prev_length = segment[-1].length;
         f32 prev_angle = segment[-1].angle;
@@ -2506,7 +2585,6 @@ static __forceinline f32 laser_mid_angle(f32 cur, f32 prev)
 // laser's width to each side across the segment's direction (averaged with
 // the previous segment's), with u running from 0 to 1 along the laser. The
 // origin VM sits on the last segment until the whole laser is out.
-// TODO: the original loads the segment z before adding the vertex z (operand order; += gets z right but y wrong, D3DXVec3Add or field-wise forms get z wrong).
 // FUNCTION: TH16 0x438750
 i32 LaserCurveInf::on_draw()
 {
@@ -2530,7 +2608,14 @@ i32 LaserCurveInf::on_draw()
             a = laser_mid_angle(cur, wrap_angle(segment[-1].angle + ZUN_PI / 2));
         }
         laser_sincosmul((Float3 *)&vertex->pos, a, inner.laser_new_arg_4 * 0.5f);
-        D3DXVec3Add((Float3 *)&vertex->pos, &segment->pos, (Float3 *)&vertex->pos);
+        // x and y as a vector add, z through a pointer to the segment's z
+        // (one per vertex): the original loads the segment's z and adds the
+        // vertex's.
+        D3DXVec2Add((Float2 *)&vertex->pos, (Float2 *)&segment->pos, (Float2 *)&vertex->pos);
+        {
+            f32 *segment_z = &segment->pos.z;
+            vertex->pos.z = *segment_z + vertex->pos.z;
+        }
         vertex->pos.x += (f32)g_game_2d_origin_x;
         vertex->pos.y += (f32)g_early_arcade_offset_y;
         vertex->pos.z = 0.0f;
@@ -2549,7 +2634,11 @@ i32 LaserCurveInf::on_draw()
             a = laser_mid_angle(cur, wrap_angle(segment[-1].angle - ZUN_PI / 2));
         }
         laser_sincosmul((Float3 *)&vertex->pos, a, inner.laser_new_arg_4 * 0.5f);
-        D3DXVec3Add((Float3 *)&vertex->pos, &segment->pos, (Float3 *)&vertex->pos);
+        D3DXVec2Add((Float2 *)&vertex->pos, (Float2 *)&segment->pos, (Float2 *)&vertex->pos);
+        {
+            f32 *segment_z = &segment->pos.z;
+            vertex->pos.z = *segment_z + vertex->pos.z;
+        }
         vertex->pos.x += (f32)g_game_2d_origin_x;
         vertex->pos.y += (f32)g_early_arcade_offset_y;
         vertex->pos.z = 0.0f;
@@ -2768,11 +2857,30 @@ void LaserCurveInf::run_ex()
     }
 }
 
-// TODO: register allocation and the order of the vector temporaries differ (the original builds them with unpcklps).
+// Steps a segment back from the previous one's position (pos, speed, angle)
+// along the node's motion. In mode 2 the whole part of t is kept as the
+// double floor returns: the original converts it with cvtpd2ps.
+// The six dead locals are not ZUN's: MSVC orders the x component loads by
+// the function's count of named variables (period 8; docs/findings.md), and
+// these give the original's dt copy and, with D3DXVec3Add(&sum, &a, &b), the
+// x operands of the sum. Matching only.
+// TODO: mode 1 still squares sum.y into the register it adds to where the original squares sum.x (the operand order of the sum, a length-squared local, offset_length_sq, D3DXVec2Length and field-wise sums do not change it).
 // FUNCTION: TH16 0x438370
 void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle,
                                f32 t)
 {
+    i32 unused_a = 0;
+    i32 unused_b = 0;
+    i32 unused_c = 0;
+    i32 unused_d = 0;
+    i32 unused_e = 0;
+    i32 unused_f = 0;
+    (void)unused_a;
+    (void)unused_b;
+    (void)unused_c;
+    (void)unused_d;
+    (void)unused_e;
+    (void)unused_f;
     switch (mode)
     {
     case 0:
@@ -2796,7 +2904,8 @@ void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
             b.z = 0.0f;
             laser_sincosmul(&a, angle, -speed);
             laser_sincosmul(&b, angle_delta, -speed_delta);
-            Float3 sum = b + a;
+            Float3 sum;
+            D3DXVec3Add(&sum, &a, &b);
             *out_pos = *pos + sum;
             *out_speed = (f32)sqrt(sum.x * sum.x + sum.y * sum.y);
             *out_angle = atan2(sum.y, sum.x);
@@ -2807,8 +2916,8 @@ void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
         Float3 d;
         d.z = 0.0f;
         laser_sincosmul(&d, angle, speed);
-        f32 whole = (f32)floor(t);
-        *out_pos = *pos - d * (t - whole);
+        double whole = floor(t);
+        *out_pos = *pos - d * (t - (f32)whole);
         *out_speed = speed - speed_delta;
         i32 i = 0;
         f32 a = angle - angle_delta;
@@ -2830,16 +2939,28 @@ void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
         }
         *out_angle = a;
         laser_sincosmul(&d, a, *out_speed);
-        *out_pos = *out_pos - d * (1.0f - t + whole);
+        *out_pos = *out_pos - d * (1.0f - t + (f32)whole);
         break;
     }
     }
 }
 
-// TODO: register allocation differs (the original keeps the stepped position in xmm registers and stack shadows; the frame is aligned to 64).
+// The four dead locals are not ZUN's: the function's count of named
+// variables decides MSVC's register choices here (docs/findings.md), and
+// these come closest to the original. The mode 2 loop is a guarded do/while
+// counting down like the original's sub/jne. Matching only.
+// TODO: in mode 2's loop the original keeps s in xmm6 and pos.x in its stack slot (ours keeps pos.x in xmm7 and s in memory); the frame is aligned to 64.
 // FUNCTION: TH16 0x437ee0
 void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, f32 time)
 {
+    i32 unused_a = 0;
+    i32 unused_b = 0;
+    i32 unused_c = 0;
+    i32 unused_d = 0;
+    (void)unused_a;
+    (void)unused_b;
+    (void)unused_c;
+    (void)unused_d;
     time -= start_time;
     switch (mode)
     {
@@ -2877,31 +2998,35 @@ void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
         f32 s = speed;
         Float3 d;
         d.z = 0.0f;
-        for (i32 n = (i32)time; n > 0; n--)
+        i32 n = (i32)time;
+        if (n > 0)
         {
-            laser_sincosmul(&d, a, s);
-            i32 i = 0;
-            a += angle_delta;
-            while (a > ZUN_PI)
+            do
             {
-                a -= ZUN_2PI;
-                if (i++ > 32)
+                laser_sincosmul(&d, a, s);
+                i32 i = 0;
+                a += angle_delta;
+                while (a > ZUN_PI)
                 {
-                    break;
+                    a -= ZUN_2PI;
+                    if (i++ > 32)
+                    {
+                        break;
+                    }
                 }
-            }
-            while (a < -ZUN_PI)
-            {
-                a += ZUN_2PI;
-                if (i++ > 32)
+                while (a < -ZUN_PI)
                 {
-                    break;
+                    a += ZUN_2PI;
+                    if (i++ > 32)
+                    {
+                        break;
+                    }
                 }
-            }
-            pos.x += d.x;
-            s += speed_delta;
-            pos.y += d.y;
-            pos.z += d.z;
+                pos.x += d.x;
+                s += speed_delta;
+                pos.y += d.y;
+                pos.z += d.z;
+            } while (--n);
         }
         laser_sincosmul(&d, a, s);
         *out_pos = pos + d * (time - (f32)floor(time));
@@ -2916,10 +3041,14 @@ void LaserCurveNode::get_state(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
 // full length, moving and shrinking to laser_new_arg_3), leaving the screen
 // once the two delay timers ran out, then the graze check and the VMs.
 // Nonzero once the laser is done.
-// TODO: the original realigns the frame, keeps the * 1.0f of the inlined timer decrement, and loads g_game_speed once for the three position components.
+// The dead double is not ZUN's code: as in LaserLineInf::initialize, it
+// makes LTCG realign the frame (and esp, -8) like the original.
+// TODO: the original keeps the * 1.0f of the inlined timer decrements, adds the tip offset's x component into its own register, and keeps the zero constant in xmm5 (ours xmm6).
 // FUNCTION: TH16 0x432f40
 i32 LaserLineInf::on_tick()
 {
+    double unused = 0.0;
+    (void)unused;
     i32 again;
     do
     {
@@ -2981,10 +3110,9 @@ i32 LaserLineInf::on_tick()
             ex_invuln_remaining_frames--;
         }
     } while (again != 0);
-    f32 step = length * g_game_speed;
     if (hit_length < inner.laser_new_arg_2)
     {
-        hit_length = step + hit_length;
+        hit_length += length * g_game_speed;
         if (hit_length > inner.laser_new_arg_2)
         {
             hit_length = inner.laser_new_arg_2;
@@ -2992,10 +3120,12 @@ i32 LaserLineInf::on_tick()
     }
     else
     {
-        unk_7c = step + unk_7c;
-        position.x = tip_offset.x * g_game_speed + position.x;
-        position.y = position.y + tip_offset.y * g_game_speed;
-        position.z = position.z + tip_offset.z * g_game_speed;
+        unk_7c += length * g_game_speed;
+        // position += tip_offset * g_game_speed, through a temporary and
+        // D3DXVec3Add with v first: g_game_speed is loaded once and the adds
+        // take the original's operand order.
+        Float3 v = tip_offset * g_game_speed;
+        D3DXVec3Add(&position, &v, &position);
         if (inner.laser_new_arg_3 > 0.0f && hit_length + unk_7c > inner.laser_new_arg_3)
         {
             hit_length = inner.laser_new_arg_3 - unk_7c;
@@ -3031,12 +3161,12 @@ i32 LaserLineInf::on_tick()
         }
     }
     check_graze_or_kill(0);
-    AnmVm *vm = &vm_92c;
-    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
-    vm->scale.x = width / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_width;
-    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
-    vm->scale.y = hit_length / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_height;
-    vm->run();
+    vm_92c.flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm_92c.scale.x = width / g_AnmManager->loaded_anms[vm_92c.anm_loaded_index]->sprites[vm_92c.sprite_id].sprite_width;
+    vm_92c.flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm_92c.scale.y =
+        hit_length / g_AnmManager->loaded_anms[vm_92c.anm_loaded_index]->sprites[vm_92c.sprite_id].sprite_height;
+    vm_92c.run();
     if (unk_7c == 0.0f)
     {
         vm_f28.run();
@@ -3049,7 +3179,9 @@ i32 LaserLineInf::on_tick()
 // One frame: the et_ex steps, then each segment follows the node list to
 // its place at segment_timer minus its index (segments not out yet stay at the
 // start), leaving the screen once every segment is off it.
-// TODO: the original walks the segments with a pointer biased by -8 and keeps the constants 192 and 448 in swapped registers; it also keeps the * 1.0f of the inlined timer decrement.
+// The segments are indexed (segs[i], segs[i - 1]): the loop then walks them
+// with a pointer biased by -8 like the original's.
+// TODO: the original calls step_ex_accel through eax (ours edx), keeps 192 and 448 in swapped registers, keeps the * 1.0f of the inlined timer decrements and tests the first node for NULL (the for loop form keeps that test but differs more elsewhere).
 // FUNCTION: TH16 0x4377d0
 i32 LaserCurveInf::on_tick()
 {
@@ -3118,48 +3250,53 @@ i32 LaserCurveInf::on_tick()
             ex_invuln_remaining_frames--;
         }
     } while (again != 0);
-    LaserCurveSegment *segment = (LaserCurveSegment *)segments;
+    LaserCurveSegment *segs = (LaserCurveSegment *)segments;
     if (!(flags_rest & 1))
     {
-        i32 placed = 0;
-        for (i32 i = 0; i < inner.segment_count; i++, segment++)
+        // volatile keeps the flag in its stack slot as in the original,
+        // where out_length holds the register ours would give it.
+        volatile i32 placed = 0;
+        for (i32 i = 0; i < inner.segment_count; i++)
         {
             f32 t = segment_timer.current_f - (f32)i;
             if (t >= 0.0f)
             {
-                f32 prev_length = segment[-1].length;
-                f32 prev_angle = segment[-1].angle;
-                f32 *out_length = &segment->length;
-                f32 *out_angle = &segment->angle;
-                LaserCurveNode *node;
-                for (node = &nodes; node != NULL; node = node->next)
+                f32 prev_length = segs[i - 1].length;
+                f32 prev_angle = segs[i - 1].angle;
+                f32 *out_length = &segs[i].length;
+                f32 *out_angle = &segs[i].angle;
+                // A do/while from the first node (never NULL) instead of a
+                // for loop: closer to the original's registers.
+                LaserCurveNode *node = &nodes;
+                do
                 {
                     if (t >= node->start_time && node->end_time > t)
                     {
                         if (!placed)
                         {
-                            node->get_state(&segment->pos, out_length, out_angle, t);
+                            node->get_state(&segs[i].pos, out_length, out_angle, t);
                         }
                         else
                         {
-                            node->step_back(&segment->pos, out_length, out_angle, &segment[-1].pos, prev_length,
+                            node->step_back(&segs[i].pos, out_length, out_angle, &segs[i - 1].pos, prev_length,
                                             prev_angle, t);
                         }
                         break;
                     }
-                }
+                    node = node->next;
+                } while (node != NULL);
                 placed = 1;
             }
             else
             {
-                segment->pos = inner.start_pos;
-                *(Float3 *)segment->unk_c = g_zero_vec;
-                segment->angle = inner.ang_aim;
-                segment->length = inner.speed;
+                segs[i].pos = inner.start_pos;
+                *(Float3 *)segs[i].unk_c = g_zero_vec;
+                segs[i].angle = inner.ang_aim;
+                segs[i].length = inner.speed;
             }
         }
     }
-    segment = (LaserCurveSegment *)segments;
+    LaserCurveSegment *segment = (LaserCurveSegment *)segments;
     if (offscreen_grace.current > 0 || (ex_flags & BULLET_EX_OFFSCREEN))
     {
         offscreen_grace.decrement(1.0f);
@@ -3350,13 +3487,15 @@ DECOMP_NOINLINE void LaserLineInf::run_ex()
 
 // Sets the laser up from its parameters: the body, origin and tip VMs, the
 // delay timers, the shot sound and the start offset along the aim.
-// TODO: the original realigns the frame (and esp, -8); everything else matches. So do
-// the other set_vm_script callers, and set_vm_script has a padded frame there. A dead
-// double in a HARNESS_CALLED AnmVm::run matches it but loses other functions; one in
-// set_vm_script only makes set_vm_script realign itself (see docs/findings.md).
+// The dead double is not ZUN's code: it stands in for double math the
+// optimizer removed from his body. LTCG's double stack alignment pass sees it
+// at the IL level, so this function realigns its frame (and esp, -8) like the
+// original (see TitleInf::set_substate).
 // FUNCTION: TH16 0x431b30
 i32 LaserLineInf::initialize(void *params)
 {
+    double unused = 0.0;
+    (void)unused;
     inner = *(LaserLineInner *)params;
     bullet_type = inner.bullet_type;
     state = LASER_STATE_ACTIVE;

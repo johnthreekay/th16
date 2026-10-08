@@ -178,8 +178,8 @@ u32 ScorefileSection::compute_checksum(i32 size)
 // PauseMenu.cpp: opens the menu shown when a replay ends.
 void open_replay_end_menu();
 
-// TODO: the original realigns its frame to 8 bytes and keeps the recorded
-// input in a local (edi, spilled to the frame); ours rereads the global.
+// TODO: 44%; the original realigns its frame through ebx and keeps the
+// recorded input in eax and edi besides its stack slot (ours reloads it).
 // FUNCTION: TH16 0x447fd0
 int ReplayManager::on_tick_record()
 {
@@ -190,7 +190,9 @@ int ReplayManager::on_tick_record()
     g_InputState.input_prev = g_InputState.input;
     g_InputState.input = (u16)g_hardware_input;
     InputState::update();
-    u32 input;
+    // The original keeps the recorded input in a stack slot; volatile
+    // stands in for whatever spilled it there.
+    u32 volatile input;
     if (g_Supervisor.config.flags & CONFIG_SHOT_HOLD_FOCUS)
     {
         input = g_InputState.input;
@@ -397,8 +399,6 @@ HARNESS_CALLED void ReplayManager::start_stage()
     }
 }
 
-// TODO: the original realigns its frame through ebx (and esp, -8), most
-// likely for repopulate_options; the body matches.
 // FUNCTION: TH16 0x448eb0
 HARNESS_CALLED void ReplayManager::begin_stage()
 {
@@ -464,9 +464,10 @@ void clear_input_state()
     g_InputState.input_held_long = 0;
 }
 
-// TODO: register allocation in the unregister_locked blocks (the original
-// keeps each func in ebx and loads the registry inside the null check) and
-// our loops get alignment padding the original lacks.
+// Each update function is unregistered with its own written-out copy of
+// UpdateFuncRegistry::unregister_locked, with the registry read inside the
+// null check (the inline helper kept the function pointer in a stack slot).
+// TODO: the original keeps each func in ebx and EnterCriticalSection's address in eax (ours rereads the func and keeps the address in ebx).
 // FUNCTION: TH16 0x447c80
 ReplayManager::~ReplayManager()
 {
@@ -482,10 +483,28 @@ ReplayManager::~ReplayManager()
         delete (RpyGamestate *)stage_gamestate_snapshots[i];
         stage_gamestate_snapshots[i] = NULL;
     }
-    g_UpdateFuncRegistry->unregister_locked(on_tick_func);
-    g_UpdateFuncRegistry->unregister_locked(fast_forward_func);
-    g_UpdateFuncRegistry->unregister_locked(on_draw_func);
-    if (g_ReplayManager == this)
+    if (on_tick_func != NULL)
+    {
+        UpdateFuncRegistry *registry = g_UpdateFuncRegistry;
+        ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
+        registry->unregister(on_tick_func);
+        LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
+    }
+    if (fast_forward_func != NULL)
+    {
+        UpdateFuncRegistry *registry = g_UpdateFuncRegistry;
+        ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
+        registry->unregister(fast_forward_func);
+        LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
+    }
+    if (on_draw_func != NULL)
+    {
+        UpdateFuncRegistry *registry = g_UpdateFuncRegistry;
+        ENTER_CS(CS_UPDATE_FUNC_REGISTRY);
+        registry->unregister(on_draw_func);
+        LEAVE_CS(CS_UPDATE_FUNC_REGISTRY);
+    }
+    if (this == g_ReplayManager)
     {
         g_ReplayManager = NULL;
     }
@@ -679,7 +698,8 @@ static __forceinline i32 finish_user_section(u8 *section, char *end)
     return size;
 }
 
-// TODO: ours realigns its frame to 64 bytes (alignment spreading up from a callee) and allocates registers differently.
+// TODO: 76%; registers are allocated differently (the original keeps 0 in
+// ebx for the stage counters and spills path; ours keeps path in ebx).
 // FUNCTION: TH16 0x448400
 HARNESS_CALLED i32 ReplayManager::save(const char *path, const char *name, i32 unused, i32 add_end_marker)
 {

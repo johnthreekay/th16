@@ -213,7 +213,7 @@ i32 AnmManager::write_sprite(RenderVertex144 *vertices)
 
 // Render mode 9: like draw_vertex_fan for visible VMs only, with the
 // texture set first and color ops reset to modulate.
-// TODO: the original keeps this in ebx and vm in esi (edi only around SetTexture); ours spills this.
+// TODO: around SetTexture ours swaps edi and esi (the device and its vtable) and loads the device before the sar.
 // FUNCTION: TH16 0x4681f0
 i32 AnmManager::draw_vertex_strip(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count)
 {
@@ -237,23 +237,23 @@ i32 AnmManager::draw_vertex_strip(AnmVm *vm, RenderVertex144 *vertices, i32 vert
     if (last_texture_id != texture)
     {
         last_texture_id = texture;
-        g_Supervisor.d3d_device->SetTexture(0, loaded_anms[texture >> 8]->d3d[texture & 0xff].texture);
+        supervisor_d3d_device()->SetTexture(0, loaded_anms[texture >> 8]->d3d[texture & 0xff].texture);
     }
     if (last_vertex_setup != ANM_VERTEX_SETUP_SCREEN_TEXTURED)
     {
-        g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
         last_vertex_setup = ANM_VERTEX_SETUP_SCREEN_TEXTURED;
     }
     setup_render_state_for_vm(vm);
     if (g_AnmManager->last_color_op != ANM_COLOR_OP_MODULATE)
     {
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
         g_AnmManager->last_color_op = ANM_COLOR_OP_MODULATE;
     }
-    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, vertex_count - 2, vertices,
+    supervisor_d3d_device()->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, vertex_count - 2, vertices,
                                              sizeof(RenderVertex144));
     return 0;
 }
@@ -290,16 +290,17 @@ i32 AnmManager::draw_vertex_fan(AnmVm *vm, RenderVertex144 *vertices, i32 vertex
 }
 
 // Draws count points, each center + offsets[i] in colors[i], as a line
-// strip (despite the name) from the primitive buffer.
-// TODO: ours never uses ebx (the original keeps count * 20 and center in it) and spills the loop counter.
+// strip (despite the name) from the primitive buffer. Always returns 0
+// (the original sets eax although its caller ignores it).
+// TODO: ours stores the saved count to [ebp-4] one instruction earlier; the rest matches since the device calls go through supervisor_d3d_device().
 // FUNCTION: TH16 0x469890
-HARNESS_CALLED void AnmManager::draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors)
+HARNESS_CALLED i32 AnmManager::draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors)
 {
     AnmManager *mgr = g_AnmManager;
     RenderVertex044 *vertices = mgr->primitive_write_cursor;
     if (vertices + 1 + count >= mgr->primitive_vertex_data + 0x8000)
     {
-        return;
+        return 0;
     }
     mgr->flush_sprites();
     for (i32 i = 0; i < count; i++)
@@ -315,21 +316,22 @@ HARNESS_CALLED void AnmManager::draw_triangle_fan(i32 count, Float3 *center, Flo
     }
     if (g_AnmManager->last_color_op != ANM_COLOR_OP_DIFFUSE)
     {
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
         g_AnmManager->last_color_op = ANM_COLOR_OP_DIFFUSE;
     }
     if (mgr->last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
         mgr->last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
-    g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
-    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_LINESTRIP, count - 1, mgr->primitive_write_cursor,
+    supervisor_d3d_device()->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+    supervisor_d3d_device()->DrawPrimitiveUP(D3DPT_LINESTRIP, count - 1, mgr->primitive_write_cursor,
                                              sizeof(RenderVertex044));
     mgr->primitive_write_cursor += count;
     mgr->stat_draw_calls++;
+    return 0;
 }
 
 // The extra data of VMs drawn by anm_on_draw_masked (ExpHP:
@@ -371,36 +373,37 @@ static __forceinline void anm_mask_begin()
 {
     g_AnmManager->flush_sprites();
     IDirect3DDevice9 *d3d = g_Supervisor.d3d_device;
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, TRUE);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ZERO);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_ONE);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ZERO);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
+    supervisor_d3d_device()->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+    supervisor_d3d_device()->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, TRUE);
+    supervisor_d3d_device()->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ZERO);
+    supervisor_d3d_device()->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
+    supervisor_d3d_device()->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+    supervisor_d3d_device()->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_ONE);
+    supervisor_d3d_device()->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ZERO);
+    supervisor_d3d_device()->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
 }
 
 static __forceinline void anm_mask_draw(AnmMaskVertex *vertices)
 {
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
-    g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
-    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, vertices, sizeof(AnmMaskVertex));
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
+    supervisor_d3d_device()->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+    supervisor_d3d_device()->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, vertices, sizeof(AnmMaskVertex));
+    supervisor_d3d_device()->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
     g_AnmManager->last_blend_mode = ANM_BLEND_FORCE_RESET;
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_SRCALPHA);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ONE);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
+    supervisor_d3d_device()->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_SRCALPHA);
+    supervisor_d3d_device()->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ONE);
+    supervisor_d3d_device()->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
 }
 
-// TODO: the original keeps the extra data in ebx and copies it to esi for the draw_vm loop; ours never uses ebx and spills it.
+// Its mask helpers calls the device through supervisor_d3d_device() so that ebx stays
+// usable (see Supervisor.h).
 // FUNCTION: TH16 0x4073a0
 i32 __fastcall anm_on_draw_masked(AnmVm *vm)
 {
@@ -433,7 +436,7 @@ i32 __fastcall anm_on_draw_masked(AnmVm *vm)
     }
     if (data->mode == 2 || (data->mode == 0 && g_Supervisor.present_params.BackBufferFormat == D3DFMT_A8R8G8B8))
     {
-        g_Supervisor.d3d_device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, FALSE);
+        supervisor_d3d_device()->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, FALSE);
         g_AnmManager->draw_vm(&data->overlay);
         g_AnmManager->flush_sprites();
     }
@@ -465,7 +468,13 @@ static void __fastcall fan_sincosmul(Float3 *dst, f32 angle, f32 radius)
 
 // Sets up render mode 10 (ANM instruction 302): a fan of random radii
 // around the VM, moved by on_tick 4 and drawn by on_draw 6.
-// TODO: the original keeps the angle in xmm4 and the radius speed in memory, storing the speed after the random call.
+// The speed is stored through `*(radius + 33)`: indexing (radius[33]) puts
+// the store after the radius's instead of between its multiply and add.
+// The loop is a do/while counting up: it compiles to the same down-counter
+// as `for (i = 31; i != 0; i--)`, but only this form loads entity_pos.z
+// before pos.z in the vertex sum like the original (which operand MSVC
+// loads first there follows its internal numbering, not the operand order;
+// see docs/findings.md).
 // FUNCTION: TH16 0x469e20
 int __fastcall anm_fan_init(AnmVm *vm)
 {
@@ -482,14 +491,15 @@ int __fastcall anm_fan_init(AnmVm *vm)
     data->uv_speed = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);
     data->unk_4a8 = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);
     f32 angle = -ZUN_PI;
+    RenderVertex144 *vertex = &data->vertices[1];
     *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
     data->vertices[0].pos.w = 1.0f;
     data->vertices[0].uv.x = 0.5f;
     data->vertices[0].uv.y = 0.5f;
     f32 speed = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 15.0f);
-    RenderVertex144 *vertex = &data->vertices[1];
     f32 *radius = data->radius;
-    for (i32 i = 31; i != 0; i--)
+    i32 i = 0;
+    do
     {
         if (angle >= ZUN_PI)
         {
@@ -501,9 +511,9 @@ int __fastcall anm_fan_init(AnmVm *vm)
         vertex->pos.z = 0.0f;
         vertex->uv.x = uv.x + 0.5f;
         vertex->uv.y = uv.y + 0.5f;
-        f32 r = g_replay_safe_rng.randf_neg_1_to_1() * 8.0f + 80.0f;
-        radius[33] = speed;
-        *radius = r;
+        *radius = g_replay_safe_rng.randf_neg_1_to_1() * 8.0f + 80.0f;
+        // radius + 33 is radius_speed[i] (it follows radius[33]); the pointer form gives the original's store order.
+        *(radius + 33) = speed;
         speed += g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 30.0f);
         if (speed < -(1.0f / 15.0f))
         {
@@ -514,13 +524,11 @@ int __fastcall anm_fan_init(AnmVm *vm)
             speed = 1.0f / 15.0f;
         }
         fan_sincosmul((Float3 *)&vertex->pos, angle, *radius);
-        vertex->pos.x = vertex->pos.x + (vm->entity_pos.x + vm->pos.x);
-        vertex->pos.y = vertex->pos.y + (vm->pos.y + vm->entity_pos.y);
-        vertex->pos.z = vertex->pos.z + (vm->entity_pos.z + vm->pos.z);
+        *(Float3 *)&vertex->pos += vm->pos + vm->entity_pos;
         angle += ZUN_2PI / 31.0f;
         vertex++;
         radius++;
-    }
+    } while (++i < 31);
     return 0;
 }
 
@@ -551,45 +559,39 @@ static inline void fan_scroll_v(AnmFanData *data, RenderVertex144 *vertex)
 
 // The on_tick callback of the fan VMs: grows the points, scrolls the
 // texture and places the fan at the VM.
-// TODO: the original hoists the -pi, 0 and 1 constants into xmm4-6 at entry and walks the radii with ebx; scheduling differs.
+// The loop walks vertex and radius pointers and copies the first point to
+// the closing vertex through them, as the original's registers show.
+// TODO: the original adds uv.x + uv_speed (first vertex), uv.y + uv_speed
+// (in the loop) and entity_pos.z + pos.z with the operands the other way
+// round; operand order and pointer forms in the scroll helpers flip
+// several of these at once (loop forms and extra locals were tried too).
 // FUNCTION: TH16 0x46a0b0
 i32 __fastcall anm_on_tick_fan(AnmVm *vm)
 {
     AnmFanData *data = (AnmFanData *)vm->extra_data;
-    *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
-    data->vertices[0].uv.x += data->uv_speed;
-    if (data->vertices[0].uv.x < 0.0f)
-    {
-        for (i32 i = 0; i < 33; i++)
-        {
-            data->vertices[i].uv.x += 1.0f;
-        }
-    }
-    data->vertices[0].uv.y += data->uv_speed;
-    if (data->vertices[0].uv.y < 0.0f)
-    {
-        for (i32 i = 0; i < 33; i++)
-        {
-            data->vertices[i].uv.y += 1.0f;
-        }
-    }
-    data->vertices[0].diffuse = vm->color_1.d3d;
     f32 angle = -ZUN_PI;
-    for (i32 i = 0; i < 31; i++)
+    *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
+    fan_scroll_u(data, &data->vertices[0]);
+    fan_scroll_v(data, &data->vertices[0]);
+    data->vertices[0].diffuse = vm->color_1.d3d;
+    RenderVertex144 *first = &data->vertices[1];
+    RenderVertex144 *vertex = first;
+    f32 *radius = data->radius;
+    for (i32 i = 31; i != 0; i--)
     {
-        RenderVertex144 *vertex = &data->vertices[i + 1];
         fan_scroll_u(data, vertex);
         fan_scroll_v(data, vertex);
         vertex->diffuse = vm->color_1.d3d;
         ((ZunColor *)&vertex->diffuse)->a = 0;
-        data->radius[i] = data->radius_speed[i] + data->radius[i];
-        fan_sincosmul((Float3 *)&vertex->pos, angle, data->radius[i]);
+        // radius + 33 is radius_speed[i] (it follows radius[33]); the pointer form gives the original's store order.
+        *radius = *(radius + 33) + *radius;
+        fan_sincosmul((Float3 *)&vertex->pos, angle, *radius);
         angle += ZUN_2PI / 31.0f;
-        vertex->pos.x = vertex->pos.x + (vm->pos.x + vm->entity_pos.x);
-        vertex->pos.y = (vm->pos.y + vm->entity_pos.y) + vertex->pos.y;
-        vertex->pos.z = (vm->entity_pos.z + vm->pos.z) + vertex->pos.z;
+        *(Float3 *)&vertex->pos += vm->entity_pos + vm->pos;
+        vertex++;
+        radius++;
     }
-    data->vertices[32] = data->vertices[1];
+    *vertex = *first;
     return 0;
 }
 

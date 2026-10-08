@@ -14,7 +14,10 @@ static void __fastcall primitive_sincosmul(Float3 *dst, f32 angle, f32 radius)
 // A width x height rectangle at (x, y) rotated by angle, anchored by
 // anchor_x and anchor_y (0 center, 1 left/top, 2 right/bottom), colored
 // color_1 on the left and color_2 on the right.
-// TODO: the float register allocation of the corner coordinates differs (the original reuses height's stack slot).
+// The left corners are assigned before the right ones (and the bottom
+// before the top): the order moves the corner registers closer to the
+// original's.
+// TODO: the float register allocation of the corner coordinates still differs (the original reuses height's stack slot) and sine and cosine trade stack slots.
 // FUNCTION: TH16 0x468c70
 HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f32 angle, D3DCOLOR color_1,
                                          D3DCOLOR color_2, i32 anchor_x, i32 anchor_y)
@@ -34,16 +37,16 @@ HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f3
     switch (anchor_x)
     {
     case ANM_ANCHOR_CENTER:
-        x1 = x3 = width * 0.5f;
         x0 = x2 = width * -0.5f;
+        x1 = x3 = width * 0.5f;
         break;
     case ANM_ANCHOR_START:
-        x1 = x3 = width;
         x0 = x2 = 0.0f;
+        x1 = x3 = width;
         break;
     case ANM_ANCHOR_END:
-        x1 = x3 = 0.0f;
         x0 = x2 = -width;
+        x1 = x3 = 0.0f;
         break;
     }
     switch (anchor_y)
@@ -99,7 +102,7 @@ HARNESS_CALLED i32 AnmManager::draw_rect(f32 x, f32 y, f32 width, f32 height, f3
 }
 
 // The outline of draw_rect's rectangle, as a line strip.
-// TODO: the float register allocation of the corner coordinates differs (the original reuses height's stack slot).
+// TODO: as in draw_rect, the corner registers and the sine and cosine stack slots differ, and the original copies the first corner to the closing vertex with one movq.
 // FUNCTION: TH16 0x468fc0
 HARNESS_CALLED i32 AnmManager::draw_rect_outline(f32 x, f32 y, f32 width, f32 height, f32 angle, D3DCOLOR color_1,
                                          D3DCOLOR color_2, i32 anchor_x, i32 anchor_y)
@@ -119,16 +122,16 @@ HARNESS_CALLED i32 AnmManager::draw_rect_outline(f32 x, f32 y, f32 width, f32 he
     switch (anchor_x)
     {
     case ANM_ANCHOR_CENTER:
-        x1 = x3 = width * 0.5f;
         x0 = x2 = width * -0.5f;
+        x1 = x3 = width * 0.5f;
         break;
     case ANM_ANCHOR_START:
-        x1 = x3 = width;
         x0 = x2 = 0.0f;
+        x1 = x3 = width;
         break;
     case ANM_ANCHOR_END:
-        x1 = x3 = 0.0f;
         x0 = x2 = -width;
+        x1 = x3 = 0.0f;
         break;
     }
     switch (anchor_y)
@@ -325,7 +328,7 @@ HARNESS_CALLED i32 AnmManager::draw_circle(f32 x, f32 y, f32 radius, f32 angle, 
 
 // The outline of a circle of count segments around (x, y), as a line
 // strip starting at angle.
-// TODO: ours never uses ebx (the original keeps the vertex count bytes and color in it) and spills this.
+// TODO: ours loads x after the count test, adds the y offset in the other operand order and lacks one nop before a loop head; ebx now matches (supervisor_d3d_device()).
 // FUNCTION: TH16 0x469a00
 HARNESS_CALLED i32 AnmManager::draw_circle_outline(f32 x, f32 y, f32 radius, f32 angle, i32 count, D3DCOLOR color)
 {
@@ -349,18 +352,18 @@ HARNESS_CALLED i32 AnmManager::draw_circle_outline(f32 x, f32 y, f32 radius, f32
     }
     if (g_AnmManager->last_color_op != ANM_COLOR_OP_DIFFUSE)
     {
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
         g_AnmManager->last_color_op = ANM_COLOR_OP_DIFFUSE;
     }
     if (last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
         last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
-    g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
-    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_LINESTRIP, count, primitive_write_cursor,
+    supervisor_d3d_device()->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+    supervisor_d3d_device()->DrawPrimitiveUP(D3DPT_LINESTRIP, count, primitive_write_cursor,
                                              sizeof(RenderVertex044));
     primitive_write_cursor += count + 1;
     stat_draw_calls++;
@@ -369,7 +372,7 @@ HARNESS_CALLED i32 AnmManager::draw_circle_outline(f32 x, f32 y, f32 radius, f32
 
 // A ring of count segments around (x, y), width wide, as a triangle strip
 // starting at angle.
-// TODO: ours never uses ebx (the original keeps the color in it) and spills this.
+// TODO: ours loads radius after the count test, addresses the second vertex through ecx and adds y in the other operand order; ebx now matches (supervisor_d3d_device()).
 // FUNCTION: TH16 0x469bd0
 HARNESS_CALLED i32 AnmManager::draw_ring(f32 x, f32 y, f32 radius, f32 width, f32 angle, i32 count, D3DCOLOR color)
 {
@@ -402,18 +405,18 @@ HARNESS_CALLED i32 AnmManager::draw_ring(f32 x, f32 y, f32 radius, f32 width, f3
     }
     if (g_AnmManager->last_color_op != ANM_COLOR_OP_DIFFUSE)
     {
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
         g_AnmManager->last_color_op = ANM_COLOR_OP_DIFFUSE;
     }
     if (last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
         last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
-    g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
-    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, count * 2, primitive_write_cursor,
+    supervisor_d3d_device()->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+    supervisor_d3d_device()->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, count * 2, primitive_write_cursor,
                                              sizeof(RenderVertex044));
     primitive_write_cursor += count * 2 + 2;
     stat_draw_calls++;

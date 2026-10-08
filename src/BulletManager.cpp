@@ -67,13 +67,16 @@ __forceinline void BulletManager::reset_lists()
     head->unk_c = NULL;
     for (i32 i = 0; i < BULLET_COUNT; i++)
     {
+        // The free list node is cleared through bullets[i] before the local
+        // pointer exists: that keeps its first store on the loop pointer, and
+        // the tick node's entry is stored before its next, as in the original.
+        bullets[i].freelist_node.entry = NULL;
+        bullets[i].freelist_node.next = NULL;
+        bullets[i].freelist_node.prev = NULL;
+        bullets[i].freelist_node.unk_c = NULL;
         Bullet *b = &bullets[i];
-        b->freelist_node.entry = NULL;
-        b->freelist_node.next = NULL;
-        b->freelist_node.prev = NULL;
-        b->freelist_node.unk_c = NULL;
-        b->tick_list_node.next = NULL;
         b->tick_list_node.entry = b;
+        b->tick_list_node.next = NULL;
         b->tick_list_node.prev = NULL;
         b->tick_list_node.unk_c = NULL;
         b->index = i;
@@ -94,8 +97,6 @@ static inline UpdateFuncCallback bullet_on_tick_callback()
     return (UpdateFuncCallback)BulletManager::on_tick_callback;
 }
 
-// TODO: esi/edi get pushed after the early return, not at entry, and the
-// loop stores b->freelist_node.entry through b, not the loop pointer.
 // FUNCTION: TH16 0x411a30
 i32 BulletManager::initialize()
 {
@@ -125,8 +126,7 @@ i32 BulletManager::initialize()
     return 0;
 }
 
-// TODO: the original has an unused 4-byte frame, keeps mgr in ebx, and
-// stores the first loop field through the loop pointer.
+// TODO: the original has an unused 4-byte frame and keeps mgr in ebx.
 // FUNCTION: TH16 0x411b70
 void BulletManager::destroy_all()
 {
@@ -231,11 +231,16 @@ i32 BulletManager::on_draw_body()
     return 1;
 }
 
-// TODO: the original aligns the stack (and esp, -8) and keeps 1.0f in xmm2
-// across the loop; the inlined ZunTimer::tick differs a little too.
+// TODO: the original keeps 1.0f in xmm2 across the loop for the inlined
+// ZunTimer::tick (reloaded after Bullet::on_tick). tick_nested hoists it too,
+// but puts the speed, 1.0f and 1.01f in xmm0, xmm1 and xmm2 (the original:
+// xmm1, xmm2, xmm0) and adds into the speed's register.
 // FUNCTION: TH16 0x412860
 i32 BulletManager::on_tick_body()
 {
+    // A dead double: LTCG then realigns the frame like the original's.
+    double unused = 0.0;
+    (void)unused;
     Bullet *b;
     b = iter_first();
     bullet_count = 0;
@@ -295,8 +300,11 @@ static_assert(offsetof(Bullet, state_time) == 0x144c, "Bullet layout");
 static_assert(offsetof(BulletManager, anm_ids) == 0x13ffc8c, "BulletManager layout");
 static_assert(offsetof(BulletManager, cancel_count) == 0x1403b14, "BulletManager layout");
 
-// Bullet::cancel's body, which clear_all has inlined.
-static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
+// Bullet::cancel's body, which clear_all has inlined. The half step the
+// bullet takes is written two ways: through a delta local in Bullet::cancel
+// and in one expression where clear_all inlines it; each matches its copy
+// (half_step_in_place is a constant at both call sites).
+static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode, BOOL half_step_in_place)
 {
     bullet->vm0.interrupt(1);
     bullet->vm0.run();
@@ -314,8 +322,15 @@ static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
         g_SoundManager.play_sound_at_position(SE_ETBREAK, bullet->pos.x);
         gen_items_from_cancel(&bullet->pos, mode);
     }
-    D3DXVECTOR3 delta = bullet->velocity * g_game_speed * 0.5f;
-    bullet->pos += delta;
+    if (half_step_in_place)
+    {
+        bullet->pos += bullet->velocity * g_game_speed * 0.5f;
+    }
+    else
+    {
+        D3DXVECTOR3 delta = bullet->velocity * g_game_speed * 0.5f;
+        bullet->pos += delta;
+    }
     bullet->state = BULLET_STATE_CANCELLED;
     bullet->state_time.reset();
     return 0;
@@ -324,11 +339,10 @@ static __forceinline i32 cancel_bullet(Bullet *bullet, i32 mode)
 // FUNCTION: TH16 0x416840
 i32 Bullet::cancel(i32 mode)
 {
-    return cancel_bullet(this, mode);
+    return cancel_bullet(this, mode, FALSE);
 }
 
-// TODO: the inlined cancel_bullet's velocity scaling and pos += delta differ in register
-// allocation and scheduling (the out-of-line Bullet::cancel matches).
+// TODO: in the inlined half step, x and y of the scaled velocity trade xmm1 and xmm2.
 // FUNCTION: TH16 0x416f40
 HARNESS_CALLED void BulletManager::clear_all(i32 unused)
 {
@@ -337,7 +351,7 @@ HARNESS_CALLED void BulletManager::clear_all(i32 unused)
     {
         if (bullet->state != BULLET_STATE_FREE && bullet->state != BULLET_STATE_HIT)
         {
-            cancel_bullet(bullet, 0);
+            cancel_bullet(bullet, 0, TRUE);
         }
     }
 }
@@ -351,8 +365,6 @@ static inline i32 bullet_in_circle(Bullet *bullet, D3DXVECTOR3 *pos, f32 radius)
     return dy * dy + dx * dx <= r * r;
 }
 
-// TODO: only the iterator differs: the original does not thread the jump after the
-// iterator's NULL entry (if/else, or iter_* defined out of line, do not change it).
 // FUNCTION: TH16 0x416c20
 HARNESS_CALLED i32 BulletManager::cancel_radius(D3DXVECTOR3 *pos, f32 radius, i32 mode)
 {
@@ -371,7 +383,6 @@ HARNESS_CALLED i32 BulletManager::cancel_radius(D3DXVECTOR3 *pos, f32 radius, i3
     return 0;
 }
 
-// TODO: as cancel_radius (only the iterator's jump threading differs).
 // FUNCTION: TH16 0x416d20
 HARNESS_CALLED i32 BulletManager::cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode)
 {
@@ -697,7 +708,9 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
     return 0;
 }
 
-// TODO: about half the code differs: ours addresses et_ex by index instead of through an ex pointer kept in esi, hoists constants, and speculatively devirtualizes the inlined lasers' initialize calls.
+// TODO: about half the code differs: ours addresses et_ex by index instead of through an ex
+// pointer kept in esi (every way of writing the pointer gives the index form), hoists
+// constants, and lays out the frame differently.
 // Starts the et_ex transforms from ex_index on, until one has to wait: an
 // empty slot, a slot-0 transform while others still run, or a transform of
 // a kind already running. Angle arguments of -999990 keep the bullet's
@@ -1262,15 +1275,15 @@ done:
 
 static_assert(offsetof(Bullet, ex_state) == 0xfa0, "Bullet layout");
 
-// TODO: in the inlined timer tick the original adds the speed to current_f in xmm0 and
-// jumps to shared stores (ours adds current_f to the speed in xmm1; tick_mixed gets closer).
+// Speeds the bullet down from 5 + speed to speed over 16 frames (ex 0). The
+// timer ticks with tick_goto, which gives the original's register choice.
 // FUNCTION: TH16 0x414ec0
 i32 Bullet::step_ex_00()
 {
     if (ex_state[0].timer.current <= 16)
     {
         bullet_sincosmul(&velocity, angle, 5.0f - ex_state[0].timer.current_f * 5.0f / 16.0f + speed);
-        ex_state[0].timer.tick_mixed();
+        ex_state[0].timer.tick_goto();
         return 0;
     }
     active_ex_flags ^= BULLET_EX_SPEEDUP;
@@ -1472,8 +1485,7 @@ i32 Bullet::step_ex_03()
     return 0;
 }
 
-// TODO: in the inlined timer tick (tick_mixed) the original loads current_f into xmm0
-// and adds the speed (ours adds current_f into the speed's xmm1).
+// Turns the bullet at intervals (ex 4); tick_goto as in step_ex_00.
 // FUNCTION: TH16 0x415570
 i32 Bullet::step_ex_04()
 {
@@ -1516,7 +1528,7 @@ i32 Bullet::step_ex_04()
         new_speed = speed - ex_state[3].timer.current_f * speed / ex_state[3].ints[0];
     }
     bullet_sincosmul(&velocity, angle, new_speed);
-    ex_state[3].timer.tick_mixed();
+    ex_state[3].timer.tick_goto();
     return 0;
 }
 
@@ -1564,20 +1576,31 @@ static AnmLoadedSprite *vm_sprite(AnmVm *vm)
     return &g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id];
 }
 
-// Whether something of the given size at x is entirely outside [lo, hi].
-static i32 outside_range(f32 x, f32 size, f32 lo, f32 hi)
+// Whether something of the given size at *x is entirely outside [lo, hi].
+// The coordinate is read through the pointer after the half size is
+// computed, which makes it the destination of the add, as in the original.
+static i32 outside_range(f32 *x, f32 size, f32 lo, f32 hi)
 {
     f32 half = size * 0.5f;
-    return x + half <= lo || x - half >= hi;
+    return *x + half <= lo || *x - half >= hi;
 }
 
-// TODO: the original keeps all five constants in registers from the start
-// and adds the half size to the position (ours the other way round).
+// outside_range for Bullet::on_tick's offscreen test (sizes scaled by the
+// bullet's scale). The coordinate is read into a local here: on_tick's
+// original adds the two the other way round from step_ex_12's.
+static i32 outside_range_scaled(f32 *x, f32 size, f32 lo, f32 hi)
+{
+    f32 half = size * 0.5f;
+    f32 v = *x;
+    return v + half <= lo || v - half >= hi;
+}
+
+// TODO: reccmp effective match: the original loads 192.0f before 448.0f.
 // FUNCTION: TH16 0x415d80
 i32 Bullet::step_ex_12()
 {
-    if (outside_range(pos.x, vm_sprite(&vm0)->sprite_width, -192.0f, 192.0f) ||
-        outside_range(pos.y, vm_sprite(&vm0)->sprite_height, 0.0f, 448.0f))
+    if (outside_range(&pos.x, vm_sprite(&vm0)->sprite_width, -192.0f, 192.0f) ||
+        outside_range(&pos.y, vm_sprite(&vm0)->sprite_height, 0.0f, 448.0f))
     {
         i32 sides = ex_state[6].ints[2];
         if ((sides & 1) && pos.y < 0.0f)
@@ -1614,8 +1637,8 @@ i32 Bullet::step_ex_12()
     return 0;
 }
 
-// TODO: the original stores pos.z after loading the angle, and the inlined
-// timer tick keeps the frame in xmm0 (ours xmm1).
+// TODO: the original stores pos.z after loading the angle (tick_goto gives the
+// timer tick's registers).
 // FUNCTION: TH16 0x415f90
 i32 Bullet::step_ex_17()
 {
@@ -1639,12 +1662,14 @@ i32 Bullet::step_ex_17()
         angle = wrap_angle(atan2(velocity.y, velocity.x));
     }
     velocity.z = 0.0f;
-    ex_state[8].timer.tick_mixed();
+    ex_state[8].timer.tick_goto();
     return 0;
 }
 
-// TODO: the original saves ebx and edi in the prologue, keeps
-// cancel_script in ecx and the manager in eax, and puts goal 4 bytes lower.
+// The cancel VM's file is read into `anm` before the call, which keeps the
+// manager in eax and cancel_script in ecx like the original.
+// TODO: the original puts goal 4 bytes lower and multiplies goal.x from a copy
+// of the game speed.
 // FUNCTION: TH16 0x4124b0
 i32 Bullet::check_player_collision(i32 graze_only)
 {
@@ -1689,8 +1714,8 @@ i32 Bullet::check_player_collision(i32 graze_only)
                 }
                 if (cancel_script >= 0)
                 {
-                    BulletManager *mgr = g_BulletManager;
-                    AnmVm *vm = mgr->bullet_anm->create_vm(cancel_script, p, 0.0f, -1, 0).find_or_clear();
+                    AnmLoaded *anm = g_BulletManager->bullet_anm;
+                    AnmVm *vm = anm->create_vm(cancel_script, p, 0.0f, -1, 0).find_or_clear();
                     D3DXVECTOR3 goal = g_game_speed * velocity * 10.0f;
                     vm->set_pos_time(30, 6, &g_zero_vec, &goal);
                 }
@@ -1725,15 +1750,54 @@ void Bullet::release()
     tick_list_node.unlink_inline();
 }
 
-// TODO: ours realigns the frame (and esp, -8), places the free path at
-// the end and orders the half-step moves differently.
-// FUNCTION: TH16 0x411e70
-i32 Bullet::on_tick()
+// One full movement step (pos += velocity * game speed) for the active case
+// of Bullet::on_tick. Written as a separate inlined helper with two unused
+// locals for matching: it changes the named-variable count that MSVC's vector
+// operand order follows for this step only (docs/findings.md, "Vector operand
+// order"), which brings the active case's moves closer to the original.
+static __forceinline void move_full_step(Bullet *b)
 {
-    time_alive.tick();
+    i32 unused_0 = 0;
+    (void)unused_0;
+    i32 unused_1 = 0;
+    (void)unused_1;
+    b->pos += b->velocity * g_game_speed;
+}
+
+// Ticks one bullet: state, ex steps, movement, offscreen deletion and VMs.
+// Returns -1 once the bullet is released. The release is written out at
+// each place (the original keeps the first copy inline at the top).
+// HARNESS_CALLED (its one caller is BulletManager::on_tick_body), like
+// step_ex_08: the 8-byte alignment step_ex_08's D3DXVECTOR2 wants then comes
+// from on_tick_body's realigned frame, and neither realigns its own.
+// The six unused locals at the top are there for matching: MSVC's choice of
+// operand order and scheduling for the vector moves follows the function's
+// count of named variables modulo 8 (docs/findings.md, "Vector operand
+// order"), and with the `anm` local this count brings the half steps closer
+// to the original. Dropping the `vm` or `goal` local instead changes the code.
+// The cancel VM's file is read into `anm` first, which loads the manager
+// before the pushes as in the original (as cancel_bullet does).
+// TODO: the half-step moves are still scheduled differently per case (the
+// original's spawning case computes all three components before storing, its
+// active case stores each in turn).
+// FUNCTION: TH16 0x411e70
+HARNESS_CALLED i32 Bullet::on_tick()
+{
+    i32 unused_0 = 0;
+    (void)unused_0;
+    i32 unused_1 = 0;
+    (void)unused_1;
+    i32 unused_2 = 0;
+    (void)unused_2;
+    i32 unused_3 = 0;
+    (void)unused_3;
+    i32 unused_4 = 0;
+    (void)unused_4;
+    i32 unused_5 = 0;
+    (void)unused_5;
+    time_alive.tick_nested();
     if (flags & BULLET_FLAG_DELETE)
     {
-    die:
         release();
         return -1;
     }
@@ -1752,7 +1816,7 @@ i32 Bullet::on_tick()
     switch (state)
     {
     case BULLET_STATE_SPAWNING:
-        pos = pos + velocity * g_game_speed * 0.5f;
+        pos += velocity * g_game_speed * 0.5f;
         if (state_time.current >= 8 && check_player_collision(0) == 1)
         {
             break;
@@ -1847,12 +1911,12 @@ i32 Bullet::on_tick()
         } while (1);
         if (!(flags & BULLET_FLAG_NO_DRAW))
         {
-            pos += velocity * g_game_speed;
+            move_full_step(this);
             check_player_collision(0);
         }
         break;
     case BULLET_STATE_HIT:
-        pos = pos + velocity * g_game_speed * 0.5f;
+        pos += velocity * g_game_speed * 0.5f;
         break;
     case BULLET_STATE_5:
         if (state_time.current < 3)
@@ -1864,12 +1928,13 @@ i32 Bullet::on_tick()
             vm0.interrupt_out_of_line(1);
             if (cancel_script >= 0)
             {
-                AnmVm *vm = g_BulletManager->bullet_anm->create_vm(cancel_script, &pos, 0.0f, -1, 0).find_or_clear();
+                AnmLoaded *anm = g_BulletManager->bullet_anm;
+                AnmVm *vm = anm->create_vm(cancel_script, &pos, 0.0f, -1, 0).find_or_clear();
                 D3DXVECTOR3 goal = velocity * g_game_speed * 10.0f;
                 vm->set_pos_time(30, 6, &g_zero_vec, &goal);
             }
         }
-        pos = pos + velocity * g_game_speed * 0.5f;
+        pos += velocity * g_game_speed * 0.5f;
         break;
     }
     if (vm_sprite(&vm0) != NULL)
@@ -1880,10 +1945,16 @@ i32 Bullet::on_tick()
         }
         if (!(active_ex_flags & BULLET_EX_OFFSCREEN) && offscreen_grace < 1)
         {
-            if (outside_range(pos.x, vm_sprite(&vm0)->sprite_width * scale, -192.0f, 192.0f) ||
-                outside_range(pos.y, vm_sprite(&vm0)->sprite_height * scale, -64.0f, 480.0f))
+            // The height's sprite is looked up in place: through vm_sprite,
+            // ours called it here, where the original inlines both lookups.
+            if (outside_range_scaled(&pos.x, vm_sprite(&vm0)->sprite_width * scale, -192.0f, 192.0f) ||
+                outside_range_scaled(&pos.y,
+                                     g_AnmManager->loaded_anms[vm0.anm_loaded_index]->sprites[vm0.sprite_id].sprite_height *
+                                         scale,
+                                     -64.0f, 448.0f))
             {
-                goto die;
+                release();
+                return -1;
             }
         }
     }
@@ -1897,7 +1968,8 @@ i32 Bullet::on_tick()
     }
     if (!(flags & BULLET_FLAG_NO_DRAW) && vm0.run())
     {
-        goto die;
+        release();
+        return -1;
     }
     if (vm1.flags_lo & 1)
     {
@@ -1906,15 +1978,17 @@ i32 Bullet::on_tick()
     return 0;
 }
 
-// TODO: ours realigns the frame (and esp, -8) for corner, folds the
-// timer decrement's multiply by 1.0f, and adds pos.x + half the other way.
+// HARNESS_CALLED: see Bullet::on_tick (otherwise it realigns its frame for
+// corner).
+// TODO: the original puts dir and corner at the top of the frame (ebp-0x10,
+// ebp-8), keeps the timer decrement's multiply by 1.0f, and adds half + pos.y.
 // FUNCTION: TH16 0x4162d0
-i32 Bullet::step_ex_08()
+HARNESS_CALLED i32 Bullet::step_ex_08()
 {
     ex_state[11].timer.decrement(1.0f);
     if (ex_state[11].ints[0] != 0 &&
-        (outside_range(pos.x, vm_sprite(&vm0)->sprite_width, -192.0f, 192.0f) ||
-         outside_range(pos.y, vm_sprite(&vm0)->sprite_height, 0.0f, 448.0f)))
+        (outside_range(&pos.x, vm_sprite(&vm0)->sprite_width, -192.0f, 192.0f) ||
+         outside_range(&pos.y, vm_sprite(&vm0)->sprite_height, 0.0f, 448.0f)))
     {
         D3DXVECTOR3 dir;
         D3DXVECTOR2 corner;

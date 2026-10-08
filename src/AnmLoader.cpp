@@ -22,7 +22,10 @@ HARNESS_CALLED void anm_log(const char *fmt, ...)
 {
 }
 
-// TODO: the original keeps this and the counts in stack slots; register allocation differs throughout.
+// The entry index starts as 0 right after the null check (the original zeroes
+// ebx there and keeps this on the stack) and counts up before the last-entry
+// test (inc ebx ahead of it).
+// TODO: the original keeps the entry count in edi and both sums on the stack (ours: the script sum in edi, the count on the stack) and tests entry against NULL on the first pass too.
 // FUNCTION: TH16 0x46cdd0
 i32 AnmLoaded::load(const char *path)
 {
@@ -33,6 +36,7 @@ i32 AnmLoaded::load(const char *path)
     {
         return -1;
     }
+    i32 i = 0;
     anm_file = data;
     strcpy(name, path);
     i32 num_scripts = data->num_scripts;
@@ -52,7 +56,7 @@ i32 AnmLoaded::load(const char *path)
     script_count = num_scripts;
     sprite_count = num_sprites;
     AnmRawEntry *entry = data;
-    for (i32 i = 0;; i++)
+    for (;;)
     {
         if (entry == NULL)
         {
@@ -64,6 +68,7 @@ i32 AnmLoaded::load(const char *path)
         {
             break;
         }
+        i++;
         if (entry->offset_to_next == 0)
         {
             vms = (AnmVm *)malloc(num_scripts * sizeof(AnmVm));
@@ -126,11 +131,12 @@ AnmLoaded *__stdcall AnmManager::preload_anm(i32 slot, const char *path)
     return anm;
 }
 
-// TODO: code matches; our frame leaves 8 unused bytes between buf and the /GS cookie (0x124 vs 0x11c).
+// Reads the image file of one entry of an ANM file, unless the file has
+// the image data inline or the entry names a render target.
 // FUNCTION: TH16 0x46d0c0
 i32 AnmLoaded::load_entry(i32 index, AnmRawEntry *entry)
 {
-    char buf[0x10c];
+    char buf[MAX_PATH];
     i32 size;
     if (entry->version != 8)
     {
@@ -476,9 +482,11 @@ AnmLoaded *__stdcall AnmManager::load_next_entry(AnmLoaded *anm)
     return anm;
 }
 
-// TODO: the original loads the last dword of the sprite before the first movups store.
+// sprite is the caller's local, never part of sprites[]: written __restrict so
+// the copy may load the last dword before the first movups store, like the
+// original.
 // FUNCTION: TH16 0x46d8a0
-void AnmLoaded::load_sprite(i32 index, AnmLoadedSprite *sprite)
+void AnmLoaded::load_sprite(i32 index, AnmLoadedSprite *__restrict sprite)
 {
     sprites[index] = *sprite;
     sprites[index].uv_start.x = sprites[index].start_pixel_inclusive.x / sprites[index].bitmap_width;

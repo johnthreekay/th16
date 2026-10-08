@@ -61,12 +61,20 @@ HARNESS_CALLED void PosVel::set_ellipse_angle(f32 angle)
     ellipse_angle.value = wrap_angle(wrap_angle(angle));
 }
 
-// TODO: identical code; the original frame has 4 more (unused) bytes, like create_vm's: a
-// frame padded for known 8-byte alignment (0x10 locals + 3 saves); not every caller of ours
-// calls it aligned (ecl_run_over_300's helpers, repopulate_options).
+// A dead double, not ZUN's code: it stands in for AnmVm::run wanting an
+// aligned stack (docs/findings.md). In this plain inline helper it is a call
+// graph node of its own, so create_vm_front does not realign itself but gets
+// known alignment and the original's 4 unused frame bytes (as create_vm).
+static inline void create_vm_front_want_aligned_stack()
+{
+    double unused_double = 0.0;
+    (void)unused_double;
+}
+
 // FUNCTION: TH16 0x426160
 HARNESS_CALLED AnmId AnmLoaded::create_vm_front(i32 script, i32 layer, i32 unused)
 {
+    create_vm_front_want_aligned_stack();
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;
     AnmVm *vm = g_AnmManager->allocate_vm();

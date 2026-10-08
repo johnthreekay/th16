@@ -17,8 +17,8 @@ struct AnmAnchorCorners
     f32 corner[4];
 };
 
-// At 0x4a3048, right after g_sound_effect_table; not annotated, since the
-// sound code's end-of-table pointer would compare as this symbol.
+// At 0x4a3048, right after g_sound_effect_table.
+// GLOBAL: TH16 0x4a3048
 AnmAnchorCorners g_anchor_corners_x[3] = {
     {-0.5f, 0.5f, -0.5f, 0.5f},
     {0.0f, 1.0f, 0.0f, 1.0f},
@@ -58,6 +58,11 @@ static inline ZunColor *diffuse_of(i32 i)
     return (ZunColor *)&g_sprite_temp_buffer[i].diffuse;
 }
 
+// The 0.5f render_sprite_2d's pixel snapping subtracts after rounding; a
+// constant of its own in the original, apart from the compiler's 0.5f.
+// GLOBAL: TH16 0x4941d8
+static const f32 g_pixel_center_offset = 0.5f;
+
 // The quad in g_sprite_temp_buffer, moved by the camera offset, rounded to
 // pixel centers if flags bit 0 is set, culled against the viewport and
 // colored by the VM's color mode unless flags bit 1 is set.
@@ -65,8 +70,6 @@ static inline ZunColor *diffuse_of(i32 i)
 // FUNCTION: TH16 0x465280
 i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
 {
-    static const f32 half = 0.5f;
-
     g_sprite_temp_buffer[0].pos.x += camera_2d_offset.x;
     g_sprite_temp_buffer[0].pos.y += camera_2d_offset.y;
     g_sprite_temp_buffer[1].pos.x += camera_2d_offset.x;
@@ -77,7 +80,7 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
     g_sprite_temp_buffer[3].pos.y += camera_2d_offset.y;
     if (flags & ANM_SPRITE_SNAP_TO_PIXELS)
     {
-        ZUN_ASM_SNAP_QUAD_TO_PIXEL_CENTERS(g_sprite_temp_buffer, half);
+        ZUN_ASM_SNAP_QUAD_TO_PIXEL_CENTERS(g_sprite_temp_buffer, g_pixel_center_offset);
     }
     vm->last_rendered_quad_in_surface_space[0] = *(Float3 *)&g_sprite_temp_buffer[0].pos;
     vm->last_rendered_quad_in_surface_space[1] = *(Float3 *)&g_sprite_temp_buffer[1].pos;
@@ -209,10 +212,16 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
 
 // Corners for render modes 0, 2 and 3: the anchored sprite rectangle,
 // scaled, at the VM's transformed position.
-// TODO: 39%; ours adds a /GS cookie for pos and walks the anchor tables differently.
+// The resolution scaling is an if/else-if chain: as a switch the two cases
+// were laid out the other way round.
+// The VM is read through a local copy of the pointer: LTCG orders the
+// operands of the multiplies differently for loads through a parameter
+// (the same as in AnmVm::transform_coords).
+// TODO: 91%; the d corner's x size multiply, every other corner's y screen and scale multiply (a, c) and the position adds still take their operands in the other order.
 // FUNCTION: TH16 0x465c40
-void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
+void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm_param, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
 {
+    AnmVm *vm = vm_param;
     AnmAnchorCorners *anchor = &g_anchor_corners_x[(vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3];
     a->x = anchor->corner[0];
     b->x = anchor->corner[1];
@@ -239,9 +248,8 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
     b->y -= vm->anchor_offset.y;
     c->y -= vm->anchor_offset.y;
     d->y -= vm->anchor_offset.y;
-    switch (vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK)
+    if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_SCALED)
     {
-    case ANM_VM_RESOLUTION_SCALED:
         a->x *= g_screen_coord_scale;
         b->x *= g_screen_coord_scale;
         c->x *= g_screen_coord_scale;
@@ -250,8 +258,9 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
         b->y *= g_screen_coord_scale;
         c->y *= g_screen_coord_scale;
         d->y *= g_screen_coord_scale;
-        break;
-    case ANM_VM_RESOLUTION_HALF_SCALED:
+    }
+    else if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_HALF_SCALED)
+    {
         a->x *= g_screen_coord_scale * 0.5f;
         b->x *= g_screen_coord_scale * 0.5f;
         c->x *= g_screen_coord_scale * 0.5f;
@@ -260,7 +269,6 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
         b->y *= g_screen_coord_scale * 0.5f;
         c->y *= g_screen_coord_scale * 0.5f;
         d->y *= g_screen_coord_scale * 0.5f;
-        break;
     }
     f32 scale_x = vm->scale_2.x * vm->scale.x;
     f32 scale_y = vm->scale_2.y * vm->scale.y;
@@ -287,39 +295,51 @@ void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Fl
 }
 
 // Corners for render modes 1 and 3: the same rectangle rotated by the
-// VM's total z rotation.
-// TODO: 48%; the original vectorizes the corner offsets through stack copies in another order.
+// VM's total z rotation. The corner offsets are plain arrays filled element
+// by element: as AnmAnchorCorners struct copies, LTCG keeps them 16-byte
+// aligned and the function realigns its frame (and esp, -16), which the
+// original does not; as arrays they keep the original's /GS cookie and frame.
+// The VM is read through a local copy of the pointer (see
+// write_sprite_corners__without_rot).
+// TODO: 74%; the original copies each table row with one movups (ours: four scalar copies), and the x and y offsets (and scale_x/scale_y) trade registers and stack slots.
 // FUNCTION: TH16 0x4660b0
-void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
+void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm_param, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
 {
+    AnmVm *vm = vm_param;
     f32 angle = vm->get_total_rotation()->z;
     f32 sine;
     f32 cosine;
     ZUN_ASM_SINCOS(angle, sine, cosine);
-    AnmAnchorCorners xs = g_anchor_corners_x[(vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3];
-    AnmAnchorCorners ys = g_anchor_corners_y[(vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3];
+    AnmAnchorCorners *xt = &g_anchor_corners_x[(vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3];
+    AnmAnchorCorners *yt = &g_anchor_corners_y[(vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3];
+    f32 xs[4];
+    f32 ys[4];
+    for (i32 j = 0; j < 4; j++)
+    {
+        xs[j] = xt->corner[j];
+        ys[j] = yt->corner[j];
+    }
     i32 i;
     for (i = 0; i < 4; i++)
     {
-        xs.corner[i] = xs.corner[i] * vm->sprite_size.x - vm->anchor_offset.x;
-        ys.corner[i] = ys.corner[i] * vm->sprite_size.y - vm->anchor_offset.y;
+        xs[i] = xs[i] * vm->sprite_size.x - vm->anchor_offset.x;
+        ys[i] = ys[i] * vm->sprite_size.y - vm->anchor_offset.y;
     }
-    switch (vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK)
+    if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_SCALED)
     {
-    case ANM_VM_RESOLUTION_SCALED:
         for (i = 0; i < 4; i++)
         {
-            xs.corner[i] *= g_screen_coord_scale;
-            ys.corner[i] *= g_screen_coord_scale;
+            xs[i] *= g_screen_coord_scale;
+            ys[i] *= g_screen_coord_scale;
         }
-        break;
-    case ANM_VM_RESOLUTION_HALF_SCALED:
+    }
+    else if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_HALF_SCALED)
+    {
         for (i = 0; i < 4; i++)
         {
-            xs.corner[i] *= g_screen_coord_scale * 0.5f;
-            ys.corner[i] *= g_screen_coord_scale * 0.5f;
+            xs[i] *= g_screen_coord_scale * 0.5f;
+            ys[i] *= g_screen_coord_scale * 0.5f;
         }
-        break;
     }
     Float3 pos;
     vm->get_own_transformed_pos(&pos);
@@ -330,23 +350,26 @@ void __stdcall AnmVm::write_sprite_corners__with_z_rot(AnmVm *vm, Float3 *a, Flo
         scale_x *= vm->parent_vm->scale_2.x * vm->parent_vm->scale.x;
         scale_y *= vm->parent_vm->scale_2.y * vm->parent_vm->scale.y;
     }
+    // y before x: the original's register order.
     for (i = 0; i < 4; i++)
     {
-        xs.corner[i] *= scale_x;
-        ys.corner[i] *= scale_y;
+        ys[i] *= scale_y;
+        xs[i] *= scale_x;
     }
-    a->x = xs.corner[0] * cosine - ys.corner[0] * sine + pos.x;
-    a->y = ys.corner[0] * cosine + xs.corner[0] * sine + pos.y;
-    b->x = xs.corner[1] * cosine - ys.corner[1] * sine + pos.x;
-    b->y = ys.corner[1] * cosine + xs.corner[1] * sine + pos.y;
-    c->x = xs.corner[2] * cosine - ys.corner[2] * sine + pos.x;
-    c->y = ys.corner[2] * cosine + xs.corner[2] * sine + pos.y;
-    d->x = xs.corner[3] * cosine - ys.corner[3] * sine + pos.x;
-    d->y = ys.corner[3] * cosine + xs.corner[3] * sine + pos.y;
+    a->x = xs[0] * cosine - ys[0] * sine + pos.x;
+    a->y = ys[0] * cosine + xs[0] * sine + pos.y;
+    b->x = xs[1] * cosine - ys[1] * sine + pos.x;
+    b->y = ys[1] * cosine + xs[1] * sine + pos.y;
+    c->x = xs[2] * cosine - ys[2] * sine + pos.x;
+    c->y = ys[2] * cosine + xs[2] * sine + pos.y;
+    d->x = xs[3] * cosine - ys[3] * sine + pos.x;
+    d->y = ys[3] * cosine + xs[3] * sine + pos.y;
     a->z = b->z = c->z = d->z = vm->entity_pos.z + vm->pos.z + vm->pos_2.z;
 }
 
-// TODO: 74%; register allocation of the corner offsets differs.
+// Corners of a billboard: the VM's world position projected to the screen,
+// sized by how far the camera's right vector projects from it.
+// TODO: 83%; register allocation of the corner offsets differs.
 // FUNCTION: TH16 0x466390
 i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
 {
@@ -354,14 +377,12 @@ i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
     f32 sine;
     f32 cosine;
     ZUN_ASM_SINCOS(angle, sine, cosine);
-    D3DXVECTOR3 world_pos(vm->entity_pos.x + vm->pos.x + vm->pos_2.x, vm->entity_pos.y + vm->pos.y + vm->pos_2.y,
-                          vm->entity_pos.z + vm->pos.z + vm->pos_2.z);
+    D3DXVECTOR3 origin(0.0f, 0.0f, 0.0f);
     D3DXMATRIX world;
     D3DXMatrixIdentity(&world);
-    world._41 = world_pos.x;
-    world._42 = world_pos.y;
-    world._43 = world_pos.z;
-    D3DXVECTOR3 origin(0.0f, 0.0f, 0.0f);
+    world._41 = vm->entity_pos.x + vm->pos.x + vm->pos_2.x;
+    world._42 = vm->entity_pos.y + vm->pos.y + vm->pos_2.y;
+    world._43 = vm->entity_pos.z + vm->pos.z + vm->pos_2.z;
     D3DXVECTOR3 screen;
     Camera *camera = g_Supervisor.current_camera;
     D3DXVec3Project(&screen, &origin, &camera->viewport, (D3DXMATRIX *)&camera->projection_matrix, (D3DXMATRIX *)&camera->view_matrix, &world);
@@ -375,7 +396,11 @@ i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
                     &world);
     f32 x = screen.x;
     f32 y = screen.y;
-    D3DXVECTOR3 diff = screen_2 - screen;
+    D3DXVECTOR3 diff;
+    // Field by field, y first and from the x/y locals: the original's order.
+    diff.y = screen_2.y - y;
+    diff.x = screen_2.x - x;
+    diff.z = screen_2.z - screen.z;
     f32 scale = D3DXVec3Length(&diff) * 0.5f;
     f32 width = vm->sprite_size.x * scale * vm->scale.x * vm->scale_2.x;
     f32 height = vm->sprite_size.y * scale * vm->scale.y * vm->scale_2.y;
@@ -425,10 +450,20 @@ i32 __stdcall AnmManager::write_billboard_corners(AnmVm *vm)
     return 0;
 }
 
-// TODO: 46%; the original keeps the scaled color channels in dword stack slots.
+// The VM is read through a local copy of the pointer, as in
+// write_sprite_corners__without_rot. The color mode switch lists all four
+// values (a jump table like the original's; a default case compares
+// instead). Nothing follows it: a return after the switch changes the
+// layout, hence the C4715 pragma.
+// The position is summed pos + entity_pos + pos_2 and assigned to a declared
+// vector (not initialized), which gives the original's operand order.
+// TODO: 88%; the original rematerializes 0xff for each color clamp where ours keeps it in edi, and the fog distances take other stack slots.
+#pragma warning(push)
+#pragma warning(disable : 4715)
 // FUNCTION: TH16 0x466820
-i32 AnmManager::draw_billboard_fog(AnmVm *vm)
+i32 AnmManager::draw_billboard_fog(AnmVm *vm_param)
 {
+    AnmVm *vm = vm_param;
     if (write_billboard_corners(vm) != 0)
     {
         return -1;
@@ -437,9 +472,7 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm)
     f32 fog_begin = camera->sky.begin_distance;
     f32 fog_range = fog_begin - camera->sky.end_distance;
     D3DXVECTOR3 diff;
-    diff.x = vm->entity_pos.x + vm->pos.x + vm->pos_2.x - camera->position.x;
-    diff.y = vm->entity_pos.y + vm->pos.y + vm->pos_2.y - camera->position.y;
-    diff.z = vm->entity_pos.z + vm->pos.z + vm->pos_2.z - camera->position.z;
+    diff = vm->pos + vm->entity_pos + vm->pos_2 - camera->position;
     if ((vm->flags_hi & ANM_VM_ORIGIN_MODE_MASK) && vm->parent_vm == NULL)
     {
         diff.x += g_resolution_x * 0.5f;
@@ -451,7 +484,7 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm)
     case 0:
     case 1: {
         ZunColor color;
-        color.d3d = (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d;
+        color.d3d = !(vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_1.d3d : vm->color_2.d3d;
         if (global_tint_enabled != 0)
         {
             color.r = color_mul(color.r, global_tint.r);
@@ -482,7 +515,8 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm)
         g_sprite_temp_buffer[3].diffuse = color.d3d;
         return render_sprite_2d(vm, ANM_SPRITE_KEEP_COLORS);
     }
-    default: {
+    case 2:
+    case 3: {
         ZunColor color_1 = vm->color_1;
         ZunColor color_2 = vm->color_2;
         if (global_tint_enabled != 0)
@@ -532,8 +566,12 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm)
     }
     }
 }
+#pragma warning(pop)
 
-// TODO: the y and z differences trade xmm0/xmm1; the loop end compares with g_sprite_temp_buffer's end, which our data layout follows with another global.
+// A while loop with the differences assigned x, y, z gives the original's
+// register and operand order for the distance (the load order inside a
+// loop follows the loop form; see docs/findings.md).
+// TODO: 99%; the loop end compares with g_sprite_temp_buffer's end, which our data layout follows with another global.
 // FUNCTION: TH16 0x467200
 i32 AnmManager::draw_sprite_fog(AnmVm *vm)
 {
@@ -542,12 +580,13 @@ i32 AnmManager::draw_sprite_fog(AnmVm *vm)
     ZunColor color;
     color.d3d = (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d;
     D3DXVECTOR4 transformed[4];
-    for (i32 i = 0; i < 4; i++)
+    i32 i = 0;
+    while (i < 4)
     {
         D3DXVec3Transform(&transformed[i], &fog_unit_quad[i].pos, (D3DXMATRIX *)&current_world_matrix);
         D3DXVECTOR3 diff;
-        diff.y = transformed[i].y - g_Supervisor.current_camera->position.y;
         diff.x = transformed[i].x - g_Supervisor.current_camera->position.x;
+        diff.y = transformed[i].y - g_Supervisor.current_camera->position.y;
         diff.z = transformed[i].z - g_Supervisor.current_camera->position.z;
         f32 distance = D3DXVec3Length(&diff);
         ZunColor *diffuse = diffuse_of(i);
@@ -571,6 +610,7 @@ i32 AnmManager::draw_sprite_fog(AnmVm *vm)
         {
             diffuse->d3d = color.d3d;
         }
+        i++;
     }
     i32 result = render_sprite_2d(vm, ANM_SPRITE_KEEP_COLORS);
     g_sprite_temp_buffer[0].pos.w = g_sprite_temp_buffer[1].pos.w = g_sprite_temp_buffer[2].pos.w =
@@ -619,9 +659,11 @@ static inline void set_color_op_modulate()
     }
 }
 
-// TODO: 44%; the rotation order cases and the texture matrix copy are laid out differently.
+// HARNESS_CALLED: kept alive by draw_vm alone, it realigns to 8 (ebx form)
+// instead of 16.
+// TODO: 49%; the original does not realign at all (its frame is laid out for draw_vm's known 8-byte alignment), and the rotation order cases and the texture matrix copy are laid out differently.
 // FUNCTION: TH16 0x467410
-i32 AnmManager::draw_3d(AnmVm *vm)
+HARNESS_CALLED i32 AnmManager::draw_3d(AnmVm *vm)
 {
     if (!(vm->flags_lo & ANM_VM_VISIBLE))
     {
@@ -791,29 +833,32 @@ i32 AnmManager::draw_3d(AnmVm *vm)
     {
         flush_sprites();
         last_texture_factor = color.d3d;
-        g_Supervisor.d3d_device->SetRenderState(D3DRS_TEXTUREFACTOR, color.d3d);
+        supervisor_d3d_device()->SetRenderState(D3DRS_TEXTUREFACTOR, color.d3d);
     }
     world._43 = vm->entity_pos.z + vm->pos.z + vm->pos_2.z;
-    g_Supervisor.d3d_device->SetTransform(D3DTS_WORLD, &world);
+    supervisor_d3d_device()->SetTransform(D3DTS_WORLD, &world);
     AnmLoadedSprite *sprite = set_texture_of_vm(this, vm);
     set_texture_transform_of_vm(this, vm, sprite);
     if (last_vertex_setup != ANM_VERTEX_SETUP_3D_QUAD)
     {
-        g_Supervisor.d3d_device->SetStreamSource(0, vertex_buffer, 0, sizeof(RenderVertexXyzTex));
-        g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZ | D3DFVF_TEX1);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
+        supervisor_d3d_device()->SetStreamSource(0, vertex_buffer, 0, sizeof(RenderVertexXyzTex));
+        supervisor_d3d_device()->SetFVF(D3DFVF_XYZ | D3DFVF_TEX1);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
         last_vertex_setup = ANM_VERTEX_SETUP_3D_QUAD;
     }
     set_color_op_modulate();
     // The vertex buffer holds one quad per anchoring (setup_vertex_buffer).
-    g_Supervisor.d3d_device->DrawPrimitive(
+    supervisor_d3d_device()->DrawPrimitive(
         D3DPT_TRIANGLESTRIP,
         (((vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3) * 3 + ((vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3)) * 4, 2);
     return 0;
 }
 
-// TODO: 39%; the identity matrix stores and the texture matrix copy are scheduled differently.
+// The identity is written through D3DXMatrixIdentity's return value: as a
+// separate statement followed by `world_matrix = sprite_matrix`, our build
+// dropped the identity stores entirely (sprite_matrix kept its old contents).
+// TODO: 31%; ours realigns the frame to 16 for the rotation matrix (the original does not realign) and keeps vm in esi (original ebx).
 // FUNCTION: TH16 0x467d00
 i32 AnmManager::draw_3d_vertex_strip(AnmVm *vm, RenderVertexXyzDiffuseTex *vertices, i32 vertex_count)
 {
@@ -837,8 +882,7 @@ i32 AnmManager::draw_3d_vertex_strip(AnmVm *vm, RenderVertexXyzDiffuseTex *verti
     {
         g_Supervisor.disable_zwrite();
     }
-    D3DXMatrixIdentity(&vm->sprite_matrix);
-    vm->world_matrix = vm->sprite_matrix;
+    vm->world_matrix = *D3DXMatrixIdentity(&vm->sprite_matrix);
     vm->world_matrix._11 *= vm->scale_2.x * vm->scale.x;
     vm->world_matrix._22 *= vm->scale_2.y * vm->scale.y;
     vm->flags_lo &= ~ANM_VM_SCALE_CHANGED;
@@ -891,7 +935,14 @@ static __forceinline BOOL is_transparent(AnmVm *vm)
     return vm->color_1.a == 0 && vm->color_2.a == 0;
 }
 
-// TODO: 70%; ours adds a /GS cookie for pos and keeps the anchors in ebx across the shape cases.
+// A VM's horizontal and vertical anchoring (AnmAnchor). draw_vm reads them
+// at each call: as locals before the shape switch they were kept in ebx.
+#define ANM_VM_ANCHOR_X(vm) (((vm)->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3)
+#define ANM_VM_ANCHOR_Y(vm) (((vm)->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3)
+
+// Draws a VM by its render mode. The last rect case ends with a break
+// rather than a return, which lets the rotated rect case jump into its
+// call like the original.
 // FUNCTION: TH16 0x468490
 HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
 {
@@ -1025,50 +1076,51 @@ HARNESS_CALLED i32 AnmManager::draw_vm(AnmVm *vm)
             width = g_screen_coord_scale * 0.5f * width;
             height = g_screen_coord_scale * 0.5f * height;
         }
-        i32 anchor_x = (vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3;
-        i32 anchor_y = (vm->flags_lo >> ANM_VM_ANCHOR_Y_SHIFT) & 3;
         switch ((vm->flags_lo >> ANM_VM_RENDER_MODE_SHIFT) & 0x1f)
         {
         case ANM_RENDER_LINE:
             draw_line(pos.x, pos.y, width, angle, vm->color_1.d3d,
-                      (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d, anchor_x, 0);
+                      (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d, ANM_VM_ANCHOR_X(vm),
+                      0);
             return 0;
         case ANM_RENDER_RECT:
-            draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d, anchor_x, anchor_y);
+            draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d, ANM_VM_ANCHOR_X(vm),
+                      ANM_VM_ANCHOR_Y(vm));
             return 0;
         case ANM_RENDER_RECT_BORDER:
             draw_rect_outline(pos.x, pos.y, width, height, angle, vm->color_1.d3d,
                               (vm->flags_lo & ANM_VM_COLOR_MODE_MASK) ? vm->color_2.d3d : vm->color_1.d3d,
-                              anchor_x, anchor_y);
+                              ANM_VM_ANCHOR_X(vm), ANM_VM_ANCHOR_Y(vm));
             return 0;
         case ANM_RENDER_RECT_GRAD:
-            draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d, anchor_x, anchor_y);
+            draw_rect(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d, ANM_VM_ANCHOR_X(vm),
+                      ANM_VM_ANCHOR_Y(vm));
             return 0;
         case ANM_RENDER_RECT_ROT:
-            draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d, anchor_x,
-                               anchor_y);
+            draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_1.d3d,
+                               ANM_VM_ANCHOR_X(vm), ANM_VM_ANCHOR_Y(vm));
             return 0;
         case ANM_RENDER_RECT_ROT_GRAD:
-            draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d, anchor_x,
-                               anchor_y);
-            return 0;
+            draw_rect_bordered(pos.x, pos.y, width, height, angle, vm->color_1.d3d, vm->color_2.d3d,
+                               ANM_VM_ANCHOR_X(vm), ANM_VM_ANCHOR_Y(vm));
+            break;
         }
         break;
     }
     case ANM_RENDER_POLY:
     case ANM_RENDER_POLY_BORDER:
     case ANM_RENDER_RING: {
+        f32 angle = vm->rotation.z;
         f32 width;
         f32 height;
         width = vm->sprite_size.x * vm->scale.x;
         height = vm->sprite_size.y * vm->scale.y;
-        f32 angle = vm->rotation.z;
         Float3 pos;
         vm->get_own_transformed_pos(&pos);
         if (vm->parent_vm != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
         {
-            angle = vm->parent_vm->rotation.z + angle;
             width *= vm->parent_vm->scale.x;
+            angle = vm->parent_vm->rotation.z + angle;
             height *= vm->parent_vm->scale.y;
         }
         if ((vm->flags_hi & ANM_VM_RESOLUTION_MODE_MASK) == ANM_VM_RESOLUTION_SCALED)

@@ -175,15 +175,32 @@ static __forceinline void help_hide_pages(HelpManual *manual)
     }
 }
 
+// The menu helpers the list inlines; they address the menu through a
+// pointer, as the original's code does ([edi + 4] for the selection).
+static __forceinline void help_menu_save(MenuHelper *m)
+{
+    m->current_selection = m->next_selection;
+}
+static __forceinline i32 help_menu_moved(MenuHelper *m)
+{
+    return m->current_selection != m->next_selection;
+}
+
 // The manual's frame: choose a page from the list (up and down; shot or
 // enter opens it, bomb or menu closes the manual), read its picture on the
 // worker thread, then show it (up and down turn the page, cancel goes back
 // to the list). Sounds 10, 7 and 9 are the cursor, select and cancel ones.
-// TODO: ours gets a /GS cookie where the original realigns the frame, and
-// reads the input globals in a different order.
+// safebuffers (on the declaration) drops the /GS cookie ours gets for pos,
+// whose address goes to create_ui_vm; the original has none. The timers are
+// the inlined reset and the tick_goto form, as the original inlines them.
 // FUNCTION: TH16 0x42eab0
 DECOMP_NOINLINE i32 HelpManual::on_tick_body()
 {
+    // A dead double: it makes LTCG realign this frame (and esp, -8) early,
+    // as the original does, which also gives create_ui_vm its padded frame.
+    // It stands in for AnmVm::run wanting an aligned stack (docs/findings.md).
+    double unused = 0.0;
+    (void)unused;
     D3DXVECTOR3 pos;
     pos.y = 0.0f;
     pos.z = 0.0f;
@@ -208,7 +225,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
             {
                 break;
             }
-            menu.current_selection = menu.next_selection;
+            help_menu_save(&menu);
             if (help_pressed_or_repeating(INPUT_UP))
             {
                 menu.move_cursor(-1);
@@ -217,7 +234,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
             {
                 menu.move_cursor(1);
             }
-            if (menu.current_selection != menu.next_selection)
+            if (help_menu_moved(&menu))
             {
                 g_SoundManager.play_sound_centered(SE_SELECT00, 0);
                 help_highlight_pages(this);
@@ -233,7 +250,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
                 help_hide_pages(this);
                 state = HELP_STATE_CLOSE;
                 substate = HELP_SUBSTATE_SETUP;
-                timer.reset();
+                timer.reset_inline();
             }
             break;
         case HELP_SUBSTATE_LOADING:
@@ -304,7 +321,7 @@ DECOMP_NOINLINE i32 HelpManual::on_tick_body()
         }
         break;
     }
-    timer.tick();
+    timer.tick_goto();
     return UPDATE_FUNC_CONTINUE;
 }
 
@@ -322,10 +339,20 @@ i32 __fastcall HelpManual::on_draw_callback(HelpManual *manual)
 
 // Creates a VM running script at pos in the UI list (like create_ui_effect,
 // with a position).
-// TODO: same frame difference as create_vm (4 more bytes, esi saved before the critical section).
+// A dead double, not ZUN's code: it stands in for AnmVm::run wanting an
+// aligned stack (docs/findings.md). In this plain inline helper it is a call
+// graph node of its own, so create_ui_vm does not realign itself but gets
+// known alignment and the original's 4 unused frame bytes (as create_vm).
+static inline void create_ui_vm_want_aligned_stack()
+{
+    double unused_double = 0.0;
+    (void)unused_double;
+}
+
 // FUNCTION: TH16 0x42efb0
 HARNESS_CALLED AnmId AnmLoaded::create_ui_vm(i32 script, D3DXVECTOR3 *pos, i32 unused)
 {
+    create_ui_vm_want_aligned_stack();
     ENTER_CS(CS_ANM_MANAGER);
     vm_count++;
     AnmVm *vm = g_AnmManager->allocate_vm();

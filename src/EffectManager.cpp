@@ -143,9 +143,10 @@ i32 __fastcall EffectManager::on_draw_callback(EffectManager *self)
     return 1;
 }
 
-// TODO: this and last_used_index's old value trade ebx and the stack slot
-// with the original since get_vm_with_id has a visible body (it matched
-// while get_vm_with_id was an opaque placeholder).
+// Steps last_used_index on and returns its previous value; while the slot it
+// lands on holds the id of a VM that is gone, clears that id and steps on
+// again; -1 after EFFECT_COUNT steps. The slot is indexed afresh in each
+// test (a reference to it puts this, not the index, in the stack slot).
 // FUNCTION: TH16 0x40e6c0
 i32 EffectManager::next_index()
 {
@@ -153,16 +154,14 @@ i32 EffectManager::next_index()
     {
         i32 index = last_used_index;
         last_used_index = (last_used_index + 1) % EFFECT_COUNT;
-        AnmId &id = anm_ids[last_used_index];
-        if (id.id == 0)
+        if (anm_ids[last_used_index].id == 0)
         {
             return index;
         }
-        if (g_AnmManager->get_vm_with_id(id) != NULL)
+        if (get_vm_or_clear(anm_ids[last_used_index]) != NULL)
         {
             return index;
         }
-        id.id = 0;
     }
     return -1;
 }
@@ -191,7 +190,10 @@ AnmId EffectManager::create_effect(i32 effect, D3DXVECTOR3 *pos, AnmVm *vm)
     }
     if (vm == NULL)
     {
-        id = (&effect_anm)[data->anm_index]->create_effect(data->script, -1, NULL);
+        // Through the member pointer (see create_effect_via_pointer), which
+        // keeps the original's shrink-wrapped edi; the helper itself loads
+        // the table index in another order here.
+        id = ((&effect_anm)[data->anm_index]->*anm_create_effect_func())(data->script, -1, NULL);
         vm = get_vm_or_clear(id);
     }
     else
@@ -211,8 +213,8 @@ AnmId EffectManager::create_effect(i32 effect, D3DXVECTOR3 *pos, AnmVm *vm)
     return id;
 }
 
-// TODO: the original has a 4 bytes bigger frame, saves esi before the
-// script check, and copies the last five indices through ecx.
+// TODO: the original copies the last five indices through ecx (a loop, an
+// inline helper, a target pointer and struct views do not change it).
 // FUNCTION: TH16 0x418ba0
 HARNESS_CALLED AnmId EffectManager::create_ui_effect(i32 effect, D3DXVECTOR3 *pos, AnmVm *vm)
 {

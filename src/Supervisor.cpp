@@ -104,6 +104,12 @@ Supervisor g_Supervisor;
 // GLOBAL: TH16 0x4a52e4
 i16 g_pad_mapping[10] = {0, 1, 2, 5, -1, -1, -1, -1, -1, 3};
 
+// Adds the buttons and directions held on the first game controller (winmm
+// or DirectInput) to input. The Acquire retries are written like
+// get_controller_state's: that keeps the joyGetPosEx failure's return as
+// the shared copy the later returns jump to, as in the original.
+// TODO: 74%; the original loads some mapping words through ax and a 16-bit
+// stack temporary (ours: cx), and keeps input in a different stack slot.
 // FUNCTION: TH16 0x4018e0
 HARNESS_CALLED u32 Supervisor::read_joypad(u32 input)
 {
@@ -150,10 +156,16 @@ HARNESS_CALLED u32 Supervisor::read_joypad(u32 input)
 
     if (FAILED(g_Supervisor.joystick->Poll()))
     {
+        i32 retries = 0;
         HRESULT hr = g_Supervisor.joystick->Acquire();
-        for (i32 i = 0; hr == DIERR_INPUTLOST && i < 400; i++)
+        while (hr == DIERR_INPUTLOST)
         {
             hr = g_Supervisor.joystick->Acquire();
+            retries++;
+            if (retries >= 400)
+            {
+                return input;
+            }
         }
         return input;
     }
@@ -300,23 +312,26 @@ HARNESS_CALLED void Supervisor::swap_transform_matrices(Camera *camera)
 // The tanf from the CRT headers stays out of line (0x43dc90).
 DECOMP_NOINLINE float __CRTDECL tanf(float);
 
-// TODO: the original builds the three vectors after the tanf call (eye and at from one packed x, y); ours stores the constants up front.
+// TODO: the original keeps x and y in registers across the tanf call and
+// stores them to eye and at afterwards as one packed pair (unpcklps, movq);
+// ours stores eye.x and eye.y before the call.
 // FUNCTION: TH16 0x43c780
 void __stdcall camera_update_2d(Camera *camera)
 {
-    f32 x = camera->viewport.X + camera->viewport.Width * 0.5f;
-    f32 y = camera->viewport.Height * 0.5f + camera->viewport.Y;
+    D3DXVECTOR3 eye;
+    eye.x = camera->viewport.X + camera->viewport.Width * 0.5f;
+    eye.y = camera->viewport.Height * 0.5f + camera->viewport.Y;
     f32 half_height = camera->viewport.Height / 2;
-    f32 z = half_height / tanf(camera->field_of_view * 0.5f);
+    eye.z = half_height / tanf(camera->field_of_view * 0.5f);
     D3DXVECTOR3 up(0.0f, -1.0f, 0.0f);
-    D3DXVECTOR3 eye(x, y, z);
-    D3DXVECTOR3 at(x, y, 0.0f);
+    D3DXVECTOR3 at(eye.x, eye.y, 0.0f);
     D3DXMatrixLookAtLH((D3DXMATRIX *)&camera->view_matrix, &eye, &at, &up);
     D3DXMatrixPerspectiveFovLH((D3DXMATRIX *)&camera->projection_matrix, camera->field_of_view,
                                (f32)camera->viewport.Width / (f32)camera->viewport.Height, 1.0f, 10000.0f);
 }
 
-// TODO: matches until write_screenshot exists (in any file, any body): then LTCG stops keeping &camera->up in ebx. Whole-program effect.
+// Its device calls go through supervisor_d3d_device() so that ebx stays
+// usable for &camera->up across the LookAt call (see Supervisor.h).
 // FUNCTION: TH16 0x43c940
 void __stdcall camera_apply_3d(Camera *camera)
 {
@@ -330,8 +345,8 @@ void __stdcall camera_apply_3d(Camera *camera)
     D3DXMatrixLookAtLH((D3DXMATRIX *)&camera->view_matrix, &eye, &at, &camera->up);
     D3DXMatrixPerspectiveFovLH((D3DXMATRIX *)&camera->projection_matrix, camera->field_of_view,
                                (f32)camera->viewport.Width / (f32)camera->viewport.Height, 30.0f, 8000.0f);
-    g_Supervisor.d3d_device->SetTransform(D3DTS_VIEW, &camera->view_matrix);
-    g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &camera->projection_matrix);
+    supervisor_d3d_device()->SetTransform(D3DTS_VIEW, &camera->view_matrix);
+    supervisor_d3d_device()->SetTransform(D3DTS_PROJECTION, &camera->projection_matrix);
     D3DXVec3Cross(&camera->right, &facing, &camera->up);
     D3DXVec3Normalize(&camera->right, &camera->right);
     if (g_AnmManager != NULL)
@@ -1200,8 +1215,10 @@ void __cdecl Supervisor::write_screenshot(void *arg)
     shot->thread = 0;
 }
 
+// HARNESS_CALLED: LTCG then drops the unused `this`, so WinMain calls it
+// without setting ecx, as the original does.
 // FUNCTION: TH16 0x43ba40
-int Supervisor::initialize()
+HARNESS_CALLED int Supervisor::initialize()
 {
     UpdateFunc *f;
     int result;

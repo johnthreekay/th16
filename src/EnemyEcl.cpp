@@ -134,31 +134,21 @@ static inline void set_next(EnemyInf *enemy, int index, int life, int time, cons
     }
 }
 
-// The fog instruction's `new Fog(0, 0x11, 0)`, kept out of line for now.
-// The original constructs the fog in ecl_run_over_300 itself, which gives
-// that function an EH frame; in our partial program that frame makes LTCG
-// stop inlining the UCRT math into zun_fabsf, zun_cosf, zun_sinf,
-// zun_floorf and shoot_bullets (they lose their matches). That happens to
-// everything called, directly or not, from a function with an EH frame
-// and no frame realignment: zun_fabsf and shoot_bullets are called from
-// here, the other three through PosVel::step. Once more of the program
-// exists, try moving it back.
-static DECOMP_NOINLINE Fog *new_enemy_fog()
+// The fog instruction's `new Fog(0, 0x11, 0)`. Inlined: the original
+// constructs the fog in ecl_run_over_300 itself, which gives that function
+// its EH frame. (Earlier, with less of the program decompiled, that frame
+// made LTCG stop inlining the UCRT math into several callees; it no longer
+// does.)
+static __forceinline Fog *new_enemy_fog()
 {
     return new Fog(0, 0x11, 0);
 }
 
-// The laser instructions and angleToPlayer, kept out of line for now
-// because of new_enemy_fog. Without its EH frame, LTCG realigns the frame
-// of ecl_run_over_300 (and esp, -8) once enough of it wants 8-byte
-// alignment: these four parameter blocks together with the two zun_atan2f
-// calls tip it. A realigned caller makes LTCG lay out Spellcard::end and
-// BulletManager::cancel_rectangle_as_bomb for the stack alignment it then
-// knows (an 8-byte frame, no shrink-wrapping), and both lose their matches.
-// Move these back together with the fog.
+// The laser instructions and angleToPlayer, as forceinline helpers: the
+// original has them inline in ecl_run_over_300.
 
 // laserOn(et): a line laser from the shooter's settings.
-static DECOMP_NOINLINE void ecl_laser_on(EnemyData *enemy)
+static __forceinline void ecl_laser_on(EnemyData *enemy)
 {
     LaserLineInner params;
     i32 idx = enemy->get_int_arg(0);
@@ -180,7 +170,7 @@ static DECOMP_NOINLINE void ecl_laser_on(EnemyData *enemy)
 }
 
 // laserStOn(et, a): an infinite laser.
-static DECOMP_NOINLINE void ecl_laser_st_on(EnemyData *enemy)
+static __forceinline void ecl_laser_st_on(EnemyData *enemy)
 {
     LaserInfiniteInner params;
     i32 idx = enemy->get_int_arg(0);
@@ -206,7 +196,7 @@ static DECOMP_NOINLINE void ecl_laser_st_on(EnemyData *enemy)
 }
 
 // A beam laser (ExpHP: unknown713).
-static DECOMP_NOINLINE void ecl_laser_beam_on(EnemyData *enemy)
+static __forceinline void ecl_laser_beam_on(EnemyData *enemy)
 {
     LaserBeamInner params;
     i32 idx = enemy->get_int_arg(0);
@@ -223,7 +213,7 @@ static DECOMP_NOINLINE void ecl_laser_beam_on(EnemyData *enemy)
 }
 
 // laserCuOn(et): a curvy laser.
-static DECOMP_NOINLINE void ecl_laser_cu_on(EnemyData *enemy)
+static __forceinline void ecl_laser_cu_on(EnemyData *enemy)
 {
     LaserCurveInner params;
     i32 idx = enemy->get_int_arg(0);
@@ -243,17 +233,14 @@ static DECOMP_NOINLINE void ecl_laser_cu_on(EnemyData *enemy)
 }
 
 // angleToPlayer(var, x, y)
-static DECOMP_NOINLINE void ecl_angle_to_player(EnemyData *enemy)
+static __forceinline void ecl_angle_to_player(EnemyData *enemy)
 {
     *enemy->get_float_arg_ptr(0) =
         zun_atan2f(g_Player->inner.pos.y - enemy->get_float_arg(2), g_Player->inner.pos.x - enemy->get_float_arg(1));
 }
 
-// TODO: the original has an EH frame (from the fog instruction's new Fog)
-// and the laser instructions and angleToPlayer inline. Ours has no EH frame
-// and those out of line (see new_enemy_fog and ecl_laser_on); with all of
-// them back the function reaches about 64% in quickdiff. The early
-// argument getters are spelled out because LTCG inlined only those (its
+// TODO: frame layout (ours is 0x18 bytes bigger) and register allocation differ.
+// The early argument getters are spelled out because LTCG inlined only those (its
 // inline budget ran out in moveVelTime), plus the three in the spell case.
 // FUNCTION: TH16 0x41dcb0
 int EnemyData::ecl_run_over_300()
@@ -357,7 +344,9 @@ int EnemyData::ecl_run_over_300()
         {
             f32 angle = -ZUN_PI / 2;
             Float3 *pos = &final_pos.pos;
-            if (!(0.04f > (last_damage_pos.x - pos->x) * (last_damage_pos.x - pos->x) +
+            // 0.2 squared: as a float product one ulp above 0.04f, as in the
+            // original (see EnemyInf::die).
+            if (!(0.2f * 0.2f > (last_damage_pos.x - pos->x) * (last_damage_pos.x - pos->x) +
                               (last_damage_pos.y - pos->y) * (last_damage_pos.y - pos->y)))
             {
                 angle = zun_atan2f(pos->y - last_damage_pos.y, pos->x - last_damage_pos.x);
@@ -376,7 +365,10 @@ int EnemyData::ecl_run_over_300()
     // anmPlayPos(file, script, x, y, rotation)
     case ECL_OP_ANM_PLAY_POS:
     {
-        Float3 pos = final_pos.pos + Float3(full->context.current_context->get_float_arg(2), full->context.current_context->get_float_arg(3), 0.0f);
+        // y is read before x as in the original (random variables draw from the replay RNG).
+        f32 y = full->context.current_context->get_float_arg(3);
+        f32 x = full->context.current_context->get_float_arg(2);
+        Float3 pos = final_pos.pos + Float3(x, y, 0.0f);
         g_EffectManager->track(create_vm_front_at(g_EnemyManager->anim_statement_anms[full->context.current_context->get_int_arg(0)], full->context.current_context->get_int_arg(1),
                                                   &pos, full->context.current_context->get_float_arg(4)));
         break;

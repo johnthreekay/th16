@@ -236,11 +236,13 @@ HARNESS_CALLED Stage *Stage::create(const char *path)
 // Runs the objects' VMs and the script (not while entering, for its first
 // 30 frames), copies the camera to the Supervisor's camera 3 and moves the
 // distortion mesh.
-// TODO: the original aligns its frame to 8 bytes (LTCG, for a callee), and
-// saves esi/edi in the prologue.
 // FUNCTION: TH16 0x409e50
 i32 Stage::on_tick()
 {
+    // A dead double: it makes LTCG realign this frame (and esp, -8) early,
+    // as the original does (docs/findings.md).
+    double unused = 0.0;
+    (void)unused;
     if (stage_flags & STAGE_DISABLED)
     {
         return UPDATE_FUNC_CONTINUE;
@@ -448,76 +450,82 @@ i32 Stage::on_draw_06()
     return UPDATE_FUNC_CONTINUE;
 }
 
-// TODO: the float math and the corner stores are scheduled differently (the original reloads center.x and groups the stores by value).
+// 1 when the object placed at pos is farther than the draw distance from the
+// camera, or when none of its box corners (and edge midpoints) projects into
+// the game area. Each corner component is written out as its own
+// expression (CSE merges them): named half sizes and bounds schedule the
+// math and the stores further from the original.
+// TODO: the float math and the corner stores are still scheduled differently (the original computes z_max first and reloads center.x).
 // FUNCTION: TH16 0x40a7d0
 HARNESS_CALLED i32 StdObject::is_culled(D3DXVECTOR3 *pos, f32 max_distance_sq, Camera *camera)
 {
+    // Dead named locals, not ZUN's code: with three more named variables the
+    // x sums load center.x and rocking_vector_1.x first like the original
+    // (docs/findings.md, the count of named variables); the camera sum's
+    // operands are swapped to compensate for that count.
+    i32 unused_1 = 0;
+    i32 unused_2 = 0;
+    i32 unused_3 = 0;
+    (void)unused_1;
+    (void)unused_2;
+    (void)unused_3;
     D3DXVECTOR3 corners[16];
     D3DXVECTOR3 projected[16];
     D3DXMATRIX world;
 
-    corners[0] = (center + *pos) - (camera->position + camera->rocking_vector_1);
+    corners[0] = (center + *pos) - (camera->rocking_vector_1 + camera->position);
     if (D3DXVec3LengthSq(&corners[0]) > max_distance_sq)
     {
         return 1;
     }
-    f32 hx = size.x * 0.5f;
-    f32 hy = size.y * 0.5f;
-    f32 hz = size.z * 0.5f;
-    f32 x_max = center.x + hx;
-    f32 x_min = center.x - hx;
-    f32 y_max = center.y + hy;
-    f32 y_min = center.y - hy;
-    f32 z_max = center.z + hz;
-    f32 z_min = center.z - hz;
-    corners[0].x = x_max;
-    corners[0].y = y_max;
-    corners[0].z = z_max;
-    corners[1].x = x_max;
-    corners[1].y = y_max;
-    corners[1].z = z_min;
-    corners[2].x = x_max;
-    corners[2].y = y_min;
-    corners[2].z = z_max;
-    corners[3].x = x_max;
-    corners[3].y = y_min;
-    corners[3].z = z_min;
-    corners[4].x = x_min;
-    corners[4].y = y_max;
-    corners[4].z = z_max;
-    corners[5].x = x_min;
-    corners[5].y = y_max;
-    corners[5].z = z_min;
-    corners[6].x = x_min;
-    corners[6].y = y_min;
-    corners[6].z = z_max;
-    corners[7].x = x_min;
-    corners[7].y = y_min;
-    corners[7].z = z_min;
+    corners[0].x = center.x + size.x * 0.5f;
+    corners[0].y = center.y + size.y * 0.5f;
+    corners[0].z = center.z + size.z * 0.5f;
+    corners[1].x = center.x + size.x * 0.5f;
+    corners[1].y = center.y + size.y * 0.5f;
+    corners[1].z = center.z - size.z * 0.5f;
+    corners[2].x = center.x + size.x * 0.5f;
+    corners[2].y = center.y - size.y * 0.5f;
+    corners[2].z = center.z + size.z * 0.5f;
+    corners[3].x = center.x + size.x * 0.5f;
+    corners[3].y = center.y - size.y * 0.5f;
+    corners[3].z = center.z - size.z * 0.5f;
+    corners[4].x = center.x - size.x * 0.5f;
+    corners[4].y = center.y + size.y * 0.5f;
+    corners[4].z = center.z + size.z * 0.5f;
+    corners[5].x = center.x - size.x * 0.5f;
+    corners[5].y = center.y + size.y * 0.5f;
+    corners[5].z = center.z - size.z * 0.5f;
+    corners[6].x = center.x - size.x * 0.5f;
+    corners[6].y = center.y - size.y * 0.5f;
+    corners[6].z = center.z + size.z * 0.5f;
+    corners[7].x = center.x - size.x * 0.5f;
+    corners[7].y = center.y - size.y * 0.5f;
+    corners[7].z = center.z - size.z * 0.5f;
     corners[8].x = center.x;
-    corners[8].y = y_min;
-    corners[8].z = z_min;
+    corners[8].y = center.y - size.y * 0.5f;
+    corners[8].z = center.z - size.z * 0.5f;
     corners[9].x = center.x;
-    corners[9].y = y_max;
-    corners[9].z = z_min;
+    corners[9].y = center.y + size.y * 0.5f;
+    corners[9].z = center.z - size.z * 0.5f;
     corners[10].x = center.x;
-    corners[10].y = y_min;
-    corners[10].z = z_max;
+    corners[10].y = center.y - size.y * 0.5f;
+    corners[10].z = center.z + size.z * 0.5f;
     corners[11].x = center.x;
-    corners[11].y = y_max;
-    corners[11].z = z_max;
+    corners[11].y = center.y + size.y * 0.5f;
+    corners[11].z = center.z + size.z * 0.5f;
     corners[12].x = center.x;
-    corners[12].y = y_min;
+    corners[12].y = center.y - size.y * 0.5f;
     corners[12].z = center.z;
     corners[13].x = center.x;
-    corners[13].y = y_max;
+    corners[13].y = center.y + size.y * 0.5f;
     corners[13].z = center.z;
     corners[14].x = center.x;
-    corners[14].y = y_min;
-    corners[14].z = center.z - hz * 0.5f;
+    corners[14].y = center.y - size.y * 0.5f;
+    corners[14].z = center.z - (size.z * 0.5f) * 0.5f;
     corners[15].x = center.x;
-    corners[15].y = y_max;
-    corners[15].z = center.z + hz * 0.5f;
+    corners[15].y = center.y + size.y * 0.5f;
+    corners[15].z = center.z + (size.z * 0.5f) * 0.5f;
     D3DXMatrixIdentity(&world);
     D3DXMatrixTranslation(&world, pos->x, pos->y, pos->z);
     D3DXVec3ProjectArray(projected, sizeof(D3DXVECTOR3), corners, sizeof(D3DXVECTOR3), &camera->viewport,
@@ -662,13 +670,18 @@ void StageInner::draw_vms(i32 layer)
     }
 }
 
-// TODO: register and stack slot allocation differ (the original keeps 255.0f in memory and adds d.x to pos.x the other way round).
+// TODO: kind 2's register and stack slot allocation differ (the original keeps 255.0f in memory, swaps the radius and radius squared spill slots and sums the squares into x's register).
 // Moves the distortion mesh: kind 1 waves the bottom of the screen while no
 // spell card is active, kind 2 bulges a disc around the center of the game
 // area whose radius shrinks towards distortion_min_radius.
 // FUNCTION: TH16 0x40c4a0
 void StageInner::step_fog()
 {
+    // A dead named local, not ZUN's code: one more named variable makes
+    // MSVC load pos.x before adding d.x in the kind 1 loop, as the original
+    // does (docs/findings.md, the count of named variables).
+    i32 unused = 0;
+    (void)unused;
     if (fog == NULL)
     {
         return;
@@ -705,9 +718,12 @@ void StageInner::step_fog()
                 d.y = sinf(angle_b.value) * t;
                 if (i != 0 && j != 0 && i != fog->strip_count - 1 && j != fog->strip_points - 1)
                 {
-                    vertex->pos.x = vertex->pos.x + d.x;
-                    vertex->pos.y = vertex->pos.y + d.y;
-                    vertex->pos.z = 0.0f;
+                    // Through a pointer to the position: pos.y is then loaded
+                    // before d.y is added, as in the original.
+                    D3DXVECTOR3 *pos = &vertex->pos;
+                    pos->x = pos->x + d.x;
+                    pos->y = pos->y + d.y;
+                    pos->z = 0.0f;
                     point->z = 0.0f;
                 }
                 angle_a.value = wrap_angle(angle_a.value + 0.66842401f);
@@ -763,10 +779,12 @@ void StageInner::step_fog()
             }
         }
         wave_angle_a = wrap_angle(wave_angle_a + ZUN_PI / 64);
-        wave_angle_b = wrap_angle(g_replay_unsafe_rng.randf_0_to_1() * ZUN_PI / 40.0f + ZUN_PI / 80 + wave_angle_b);
+        // The random number in a local: the sum then adds wave_angle_b last.
+        f32 r = g_replay_unsafe_rng.randf_0_to_1();
+        wave_angle_b = wrap_angle(r * ZUN_PI / 40.0f + ZUN_PI / 80 + wave_angle_b);
     }
 tick:
-    fog_timer.tick_in_place();
+    fog_timer.tick_split();
 }
 
 // FUNCTION: TH16 0x40a7b0
@@ -838,32 +856,30 @@ i32 Stage::load_std(const char *path)
 }
 
 // Starts a VM for every quad of every object, the update functions and
-// the script.
+// the script. Static and reading g_Stage itself: GameThread::begin_stage
+// calls it through a function pointer (see start_std_vms_func there).
 // FUNCTION: TH16 0x40add0
 HARNESS_CALLED void Stage::start_std_vms()
 {
+    Stage *stage = g_Stage;
     i32 vm_index = 0;
-    on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
-    on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
-    on_draw_func_2->flags |= UPDATE_FUNC_ACTIVE;
-    for (i32 i = 0; i < std->num_objects; i++)
+    stage->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
+    stage->on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+    stage->on_draw_func_2->flags |= UPDATE_FUNC_ACTIVE;
+    for (i32 i = 0; i < stage->std->num_objects; i++)
     {
-        objects[i]->flags = 1;
-        for (StdQuad *quad = objects[i]->quads; quad->type >= 0; quad = (StdQuad *)((u8 *)quad + quad->size))
+        stage->objects[i]->flags = 1;
+        for (StdQuad *quad = stage->objects[i]->quads; quad->type >= 0; quad = (StdQuad *)((u8 *)quad + quad->size))
         {
-            stage_anm->copy_vm_and_run(&vms[vm_index], quad->script);
+            stage->stage_anm->copy_vm_and_run(&stage->vms[vm_index], quad->script);
             quad->vm_index = vm_index++;
         }
     }
-    inner.cur_instr_offset = 0;
+    stage->inner.cur_instr_offset = 0;
 }
 
 // Runs the VMs of objects still marked as running; unmarks objects whose
 // VMs have all finished.
-// TODO: ours saves ebx/edi after the loop guard (shrink-wrapped): the
-// original's frame is padded for alignment from Stage::on_tick, which
-// realigns itself there and not in ours (it matched while on_tick_callback
-// was entered aligned, which costs that thunk its jump).
 // FUNCTION: TH16 0x40aed0
 i32 Stage::update_std_vms()
 {
@@ -927,10 +943,66 @@ HARNESS_CALLED void Stage::start_enter()
     stage_flags |= STAGE_ENTERING;
 }
 
-// TODO: ours gets a /GS cookie (the CameraSky temporaries), which shifts every stack slot; the original also shares one return path per result.
+// InterpCameraSky::step's methods, written as inline helpers: with the
+// bodies in step itself, its registers and return paths come out further
+// from the original's. They are __declspec(safebuffers) (as are the
+// CameraSky operators they inline) because a __forceinline callee brings its
+// own /GS check into step: the CameraSky temporaries gave step a cookie the
+// original does not have, and safebuffers on step alone did not remove it.
+
+// Method 7: initial moves by goal every frame.
+static __declspec(safebuffers) __forceinline void sky_step_7(InterpCameraSky *s)
+{
+    CameraSky tmp = s->initial;
+    s->initial = tmp.add_inline(s->goal);
+    s->current = s->initial;
+}
+// Method 17: initial moves by bezier_2, which itself moves by goal.
+static __declspec(safebuffers) __forceinline void sky_step_17(InterpCameraSky *s)
+{
+    CameraSky tmp = s->initial;
+    s->initial = tmp + s->bezier_2;
+    s->bezier_2 = s->bezier_2 + s->goal;
+    s->current = s->initial;
+}
+// Method 8: Hermite curve from initial to goal with tangents bezier_1 and
+// bezier_2.
+static __declspec(safebuffers) __forceinline void sky_step_8(InterpCameraSky *s)
+{
+    f32 t = s->time.current_f / (f32)s->end_time;
+    f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
+    f32 c_goal = t * t * (3.0f - 2.0f * t);
+    f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
+    f32 c_bezier_2 = (t - 1.0f) * t * t;
+    s->current = s->initial * c_initial + s->goal * c_goal + s->bezier_1 * c_bezier_1 + s->bezier_2 * c_bezier_2;
+}
+// The other methods: the shared easing curves between initial and goal.
+static __declspec(safebuffers) __forceinline void sky_step_other(InterpCameraSky *s)
+{
+    f32 x = interp_common_methods(s->method, s->time.current_f, (f32)s->end_time);
+    s->current = (s->goal - s->initial) * x + s->initial;
+}
+
+// The finished interpolation's return is shared by the two checks of
+// end_time (goto): written out twice, it stayed two copies.
+// TODO: ours keeps the return pointer in ebx where the original reloads it at each
+// return; method 8's color loops multiply in the other operand order (no loop form
+// changes it), and for the other methods ours vectorizes (goal - initial) * x
+// (mulps) where the original recomputes the differences field by field.
 // FUNCTION: TH16 0x40cd10
 CameraSky InterpCameraSky::step()
 {
+    // Dead named locals, not ZUN's code: with four more named variables
+    // method 8 multiplies initial's first field in the original's operand
+    // order (docs/findings.md, the count of named variables).
+    i32 unused_1 = 0;
+    i32 unused_2 = 0;
+    i32 unused_3 = 0;
+    i32 unused_4 = 0;
+    (void)unused_1;
+    (void)unused_2;
+    (void)unused_3;
+    (void)unused_4;
     if (end_time > 0)
     {
         time.tick();
@@ -938,15 +1010,12 @@ CameraSky InterpCameraSky::step()
         {
             time.set(end_time);
             end_time = 0;
-            if (method == 7 || method == 17)
-            {
-                return initial;
-            }
-            return goal;
+            goto finished;
         }
     }
     else if (end_time == 0)
     {
+    finished:
         if (method == 7 || method == 17)
         {
             return initial;
@@ -955,30 +1024,19 @@ CameraSky InterpCameraSky::step()
     }
     if (method == 7)
     {
-        CameraSky tmp = initial;
-        initial = tmp.add_inline(goal);
-        current = initial;
+        sky_step_7(this);
     }
     else if (method == 17)
     {
-        CameraSky tmp = initial;
-        initial = tmp + bezier_2;
-        bezier_2 = bezier_2 + goal;
-        current = initial;
+        sky_step_17(this);
     }
     else if (method == 8)
     {
-        f32 t = time.current_f / (f32)end_time;
-        f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
-        f32 c_goal = t * t * (3.0f - 2.0f * t);
-        f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
-        f32 c_bezier_2 = (t - 1.0f) * t * t;
-        current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+        sky_step_8(this);
     }
     else
     {
-        f32 x = interp_common_methods(method, time.current_f, (f32)end_time);
-        current = (goal - initial) * x + initial;
+        sky_step_other(this);
     }
     return current;
 }
@@ -1016,12 +1074,21 @@ HARNESS_CALLED CameraSky::CameraSky(f32 begin_distance, f32 end_distance, f32 c0
     }
 }
 
-// TODO: the original frame has 4 more (unused) bytes: padding for the
-// known alignment run_std's realignment gives it (run_std does not realign
-// in ours).
+// A dead double, not ZUN's code: it stands in for AnmVm::run wanting an
+// aligned stack (docs/findings.md). In this plain inline helper it is a call
+// graph node of its own, so interrupt_vms pads its frame (4 unused bytes,
+// like the original) instead of realigning it.
+static inline void interrupt_vms_want_aligned_stack()
+{
+    double unused_double = 0.0;
+    (void)unused_double;
+}
+
+// Sends the interrupt to the stage's VMs and runs them.
 // FUNCTION: TH16 0x40b2f0
 void Stage::interrupt_vms(i32 n)
 {
+    interrupt_vms_want_aligned_stack();
     if (vms != NULL)
     {
         AnmVm *vm = vms;
@@ -1041,14 +1108,22 @@ void Stage::interrupt_vms(i32 n)
 // The stage script (STD) and the camera rocking patterns. The rocking code
 // calls the out-of-line sinf and cosf (0x405510, 0x4054f0), which LTCG
 // keeps out of line here (this function has an EH frame).
-// TODO: the original realigns its frame (and esp, -8 with an ebx frame),
-// which moves every stack slot; ours does not, also now that its callees
-// that realign (AnmVm::run) are decompiled.
+// safebuffers (on the declaration) drops the /GS cookie ours got for its
+// locals; the original only has the EH frame's. The first time check is
+// written separately from the loop's (current loaded first, as in the
+// original's entry test).
+// TODO: a few vector stores are scheduled around unpcklps differently, and
+// the final timer tick adds current_f from memory where the original loads it.
 // FUNCTION: TH16 0x40b3b0
 i32 StageInner::run_std()
 {
     StdInstr *ins = (StdInstr *)((u8 *)stage->script + cur_instr_offset);
-    while (ins->time <= time_in_stage.current)
+    i32 now = time_in_stage.current;
+    if (ins->time > now)
+    {
+        goto ticked;
+    }
+    do
     {
         switch (ins->opcode)
         {
@@ -1196,14 +1271,18 @@ i32 StageInner::run_std()
                 vm->root_vm = NULL;
                 vm->run();
             }
+            // A VM pointer in each branch: the -2 branch then jumps into the
+            // -1 branch's shared flag store, as in the original.
             else if (script == -2)
             {
-                anm_vms[ins->args[0]].flags_lo &= ~1;
+                AnmVm *vm = &anm_vms[ins->args[0]];
+                vm->flags_lo &= ~1;
             }
             else if (script == -1)
             {
-                anm_vms[ins->args[0]].instr_offset = script;
-                anm_vms[ins->args[0]].flags_lo &= ~1;
+                AnmVm *vm = &anm_vms[ins->args[0]];
+                vm->instr_offset = script;
+                vm->flags_lo &= ~1;
             }
             anm_vm_layers[ins->args[0]] = ins->args[2];
             break;
@@ -1242,7 +1321,8 @@ i32 StageInner::run_std()
         }
         cur_instr_offset += ins->size;
         ins = (StdInstr *)((u8 *)stage->script + cur_instr_offset);
-    }
+    } while (ins->time <= time_in_stage.current);
+ticked:
     time_in_stage.tick();
 stopped:
     if (camera_facing_i.end_time != 0)

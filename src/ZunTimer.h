@@ -267,6 +267,67 @@ struct ZunTimer
         current = cur;
     }
 
+    // tick with a missing speed jumping into the whole-frame branch, so each
+    // branch keeps its own stores. How the scaled branch adds depends on
+    // the caller and can go either way: some get the original's
+    // `addss xmm1, [current_f]` (ScreenEffect::on_tick_flash, on_tick_hold),
+    // others its load of current_f into xmm0 first (Bullet::step_ex_00 and
+    // step_ex_04, EnemyManager::kill_all).
+    void tick_goto()
+    {
+        f32 *speed = this->speed();
+        i32 cur = current;
+        previous = cur;
+        if (speed == NULL)
+        {
+            goto whole_frame;
+        }
+        if (*speed > 0.99f && *speed < 1.01f)
+        {
+        whole_frame:
+            cur++;
+            current_f = current_f + 1.0f;
+        }
+        else
+        {
+            current_f = *speed + current_f;
+            cur = (i32)current_f;
+        }
+        current = cur;
+    }
+
+    // tick with the whole-frame step written twice, once for a missing
+    // speed and once for a speed close to 1. MSVC loads the 1.0f for the two
+    // copies into a register early, then merges them into one block
+    // (EnemyManager::update keeps 1.0f in xmm2 across the store before it).
+    void tick_nested()
+    {
+        f32 *speed = this->speed();
+        i32 cur = current;
+        f32 cur_f;
+        previous = cur;
+        if (speed != NULL)
+        {
+            if (*speed > 0.99f && *speed < 1.01f)
+            {
+                cur++;
+                cur_f = current_f + 1.0f;
+            }
+            else
+            {
+                cur_f = current_f + *speed;
+                cur = (i32)cur_f;
+            }
+        }
+        else
+        {
+            cur++;
+            cur_f = current_f + 1.0f;
+        }
+        current = cur;
+        current_f = cur_f;
+    }
+
     // Count back by whole frames, ignoring the speed multiplier (ANM's
     // wait instruction, which AnmVm::run runs once the time has passed).
     void rewind(i32 frames)

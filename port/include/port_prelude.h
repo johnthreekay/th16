@@ -44,6 +44,13 @@
 // error, and nothing in the port depends on inlining.
 #define __forceinline inline
 
+// __declspec(safebuffers) turns off MSVC's /GS stack cookies for a function;
+// the matching build puts it on a few functions. The port has no /GS, so it
+// expands to nothing. Any other __declspec stops the build here (the paste
+// names no macro) rather than being dropped silently.
+#define __declspec(spec) TH16_PORT_DECLSPEC_##spec
+#define TH16_PORT_DECLSPEC_safebuffers
+
 // (MSVC aligns it to 8 inside structs and i386 GCC to 4; the game's two
 // __int64 fields sit at offsets where that makes no difference, see
 // CMakeLists.txt.)

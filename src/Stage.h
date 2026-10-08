@@ -190,7 +190,8 @@ struct StageInner
     void set_sky_interp(i32 end_time, i32 method, CameraSky *goal);
     // 0x40b3b0. Runs the instructions whose time has come, advances the
     // time, steps the camera interpolators and rocks the camera.
-    i32 run_std();
+    // safebuffers: see run_std (Stage.cpp).
+    __declspec(safebuffers) i32 run_std();
     // The camera rocking pattern (STD_ROCKING_MODE): 0 for none.
     u8 &rocking_mode()
     {
@@ -274,7 +275,7 @@ struct Stage
     void interrupt_vms(i32 n);
 
     // These reach the stage through g_Stage.
-    HARNESS_CALLED void start_std_vms();
+    HARNESS_CALLED static void start_std_vms();
     HARNESS_CALLED void jump_to_label(i32 label);
     HARNESS_CALLED void start_exit();
     HARNESS_CALLED void start_enter();

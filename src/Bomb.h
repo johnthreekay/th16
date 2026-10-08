@@ -235,7 +235,8 @@ class BombMarisaAInf : public BombInf
 {
   public:
     virtual i32 begin();
-    virtual i32 on_tick();
+    // safebuffers: see BombMarisaAInf::on_tick (BombMain.cpp).
+    __declspec(safebuffers) virtual i32 on_tick();
     virtual i32 cancel_bullets();
     virtual i32 on_draw();
     virtual i32 compute_damage(i32 enemy_pos, i32 enemy_size);

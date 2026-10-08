@@ -27,12 +27,12 @@ HARNESS_CALLED void AnmManager::release_textures()
 inline void AnmLoadedD3D::create_render_target(i32 width, i32 height)
 {
     flags |= 1;
-    g_Supervisor.d3d_device->CreateTexture(width, height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8,
+    supervisor_d3d_device()->CreateTexture(width, height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8,
                                            D3DPOOL_DEFAULT, &texture, NULL);
     bytes_per_pixel = g_Supervisor.present_params.BackBufferFormat == D3DFMT_A8R8G8B8 ? 4 : 2;
 }
 
-// TODO: ours leaves ebx unused (whole-program effect; without the DirectInput enum callbacks only edi/esi differ).
+// TODO: ours swaps esi and edi (the entry and the texture width); create_render_target's call through supervisor_d3d_device() gave it ebx back.
 // FUNCTION: TH16 0x459640
 HARNESS_CALLED void AnmManager::create_d3d_textures_for_loaded_anms()
 {

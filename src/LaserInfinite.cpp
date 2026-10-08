@@ -12,7 +12,7 @@ i32 LaserInfiniteInf::on_destroy()
 }
 
 // Runs the laser's pending et_ex transforms.
-// TODO: in the blend mode case the original increments ex_index in memory (inc, reload) instead of from the loaded index.
+// TODO: the original keeps ex in eax and its type in edx (ours the other way round; a type local, an index local, (u32) and the case order do not change it).
 // FUNCTION: TH16 0x436fd0
 void LaserInfiniteInf::run_ex()
 {
@@ -36,33 +36,38 @@ void LaserInfiniteInf::run_ex()
             state = LASER_STATE_WARNING;
             break;
         case BULLET_EX_BLEND:
+        {
+            // Through a VM pointer: the original then increments ex_index
+            // in memory (inc, reload) in this case.
+            AnmVm *vm = &vm_950;
             if (ex->a != 0)
             {
-                vm_950.flags_lo = vm_950.flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
+                vm->flags_lo = vm->flags_lo & ~ANM_VM_BLEND_MODE_MASK | (1 << ANM_VM_BLEND_MODE_SHIFT);
             }
             else
             {
-                vm_950.flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
+                vm->flags_lo &= ~ANM_VM_BLEND_MODE_MASK;
             }
             ex_index++;
             continue;
+        }
         }
         ex_index++;
     }
 }
 
 // 2 if a circle at pos touches the laser's rectangle, else 0.
-// TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
+// The offset is a Float3 and y is computed before x: written as separate
+// floats in the other order, ours multiplies d.x from memory.
 // FUNCTION: TH16 0x436ef0
 i32 LaserInfiniteInf::touches_circle(Float3 *pos, f32 radius)
 {
-    f32 dx = pos->x - position.x;
-    f32 dy = pos->y - position.y;
+    Float3 d = *pos - position;
     f32 a = -angle;
     f32 s = zun_sinf(a);
     f32 c = zun_cosf(a);
-    f32 x = dx * c - dy * s;
-    f32 y = dx * s + dy * c;
+    f32 y = d.x * s + d.y * c;
+    f32 x = d.x * c - d.y * s;
     D3DXVECTOR2 lo(x - radius, y - radius);
     D3DXVECTOR2 hi(x + radius, y + radius);
     if (lo.x > hit_length || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
@@ -76,10 +81,22 @@ i32 LaserInfiniteInf::touches_circle(Float3 *pos, f32 radius)
 // One frame: et_ex, growth and rotation, following the boss (flag 1),
 // moving, then the warning (3), grow (4), full (2) and fade (5) states.
 // Nonzero once the laser is done.
-// TODO: the original realigns the frame and saves esi/edi, and its find_enemy_by_id loop keeps a NULL in ecx.
+// The dead double is not ZUN's code: as in LaserLineInf::initialize, it
+// makes LTCG realign the frame (and esp, -8) like the original. Neither are
+// the two dead ints: MSVC orders the x component's load by the function's
+// count of named variables (period 8; docs/findings.md), and with the
+// velocity scaled field by field into v they give the original's adds.
+// Matching only.
+// TODO: the original keeps a NULL in ecx in the find_enemy_by_id loop and addresses vm_950 through a pointer in edi while ORing the scale flag twice and reloading the sprite index (an AnmVm pointer local, with the scales computed first or not, gives other registers).
 // FUNCTION: TH16 0x4352f0
 i32 LaserInfiniteInf::on_tick()
 {
+    double unused = 0.0;
+    (void)unused;
+    i32 unused_a = 0;
+    i32 unused_b = 0;
+    (void)unused_a;
+    (void)unused_b;
     run_ex();
     if (ex_flags != 0)
     {
@@ -134,9 +151,11 @@ i32 LaserInfiniteInf::on_tick()
             position = g_EnemyManager->get_boss(0)->enemy.final_pos.pos;
         }
     }
-    position.x = inner.velocity.x * g_game_speed + position.x;
-    position.y = position.y + inner.velocity.y * g_game_speed;
-    position.z = position.z + inner.velocity.z * g_game_speed;
+    Float3 v;
+    v.x = inner.velocity.x * g_game_speed;
+    v.y = inner.velocity.y * g_game_speed;
+    v.z = inner.velocity.z * g_game_speed;
+    position += v;
     switch (state)
     {
     case LASER_STATE_WARNING:
@@ -147,14 +166,19 @@ i32 LaserInfiniteInf::on_tick()
         }
         break;
     case LASER_STATE_EXPANDING:
-        if (timer.current < inner.expand_time)
+        // Written as >= with the else breaking for the original's case
+        // layout; the if branch falls through into ACTIVE.
+        if (timer.current >= inner.expand_time)
+        {
+            timer.set_value(0);
+            state = LASER_STATE_ACTIVE;
+            width = inner.laser_new_arg_4;
+        }
+        else
         {
             width = inner.laser_new_arg_4 * timer.current_f / inner.expand_time;
             break;
         }
-        timer.set_value(0);
-        state = LASER_STATE_ACTIVE;
-        width = inner.laser_new_arg_4;
     case LASER_STATE_ACTIVE:
         if (timer.current < inner.duration)
         {
@@ -171,12 +195,12 @@ i32 LaserInfiniteInf::on_tick()
         break;
     }
     check_graze_or_kill(0);
-    AnmVm *vm = &vm_950;
-    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
-    vm->scale.x = width / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_width;
-    vm->flags_lo |= ANM_VM_SCALE_CHANGED;
-    vm->scale.y = hit_length / g_AnmManager->loaded_anms[vm->anm_loaded_index]->sprites[vm->sprite_id].sprite_height;
-    vm->run();
+    vm_950.flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm_950.scale.x = width / g_AnmManager->loaded_anms[vm_950.anm_loaded_index]->sprites[vm_950.sprite_id].sprite_width;
+    vm_950.flags_lo |= ANM_VM_SCALE_CHANGED;
+    vm_950.scale.y =
+        hit_length / g_AnmManager->loaded_anms[vm_950.anm_loaded_index]->sprites[vm_950.sprite_id].sprite_height;
+    vm_950.run();
     if (unk_7c == 0.0f)
     {
         vm_f4c.run();
