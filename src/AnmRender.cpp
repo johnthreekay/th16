@@ -562,7 +562,7 @@ static inline void fan_scroll_v(AnmFanData *data, RenderVertex144 *vertex)
 // TODO: the original adds uv.x + uv_speed (first vertex), uv.y + uv_speed
 // (in the loop) and entity_pos.z + pos.z with the operands the other way
 // round; operand order and pointer forms in the scroll helpers flip
-// several of these at once.
+// several of these at once (loop forms and extra locals were tried too).
 // FUNCTION: TH16 0x46a0b0
 i32 __fastcall anm_on_tick_fan(AnmVm *vm)
 {
