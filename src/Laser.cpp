@@ -2821,11 +2821,27 @@ void LaserCurveInf::run_ex()
 // Steps a segment back from the previous one's position (pos, speed, angle)
 // along the node's motion. In mode 2 the whole part of t is kept as the
 // double floor returns: the original converts it with cvtpd2ps.
-// TODO: mode 1 differs in operand order only: the original copies dt to multiply velocity.x from memory, loads the x operands of b + a the other way round and squares sum.x into the register it adds to (a + b or a field-wise sum flips other components).
+// The six dead locals are not ZUN's: MSVC orders the x component loads by
+// the function's count of named variables (period 8; docs/findings.md), and
+// these give the original's dt copy and, with D3DXVec3Add(&sum, &a, &b), the
+// x operands of the sum. Matching only.
+// TODO: mode 1 still squares sum.y into the register it adds to where the original squares sum.x (the operand order of the sum, a length-squared local, offset_length_sq, D3DXVec2Length and field-wise sums do not change it).
 // FUNCTION: TH16 0x438370
 void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, Float3 *pos, f32 speed, f32 angle,
                                f32 t)
 {
+    i32 unused_a = 0;
+    i32 unused_b = 0;
+    i32 unused_c = 0;
+    i32 unused_d = 0;
+    i32 unused_e = 0;
+    i32 unused_f = 0;
+    (void)unused_a;
+    (void)unused_b;
+    (void)unused_c;
+    (void)unused_d;
+    (void)unused_e;
+    (void)unused_f;
     switch (mode)
     {
     case 0:
@@ -2849,7 +2865,8 @@ void LaserCurveNode::step_back(Float3 *out_pos, f32 *out_speed, f32 *out_angle, 
             b.z = 0.0f;
             laser_sincosmul(&a, angle, -speed);
             laser_sincosmul(&b, angle_delta, -speed_delta);
-            Float3 sum = b + a;
+            Float3 sum;
+            D3DXVec3Add(&sum, &a, &b);
             *out_pos = *pos + sum;
             *out_speed = (f32)sqrt(sum.x * sum.x + sum.y * sum.y);
             *out_angle = atan2(sum.y, sum.x);
