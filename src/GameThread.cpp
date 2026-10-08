@@ -906,8 +906,10 @@ static inline StageFunc start_std_vms_func()
     return &Stage::start_std_vms;
 }
 
-// TODO: the original folds allocate_new_enemy's unused argument (push ecx
-// where ours pushes 0).
+// allocate_new_enemy's third argument is unused, and LTCG drops it once it
+// sees every caller (HARNESS_CALLED, see src/harness/r3b.cpp).
+// TODO: the original fills the dropped argument's slot with `push ecx`;
+// ours leaves memset's last argument there, as finish_stage_transition does.
 // FUNCTION: TH16 0x42dc50
 HARNESS_CALLED i32 GameThread::begin_stage()
 {
@@ -939,8 +941,10 @@ HARNESS_CALLED i32 GameThread::begin_stage()
     return 0;
 }
 
-// TODO: the original leaves memset's last argument as allocate_new_enemy's
-// unused one, and indexes bgm_unlocked as [esi + eax].
+// memset's last argument stays on the stack as allocate_new_enemy's dropped
+// third one, as in the original.
+// TODO: effective match only: the original indexes bgm_unlocked as
+// [esi + eax] (base and index swapped; no source form found).
 // FUNCTION: TH16 0x42dee0
 i32 GameThread::finish_stage_transition()
 {

@@ -1402,7 +1402,7 @@ int EnemyData::ecl_anm_set_sprite()
 }
 
 // FUNCTION: TH16 0x41aa70
-EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, EnemyCreateParams *params, i32 unused)
+HARNESS_CALLED EnemyInf *EnemyManager::allocate_new_enemy(const char *sub_name, EnemyCreateParams *params, i32 unused)
 {
     EnemyInf *enemy = new EnemyInf(sub_name);
     enemy->enemy.abs_pos.pos = params->pos;
