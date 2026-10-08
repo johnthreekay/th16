@@ -178,8 +178,8 @@ u32 ScorefileSection::compute_checksum(i32 size)
 // PauseMenu.cpp: opens the menu shown when a replay ends.
 void open_replay_end_menu();
 
-// TODO: the original realigns its frame to 8 bytes and keeps the recorded
-// input in a local (edi, spilled to the frame); ours rereads the global.
+// TODO: 44%; the original realigns its frame through ebx and keeps the
+// recorded input in eax and edi besides its stack slot (ours reloads it).
 // FUNCTION: TH16 0x447fd0
 int ReplayManager::on_tick_record()
 {
@@ -190,7 +190,9 @@ int ReplayManager::on_tick_record()
     g_InputState.input_prev = g_InputState.input;
     g_InputState.input = (u16)g_hardware_input;
     InputState::update();
-    u32 input;
+    // The original keeps the recorded input in a stack slot; volatile
+    // stands in for whatever spilled it there.
+    u32 volatile input;
     if (g_Supervisor.config.flags & CONFIG_SHOT_HOLD_FOCUS)
     {
         input = g_InputState.input;
