@@ -471,8 +471,6 @@ HARNESS_CALLED EnemyRef EnemyManager::find_closest(D3DXVECTOR3 *pos, f32 max_dis
 
 // ECL funcset 1 (the snowman card): cancels the bullets within
 // ecl_float_vars[0] of the player.
-// TODO: ours jumps straight out of the loop when iter_current is NULL; the original goes through
-// the "entry or NULL" join and tests again.
 // FUNCTION: TH16 0x4252d0
 int __fastcall ecl_funcset_cancel_near_player(EnemyData *enemy)
 {

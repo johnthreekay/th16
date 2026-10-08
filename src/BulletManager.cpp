@@ -351,8 +351,6 @@ static inline i32 bullet_in_circle(Bullet *bullet, D3DXVECTOR3 *pos, f32 radius)
     return dy * dy + dx * dx <= r * r;
 }
 
-// TODO: only the iterator differs: the original does not thread the jump after the
-// iterator's NULL entry (if/else, or iter_* defined out of line, do not change it).
 // FUNCTION: TH16 0x416c20
 HARNESS_CALLED i32 BulletManager::cancel_radius(D3DXVECTOR3 *pos, f32 radius, i32 mode)
 {
@@ -371,7 +369,6 @@ HARNESS_CALLED i32 BulletManager::cancel_radius(D3DXVECTOR3 *pos, f32 radius, i3
     return 0;
 }
 
-// TODO: as cancel_radius (only the iterator's jump threading differs).
 // FUNCTION: TH16 0x416d20
 HARNESS_CALLED i32 BulletManager::cancel_radius_as_bomb(D3DXVECTOR3 *pos, f32 radius, i32 mode)
 {

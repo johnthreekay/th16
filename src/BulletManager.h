@@ -311,18 +311,22 @@ struct BulletManager
     void reset_lists();
 
     // Walk the tick list with iter_current/iter_next, so that the bullet
-    // being ticked can unlink itself.
+    // being ticked can unlink itself. The result goes through a local: then
+    // the caller's NULL test after the "entry or NULL" join stays (returning
+    // the ternary directly lets the NULL branch jump straight out).
     Bullet *iter_first()
     {
         iter_current = tick_list_head.next;
         iter_next = iter_current != NULL ? iter_current->next : NULL;
-        return iter_current != NULL ? iter_current->entry : NULL;
+        Bullet *b = iter_current != NULL ? iter_current->entry : NULL;
+        return b;
     }
     Bullet *iter_advance()
     {
         iter_current = iter_next;
         iter_next = iter_current != NULL ? iter_current->next : NULL;
-        return iter_current != NULL ? iter_current->entry : NULL;
+        Bullet *b = iter_current != NULL ? iter_current->entry : NULL;
+        return b;
     }
 
     // Whether the counter is a multiple of n. Written as members, these
