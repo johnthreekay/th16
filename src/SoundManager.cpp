@@ -963,7 +963,8 @@ static inline IDirectSoundBuffer *bgm_buffer(CStreamingSound *sound)
 // Runs the first queued BGM command one step further (commands take several
 // calls, counted in step) and plays or stops the queued sound effects.
 // Returns the BGM command now first in the queue.
-// TODO: 44%; the BGM command switch shares fewer tails than the original.
+// TODO: 55%; the step switches become jump tables where the original
+// compares, and the pan sum is unrolled by two.
 // FUNCTION: TH16 0x45e330
 i32 SoundManager::update_sound_thread()
 {
@@ -1214,10 +1215,11 @@ done:
             {
                 i32 pan = 0;
                 // The original sums with plain scalar adds.
+                i32 *pans = g_SoundManager.queued_pans[i];
 #pragma loop(no_vector)
-                for (i32 j = 0; j < count; j++)
+                for (i32 j = count; j > 0; j--)
                 {
-                    pan += g_SoundManager.queued_pans[i][j];
+                    pan += *pans++;
                 }
                 if (count > 0)
                 {
