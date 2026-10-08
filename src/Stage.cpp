@@ -454,11 +454,21 @@ i32 Stage::on_draw_06()
 // FUNCTION: TH16 0x40a7d0
 HARNESS_CALLED i32 StdObject::is_culled(D3DXVECTOR3 *pos, f32 max_distance_sq, Camera *camera)
 {
+    // Dead named locals, not ZUN's code: with three more named variables the
+    // x sums load center.x and rocking_vector_1.x first like the original
+    // (docs/findings.md, the count of named variables); the camera sum's
+    // operands are swapped to compensate for that count.
+    i32 unused_1 = 0;
+    i32 unused_2 = 0;
+    i32 unused_3 = 0;
+    (void)unused_1;
+    (void)unused_2;
+    (void)unused_3;
     D3DXVECTOR3 corners[16];
     D3DXVECTOR3 projected[16];
     D3DXMATRIX world;
 
-    corners[0] = (center + *pos) - (camera->position + camera->rocking_vector_1);
+    corners[0] = (center + *pos) - (camera->rocking_vector_1 + camera->position);
     if (D3DXVec3LengthSq(&corners[0]) > max_distance_sq)
     {
         return 1;
