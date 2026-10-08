@@ -907,3 +907,62 @@ Lasers and MainMenuStates:
   `id % 10`; tens first, locals, unsigned); on_draw__replay's setne vs
   neg/sbb/and (ternary, `!!`, bool/u8 locals all identical); do_music_room's
   /GS cookie comes from its direct AnmManager::interrupt_tree calls.
+
+System files and MainMenu:
+- Moving a function's double math into a `static __forceinline` helper
+  makes it realign through ebx with ebp-relative locals like the original;
+  written in place, the same body realigns with `and esp, -8` and
+  esp-relative locals. get_runtime's helper also gave its callers their
+  padded frames (PauseMenu::leave_paused matched, CSound::Unpause's frame
+  fixed); get_controller_state matched with its whole body in a helper.
+- A dead `double unused = 0.0;` matched Globals::add_to_score (ebx-form
+  realignment), in the body or in a helper around the show_notice call. It
+  is not universal: in ReplayManager::begin_stage it gives `and esp, -8`
+  instead; in on_tick_record and present (inside an if) it does nothing;
+  in the /INCLUDE'd add_power it only moves esi's push into the prologue.
+- A function inlined at some call sites and called at others
+  (get_score_extend_quota: inlined by the HUD, called by add_to_score,
+  which keeps the score in edx across the call): an inline definition in
+  the header plus a HARNESS_CALLED out-of-line copy
+  (score_extend_quota_out_of_line, 0x43ddd0). Marking the one function
+  HARNESS_CALLED instead cost Gui::update_lives its match.
+- Shared return/failure blocks: the original keeps the first copy inline
+  and later returns jump back into it; which copy ours keeps follows the
+  loop structure. read_joypad's Acquire retry loop written like
+  get_controller_state's (`while (hr == LOST) { hr = Acquire(); if (++n >=
+  400) return; }`) makes the joyGetPosEx failure the shared copy.
+- Switches on a step counter became jump tables where the original
+  compares (SoundManager::update_sound_thread); if/else-if chains gave
+  +11%. In the same function a `for` pan-sum loop was vectorized (unrolled
+  by 2 with no_vector); `do { } while (--j)` inside `if (count > 0)` gives
+  the plain loop. SoundBufferEntry::play and CSound::SetVolume need
+  DECOMP_NOINLINE (the original calls them at every site).
+- Computing a call's result into a local first keeps the destination
+  pointer reload after the call (`DWORD pos = SetFilePointer(...);
+  wave->x = pos - ...` matched CSound::Pause).
+- `if (!(p & m) && !(r & m)) return 0; return 1;` avoids the setcc that
+  two `if (...) return 1;` give (input_pressed_or_repeating). Nested
+  `if (!reset) { if (dev) ... }` loads the device before the test where
+  `&&` does not (create_d3d_device). A cursor copy of a pointer parameter
+  frees its argument slot for the loop counter (Arcfile::parse_directory).
+  `for (i = N; i != 0; i--)` lets WinMain reuse the final 0 in edi.
+  `(x & 0xffff)` gives `movzx; test`, a `(u16)` cast gives
+  `cmp word [mem], 0` (TitleInf::on_tick).
+- volatile locals for values the original spills (WinMain's result,
+  on_tick_record's input) help partly; the original also keeps a register
+  copy.
+- Dead ends: the demo index's divide by -3 (`% 3`, `% -3`,
+  `x - x / -3 * -3`, an inline helper: all fold to /3 or idiv); register
+  choices in CSound::SetVolume, SoundBufferEntry::play, preload_bgm,
+  file_read_all, ScorefileStatus::init and lzss_decompress; get_runtime's
+  spill slot ([ebp-8] vs [ebp-0x10]); loop-alignment nops ours adds at
+  some loop heads (read_line, ScorefileStatus::init, the ReplayManager
+  destructor, WinMain); SoundManager::initialize (99.53%) differs only in
+  data layout.
+- Open, cross-file: an early-aligned GameThread::on_tick_body (seek
+  written inline, or a dead double in begin_stage) matches
+  ReplayManager::begin_stage and gives finish_stage_transition and
+  begin_stage their frames, but Stage::start_std_vms loses its match (it
+  loses edi shrink-wrapping). EnemyManager::allocate_new_enemy's dead
+  parameter (junk third argument in begin_stage) needs it HARNESS_CALLED
+  plus a harness caller with a second object.
