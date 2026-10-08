@@ -892,7 +892,7 @@ void EnemyDrop::eject_all_drops(D3DXVECTOR3 *pos)
 }
 
 // TODO: the original multiplies x as dist * x with dist loaded into a register; ours loads x
-// (the operand order in the source does not change it).
+// early (operand order, declaration order and indexing do not change it).
 // FUNCTION: TH16 0x41d700
 void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
 {
@@ -906,7 +906,12 @@ void EnemyDrop::eject_extra_drops(D3DXVECTOR3 *pos)
                 Float3 item_pos;
                 sincosmul_ellipse(&item_pos, angle, area.x, area.y);
                 f32 dist = g_replay_safe_rng.randf_0_to_1() * 0.5f + 0.5f;
-                Float3 offset(item_pos.x * dist, dist * item_pos.y, 0.0f);
+                // y is scaled first: the order of these assignments decides
+                // which product loads its operand early.
+                Float3 offset;
+                offset.y = item_pos.y * dist;
+                offset.x = item_pos.x * dist;
+                offset.z = 0.0f;
                 item_pos.x = pos->x + offset.x;
                 item_pos.y = pos->y + offset.y;
                 item_pos.z = pos->z + offset.z;
