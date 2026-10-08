@@ -548,13 +548,15 @@ D3DXVECTOR3 InterpStrange1::step()
     return current;
 }
 
-// TODO: the timer tick's scaled sum goes to the speed's xmm1 (the original loads current_f into xmm0, see docs/findings.md; InterpStrange1::step gets it right with the same tick()); one lea swaps its operands.
+// The timer tick is tick_goto: tick() and tick_mixed added current_f from
+// memory into the speed's register where the original loads it into xmm0.
+// TODO: 100%*: the merged timer stores come current_f first (current first in the original); with the stores after the branches instead, the lerp's y lea takes its operands the other way round.
 // FUNCTION: TH16 0x464590
 HARNESS_CALLED Int3 InterpInt3::step()
 {
     if (end_time > 0)
     {
-        time.tick();
+        time.tick_goto();
         if (time.current >= end_time)
         {
             time.set(end_time);
