@@ -1232,10 +1232,36 @@ i32 TitleInf::do_player_data()
     return 1;
 }
 
+// Inline nodes between draw_spell_card_page and the variadic
+// AnmManager::draw_text_centered, which realigns its own frame. Called
+// directly, the call makes LTCG realign the page's frame too (early
+// alignment, see docs/findings.md); the original's does not.
+static inline void spell_page_text(AnmVm *vm, D3DCOLOR color, const char *text)
+{
+    g_AnmManager->draw_text_centered(vm, color, 0, 0, 0, text);
+}
+static inline void spell_page_seen(AnmVm *vm, D3DCOLOR color, const char *hundreds, const char *tens,
+                                   const char *ones, const char *name, i32 captures, i32 attempts)
+{
+    g_AnmManager->draw_text_centered(vm, color, 0, 0, 0, "No.%s%s%s %s %4d/%4d", hundreds, tens, ones, name, captures,
+                                     attempts);
+}
+static inline void spell_page_unseen(AnmVm *vm, const char *hundreds, const char *tens, const char *ones,
+                                     i32 captures, i32 attempts)
+{
+    g_AnmManager->draw_text_centered(
+        vm, 0x808080, 0, 0, 0,
+        "No.%s%s%s \x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H"
+        "\x81H\x81H\x81H\x81H %4d/%4d",
+        hundreds, tens, ones, captures, attempts);
+}
+
 // Player data, spell card page: ten spell cards of the chosen difficulty
 // (page page_menu - 1), numbered with full-width digits, with their names
 // once seen and the chosen character's captures.
-// TODO: ours realigns the frame (and esp, -8) and divides by 10 with a multiply; the original uses idiv by a register.
+// The text goes through the inline spell_page_* nodes above so that the
+// frame is not realigned.
+// TODO: ours computes id % 10 with a multiply (the original divides by 10 in a register for both digits) and builds the spell pointer where the original indexes the score file per access.
 // FUNCTION: TH16 0x452c30
 i32 TitleInf::draw_spell_card_page()
 {
@@ -1265,7 +1291,7 @@ i32 TitleInf::draw_spell_card_page()
         {
             for (; row < 10; row++)
             {
-                g_AnmManager->draw_text_centered(get_vm_or_clear(text_row_ids[row]), 0xffffffff, 0, 0, 0, " ");
+                spell_page_text(get_vm_or_clear(text_row_ids[row]), 0xffffffff, " ");
             }
             return 0;
         }
@@ -1284,9 +1310,8 @@ i32 TitleInf::draw_spell_card_page()
             const char *tens = id / 10 % 10 == 0 && id / 100 == 0 ? "\x81\x40" : digits[id / 10 % 10];
             const char *hundreds = id / 100 != 0 ? digits[id / 100] : "\x81\x40";
             ScorefileSpell *spell = &g_Scorefile->characters[menu.next_selection].spells[id - 1];
-            g_AnmManager->draw_text_centered(get_vm_or_clear(*row_id), spell->captures[0] != 0 ? 0xffff80 : 0xefefef, 0,
-                                             0, 0, "No.%s%s%s %s %4d/%4d", hundreds, tens, ones, name,
-                                             spell->captures[0], spell->attempts[0]);
+            spell_page_seen(get_vm_or_clear(*row_id), spell->captures[0] != 0 ? 0xffff80 : 0xefefef, hundreds, tens, ones,
+                            name, spell->captures[0], spell->attempts[0]);
         }
         else
         {
@@ -1295,11 +1320,7 @@ i32 TitleInf::draw_spell_card_page()
             const char *tens = id / 10 % 10 == 0 && id / 100 == 0 ? "\x81\x40" : digits[id / 10 % 10];
             const char *hundreds = id / 100 != 0 ? digits[id / 100] : "\x81\x40";
             ScorefileSpell *spell = &g_Scorefile->characters[menu.next_selection].spells[id - 1];
-            g_AnmManager->draw_text_centered(
-                get_vm_or_clear(*row_id), 0x808080, 0, 0, 0,
-                "No.%s%s%s \x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H\x81H"
-                "\x81H\x81H\x81H\x81H %4d/%4d",
-                hundreds, tens, ones, spell->captures[0], spell->attempts[0]);
+            spell_page_unseen(get_vm_or_clear(*row_id), hundreds, tens, ones, spell->captures[0], spell->attempts[0]);
         }
     }
     return 0;
