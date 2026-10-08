@@ -26,6 +26,7 @@
 #include "ZunAsm.h"
 
 #ifdef TH16_PORT
+#include "port_record_test.h"
 #include "port_thcrap.h"
 #endif
 
@@ -480,6 +481,10 @@ fail:
 // FUNCTION: TH16 0x42d200
 DECOMP_NOINLINE GameThread::~GameThread()
 {
+#ifdef TH16_PORT
+    // The recording test saves its replay when the game is cleared.
+    port_record_test_game_thread_end(g_Supervisor.gamemode_to_switch_to);
+#endif
     scorefile_save();
     GLOBALS_FLAGS_45C &= ~(GLOBALS_SAME_STAGE_AGAIN | GLOBALS_NEXT_STAGE);
     g_game_speed = 1.0f;

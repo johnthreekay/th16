@@ -250,8 +250,8 @@ const char *port_replay_test_title_tick(int idle_frames)
 void port_replay_test_describe(const ReplayManager *replay)
 {
     const RpyInfo *info = replay->info;
-    report("character %d, subseason %d, difficulty %d, %d stage(s), ends on stage %d, score %u", info->character,
-           info->subseason, info->difficulty, info->num_stages, info->stage, info->score * 10);
+    report("character %d, subseason %d, difficulty %d, %d stage(s), ends on stage %d, score %llu", info->character,
+           info->subseason, info->difficulty, info->num_stages, info->stage, info->score * 10ULL);
     for (int i = 0; i < 8; i++)
     {
         const RpyGamestate *gs = replay->stages[i].gamestate_at_stage_begin;
@@ -260,9 +260,9 @@ void port_replay_test_describe(const ReplayManager *replay)
             continue;
         }
         const Globals *g = (const Globals *)gs->globals;
-        report("  stage %d: %d frames, rng seed %u, score %u, lives %d+%d, bombs %d+%d, power %d, season %d, "
+        report("  stage %d: %d frames, rng seed %u, score %llu, lives %d+%d, bombs %d+%d, power %d, season %d, "
                "player (%d, %d)",
-               gs->stage, gs->num_frames, (u16)gs->rng_state, g->score * 10, g->lives, g->life_fragments, g->bombs,
+               gs->stage, gs->num_frames, (u16)gs->rng_state, g->score * 10ULL, g->lives, g->life_fragments, g->bombs,
                g->bomb_fragments, g->power, g->season_power, gs->player_pos_subpixel[0], gs->player_pos_subpixel[1]);
     }
 }
@@ -321,11 +321,12 @@ void port_replay_test_frame(const ReplayManager *replay)
     {
         return;
     }
-    report("trace stage %d frame %d: score %u, lives %d+%d, bombs %d+%d, power %d, graze %d, season %d, "
+    report("trace stage %d frame %d: score %llu, lives %d+%d, bombs %d+%d, power %d, graze %d, season %d, "
            "rng %u/%u, player (%d, %d)",
-           replay->stage_num, frame, g_Globals.score * 10, g_Globals.lives, g_Globals.life_fragments, g_Globals.bombs,
-           g_Globals.bomb_fragments, g_Globals.power, g_Globals.graze, g_Globals.season_power, g_replay_safe_rng.seed,
-           g_replay_safe_rng.generation_count, g_Player != NULL ? g_Player->inner.pos_subpixel.x : 0,
+           replay->stage_num, frame, g_Globals.score * 10ULL, g_Globals.lives, g_Globals.life_fragments,
+           g_Globals.bombs, g_Globals.bomb_fragments, g_Globals.power, g_Globals.graze, g_Globals.season_power,
+           g_replay_safe_rng.seed, g_replay_safe_rng.generation_count,
+           g_Player != NULL ? g_Player->inner.pos_subpixel.x : 0,
            g_Player != NULL ? g_Player->inner.pos_subpixel.y : 0);
 }
 
@@ -352,9 +353,9 @@ void port_replay_test_stage_start(const ReplayManager *replay, const RpyGamestat
                               ? replay->stages[prev].gamestate_at_stage_begin->num_frames
                               : -1;
     g_stages_checked++;
-    report("stage %d -> %d: score %u (recorded %u), stage %d took %d frames (recorded %d), rng steps %u", prev, stage,
-           g_Globals.score * 10, ((const Globals *)recorded->globals)->score * 10, prev, frame, recorded_frames,
-           g_replay_safe_rng.generation_count);
+    report("stage %d -> %d: score %llu (recorded %llu), stage %d took %d frames (recorded %d), rng steps %u", prev,
+           stage, g_Globals.score * 10ULL, ((const Globals *)recorded->globals)->score * 10ULL, prev, frame,
+           recorded_frames, g_replay_safe_rng.generation_count);
     // Not a sync check: the recording keeps adding frames to a stage until
     // the next one has loaded (begin_stage), while playback moves on when it
     // starts loading (start_stage), so the difference is the original's
@@ -413,8 +414,8 @@ void port_replay_test_replay_end()
             recorded_frames = replay->stages[stage].gamestate_at_stage_begin->num_frames;
         }
     }
-    report("end in stage %d at frame %d (stage recorded %d frames): score %u (recorded %u)", stage, frame,
-           recorded_frames, g_Globals.score * 10, replay->info->score * 10);
+    report("end in stage %d at frame %d (stage recorded %d frames): score %llu (recorded %llu)", stage, frame,
+           recorded_frames, g_Globals.score * 10ULL, replay->info->score * 10ULL);
     check(g_Globals.score == replay->info->score, "final score / 10", stage, frame, replay->info->score,
           g_Globals.score, true);
     finish(g_failures == 0 ? 0 : 1);
@@ -429,7 +430,7 @@ void port_replay_test_abort(const char *why)
     const ReplayManager *replay = g_ReplayManager;
     int stage = g_Globals.stage_num;
     int frame = replay != NULL && stage >= 0 && stage < 8 ? replay->stages[stage].frame_current : -1;
-    report("stopped in stage %d at frame %d: %s (score %u, lives %d, bombs %d, power %d)", stage, frame, why,
-           g_Globals.score * 10, g_Globals.lives, g_Globals.bombs, g_Globals.power);
+    report("stopped in stage %d at frame %d: %s (score %llu, lives %d, bombs %d, power %d)", stage, frame, why,
+           g_Globals.score * 10ULL, g_Globals.lives, g_Globals.bombs, g_Globals.power);
     finish(2);
 }

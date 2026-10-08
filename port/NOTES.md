@@ -574,6 +574,75 @@ once the evaluation order was fixed. The first difference before that was
 the season items' launch angles at frame 250 of the Extra stage, then item
 collection a few frames apart, and the first extra death at frame 6929.
 
+#### Replay recording tests
+
+The sync tests play replays the original recorded; the recording tests
+check the other direction, that a replay the port records is the replay
+the original would have recorded. `th16 --record-from SOURCE --record-to
+NAME` (port/src/record_test.cpp, port_record_test.h) starts a normal game
+(not a replay) from the title menu with SOURCE's character, season and
+difficulty, as the menus would, and plays it with SOURCE's input: each
+frame, ReplayManager::on_tick_record takes SOURCE's input for the stage
+and frame it is about to record instead of the keyboard's. At the point
+where playback sets them (ReplayManager::initialize) the replay RNG gets
+SOURCE's seed and the game thread SOURCE's settings, so the game is the
+one SOURCE recorded, and the recorder's own snapshot of each stage is
+compared with SOURCE's as the stage begins. It runs with the replay
+fast-forward (8 ticks per frame), which on_tick_fast_forward also applies
+while recording in this test. When the cleared game goes on to the ending
+(or after the extra stage to the score entry), the test saves the replay
+as the replay save menu would after them (set_end_stage(1), then save
+without an end marker, which is what the clear replays in
+port/tests/replays have) and exits: 0 saved, 1 saved but a snapshot
+differed, 2 a game over, the stage end menu or a return to the title.
+
+tests/run_record_test.sh then compares the saved replay with SOURCE
+(`port/tools/rpy_compare.py compare`, which decrypts and decompresses
+both as read_replay_file does: the info, every stage's snapshot and every
+frame's input) and plays it back with the sync test. Expected
+differences, shown as notes: the spell cards' capture times (real time
+from get_runtime, so about an eighth of the original's when
+fast-forwarded; only how many cards ended has to match), the settings,
+and what the previous game in the original's process left in g_Globals
+(a fresh process, like the port's, has zeros): the first stage's
+snapshot is taken (ReplayManager::initialize) before the stage starts,
+and a new game does not reset the per-chapter values (chapter,
+last_collect_pos, ...; the stage does), while graze_in_chapter and
+enemies_spawned/destroyed_in_chapter are never reset at all, so the
+previous game's counts stay in them and they differ by the same amount
+at every stage of the replay (seen in replays recorded after another
+game, for example a Royalflare Hard run whose player had grazed 33781
+times before it). The live check during recording logs these as notes
+too. ctest runs it for the Reimu Extra clear and the Cirno Easy clear
+(record_*, skipped without `TH16_DATA_DIR`; about 3 and 7 minutes, and
+all eight tests take 8.5 minutes with `ctest -j4`). `rpy_compare.py
+show FILE` prints a replay's header, info and stage snapshots.
+
+To check that the original accepts the port's replays, play one in
+th16.exe with `replay_reference.py record` and compare its dump with the
+port's (`TH16_REPLAY_TEST_DUMP` while `th16 --replay` plays the same
+file). Several reference runs at once each need their own WINEPREFIX and
+`--display N` (xvfb-run -a races when two start together).
+
+Checked (clang64 null renderer, on the merge of main 6d99888): the two
+ctest replays and seven 1cc replays from the Royalflare archive (Extra
+clears with Aya, Cirno and Marisa; Hard Reimu Autumn, Lunatic Aya Summer,
+Lunatic Marisa Autumn, Normal Cirno Autumn) record to files that match
+their sources (every stage's RNG seed, g_Globals, player position and
+focus, every frame's input, the final score, even each stage's frame
+count) apart from the expected differences above, and play back in sync.
+The original th16.exe played the port's recordings of the Reimu Extra
+clear and the six-stage Cirno Easy clear to their ends, and its state
+matched the port's frame for frame (36013 and 93548 frames sampled; the
+only differences are the replay RNG's step counter on the last frame of
+two stages, where the port's dump is a tick later and the next stage has
+already reset it).
+
+ReplayManager::save writes RpyInfo, RpyGamestate and the chunks' input
+as they are in memory, so record_test.cpp also checks their layout
+(static_asserts: the 64-bit build keeps the original's 0xa0, 0x294 and
+6-byte records; RpyInfo is pack(4) for its 8-byte timestamp at 0xc).
+
 ### Not done
 
 - Controller hot-plugging through DirectInput (only the winmm fallback

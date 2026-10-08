@@ -7,6 +7,7 @@
 #include "GameThread.h"
 #include "Lzss.h"
 #ifdef TH16_PORT
+#include "port_record_test.h"
 #include "port_replay_test.h"
 #endif
 #include "GameWindow.h"
@@ -70,8 +71,11 @@ int __fastcall ReplayManager::on_tick_fast_forward(void *arg)
 
     // Fast-forward: run the tick list again for 7 of every 8 ticks.
 #ifdef TH16_PORT
-    if (g_GameThread != NULL && !g_GameThread->flags.loading && replay->mode == REPLAY_PLAYBACK &&
-        ((g_hardware_input & (INPUT_SKIP | INPUT_SHOT)) || port_replay_test_fast_forward()) &&
+    // The recording test (port_record_test.h) fast-forwards the same way.
+    if (g_GameThread != NULL && !g_GameThread->flags.loading &&
+        ((replay->mode == REPLAY_PLAYBACK &&
+          ((g_hardware_input & (INPUT_SKIP | INPUT_SHOT)) || port_replay_test_fast_forward())) ||
+         (replay->mode == REPLAY_RECORDING && port_record_test_fast_forward())) &&
         replay->current_tick_num_in_stage % 8 != 0)
     {
         return UPDATE_FUNC_RESTART_FROM_FIRST;
@@ -200,7 +204,12 @@ int ReplayManager::on_tick_record()
         return 1;
     }
     g_InputState.input_prev = g_InputState.input;
+#ifdef TH16_PORT
+    // The recording test plays with a replay's input instead of the keyboard.
+    g_InputState.input = port_record_test_active() ? port_record_test_input(this) : (u16)g_hardware_input;
+#else
     g_InputState.input = (u16)g_hardware_input;
+#endif
     InputState::update();
     // The original keeps the recorded input in a stack slot; volatile
     // stands in for whatever spilled it there.
@@ -448,6 +457,9 @@ HARNESS_CALLED void ReplayManager::begin_stage()
         stage_num = g_Globals.stage_num;
         current_tick_num_in_stage = 0;
         ((RpyGamestate *)stage_gamestate_snapshots[stage_num])->player_is_focused = g_Player->inner.is_focused;
+#ifdef TH16_PORT
+        port_record_test_stage_begin(this);
+#endif
     }
     else if (mode == REPLAY_PLAYBACK)
     {
@@ -576,6 +588,10 @@ int ReplayManager::initialize(i32 mode, const char *filename)
     this->mode = mode;
     if (mode == REPLAY_RECORDING)
     {
+#ifdef TH16_PORT
+        // The recording test: the source replay's seed and settings.
+        port_record_test_initialize(this);
+#endif
         g_ReplayManager = this;
         free_chunks(g_Globals.stage_num);
         currently_recording_chunk = new_chunk(g_Globals.stage_num);

@@ -3,7 +3,8 @@
 // startup code would.
 //
 //   th16 [--game-dir DIR] [--save-dir DIR] [--thcrap DIR]
-//        [--thcrap-config NAME] [--no-thcrap] [--replay FILE] [DIR]
+//        [--thcrap-config NAME] [--no-thcrap] [--replay FILE]
+//        [--record-from FILE --record-to NAME] [DIR]
 //
 // The game folder (th16.dat, thbgm.dat; never written to) is DIR or
 // --game-dir, else $TH16_DATA_DIR, else the current directory if it has
@@ -13,7 +14,9 @@
 // Linux, ~/Library/Application Support/th16-port on macOS). With thcrap
 // support (TH16_THCRAP), a thcrap folder's patch stack is loaded: see
 // thcrap/thcrap.h and NOTES.md, "thcrap". --replay FILE runs the replay
-// sync test (port_replay_test.h) instead of a normal game, without thcrap.
+// sync test (port_replay_test.h) instead of a normal game, without thcrap;
+// --record-from FILE --record-to NAME the recording test
+// (port_record_test.h).
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,6 +29,7 @@
 #include <windows.h>
 
 #include "port_platform.h"
+#include "port_record_test.h"
 #include "port_replay_test.h"
 #include "port_vfs.h"
 #ifdef TH16_THCRAP
@@ -66,7 +70,10 @@ static void usage(const char *program)
             "                   $TH16_THCRAP_CONFIG (default: the newest one)\n"
             "  --no-thcrap      no patches (also TH16_THCRAP=0)\n"
             "  --replay FILE    play FILE (a .rpy) and check that it stays in sync, then exit\n"
-            "                   (0 in sync, 1 desync, 2 did not finish); see NOTES.md, Testing\n",
+            "                   (0 in sync, 1 desync, 2 did not finish); see NOTES.md, Testing\n"
+            "  --record-from FILE --record-to NAME\n"
+            "                   play a game with FILE's input, save it as replay/NAME, then exit\n"
+            "                   (0 saved, 1 saved but differs, 2 did not finish); NOTES.md, Testing\n",
             program);
 }
 
@@ -78,6 +85,8 @@ int main(int argc, char **argv)
     std::string thcrap_config;
     bool no_thcrap = false;
     std::string replay_file;
+    std::string record_source;
+    std::string record_name;
     std::string command_line;
     for (int i = 1; i < argc; i++)
     {
@@ -104,6 +113,16 @@ int main(int argc, char **argv)
             // The replays were recorded without patches, and binary hacks
             // can change gameplay.
             no_thcrap = true;
+        }
+        else if (arg == "--record-from" && i + 1 < argc)
+        {
+            record_source = argv[++i];
+            // As for --replay: the source was recorded without patches.
+            no_thcrap = true;
+        }
+        else if (arg == "--record-to" && i + 1 < argc)
+        {
+            record_name = argv[++i];
         }
         else if (arg == "--no-thcrap")
         {
@@ -185,6 +204,12 @@ int main(int argc, char **argv)
     port_log("game folder %s, save folder %s", game_dir.c_str(), save_dir.c_str());
     if (!replay_file.empty() && !port_replay_test_init(replay_file.c_str(), save_dir.c_str()))
     {
+        return 2;
+    }
+    if (!record_source.empty() &&
+        (!replay_file.empty() || !port_record_test_init(record_source.c_str(), record_name.c_str(), save_dir.c_str())))
+    {
+        fprintf(stderr, "--record-from needs --record-to NAME and no --replay\n");
         return 2;
     }
 #ifdef TH16_THCRAP

@@ -292,3 +292,14 @@ foreach(replay extra_clear_reimu extra_clear_reimu_2 easy_clear_cirno)
                      ${CMAKE_CURRENT_SOURCE_DIR}/tests/replays/${replay}.rpy ${CMAKE_CURRENT_BINARY_DIR}/replay_test)
     set_tests_properties(replay_${replay} PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 3600)
 endforeach()
+
+# Replay recording tests (tests/run_record_test.sh, NOTES.md "Testing"): a
+# game played with one of those replays' input, recorded by th16 itself;
+# the saved replay is compared with the source and played back. They need
+# Python 3 as well.
+foreach(replay extra_clear_reimu easy_clear_cirno)
+    add_test(NAME record_${replay}
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_record_test.sh $<TARGET_FILE:th16>
+                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/replays/${replay}.rpy ${CMAKE_CURRENT_BINARY_DIR}/record_test)
+    set_tests_properties(record_${replay} PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 3600)
+endforeach()

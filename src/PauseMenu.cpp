@@ -14,6 +14,7 @@
 #include "Supervisor.h"
 
 #ifdef TH16_PORT
+#include "port_record_test.h"
 #include "port_replay_test.h"
 #include "port_thcrap.h"
 #endif
@@ -502,6 +503,9 @@ void open_stage_end_menu()
             (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         return;
     }
+#ifdef TH16_PORT
+    port_record_test_abort("the stage end menu opened");
+#endif
     g_GameThread->flags.in_menu = 1;
     menu->set_state(PAUSE_STAGE_END);
     menu->set_substate_inline(PAUSE_SUB_OPEN_STAGE_END);
@@ -627,6 +631,9 @@ void open_game_over_menu()
             (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         return;
     }
+#ifdef TH16_PORT
+    port_record_test_abort("game over");
+#endif
     menu->set_state(PAUSE_GAME_OVER);
     menu->set_substate_inline(PAUSE_SUB_OPEN_GAME_OVER);
     g_GameThread->flags.in_menu = 1;

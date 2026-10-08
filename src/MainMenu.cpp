@@ -16,6 +16,7 @@
 #include "SoundManager.h"
 #include "Supervisor.h"
 #ifdef TH16_PORT
+#include "port_record_test.h"
 #include "port_replay_test.h"
 #endif
 
@@ -1014,6 +1015,28 @@ static void port_start_test_replay(const char *name)
     g_title_return_point = TITLE_RETURN_MAIN;
     g_title_idle_frames = 0;
 }
+
+// The port's replay recording test (port_record_test.h): starts a normal
+// game with the source replay's character, season and difficulty, as the
+// menus do once the season is picked (MainMenuStates.cpp), from stage 1 or
+// the extra stage.
+static void port_start_record_test()
+{
+    const RpyInfo *info = port_record_test_source()->info;
+    g_Globals.set_game_mode(GAME_MODE_NORMAL);
+    g_Globals.difficulty = info->difficulty;
+    g_Globals.character = info->character;
+    g_Globals.subshot = info->subshot;
+    g_Globals.subseason = info->subseason;
+    g_Globals.spell_id = -1;
+    i32 stage = g_Globals.difficulty < DIFFICULTY_EXTRA ? 1 : 7;
+    g_stage_data = &g_stage_table[stage];
+    g_Globals.stage_num = stage;
+    g_Globals.weird_stage_num = stage;
+    g_Supervisor.gamemode_to_switch_to = GAMEMODE_GAME;
+    g_title_return_point = TITLE_RETURN_MAIN;
+    g_title_idle_frames = 0;
+}
 #endif
 
 // Plays a demo replay after 30 idle seconds on the title screen, starts the
@@ -1035,6 +1058,10 @@ i32 TitleInf::on_tick()
         else if (const char *name = port_replay_test_title_tick(g_title_idle_frames))
         {
             port_start_test_replay(name);
+        }
+        else if (port_record_test_title_tick(g_title_idle_frames))
+        {
+            port_start_record_test();
         }
 #endif
         else if (g_title_idle_frames >= 1800)
