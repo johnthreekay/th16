@@ -1341,19 +1341,18 @@ static inline AnmId find_child_id_of(AnmManager *anm, AnmId &id, i32 script)
 }
 
 // find_child_id_of as LTCG inlined it into setup_stage_hud, with the first
-// level of AnmVm::search_children inlined as well.
+// level of AnmVm::search_children inlined as well. The early return for a
+// missing parent keeps the search laid out in line, as in the original (an
+// if/else assigning the child moved it after the function's ret).
 static __forceinline AnmId find_child_id_inline_search(AnmId &id, i32 script)
 {
-    AnmVm *child;
+    AnmId result;
     if (get_vm_or_clear(id) == NULL)
     {
-        child = NULL;
+        result.id = 0;
+        return result;
     }
-    else
-    {
-        child = search_children_inline(get_vm_or_clear(id), script, 0);
-    }
-    AnmId result;
+    AnmVm *child = search_children_inline(get_vm_or_clear(id), script, 0);
     result.id = child != NULL ? child->id.id : 0;
     return result;
 }
@@ -1688,7 +1687,8 @@ static inline void set_entity_pos_xyz(AnmId id, f32 x, f32 y, f32 z)
 // Sets the HUD up for a stage: the life and bomb counters, the boss timer,
 // the stage logo, the demo and difficulty markers and the season gauge.
 // TODO: the original adds the difficulty scripts' base at the copy_vm call (ours
-// before spilling the script) and lays the season gauge icon's child search out in line.
+// before spilling the script); after the icon search it shares the g_AnmManager reload
+// between the found and not-found exits, and has no nop before the search loop.
 // FUNCTION: TH16 0x426d70
 void Gui::setup_stage_hud()
 {
