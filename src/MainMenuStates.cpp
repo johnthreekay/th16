@@ -3231,6 +3231,16 @@ static __forceinline i32 spell_row_captured(const i32 *row, i32 count)
 // FUNCTION: TH16 0x4560b0
 HARNESS_CALLED i32 TitleInf::load_spell_list(i32 stage, i32 row, i32 *ids, i32 selected)
 {
+    // Dead named locals for matching: with four or more, MSVC's register
+    // choices come closer to the original's.
+    i32 unused_0 = 0;
+    (void)unused_0;
+    i32 unused_1 = 0;
+    (void)unused_1;
+    i32 unused_2 = 0;
+    (void)unused_2;
+    i32 unused_3 = 0;
+    (void)unused_3;
     char name[0xc1];
     ids[0] = -2;
     ids[1] = -2;
