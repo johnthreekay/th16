@@ -6,6 +6,9 @@
 
 #include "GameThread.h"
 #include "Lzss.h"
+#ifdef TH16_PORT
+#include "port_replay_test.h"
+#endif
 #include "GameWindow.h"
 #include "FileSystem.h"
 #include "Crypt.h"
@@ -66,11 +69,20 @@ int __fastcall ReplayManager::on_tick_fast_forward(void *arg)
     ReplayManager *replay = (ReplayManager *)arg;
 
     // Fast-forward: run the tick list again for 7 of every 8 ticks.
+#ifdef TH16_PORT
+    if (g_GameThread != NULL && !g_GameThread->flags.loading && replay->mode == REPLAY_PLAYBACK &&
+        ((g_hardware_input & (INPUT_SKIP | INPUT_SHOT)) || port_replay_test_fast_forward()) &&
+        replay->current_tick_num_in_stage % 8 != 0)
+    {
+        return UPDATE_FUNC_RESTART_FROM_FIRST;
+    }
+#else
     if (g_GameThread != NULL && !g_GameThread->flags.loading && replay->mode == REPLAY_PLAYBACK &&
         (g_hardware_input & (INPUT_SKIP | INPUT_SHOT)) && replay->current_tick_num_in_stage % 8 != 0)
     {
         return UPDATE_FUNC_RESTART_FROM_FIRST;
     }
+#endif
     return UPDATE_FUNC_CONTINUE;
 }
 
@@ -271,6 +283,9 @@ int ReplayManager::on_tick_playback()
             {
                 stages[stage_num].fps_counts_current++;
             }
+#ifdef TH16_PORT
+            port_replay_test_frame(this);
+#endif
         }
         else
         {
@@ -391,6 +406,10 @@ HARNESS_CALLED void ReplayManager::start_stage()
         RpyGamestate *gamestate = stage->gamestate_at_stage_begin;
         stage->input_current = stage->input_begin;
         stage->fps_counts_current = stage->fps_counts_begin;
+#ifdef TH16_PORT
+        // Before the recorded state replaces the one the port reached.
+        port_replay_test_stage_start(this, gamestate);
+#endif
         stage->frame_current = -1;
         g_replay_safe_rng.seed = gamestate->rng_state;
         g_replay_unsafe_rng.seed = gamestate->rng_state;

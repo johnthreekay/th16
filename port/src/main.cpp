@@ -3,7 +3,7 @@
 // startup code would.
 //
 //   th16 [--game-dir DIR] [--save-dir DIR] [--thcrap DIR]
-//        [--thcrap-config NAME] [--no-thcrap] [DIR]
+//        [--thcrap-config NAME] [--no-thcrap] [--replay FILE] [DIR]
 //
 // The game folder (th16.dat, thbgm.dat; never written to) is DIR or
 // --game-dir, else $TH16_DATA_DIR, else the current directory if it has
@@ -12,7 +12,8 @@
 // $TH16_SAVE_DIR, else SDL's preference path (~/.local/share/th16-port on
 // Linux, ~/Library/Application Support/th16-port on macOS). With thcrap
 // support (TH16_THCRAP), a thcrap folder's patch stack is loaded: see
-// thcrap/thcrap.h and NOTES.md, "thcrap".
+// thcrap/thcrap.h and NOTES.md, "thcrap". --replay FILE runs the replay
+// sync test (port_replay_test.h) instead of a normal game, without thcrap.
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +26,7 @@
 #include <windows.h>
 
 #include "port_platform.h"
+#include "port_replay_test.h"
 #include "port_vfs.h"
 #ifdef TH16_THCRAP
 #include "thcrap/thcrap.h"
@@ -62,7 +64,9 @@ static void usage(const char *program)
             "                   (default: ~/.local/share/thcrap if it exists)\n"
             "  --thcrap-config  its run configuration (a name in config/ or a path); also\n"
             "                   $TH16_THCRAP_CONFIG (default: the newest one)\n"
-            "  --no-thcrap      no patches (also TH16_THCRAP=0)\n",
+            "  --no-thcrap      no patches (also TH16_THCRAP=0)\n"
+            "  --replay FILE    play FILE (a .rpy) and check that it stays in sync, then exit\n"
+            "                   (0 in sync, 1 desync, 2 did not finish); see NOTES.md, Testing\n",
             program);
 }
 
@@ -73,6 +77,7 @@ int main(int argc, char **argv)
     std::string thcrap_dir;
     std::string thcrap_config;
     bool no_thcrap = false;
+    std::string replay_file;
     std::string command_line;
     for (int i = 1; i < argc; i++)
     {
@@ -92,6 +97,13 @@ int main(int argc, char **argv)
         else if (arg == "--thcrap-config" && i + 1 < argc)
         {
             thcrap_config = argv[++i];
+        }
+        else if (arg == "--replay" && i + 1 < argc)
+        {
+            replay_file = argv[++i];
+            // The replays were recorded without patches, and binary hacks
+            // can change gameplay.
+            no_thcrap = true;
         }
         else if (arg == "--no-thcrap")
         {
@@ -171,6 +183,10 @@ int main(int argc, char **argv)
         return 1;
     }
     port_log("game folder %s, save folder %s", game_dir.c_str(), save_dir.c_str());
+    if (!replay_file.empty() && !port_replay_test_init(replay_file.c_str(), save_dir.c_str()))
+    {
+        return 2;
+    }
 #ifdef TH16_THCRAP
     if (!no_thcrap)
     {

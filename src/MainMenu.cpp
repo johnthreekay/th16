@@ -15,6 +15,9 @@
 #include "Scorefile.h"
 #include "SoundManager.h"
 #include "Supervisor.h"
+#ifdef TH16_PORT
+#include "port_replay_test.h"
+#endif
 
 static_assert(offsetof(TitleInf, state) == 0x18, "TitleInf::state");
 static_assert(offsetof(TitleInf, menu) == 0x24, "TitleInf::menu");
@@ -965,6 +968,54 @@ i32 g_demo_replay_index;
 // GLOBAL: TH16 0x49371c
 const char *const g_demo_replay_names[3] = {"demo/demo1.rpy", "demo/demo2.rpy", "demo/demo3.rpy"};
 
+#ifdef TH16_PORT
+// The port's replay test (port_replay_test.h): starts the replay given on
+// the command line from the title menu. Set up as the demo replay below
+// is, but read from the save folder's replay/ as a replay chosen in the
+// replay menu is (no demo flag).
+static void port_start_test_replay(const char *name)
+{
+    strcpy(g_current_replay_filename, name);
+    ReplayManager *replay = ReplayManager::create_from_file(g_current_replay_filename);
+    if (replay == NULL)
+    {
+        port_replay_test_abort("the replay could not be read");
+        return;
+    }
+    port_replay_test_describe(replay);
+    i32 stage;
+    for (stage = 0; stage < 8; stage++)
+    {
+        if (replay->stages[stage].gamestate_at_stage_begin != NULL)
+        {
+            break;
+        }
+    }
+    g_stage_data = &g_stage_table[stage];
+    g_Globals.stage_num = stage;
+    g_Globals.weird_stage_num = stage;
+    g_Supervisor.gamemode_to_switch_to = GAMEMODE_START_REPLAY;
+    RpyInfo *info = replay->info;
+    g_Globals.character = info->character;
+    g_Globals.subshot = info->subshot;
+    g_Globals.subseason = info->subseason;
+    g_Globals.difficulty = info->difficulty;
+    if (info->flags_a & 2)
+    {
+        g_Globals.set_game_mode(GAME_MODE_SPELL_PRACTICE);
+        g_Globals.spell_id = info->spell_id;
+    }
+    else
+    {
+        g_Globals.set_game_mode(GAME_MODE_NORMAL);
+        g_Globals.spell_id = -1;
+    }
+    delete replay;
+    g_title_return_point = TITLE_RETURN_MAIN;
+    g_title_idle_frames = 0;
+}
+#endif
+
 // Plays a demo replay after 30 idle seconds on the title screen, starts the
 // title BGM a few frames after it appears, and runs the current screen.
 // The input test masks the low word (a u16 cast compares the word in
@@ -980,6 +1031,12 @@ i32 TitleInf::on_tick()
         {
             g_title_idle_frames = 0;
         }
+#ifdef TH16_PORT
+        else if (const char *name = port_replay_test_title_tick(g_title_idle_frames))
+        {
+            port_start_test_replay(name);
+        }
+#endif
         else if (g_title_idle_frames >= 1800)
         {
             // Idle on the title screen for 30 seconds: play a demo replay.

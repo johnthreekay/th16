@@ -14,6 +14,7 @@
 #include "Supervisor.h"
 
 #ifdef TH16_PORT
+#include "port_replay_test.h"
 #include "port_thcrap.h"
 #endif
 
@@ -494,6 +495,9 @@ void open_stage_end_menu()
     GameThread::update_play_time();
     if (g_GameThread->replay_mode == 1)
     {
+#ifdef TH16_PORT
+        port_replay_test_abort("the stage end menu opened");
+#endif
         g_Supervisor.gamemode_to_switch_to =
             (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         return;
@@ -587,6 +591,9 @@ void PauseMenu::begin_score_entry()
 // FUNCTION: TH16 0x43f240
 void open_replay_end_menu()
 {
+#ifdef TH16_PORT
+    port_replay_test_replay_end();
+#endif
     PauseMenu *menu = g_PauseMenu;
     menu->set_state(PAUSE_PAUSED);
     menu->set_substate_inline(PAUSE_SUB_OPEN_REPLAY_END);
@@ -613,6 +620,9 @@ void open_game_over_menu()
     GameThread::update_play_time();
     if (g_GameThread->replay_mode == 1)
     {
+#ifdef TH16_PORT
+        port_replay_test_abort("game over");
+#endif
         g_Supervisor.gamemode_to_switch_to =
             (g_Supervisor.flags & SUPERVISOR_IDLE_ON_EXIT) ? GAMEMODE_IDLE : GAMEMODE_TITLE;
         return;

@@ -281,3 +281,14 @@ set_tests_properties(platform PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_
 if(TH16_THCRAP)
     add_test(NAME thcrap COMMAND th16_thcrap_test)
 endif()
+
+# Replay sync tests (tests/run_replay_test.sh, NOTES.md "Testing"): replays
+# recorded in the original game, played back headless in th16 itself. They
+# need the game's data in $TH16_DATA_DIR and are skipped without it. A
+# null renderer build (TH16_NULL_RENDERER) runs them without any display.
+foreach(replay extra_clear_reimu easy_clear_cirno)
+    add_test(NAME replay_${replay}
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_replay_test.sh $<TARGET_FILE:th16>
+                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/replays/${replay}.rpy ${CMAKE_CURRENT_BINARY_DIR}/replay_test)
+    set_tests_properties(replay_${replay} PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 3600)
+endforeach()
