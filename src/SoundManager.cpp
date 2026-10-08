@@ -1213,6 +1213,8 @@ done:
             else
             {
                 i32 pan = 0;
+                // The original sums with plain scalar adds.
+#pragma loop(no_vector)
                 for (i32 j = 0; j < count; j++)
                 {
                     pan += g_SoundManager.queued_pans[i][j];

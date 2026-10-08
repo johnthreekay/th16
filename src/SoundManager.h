@@ -450,8 +450,9 @@ struct SoundBufferEntry
     // Set while the game is paused if the buffer was playing.
     i32 was_playing;
 
-    // Restarts the sound at a pan, at the configured volume.
-    void play(i32 pan);
+    // Restarts the sound at a pan, at the configured volume. Kept out of
+    // line: update_sound_thread calls it.
+    DECOMP_NOINLINE void play(i32 pan);
     // Creates the buffer from the loaded .wav file (or duplicates the
     // buffer of an earlier entry playing the same file), then frees the
     // file. The name is only for the log.
