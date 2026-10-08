@@ -556,32 +556,19 @@ static inline void fan_scroll_v(AnmFanData *data, RenderVertex144 *vertex)
 // texture and places the fan at the VM.
 // The loop walks vertex and radius pointers and copies the first point to
 // the closing vertex through them, as the original's registers show.
-// TODO: the original loads -pi into xmm6 at entry, and adds
-// uv.x + uv_speed (first vertex), uv.y + uv_speed (in the loop) and
-// pos.y + entity_pos.y with the operands the other way round.
+// TODO: the original adds uv.x + uv_speed (first vertex), uv.y + uv_speed
+// (in the loop) and entity_pos.z + pos.z with the operands the other way
+// round; operand order and pointer forms in the scroll helpers flip
+// several of these at once.
 // FUNCTION: TH16 0x46a0b0
 i32 __fastcall anm_on_tick_fan(AnmVm *vm)
 {
     AnmFanData *data = (AnmFanData *)vm->extra_data;
-    *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
-    data->vertices[0].uv.x += data->uv_speed;
-    if (data->vertices[0].uv.x < 0.0f)
-    {
-        for (i32 i = 0; i < 33; i++)
-        {
-            data->vertices[i].uv.x += 1.0f;
-        }
-    }
-    data->vertices[0].uv.y += data->uv_speed;
-    if (data->vertices[0].uv.y < 0.0f)
-    {
-        for (i32 i = 0; i < 33; i++)
-        {
-            data->vertices[i].uv.y += 1.0f;
-        }
-    }
-    data->vertices[0].diffuse = vm->color_1.d3d;
     f32 angle = -ZUN_PI;
+    *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
+    fan_scroll_u(data, &data->vertices[0]);
+    fan_scroll_v(data, &data->vertices[0]);
+    data->vertices[0].diffuse = vm->color_1.d3d;
     RenderVertex144 *first = &data->vertices[1];
     RenderVertex144 *vertex = first;
     f32 *radius = data->radius;
@@ -594,7 +581,7 @@ i32 __fastcall anm_on_tick_fan(AnmVm *vm)
         *radius = *(radius + 33) + *radius;
         fan_sincosmul((Float3 *)&vertex->pos, angle, *radius);
         angle += ZUN_2PI / 31.0f;
-        *(Float3 *)&vertex->pos += vm->pos + vm->entity_pos;
+        *(Float3 *)&vertex->pos += vm->entity_pos + vm->pos;
         vertex++;
         radius++;
     }
