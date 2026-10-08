@@ -414,7 +414,10 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                 }
                 else
                 {
-                    f32 width = (strlen(text) / 2 * 16 - 28) * 2.0f;
+                    // strlen / 2 * 16 (two bytes per Shift-JIS character, 16 pixels
+                    // each), spelled the way the original computes it (lea; and):
+                    // `/ 2 * 16` compiles to shr; shl.
+                    f32 width = ((strlen(text) * 8 & ~15) - 28) * 2.0f;
                     bubble_width = width > bubble_width ? width : bubble_width;
                     set_textbox(bubble_x, bubble_y, bubble_width, MSG_TEXTBOX_KIND());
                     set_textbox_width(bubble_width, MSG_TEXTBOX_KIND());
@@ -453,7 +456,7 @@ HARNESS_CALLED i32 GuiMsgVm::run()
                 }
                 else
                 {
-                    f32 width = (strlen(text) / 2 * 16 - 28) * 2.0f;
+                    f32 width = ((strlen(text) * 8 & ~15) - 28) * 2.0f;
                     bubble_width = width > bubble_width ? width : bubble_width;
                     set_textbox(bubble_x, bubble_y, bubble_width, MSG_TEXTBOX_KIND() + 8);
                     set_textbox_width(bubble_width, MSG_TEXTBOX_KIND() + 8);
