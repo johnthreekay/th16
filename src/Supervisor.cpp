@@ -330,9 +330,8 @@ void __stdcall camera_update_2d(Camera *camera)
                                (f32)camera->viewport.Width / (f32)camera->viewport.Height, 1.0f, 10000.0f);
 }
 
-// TODO: the original keeps &camera->up in ebx across the LookAt call; ours
-// recomputes it (whole-program effect: this once matched while
-// write_screenshot did not exist, but leaving it out no longer helps).
+// Its device calls go through supervisor_d3d_device() so that ebx stays
+// usable for &camera->up across the LookAt call (see Supervisor.h).
 // FUNCTION: TH16 0x43c940
 void __stdcall camera_apply_3d(Camera *camera)
 {
@@ -346,8 +345,8 @@ void __stdcall camera_apply_3d(Camera *camera)
     D3DXMatrixLookAtLH((D3DXMATRIX *)&camera->view_matrix, &eye, &at, &camera->up);
     D3DXMatrixPerspectiveFovLH((D3DXMATRIX *)&camera->projection_matrix, camera->field_of_view,
                                (f32)camera->viewport.Width / (f32)camera->viewport.Height, 30.0f, 8000.0f);
-    g_Supervisor.d3d_device->SetTransform(D3DTS_VIEW, &camera->view_matrix);
-    g_Supervisor.d3d_device->SetTransform(D3DTS_PROJECTION, &camera->projection_matrix);
+    supervisor_d3d_device()->SetTransform(D3DTS_VIEW, &camera->view_matrix);
+    supervisor_d3d_device()->SetTransform(D3DTS_PROJECTION, &camera->projection_matrix);
     D3DXVec3Cross(&camera->right, &facing, &camera->up);
     D3DXVec3Normalize(&camera->right, &camera->right);
     if (g_AnmManager != NULL)

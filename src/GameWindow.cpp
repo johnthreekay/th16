@@ -166,9 +166,8 @@ HARNESS_CALLED i32 GameWindow::do_frame_sleeping()
     return 0;
 }
 
-// TODO: ours realigns its frame (ebx form): the original gets known
-// alignment from do_frame_sleeping, ours does not (whole-program effect;
-// leaving out the DirectInput enum callbacks no longer changes it).
+// Its device calls go through supervisor_d3d_device(): written as
+// g_Supervisor.d3d_device->..., ours realigned its frame (see Supervisor.h).
 // FUNCTION: TH16 0x45a9f0
 HARNESS_CALLED void GameWindow::update_window_sleeping()
 {
@@ -213,7 +212,7 @@ HARNESS_CALLED void GameWindow::update_window_sleeping()
                 Sleep(1);
             }
             raster.InVBlank = FALSE;
-            while (g_Supervisor.d3d_device->GetRasterStatus(0, &raster) == D3D_OK)
+            while (supervisor_d3d_device()->GetRasterStatus(0, &raster) == D3D_OK)
             {
                 if (raster.InVBlank)
                 {
@@ -228,11 +227,11 @@ HARNESS_CALLED void GameWindow::update_window_sleeping()
     }
     sleep_start_time = get_runtime();
     take_screenshot();
-    if (g_Supervisor.d3d_device->Present(NULL, NULL, NULL, NULL) < 0)
+    if (supervisor_d3d_device()->Present(NULL, NULL, NULL, NULL) < 0)
     {
         g_Supervisor.release_surfaces();
         g_AnmManager->release_textures();
-        g_Supervisor.d3d_device->Reset(&g_Supervisor.present_params);
+        supervisor_d3d_device()->Reset(&g_Supervisor.present_params);
         g_AnmManager->create_d3d_textures_for_loaded_anms();
         g_Supervisor.setup_special_anms();
         Supervisor::reset_render_state();
@@ -311,18 +310,18 @@ HARNESS_CALLED i32 GameWindow::do_frame_frameskip()
     return 0;
 }
 
-// TODO: ours lacks the push ecx padding the original has for known
-// alignment from do_frame_frameskip (whole-program effect; leaving out the
-// DirectInput enum callbacks no longer changes it).
+// Its device calls go through supervisor_d3d_device(): written as
+// g_Supervisor.d3d_device->..., ours lacked the push ecx padding for its
+// caller's known alignment (see Supervisor.h).
 // FUNCTION: TH16 0x45adf0
 HARNESS_CALLED void GameWindow::present()
 {
     take_screenshot();
-    if (g_Supervisor.d3d_device->Present(NULL, NULL, NULL, NULL) < 0)
+    if (supervisor_d3d_device()->Present(NULL, NULL, NULL, NULL) < 0)
     {
         g_Supervisor.release_surfaces();
         g_AnmManager->release_textures();
-        g_Supervisor.d3d_device->Reset(&g_Supervisor.present_params);
+        supervisor_d3d_device()->Reset(&g_Supervisor.present_params);
         g_AnmManager->create_d3d_textures_for_loaded_anms();
         g_Supervisor.setup_special_anms();
         Supervisor::reset_render_state();

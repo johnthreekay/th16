@@ -887,7 +887,11 @@ char *__fastcall skip_line(char *p, i32 *remaining)
 
 // Copies the line starting at src into dst and returns the start of the
 // next line.
-// TODO: ours pads the second loop's head with a nop to 16 bytes; the original does not align it.
+// The line break loop reads the next character and stores the count both
+// before the loop and at the end of its body: the compiler merges the two
+// copies and jumps back to the one before the loop, which is not the loop
+// head it would pad to a 16-byte boundary (written as one loop, ours got a
+// nop there).
 // FUNCTION: TH16 0x455370
 char *__fastcall read_line(char *dst, char *src, i32 *remaining)
 {
@@ -909,19 +913,19 @@ char *__fastcall read_line(char *dst, char *src, i32 *remaining)
     *p = '\0';
     strcpy(dst, src);
     p++;
-    for (i32 n = left - 1;; n--)
+    i32 n = left - 1;
+    char c = *p;
+    *remaining = n;
+    while (c == '\n' || c == '\r')
     {
-        char c = *p;
-        *remaining = n;
-        if (c != '\n' && c != '\r')
-        {
-            break;
-        }
         if (n == 0)
         {
             return p;
         }
         p++;
+        n--;
+        c = *p;
+        *remaining = n;
     }
     return p;
 }

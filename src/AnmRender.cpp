@@ -213,7 +213,7 @@ i32 AnmManager::write_sprite(RenderVertex144 *vertices)
 
 // Render mode 9: like draw_vertex_fan for visible VMs only, with the
 // texture set first and color ops reset to modulate.
-// TODO: the original keeps this in ebx and vm in esi (edi only around SetTexture); ours spills this.
+// TODO: around SetTexture ours swaps edi and esi (the device and its vtable) and loads the device before the sar.
 // FUNCTION: TH16 0x4681f0
 i32 AnmManager::draw_vertex_strip(AnmVm *vm, RenderVertex144 *vertices, i32 vertex_count)
 {
@@ -237,23 +237,23 @@ i32 AnmManager::draw_vertex_strip(AnmVm *vm, RenderVertex144 *vertices, i32 vert
     if (last_texture_id != texture)
     {
         last_texture_id = texture;
-        g_Supervisor.d3d_device->SetTexture(0, loaded_anms[texture >> 8]->d3d[texture & 0xff].texture);
+        supervisor_d3d_device()->SetTexture(0, loaded_anms[texture >> 8]->d3d[texture & 0xff].texture);
     }
     if (last_vertex_setup != ANM_VERTEX_SETUP_SCREEN_TEXTURED)
     {
-        g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
         last_vertex_setup = ANM_VERTEX_SETUP_SCREEN_TEXTURED;
     }
     setup_render_state_for_vm(vm);
     if (g_AnmManager->last_color_op != ANM_COLOR_OP_MODULATE)
     {
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
         g_AnmManager->last_color_op = ANM_COLOR_OP_MODULATE;
     }
-    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, vertex_count - 2, vertices,
+    supervisor_d3d_device()->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, vertex_count - 2, vertices,
                                              sizeof(RenderVertex144));
     return 0;
 }
@@ -292,7 +292,7 @@ i32 AnmManager::draw_vertex_fan(AnmVm *vm, RenderVertex144 *vertices, i32 vertex
 // Draws count points, each center + offsets[i] in colors[i], as a line
 // strip (despite the name) from the primitive buffer. Always returns 0
 // (the original sets eax although its caller ignores it).
-// TODO: ours never uses ebx (the original keeps count * 20 and center in it) and spills the loop counter; the original's frame has known 8-byte alignment from its caller, which dead doubles here (each form tried) turn into an ebx-form realignment of its own instead.
+// TODO: ours stores the saved count to [ebp-4] one instruction earlier; the rest matches since the device calls go through supervisor_d3d_device().
 // FUNCTION: TH16 0x469890
 HARNESS_CALLED i32 AnmManager::draw_triangle_fan(i32 count, Float3 *center, Float2 *offsets, ZunColor *colors)
 {
@@ -316,18 +316,18 @@ HARNESS_CALLED i32 AnmManager::draw_triangle_fan(i32 count, Float3 *center, Floa
     }
     if (g_AnmManager->last_color_op != ANM_COLOR_OP_DIFFUSE)
     {
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
         g_AnmManager->last_color_op = ANM_COLOR_OP_DIFFUSE;
     }
     if (mgr->last_vertex_setup != ANM_VERTEX_SETUP_DIFFUSE)
     {
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
-        g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
         mgr->last_vertex_setup = ANM_VERTEX_SETUP_DIFFUSE;
     }
-    g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
-    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_LINESTRIP, count - 1, mgr->primitive_write_cursor,
+    supervisor_d3d_device()->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+    supervisor_d3d_device()->DrawPrimitiveUP(D3DPT_LINESTRIP, count - 1, mgr->primitive_write_cursor,
                                              sizeof(RenderVertex044));
     mgr->primitive_write_cursor += count;
     mgr->stat_draw_calls++;
@@ -373,36 +373,37 @@ static __forceinline void anm_mask_begin()
 {
     g_AnmManager->flush_sprites();
     IDirect3DDevice9 *d3d = g_Supervisor.d3d_device;
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, TRUE);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ZERO);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_ONE);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ZERO);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
+    supervisor_d3d_device()->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+    supervisor_d3d_device()->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, TRUE);
+    supervisor_d3d_device()->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ZERO);
+    supervisor_d3d_device()->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
+    supervisor_d3d_device()->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+    supervisor_d3d_device()->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_ONE);
+    supervisor_d3d_device()->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ZERO);
+    supervisor_d3d_device()->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
 }
 
 static __forceinline void anm_mask_draw(AnmMaskVertex *vertices)
 {
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
-    g_Supervisor.d3d_device->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
-    g_Supervisor.d3d_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, vertices, sizeof(AnmMaskVertex));
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
-    g_Supervisor.d3d_device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
+    supervisor_d3d_device()->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+    supervisor_d3d_device()->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, vertices, sizeof(AnmMaskVertex));
+    supervisor_d3d_device()->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    supervisor_d3d_device()->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
     g_AnmManager->last_blend_mode = ANM_BLEND_FORCE_RESET;
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_SRCALPHA);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ONE);
-    g_Supervisor.d3d_device->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
+    supervisor_d3d_device()->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_SRCALPHA);
+    supervisor_d3d_device()->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ONE);
+    supervisor_d3d_device()->SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD);
 }
 
-// TODO: the original keeps the extra data in ebx and copies it to esi for the draw_vm loop; ours never uses ebx and spills it.
+// Its mask helpers calls the device through supervisor_d3d_device() so that ebx stays
+// usable (see Supervisor.h).
 // FUNCTION: TH16 0x4073a0
 i32 __fastcall anm_on_draw_masked(AnmVm *vm)
 {
@@ -435,7 +436,7 @@ i32 __fastcall anm_on_draw_masked(AnmVm *vm)
     }
     if (data->mode == 2 || (data->mode == 0 && g_Supervisor.present_params.BackBufferFormat == D3DFMT_A8R8G8B8))
     {
-        g_Supervisor.d3d_device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, FALSE);
+        supervisor_d3d_device()->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, FALSE);
         g_AnmManager->draw_vm(&data->overlay);
         g_AnmManager->flush_sprites();
     }
