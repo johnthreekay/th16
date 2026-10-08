@@ -498,12 +498,14 @@ void BombReimuAOrb::update()
     timer.tick_mixed();
 }
 
-// Not ZUN's: calling update through this keeps LTCG from realigning
-// on_tick's frame for it, which the original does not do (and which would
-// pad BombReimuAOrb::finish's frame).
-static DECOMP_NOINLINE void orb_update(BombReimuAOrb *orb)
+// BombReimuAOrb::update as a member function pointer: a call through it
+// compiles to the original's direct call but is not an edge in LTCG's call
+// graph, which keeps LTCG from realigning on_tick's frame for it (the
+// original does not, and it would pad BombReimuAOrb::finish's frame).
+typedef void (BombReimuAOrb::*OrbUpdateFunc)();
+static inline OrbUpdateFunc orb_update_func()
 {
-    orb->update();
+    return &BombReimuAOrb::update;
 }
 
 // Starts the orbs at frame 0, steps them, and bursts those whose damage
@@ -516,7 +518,7 @@ static DECOMP_NOINLINE void orb_update(BombReimuAOrb *orb)
 // before the radial_speed store loads it first, like the original.
 // TODO: register allocation differs (orbs is read from its stack slot in
 // the original, the timer goes to edx, the loop counters swap stack
-// slots); calls update through the orb_update stand-in (see there).
+// slots); calls update through orb_update_func (see there).
 // FUNCTION: TH16 0x410de0
 i32 BombReimuAInf::on_tick()
 {
@@ -577,7 +579,7 @@ orb_alive:
     {
         if (orb->active)
         {
-            orb_update(orb);
+            (orb->*orb_update_func())();
             if (g_Player->get_damage_source(orb->damage_source)->total_damage_dealt >= 300)
             {
                 orb->finish();
