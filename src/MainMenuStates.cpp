@@ -120,7 +120,7 @@ void TitleInf::load_replay_list()
 }
 
 // Saving the replay after a game: picking a slot, then entering the name.
-// TODO: this lives in esi (the original edi, spilled), and g_stage_table[8] lands on another global here.
+// TODO: the replay_name stores address [index + this] (the original [this + index]), the last_replay_name copy folds 0x19f8c into the store's displacement (the original adds it to the pointer), and g_stage_table[8] lands on another global here.
 // FUNCTION: TH16 0x453c10
 i32 TitleInf::do_replay_save()
 {
@@ -281,7 +281,10 @@ i32 TitleInf::do_replay_save()
                 sprintf(path, "th16_%.2d.rpy", menu.next_selection + 1);
                 ReplayManager::destroy(replays[menu.next_selection]);
                 g_ReplayManager->save(path, replay_name, 0, 0);
-                replays[menu.next_selection] = ReplayManager::create_from_file(path);
+                // Read before the call: the original keeps the slot in esi
+                // across it, which leaves edi for this.
+                i32 slot = menu.next_selection;
+                replays[slot] = ReplayManager::create_from_file(path);
                 strcpy(g_Scorefile->last_replay_name, replay_name);
                 set_substate(2);
             }
