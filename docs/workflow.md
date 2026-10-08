@@ -35,6 +35,24 @@ Its section comparison is only informative: `.rdata` differs after every
 relink, and a change to `.rdata`'s size shows the five atexit thunks as
 changed (see "Known tooling gaps").
 
+A function that does not match yet can still behave differently from the
+original, and a matching edit can change behaviour without anyone
+noticing. `behavior_diff.py` compares what each function does rather than
+how: calls and their constant arguments, constants, the globals and fields
+it reads and writes, comparisons with constants, returned constants and
+switch cases without code, normalized so that register allocation,
+scheduling and block layout cannot change them. Every exact and
+scheduling-only match reports nothing; what it reports for the others is
+either a behaviour difference or an equivalent shape (a call shared by two
+branches, a loop pointer starting elsewhere), so read each one.
+
+```sh
+.venv/bin/python scripts/behavior_diff.py                  # every function that differs
+.venv/bin/python scripts/behavior_diff.py --items 0x401300 # both builds' items side by side
+.venv/bin/python scripts/behavior_diff.py --save           # before a matching edit
+.venv/bin/python scripts/behavior_diff.py --check          # after it: what changed
+```
+
 ## Annotations
 
 Each decompiled function carries an annotation with its address in the

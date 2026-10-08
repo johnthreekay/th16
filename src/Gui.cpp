@@ -1081,8 +1081,8 @@ void Gui::update_score()
 
 // Shows a HUD notice (GuiNotice). The spell card bonus also spells out
 // bonus in digits, leaving out leading zeros and adding the commas it needs.
-// Every caller passes 0-4, which is how the original's jump table goes
-// without a bounds check; the __assume reproduces that.
+// The original's jump table covers kinds 0 to 6 (5 does nothing) with no
+// bounds check, which the __assume reproduces.
 // TODO: in the digit loop the original keeps the manager in ebx and spills the counter; ours does the reverse.
 // FUNCTION: TH16 0x42bcf0
 HARNESS_CALLED void Gui::show_notice(i32 bonus, i32 kind)
@@ -1188,6 +1188,8 @@ HARNESS_CALLED void Gui::show_notice(i32 bonus, i32 kind)
     case GUI_NOTICE_EXTEND:
         delete_vm_and_clear(notice_id);
         notice_id = create_effect_via_pointer(front_anm, FRONT_ANM_EXTEND, -1, NULL);
+        break;
+    case GUI_NOTICE_5:
         break;
     case GUI_NOTICE_6:
         delete_vm_and_clear(spell_notice_id);

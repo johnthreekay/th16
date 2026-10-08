@@ -1683,7 +1683,8 @@ int EnemyData::ecl_run_over_300()
     case ECL_OP_ET_AIM:
     {
         i32 slot = get_int_arg(0);
-        bullet_props[slot].aim_type = get_int_arg(1);
+        // Only the low 16 bits, as everywhere else (the original stores a word).
+        *(u16 *)&bullet_props[slot].aim_type = get_int_arg(1);
         break;
     }
     // etSound(slot, shot_sfx, transform_sfx)
