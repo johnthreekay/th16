@@ -907,7 +907,45 @@ HARNESS_CALLED void Stage::start_enter()
     stage_flags |= STAGE_ENTERING;
 }
 
-// TODO: ours gets a /GS cookie (the CameraSky temporaries), which shifts every stack slot; the original also shares one return path per result.
+// InterpCameraSky::step's methods, written as inline helpers: with the
+// bodies in step itself, its registers and return paths come out further
+// from the original's.
+
+// Method 7: initial moves by goal every frame.
+static __forceinline void sky_step_7(InterpCameraSky *s)
+{
+    CameraSky tmp = s->initial;
+    s->initial = tmp.add_inline(s->goal);
+    s->current = s->initial;
+}
+// Method 17: initial moves by bezier_2, which itself moves by goal.
+static __forceinline void sky_step_17(InterpCameraSky *s)
+{
+    CameraSky tmp = s->initial;
+    s->initial = tmp + s->bezier_2;
+    s->bezier_2 = s->bezier_2 + s->goal;
+    s->current = s->initial;
+}
+// Method 8: Hermite curve from initial to goal with tangents bezier_1 and
+// bezier_2.
+static __forceinline void sky_step_8(InterpCameraSky *s)
+{
+    f32 t = s->time.current_f / (f32)s->end_time;
+    f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
+    f32 c_goal = t * t * (3.0f - 2.0f * t);
+    f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
+    f32 c_bezier_2 = (t - 1.0f) * t * t;
+    s->current = s->initial * c_initial + s->goal * c_goal + s->bezier_1 * c_bezier_1 + s->bezier_2 * c_bezier_2;
+}
+// The other methods: the shared easing curves between initial and goal.
+static __forceinline void sky_step_other(InterpCameraSky *s)
+{
+    f32 x = interp_common_methods(s->method, s->time.current_f, (f32)s->end_time);
+    s->current = (s->goal - s->initial) * x + s->initial;
+}
+
+// TODO: ours gets a /GS cookie (the CameraSky temporaries) and shares one return path per result; the
+// original has neither and computes (goal - initial) * x for the other methods in a different order.
 // FUNCTION: TH16 0x40cd10
 CameraSky InterpCameraSky::step()
 {
@@ -935,30 +973,19 @@ CameraSky InterpCameraSky::step()
     }
     if (method == 7)
     {
-        CameraSky tmp = initial;
-        initial = tmp.add_inline(goal);
-        current = initial;
+        sky_step_7(this);
     }
     else if (method == 17)
     {
-        CameraSky tmp = initial;
-        initial = tmp + bezier_2;
-        bezier_2 = bezier_2 + goal;
-        current = initial;
+        sky_step_17(this);
     }
     else if (method == 8)
     {
-        f32 t = time.current_f / (f32)end_time;
-        f32 c_initial = (t - 1.0f) * (t - 1.0f) * (2.0f * t + 1.0f);
-        f32 c_goal = t * t * (3.0f - 2.0f * t);
-        f32 c_bezier_1 = (1.0f - t) * (1.0f - t) * t;
-        f32 c_bezier_2 = (t - 1.0f) * t * t;
-        current = initial * c_initial + goal * c_goal + bezier_1 * c_bezier_1 + bezier_2 * c_bezier_2;
+        sky_step_8(this);
     }
     else
     {
-        f32 x = interp_common_methods(method, time.current_f, (f32)end_time);
-        current = (goal - initial) * x + initial;
+        sky_step_other(this);
     }
     return current;
 }
