@@ -1248,7 +1248,8 @@ HARNESS_CALLED void __stdcall EnemyManager::kill_all_in_group(i32 value)
 }
 
 // TODO: in the inlined tick the original adds current_f into the speed's xmm1; ours loads
-// current_f into xmm0 and adds the speed, the opposite of kill_all (tick or tick_mixed alike).
+// current_f into xmm0 and adds the speed, the opposite of kill_all (tick, tick_mixed,
+// tick_goto, tick_nested and tick_in_place alike).
 // FUNCTION: TH16 0x41db70
 void EnemyManager::kill_all_no_set_death()
 {

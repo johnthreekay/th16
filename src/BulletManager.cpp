@@ -232,7 +232,9 @@ i32 BulletManager::on_draw_body()
 }
 
 // TODO: the original keeps 1.0f in xmm2 across the loop for the inlined
-// ZunTimer::tick (reloaded after Bullet::on_tick).
+// ZunTimer::tick (reloaded after Bullet::on_tick). tick_nested hoists it too,
+// but puts the speed, 1.0f and 1.01f in xmm0, xmm1 and xmm2 (the original:
+// xmm1, xmm2, xmm0) and adds into the speed's register.
 // FUNCTION: TH16 0x412860
 i32 BulletManager::on_tick_body()
 {
@@ -706,7 +708,9 @@ i32 BulletManager::shoot_one(EnemyBulletShooter *props, i32 i, i32 layer, f32 an
     return 0;
 }
 
-// TODO: about half the code differs: ours addresses et_ex by index instead of through an ex pointer kept in esi, hoists constants, and speculatively devirtualizes the inlined lasers' initialize calls.
+// TODO: about half the code differs: ours addresses et_ex by index instead of through an ex
+// pointer kept in esi (every way of writing the pointer gives the index form), hoists
+// constants, and lays out the frame differently.
 // Starts the et_ex transforms from ex_index on, until one has to wait: an
 // empty slot, a slot-0 transform while others still run, or a transform of
 // a kind already running. Angle arguments of -999990 keep the bullet's
