@@ -3,8 +3,20 @@
 #include "Collision.h"
 #include "ZunMath.h"
 
-// TODO: same operations, different register and stack slot choices (the
-// original keeps 0.5 and the two offsets in registers).
+// The squared length of an offset's x and y, y term first. Taking the
+// offset by pointer keeps each test's squares apart (the original squares
+// every corner offset again in each test, where plain expressions share
+// them), and the y term first gives the original's x-term accumulator. The
+// offset is a Float3 because an 8-byte local (a Float2) would make LTCG
+// realign the callers' frames (BulletManager::cancel_rectangle_as_bomb).
+static inline f32 offset_length_sq(const Float3 *d)
+{
+    return d->y * d->y + d->x * d->x;
+}
+
+// Whether a circle touches a w x h rectangle centered on (rect_x, rect_y)
+// and rotated by angle: the edges first, then the corners.
+// TODO: the rotation multiplies into the sine and cosine registers with the circle offsets from memory (the original loads the offsets), and the stack slots differ.
 // FUNCTION: TH16 0x403d30
 HARNESS_CALLED i32 __stdcall collision_test_circle_rect(f32 rect_x, f32 rect_y, f32 w, f32 h, f32 angle, f32 circle_x,
                                                         f32 circle_y, f32 radius)
@@ -18,31 +30,40 @@ HARNESS_CALLED i32 __stdcall collision_test_circle_rect(f32 rect_x, f32 rect_y, 
     f32 x = circle_x * c - circle_y * s;
     f32 y = circle_x * s + circle_y * c;
     f32 half_w = w * 0.5f;
-    f32 half_h = h * 0.5f;
     f32 abs_x = fabsf(x);
-    if (half_w + radius >= abs_x && half_h >= fabsf(y))
+    if (half_w + radius >= abs_x && fabsf(y) <= h * 0.5f)
     {
         return 1;
     }
-    if (half_w >= abs_x && half_h + radius >= fabsf(y))
+    if (half_w >= abs_x && fabsf(y) <= h * 0.5f + radius)
     {
         return 1;
     }
     // Then the corners.
+    f32 half_h = h * 0.5f;
     f32 radius_sq = radius * radius;
-    if (radius_sq > (x - half_w) * (x - half_w) + (y - half_h) * (y - half_h))
+    Float3 d;
+    d.x = x - half_w;
+    d.y = y - half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    if (radius_sq > (x + half_w) * (x + half_w) + (y - half_h) * (y - half_h))
+    d.x = x + half_w;
+    d.y = y - half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    if (radius_sq > (x - half_w) * (x - half_w) + (y + half_h) * (y + half_h))
+    d.x = x - half_w;
+    d.y = y + half_h;
+    if (radius_sq > offset_length_sq(&d))
     {
         return 1;
     }
-    return radius_sq > (x + half_w) * (x + half_w) + (y + half_h) * (y + half_h);
+    d.x = x + half_w;
+    d.y = y + half_h;
+    return radius_sq > offset_length_sq(&d);
 }
 
 // The corners each edge of a rectangle joins.
