@@ -1647,9 +1647,24 @@ static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
     }
 }
 
+// Moves the VM with the id to (x, y, z), if it still exists. A plain inline
+// helper: the Float3 local, which stays in memory across the lookup, then
+// belongs to the helper's call graph node and does not give the caller a
+// /GS cookie (written in setup_stage_hud, it did; __forceinline did too).
+static inline void set_entity_pos_xyz(AnmId id, f32 x, f32 y, f32 z)
+{
+    Float3 pos(x, y, z);
+    AnmVm *vm = g_AnmManager->get_vm_with_id(id);
+    if (vm != NULL)
+    {
+        vm->entity_pos = pos;
+    }
+}
+
 // Sets the HUD up for a stage: the life and bomb counters, the boss timer,
 // the stage logo, the demo and difficulty markers and the season gauge.
-// TODO: ours gets a /GS cookie for pos (see docs/findings.md) and realigns through ebx; the original realigns plainly.
+// TODO: the original realigns its frame (and esp, -8; probably for AnmVm::run in the
+// inlined create_effect) and inlines the first level of search_children for the season gauge icon.
 // FUNCTION: TH16 0x426d70
 void Gui::setup_stage_hud()
 {
@@ -1710,12 +1725,7 @@ void Gui::setup_stage_hud()
     if (g_Globals.stage_num == 1 && g_GameThread->replay_mode == 0 && g_Globals.continues_used == 0)
     {
         AnmId id = create_effect_inline(gui->front_anm, FRONT_ANM_GAME_START, -1, NULL);
-        Float3 pos(0.0f, g_Globals.character == CHARACTER_MARISA ? 148 : 128, 0.0f);
-        AnmVm *vm = g_AnmManager->get_vm_with_id(id);
-        if (vm != NULL)
-        {
-            vm->entity_pos = pos;
-        }
+        set_entity_pos_xyz(id, 0.0f, g_Globals.character == CHARACTER_MARISA ? 148 : 128, 0.0f);
     }
     if (g_Supervisor.new_game_started != 0)
     {
