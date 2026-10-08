@@ -1266,15 +1266,15 @@ done:
 
 static_assert(offsetof(Bullet, ex_state) == 0xfa0, "Bullet layout");
 
-// TODO: in the inlined timer tick the original adds the speed to current_f in xmm0 and
-// jumps to shared stores (ours adds current_f to the speed in xmm1; tick_mixed gets closer).
+// Speeds the bullet down from 5 + speed to speed over 16 frames (ex 0). The
+// timer ticks with tick_goto, which gives the original's register choice.
 // FUNCTION: TH16 0x414ec0
 i32 Bullet::step_ex_00()
 {
     if (ex_state[0].timer.current <= 16)
     {
         bullet_sincosmul(&velocity, angle, 5.0f - ex_state[0].timer.current_f * 5.0f / 16.0f + speed);
-        ex_state[0].timer.tick_mixed();
+        ex_state[0].timer.tick_goto();
         return 0;
     }
     active_ex_flags ^= BULLET_EX_SPEEDUP;
@@ -1476,8 +1476,7 @@ i32 Bullet::step_ex_03()
     return 0;
 }
 
-// TODO: in the inlined timer tick (tick_mixed) the original loads current_f into xmm0
-// and adds the speed (ours adds current_f into the speed's xmm1).
+// Turns the bullet at intervals (ex 4); tick_goto as in step_ex_00.
 // FUNCTION: TH16 0x415570
 i32 Bullet::step_ex_04()
 {
@@ -1520,7 +1519,7 @@ i32 Bullet::step_ex_04()
         new_speed = speed - ex_state[3].timer.current_f * speed / ex_state[3].ints[0];
     }
     bullet_sincosmul(&velocity, angle, new_speed);
-    ex_state[3].timer.tick_mixed();
+    ex_state[3].timer.tick_goto();
     return 0;
 }
 
@@ -1619,8 +1618,8 @@ i32 Bullet::step_ex_12()
     return 0;
 }
 
-// TODO: the original stores pos.z after loading the angle, and the inlined
-// timer tick keeps the frame in xmm0 (ours xmm1).
+// TODO: the original stores pos.z after loading the angle (tick_goto gives the
+// timer tick's registers).
 // FUNCTION: TH16 0x415f90
 i32 Bullet::step_ex_17()
 {
@@ -1644,7 +1643,7 @@ i32 Bullet::step_ex_17()
         angle = wrap_angle(atan2(velocity.y, velocity.x));
     }
     velocity.z = 0.0f;
-    ex_state[8].timer.tick_mixed();
+    ex_state[8].timer.tick_goto();
     return 0;
 }
 

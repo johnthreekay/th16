@@ -1197,7 +1197,7 @@ int EnemyInf::die()
 
 // Kills every enemy not protected by ENEMY_FLAGS_SURVIVE_KILL_ALL: death
 // effects, drops and set_death, then ENEMY_FLAG_DELETE.
-// TODO: the inlined tick (tick_mixed) adds speed and current_f the other way round (register choice).
+// The stage timer ticks with tick_goto, which gives the original's registers.
 // FUNCTION: TH16 0x41d900
 void EnemyManager::kill_all()
 {
@@ -1217,7 +1217,7 @@ void EnemyManager::kill_all()
             enemy->enemy.flags_low |= ENEMY_FLAG_DELETE;
         }
     }
-    mgr->inner.time_in_stage.tick_mixed();
+    mgr->inner.time_in_stage.tick_goto();
 }
 
 // kill_all for the enemies in the given kill_group (ECL 551).
@@ -1242,7 +1242,7 @@ void __stdcall EnemyManager::kill_all_in_group(i32 value)
         }
         node = next;
     }
-    mgr->inner.time_in_stage.tick();
+    mgr->inner.time_in_stage.tick_goto();
 }
 
 // TODO: in the inlined tick the original adds current_f into the speed's xmm1; ours loads
