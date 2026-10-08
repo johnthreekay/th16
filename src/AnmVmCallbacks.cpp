@@ -373,11 +373,19 @@ int __fastcall anm_jagged_line_on_tick(AnmVm *vm)
     return 1;
 }
 
-// TODO: the original aligns the frame to 8 bytes (and esp, -8) and adds
-// entity_pos.x + pos.x in the other order.
+// Draws the line as a strip through the stored offsets around the VM's
+// position. The dead double math is not ZUN's code: it is enough of it for
+// LTCG's double stack alignment pass to realign the frame (and esp, -8)
+// like the original, and it also gives entity_pos.x + pos.x the original's
+// operand order (one or two plain dead doubles fix only the order).
 // FUNCTION: TH16 0x406860
 int __fastcall anm_jagged_line_on_draw(AnmVm *vm)
 {
+    double unused = 0.0;
+    unused = unused * 2.0;
+    unused = unused * 2.0;
+    unused = unused * 2.0;
+    (void)unused;
     AnmJaggedLineData *data = (AnmJaggedLineData *)vm->extra_data;
     g_AnmManager->setup_render_state_for_vm(vm);
     Float3 pos;
