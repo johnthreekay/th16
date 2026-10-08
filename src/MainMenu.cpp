@@ -1201,6 +1201,22 @@ static __forceinline void title_interrupt_child(TitleInf *menu, i32 script, i32 
     vm->interrupt(interrupt);
 }
 
+// title_interrupt_child with search_children inlined too, as for the
+// greyed out Extra Start items.
+static __forceinline void title_interrupt_child_inline(TitleInf *menu, i32 script, i32 interrupt)
+{
+    AnmVm *vm;
+    if (get_vm_or_clear(menu->anm_ids[0]) == NULL)
+    {
+        vm = NULL;
+    }
+    else
+    {
+        vm = search_children_inline(get_vm_or_clear(menu->anm_ids[0]), script, 0);
+    }
+    vm->interrupt(interrupt);
+}
+
 static __forceinline void title_interrupt_child_and_run(TitleInf *menu, i32 script, i32 interrupt)
 {
     AnmVm *vm = find_child_of(menu->anm_ids[0], script);
@@ -1226,7 +1242,8 @@ static __forceinline void title_highlight_inline(TitleInf *menu)
     }
 }
 
-// TODO: functionally complete; register allocation and the choice of inlined vs called menu highlight copies differ in places.
+// The first "no clear" greying inlines search_children, the second calls it.
+// TODO: 92%; some locals sit 4 bytes off the original's stack slots.
 // FUNCTION: TH16 0x44b5f0
 i32 TitleInf::do_title_screen()
 {
@@ -1308,8 +1325,8 @@ i32 TitleInf::do_title_screen()
             title_highlight_inline(this);
             if (!g_Scorefile->any_cleared())
             {
-                title_interrupt_child(this, 4, TITLE_INTERRUPT_DISABLED);
-                title_interrupt_child(this, 14, TITLE_INTERRUPT_DISABLED);
+                title_interrupt_child_inline(this, 4, TITLE_INTERRUPT_DISABLED);
+                title_interrupt_child_inline(this, 14, TITLE_INTERRUPT_DISABLED);
             }
         }
         break;
