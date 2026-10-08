@@ -2222,8 +2222,10 @@ void EnemyData::ecl_anm_vm_instr()
     // anmPosTime(slot, time, mode, x, y)
     case ECL_OP_ANM_POS_TIME:
     {
-        Float3 goal(full->context.current_context->get_float_arg(3), full->context.current_context->get_float_arg(4),
-                    0.0f);
+        // y is read before x as in the original (random variables draw from the replay RNG).
+        f32 y = full->context.current_context->get_float_arg(4);
+        f32 x = full->context.current_context->get_float_arg(3);
+        Float3 goal(x, y, 0.0f);
         vm->set_pos_time(full->context.current_context->get_int_arg(1), full->context.current_context->get_int_arg(2),
                          &anm_ids[full->context.current_context->get_int_arg(0)].find_or_clear()->entity_pos, &goal);
         break;

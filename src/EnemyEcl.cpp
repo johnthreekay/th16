@@ -361,7 +361,10 @@ int EnemyData::ecl_run_over_300()
     // anmPlayPos(file, script, x, y, rotation)
     case ECL_OP_ANM_PLAY_POS:
     {
-        Float3 pos = final_pos.pos + Float3(full->context.current_context->get_float_arg(2), full->context.current_context->get_float_arg(3), 0.0f);
+        // y is read before x as in the original (random variables draw from the replay RNG).
+        f32 y = full->context.current_context->get_float_arg(3);
+        f32 x = full->context.current_context->get_float_arg(2);
+        Float3 pos = final_pos.pos + Float3(x, y, 0.0f);
         g_EffectManager->track(create_vm_front_at(g_EnemyManager->anim_statement_anms[full->context.current_context->get_int_arg(0)], full->context.current_context->get_int_arg(1),
                                                   &pos, full->context.current_context->get_float_arg(4)));
         break;
