@@ -22,7 +22,9 @@ HARNESS_CALLED void anm_log(const char *fmt, ...)
 {
 }
 
-// TODO: the original keeps this and the counts in stack slots; register allocation differs throughout.
+// The entry index starts as 0 right after the null check (the original zeroes
+// ebx there and keeps this on the stack).
+// TODO: the original keeps the entry count in edi and both sums on the stack (ours: the script sum in edi, the count on the stack) and tests entry against NULL on the first pass too.
 // FUNCTION: TH16 0x46cdd0
 i32 AnmLoaded::load(const char *path)
 {
@@ -33,6 +35,7 @@ i32 AnmLoaded::load(const char *path)
     {
         return -1;
     }
+    i32 i = 0;
     anm_file = data;
     strcpy(name, path);
     i32 num_scripts = data->num_scripts;
@@ -52,7 +55,7 @@ i32 AnmLoaded::load(const char *path)
     script_count = num_scripts;
     sprite_count = num_sprites;
     AnmRawEntry *entry = data;
-    for (i32 i = 0;; i++)
+    for (;; i++)
     {
         if (entry == NULL)
         {
