@@ -245,6 +245,9 @@ static void __fastcall anm_sincosmul(Float3 *dst, f32 angle, f32 radius)
 // extra_data: a ring strip around the VM (9), an arc of it (13,
 // 14) and an upright cylinder band (24, 25), int_vars[0] steps around
 // with the texture's u spread over int_vars[1].
+// The screen-space vertices add pos with D3DXVECTOR3's +=, which keeps the
+// original's store of z = 0 and its reload; written per field, the z sum
+// was folded.
 // TODO: register allocation differs (the original keeps this in edi and the vertex cursor on the stack in mode 9).
 // FUNCTION: TH16 0x4632f0
 void AnmVm::update_special_vertices()
@@ -288,9 +291,7 @@ void AnmVm::update_special_vertices()
             vertex->uv.y = uv_scroll_pos.y + v;
             anm_sincosmul((Float3 *)&vertex->pos, angle, outer);
             vertex->pos.z = 0.0f;
-            vertex->pos.x = vertex->pos.x + pos.x;
-            vertex->pos.y = pos.y + vertex->pos.y;
-            vertex->pos.z = vertex->pos.z + pos.z;
+            *(Float3 *)&vertex->pos += pos;
             vertex++;
             vertex->pos.w = 1.0f;
             vertex->diffuse = color_inner;
@@ -298,9 +299,7 @@ void AnmVm::update_special_vertices()
             vertex->uv.y = uv_scroll_pos.y + v;
             anm_sincosmul((Float3 *)&vertex->pos, angle, inner);
             vertex->pos.z = 0.0f;
-            vertex->pos.x = vertex->pos.x + pos.x;
-            vertex->pos.y = pos.y + vertex->pos.y;
-            vertex->pos.z = vertex->pos.z + pos.z;
+            *(Float3 *)&vertex->pos += pos;
             v += v_step;
             angle += angle_step;
             vertex++;
@@ -360,18 +359,14 @@ void AnmVm::update_special_vertices()
             vertex[0].uv.y = uv_scroll_pos.y + v;
             anm_sincosmul((Float3 *)&vertex[0].pos, angle, outer);
             vertex[0].pos.z = 0.0f;
-            vertex[0].pos.x = pos.x + vertex[0].pos.x;
-            vertex[0].pos.y = vertex[0].pos.y + pos.y;
-            vertex[0].pos.z = pos.z + vertex[0].pos.z;
+            *(Float3 *)&vertex[0].pos += pos;
             vertex[1].pos.w = 1.0f;
             vertex[1].diffuse = color;
             vertex[1].uv.x = uv_quad_of_sprite[1].x + uv_scroll_pos.x;
             vertex[1].uv.y = uv_scroll_pos.y + v;
             anm_sincosmul((Float3 *)&vertex[1].pos, angle, inner);
             vertex[1].pos.z = 0.0f;
-            vertex[1].pos.x = pos.x + vertex[1].pos.x;
-            vertex[1].pos.y = vertex[1].pos.y + pos.y;
-            vertex[1].pos.z = pos.z + vertex[1].pos.z;
+            *(Float3 *)&vertex[1].pos += pos;
             vertex += 2;
             v = v_step + v;
             angle += angle_step;
