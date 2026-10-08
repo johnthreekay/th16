@@ -1230,14 +1230,18 @@ i32 StageInner::run_std()
                 vm->root_vm = NULL;
                 vm->run();
             }
+            // A VM pointer in each branch: the -2 branch then jumps into the
+            // -1 branch's shared flag store, as in the original.
             else if (script == -2)
             {
-                anm_vms[ins->args[0]].flags_lo &= ~1;
+                AnmVm *vm = &anm_vms[ins->args[0]];
+                vm->flags_lo &= ~1;
             }
             else if (script == -1)
             {
-                anm_vms[ins->args[0]].instr_offset = script;
-                anm_vms[ins->args[0]].flags_lo &= ~1;
+                AnmVm *vm = &anm_vms[ins->args[0]];
+                vm->instr_offset = script;
+                vm->flags_lo &= ~1;
             }
             anm_vm_layers[ins->args[0]] = ins->args[2];
             break;
