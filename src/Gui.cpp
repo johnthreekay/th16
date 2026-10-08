@@ -751,7 +751,8 @@ waiting:
         return 0;
     }
     Float3 pos;
-    pos = bubble->pos + bubble->entity_pos + bubble->pos_2;
+    D3DXVec3Add(&pos, &bubble->pos, &bubble->entity_pos);
+    pos = pos + bubble->pos_2;
     bubble->transform_coords(&pos);
     f32 scale = 2.0f / g_screen_coord_scale;
     pos.y *= scale;
@@ -796,8 +797,10 @@ waiting:
 }
 
 // Puts vm just outside the bubble's body, on the side of the speaker.
-// TODO: the original aligns its frame to 8 bytes and adds two of the
-// vector components the other way round.
+// The position sum written with D3DXVec3Add for the first two vectors adds
+// every component in the original's operand order.
+// TODO: the original aligns its frame to 8 bytes (esp-relative locals); a dead
+// double does not do it here.
 // FUNCTION: TH16 0x42b480
 void GuiMsgVm::update_callout(AnmVm *vm)
 {
@@ -812,7 +815,8 @@ void GuiMsgVm::update_callout(AnmVm *vm)
         return;
     }
     Float3 pos;
-    pos = bubble->pos + bubble->entity_pos + bubble->pos_2;
+    D3DXVec3Add(&pos, &bubble->pos, &bubble->entity_pos);
+    pos = pos + bubble->pos_2;
     bubble->transform_coords(&pos);
     f32 scale = 2.0f / g_screen_coord_scale;
     pos.x *= scale;
