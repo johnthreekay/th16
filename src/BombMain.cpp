@@ -233,9 +233,9 @@ i32 BombMarisaAInf::begin()
 // with their horizontal movement; every third frame three rectangles of
 // damage along the beam. After 300 frames the beam fades and the player
 // can move and shoot again.
-// TODO: ours gets a /GS cookie for beam_pos (it goes away without the
-// interrupt_tree calls, also when those go through an inline helper), which
-// shifts the stack slots; the code is otherwise the original's.
+// Declared __declspec(safebuffers) (Bomb.h): without it ours gets a /GS
+// cookie for beam_pos (it goes away without the interrupt_tree calls) that
+// the original does not have.
 // FUNCTION: TH16 0x40fb00
 i32 BombMarisaAInf::on_tick()
 {
@@ -283,7 +283,10 @@ i32 BombMarisaAInf::on_tick()
         g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 128.0f, angle, 0, 20))
             ->flags |= DAMAGE_SOURCE_BOMB;
         marisa_sincosmul(&beam_pos, angle, 304.0f);
-        beam_pos += pos;
+        // D3DXVec3Add here, not +=: like the original's third sum it loads
+        // pos.x and adds beam_pos.x (the x order of each vector op follows
+        // the function's named-variable count, see docs/findings.md).
+        D3DXVec3Add(&beam_pos, &beam_pos, &pos);
         g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 256.0f, angle, 0, 20))
             ->flags |= DAMAGE_SOURCE_BOMB;
     }
