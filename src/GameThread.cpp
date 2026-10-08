@@ -603,7 +603,6 @@ DECOMP_NOINLINE GameThread::~GameThread()
 // the demo's end, the music restart and the timers. UPDATE_FUNC_BREAK
 // skips the rest of the frame's on_tick functions: that is how a menu or a
 // music restart stops the game.
-// TODO: the original keeps the return 3 epilogue at the top, tests in_menu, flag_5 and flag_6 separately, and keeps a second null test around the inlined delete of g_Stage2.
 // FUNCTION: TH16 0x42d7b0
 HARNESS_CALLED i32 GameThread::on_tick_body()
 {
@@ -655,7 +654,10 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         finish_stage_transition();
     }
     // The previous stage's background goes once it has faded out.
-    if (g_Stage2 != NULL && (g_Stage2->stage_flags & STAGE_DISABLED))
+    // Tested through a local, deleted through the global: the delete keeps
+    // its own null test, as in the original.
+    Stage *stage = g_Stage2;
+    if (stage != NULL && (stage->stage_flags & STAGE_DISABLED))
     {
         delete g_Stage2;
     }
@@ -689,8 +691,17 @@ HARNESS_CALLED i32 GameThread::on_tick_body()
         }
     }
     Gui::update_score();
-    if ((GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_IN_MENU) || (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_5) ||
-        (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_6))
+    // Three separate tests, as in the original (one || condition merges
+    // them into a single test of the three bits).
+    if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_IN_MENU)
+    {
+        return UPDATE_FUNC_BREAK;
+    }
+    if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_5)
+    {
+        return UPDATE_FUNC_BREAK;
+    }
+    if (GAME_THREAD_FLAG_WORD(this) & GAME_THREAD_FLAG_6)
     {
         return UPDATE_FUNC_BREAK;
     }
