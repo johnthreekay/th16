@@ -16,6 +16,9 @@ MSVC's output (add new findings there).
   `.venv/bin/python scripts/check_unchanged.py --save`; edit; build;
   `.venv/bin/python scripts/check_unchanged.py` (every function's quickdiff result
   must be unchanged)
+- Behaviour check for matching edits: `.venv/bin/python scripts/behavior_diff.py --save`
+  before, `--check` after (calls, constants, globals and fields each function
+  uses, against the original; a new difference is a behaviour change to look at)
 
 ## Decompiling a function
 
