@@ -798,12 +798,19 @@ waiting:
 
 // Puts vm just outside the bubble's body, on the side of the speaker.
 // The position sum written with D3DXVec3Add for the first two vectors adds
-// every component in the original's operand order.
-// TODO: the original aligns its frame to 8 bytes (esp-relative locals); a dead
-// double does not do it here.
+// every component in the original's operand order. The scale is written out
+// at each use: through a local, both multiplies load the coordinate into a
+// register instead of multiplying a copy of the scale from memory.
 // FUNCTION: TH16 0x42b480
 void GuiMsgVm::update_callout(AnmVm *vm)
 {
+    // Dead double math, not ZUN's code: with it LTCG realigns the frame
+    // (and esp, -8, esp-relative locals) like the original's. A plain dead
+    // double is not enough here.
+    double unused = 0.0;
+    unused = unused * 2.0;
+    unused = unused * 2.0;
+    (void)unused;
     i32 script = textbox_kind + FRONT_ANM_BUBBLE_BODY;
     if (get_vm_or_clear(textbox) == NULL)
     {
@@ -818,9 +825,8 @@ void GuiMsgVm::update_callout(AnmVm *vm)
     D3DXVec3Add(&pos, &bubble->pos, &bubble->entity_pos);
     pos = pos + bubble->pos_2;
     bubble->transform_coords(&pos);
-    f32 scale = 2.0f / g_screen_coord_scale;
-    pos.x *= scale;
-    pos.y *= scale;
+    pos.x *= 2.0f / g_screen_coord_scale;
+    pos.y *= 2.0f / g_screen_coord_scale;
     if (active_side >= 1)
     {
         if (bubble->scale.x < 1.0f)
