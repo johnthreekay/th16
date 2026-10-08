@@ -1735,6 +1735,20 @@ void Bullet::release()
     tick_list_node.unlink_inline();
 }
 
+// One full movement step (pos += velocity * game speed) for the active case
+// of Bullet::on_tick. Written as a separate inlined helper with two unused
+// locals for matching: it changes the named-variable count that MSVC's vector
+// operand order follows for this step only (docs/findings.md, "Vector operand
+// order"), which brings the active case's moves closer to the original.
+static __forceinline void move_full_step(Bullet *b)
+{
+    i32 unused_0 = 0;
+    (void)unused_0;
+    i32 unused_1 = 0;
+    (void)unused_1;
+    b->pos += b->velocity * g_game_speed;
+}
+
 // Ticks one bullet: state, ex steps, movement, offscreen deletion and VMs.
 // Returns -1 once the bullet is released. The release is written out at
 // each place (the original keeps the first copy inline at the top).
@@ -1883,7 +1897,7 @@ HARNESS_CALLED i32 Bullet::on_tick()
         } while (1);
         if (!(flags & BULLET_FLAG_NO_DRAW))
         {
-            pos += velocity * g_game_speed;
+            move_full_step(this);
             check_player_collision(0);
         }
         break;
