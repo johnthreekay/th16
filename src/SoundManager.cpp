@@ -965,8 +965,9 @@ static inline IDirectSoundBuffer *bgm_buffer(CStreamingSound *sound)
 // Returns the BGM command now first in the queue.
 // The steps are if chains: as switches they become jump tables where the
 // original compares.
-// TODO: 81%; the sound effect loop allocates registers differently and the
-// pan sum is unrolled by two.
+// TODO: 88%; in the sound effect loop the original keeps the count in edi
+// and spills the id (ours does the reverse), and tests the count again
+// before the division.
 // FUNCTION: TH16 0x45e330
 i32 SoundManager::update_sound_thread()
 {
@@ -1217,8 +1218,8 @@ done:
             {
                 break;
             }
-            g_SoundManager.queued_ids[i] = -1;
             i32 count = g_SoundManager.queued_counts[i];
+            g_SoundManager.queued_ids[i] = -1;
             if (count < 0)
             {
                 SoundBufferEntry *entry = &g_SoundManager.sound_buffers[id];
@@ -1235,12 +1236,17 @@ done:
             else
             {
                 i32 pan = 0;
-                // The original sums with plain scalar adds.
+                // A do-while: as a for loop the sum is vectorized or
+                // unrolled, where the original adds one pan at a time.
                 i32 *pans = g_SoundManager.queued_pans[i];
-#pragma loop(no_vector)
-                for (i32 j = count; j > 0; j--)
+                if (count > 0)
                 {
-                    pan += *pans++;
+                    i32 j = count;
+#pragma loop(no_vector)
+                    do
+                    {
+                        pan += *pans++;
+                    } while (--j != 0);
                 }
                 if (count > 0)
                 {
