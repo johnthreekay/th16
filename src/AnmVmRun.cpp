@@ -1446,30 +1446,45 @@ void AnmVm::set_alpha2_time(i32 end_time, i32 method, u8 initial, u8 goal)
     flags_lo = flags_lo & ~ANM_VM_COLOR_MODE_MASK | ANM_VM_COLOR_MODE_1;
 }
 
-// TODO: the original loads both colors before storing either (y, z, x order) and keeps this in edi.
+// Starts interpolating color_2 from initial to goal (blue, green, red as
+// x, y, z), and switches the VM to the two-color mode.
 // FUNCTION: TH16 0x464b40
 void AnmVm::set_rgb2_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal)
 {
     rgb2_i.end_time = end_time;
     rgb2_i.bezier_2 = rgb2_i.bezier_1 = Int3(0, 0, 0);
     rgb2_i.method = method;
-    Int3 a(initial->b, initial->g, initial->r);
-    Int3 b(goal->b, goal->g, goal->r);
+    // Filled in y, z, x order: the original loads green, red, then blue.
+    Int3 a;
+    a.y = initial->g;
+    a.z = initial->r;
+    a.x = initial->b;
+    Int3 b;
+    b.y = goal->g;
+    b.z = goal->r;
+    b.x = goal->b;
     rgb2_i.initial = a;
     rgb2_i.goal = b;
     rgb2_i.time = 0;
     flags_lo = flags_lo & ~ANM_VM_COLOR_MODE_MASK | ANM_VM_COLOR_MODE_1;
 }
 
-// TODO: same color load order difference as set_rgb2_time.
+// Starts interpolating color_1 from initial to goal.
 // FUNCTION: TH16 0x464c60
 void AnmVm::set_rgb1_time(i32 end_time, i32 method, ZunColor *initial, ZunColor *goal)
 {
     rgb1_i.end_time = end_time;
     rgb1_i.bezier_2 = rgb1_i.bezier_1 = Int3(0, 0, 0);
     rgb1_i.method = method;
-    Int3 a(initial->b, initial->g, initial->r);
-    Int3 b(goal->b, goal->g, goal->r);
+    // Filled in y, z, x order: the original loads green, red, then blue.
+    Int3 a;
+    a.y = initial->g;
+    a.z = initial->r;
+    a.x = initial->b;
+    Int3 b;
+    b.y = goal->g;
+    b.z = goal->r;
+    b.x = goal->b;
     rgb1_i.initial = a;
     rgb1_i.goal = b;
     rgb1_i.time = 0;
