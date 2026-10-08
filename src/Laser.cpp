@@ -1240,7 +1240,9 @@ i32 LaserInfiniteInf::cancel(i32 mode, i32 skip_invuln)
 // laser: a hit head moves its start forward, the first hit run ends it, and
 // every later unhit run becomes a new laser. Returns the number of points
 // hit.
-// TODO: register allocation differs throughout (the original keeps center in ebx and count in memory) and the run loops are laid out differently.
+// As in LaserInfiniteInf::cancel_as_bomb_circle, i is zeroed before the memset
+// and step.z is stored before the sincosmul call.
+// TODO: register allocation differs (the original keeps center in ebx and count in memory) and the run loops are laid out differently.
 // FUNCTION: TH16 0x434730
 i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i32 skip_invuln)
 {
@@ -1251,11 +1253,12 @@ i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i3
     Float3 origin = position;
     i32 count = 0;
     f32 dist = 8.0f;
+    i32 i = 0;
     u8 hit[0x100];
     memset(hit, 0, sizeof(hit));
     Float3 step;
-    laser_sincosmul(&step, angle, 8.0f);
     step.z = 0.0f;
+    laser_sincosmul(&step, angle, 8.0f);
     Float3 pos;
     pos = position + step;
     pos.z = 0.0f;
@@ -1263,8 +1266,7 @@ i32 LaserLineInf::cancel_as_bomb_circle(Float3 *center, f32 radius, i32 mode, i3
     step.y += step.y;
     step.z += step.z;
     radius = radius * radius;
-    i32 i;
-    for (i = 0; hit_length >= dist + 8.0f; i++)
+    for (; hit_length >= dist + 8.0f; i++)
     {
         if (!((center->x - pos.x) * (center->x - pos.x) + (center->y - pos.y) * (center->y - pos.y) > radius))
         {
