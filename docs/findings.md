@@ -733,6 +733,17 @@ assume is in [workflow.md](workflow.md).
 - do_shooting's ebx-form realignment does not come from
   AnmLoaded::create_effect: making that realign (a volatile double)
   changes nothing in do_shooting or tick_shooting_state.
+- Player::on_tick_body has two `time_in_state.current % 3`: the original
+  divides in the blue flash (`mov ecx, 3; idiv`) and multiplies in the
+  scale check. A local declared before the if (`i32 time = ...;`) gets
+  the multiply but is loaded ahead of the `&&`'s first test; assigning it
+  in the condition (`(time = inner.time_in_state.current) % 3 == 0`)
+  loads it where the original does. A free inline helper taking the
+  member keeps idiv.
+- D3DXVECTOR3 `a + b` with both operands in memory loads b and adds a
+  from memory (`pos + halfsize` loads halfsize); swap the operands for
+  the other order. With a product on one side (`pos + halfsize * scale`),
+  and for `v * f` against `f * v`, the operand order changes nothing.
 
 ### Sweep round 2, list B
 

@@ -1729,7 +1729,11 @@ i32 Player::on_tick_body()
         if (player_scale_i.end_time != 0)
         {
             player_scale = player_scale_i.step();
-            if (player_scale_i.end_time != 0 && inner.time_in_state.current % 3 == 0)
+            // Copied into a local inside the condition: `% 3` on the member
+            // compiles to idiv, and a local set before the if is loaded
+            // ahead of the end_time check.
+            i32 time;
+            if (player_scale_i.end_time != 0 && (time = inner.time_in_state.current) % 3 == 0)
             {
                 vm.scale.x = 1.0f;
                 vm.scale.y = 1.0f;
@@ -1744,6 +1748,8 @@ i32 Player::on_tick_body()
             vm.scale.x = vm.scale.y = player_scale;
         }
         vm.flags_lo |= ANM_VM_SCALE_CHANGED;
+        // TODO: same instructions, but scale and 0.5f sit in xmm7/xmm6 (the
+        // original's xmm6/xmm5) and the multiplies are scheduled differently.
         f32 scale = player_scale;
         hurtbox.min_pos = inner.pos - hurtbox_halfsize * scale;
         hurtbox.max_pos = inner.pos + hurtbox_halfsize * scale;
@@ -1759,14 +1765,18 @@ i32 Player::on_tick_body()
         vm.flags_lo |= ANM_VM_SCALE_CHANGED;
         vm.scale.x = 1.0f;
         vm.scale.y = 1.0f;
+        // The order of the operands of + decides which one is loaded and
+        // which is added from memory (written to match the original).
         hurtbox.min_pos = inner.pos - hurtbox_halfsize;
-        hurtbox.max_pos = inner.pos + hurtbox_halfsize;
+        hurtbox.max_pos = hurtbox_halfsize + inner.pos;
         item_collect_box.min_pos = inner.pos - item_attract_box_unfocused_halfsize * 0.5f;
         item_collect_box.max_pos = inner.pos + item_attract_box_unfocused_halfsize * 0.5f;
         item_attract_box_focused.min_pos = inner.pos - item_attract_box_focused_halfsize;
+        // TODO: the original loads pos.x but halfsize.y and .z first here;
+        // either operand order gives the same choice for all three.
         item_attract_box_focused.max_pos = inner.pos + item_attract_box_focused_halfsize;
         item_attract_box_unfocused.min_pos = inner.pos - item_attract_box_unfocused_halfsize;
-        item_attract_box_unfocused.max_pos = item_attract_box_unfocused_halfsize + inner.pos;
+        item_attract_box_unfocused.max_pos = inner.pos + item_attract_box_unfocused_halfsize;
     }
     inner.time_in_state.tick();
     inner.time_in_stage.tick();
