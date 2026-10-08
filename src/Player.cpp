@@ -224,9 +224,11 @@ HARNESS_CALLED i32 Player::check_hit_rect(Float3 *pos, Float3 *size, i32 graze_o
     return 1;
 }
 
-// TODO: the original loads inner.pos.y first and sums x*x + y*y (ours
-// y*y + x*x, swapped registers), and puts the return 0 for an open dialogue
-// right after its test.
+// g_Gui is read into a local: that gives the distance its original
+// registers.
+// TODO: the original loads inner.pos.y before x, and puts the return 0 for
+// an open dialogue right after its test (a goto from the state test into it
+// changed nothing).
 // FUNCTION: TH16 0x4439e0
 HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_only)
 {
@@ -248,7 +250,8 @@ HARNESS_CALLED i32 Player::check_hit_circle(Float3 *pos, f32 radius, i32 graze_o
         }
         return 2;
     }
-    if (g_Gui != NULL && g_Gui->msg != NULL)
+    Gui *gui = g_Gui;
+    if (gui != NULL && gui->msg != NULL)
     {
         return 0;
     }
@@ -931,9 +934,9 @@ static __forceinline i32 is_off_screen(Float3 *pos)
 
 // The bullet pointer is advanced with the counter, and the off-screen test
 // is written as the negated comparisons, as the original's code shows.
-// TODO: the original's second pointer into the bullet points at
-// age.current (ours at age.speed_index), and the counter and the VM take
-// each other's stack slots.
+// The age ticks with tick_in_place (each branch updates the fields).
+// TODO: the tick stores previous before looking up the speed pointer and
+// current_f before current, where the original does the opposite.
 // FUNCTION: TH16 0x4456d0
 i32 Player::tick_bullets()
 {
@@ -997,7 +1000,7 @@ i32 Player::tick_bullets()
             vm->rotation.z = bullet->pos.angle.value;
             vm->flags_lo |= ANM_VM_ROTATION_CHANGED;
         }
-        bullet->age.tick();
+        bullet->age.tick_in_place();
     }
     return 0;
 }
@@ -1390,9 +1393,10 @@ static __forceinline void interrupt_tree_inline(AnmId id, i32 interrupt)
     }
 }
 
-// TODO: ours gets a /GS cookie for the zero position passed to
-// create_vm_inline; the original zeroes one local before the loops and
-// aligns its frame.
+// Declared __declspec(safebuffers) (Player.h): without it ours gets a /GS
+// cookie for the zero position passed to create_vm_inline.
+// TODO: the original zeroes one local before the loops and aligns its
+// frame.
 // FUNCTION: TH16 0x4440e0
 void PlayerInner::repopulate_options()
 {
@@ -1800,10 +1804,10 @@ i32 Player::on_tick_body()
         item_attract_box_unfocused.min_pos = inner.pos - item_attract_box_unfocused_halfsize;
         item_attract_box_unfocused.max_pos = inner.pos + item_attract_box_unfocused_halfsize;
     }
-    // tick_split stores current_f in each branch like the original.
-    inner.time_in_state.tick_split();
-    inner.time_in_stage.tick_split();
-    inner.shot_time_in_stage.tick_split();
+    // tick_nested: the original keeps 1.0f in a register for the ticks.
+    inner.time_in_state.tick_nested();
+    inner.time_in_stage.tick_nested();
+    inner.shot_time_in_stage.tick_nested();
     // Shooting: not during dialogue or before the stage's enemies run.
     if (g_Gui->msg == NULL && g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 &&
         !(*(u32 *)&g_GameThread->flags & GAME_THREAD_GAME_CLEARED) && inner.shot_time_in_stage.current >= 20 &&

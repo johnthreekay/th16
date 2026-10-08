@@ -33,9 +33,10 @@ i32 __fastcall sht_on_init_sideways(PlayerBullet *bullet);
 i32 __fastcall sht_on_init_piercing(PlayerBullet *bullet);
 i32 __fastcall sht_on_init_spread(PlayerBullet *bullet);
 i32 __fastcall sht_on_tick_homing(PlayerBullet *bullet);
-i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet);
+// safebuffers: see sht_on_tick_laser and sht_on_tick_sideways.
+__declspec(safebuffers) i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet);
 i32 __fastcall sht_on_tick_accelerate(PlayerBullet *bullet);
-i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet);
+__declspec(safebuffers) i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet);
 i32 __fastcall sht_on_tick_accelerate_slow(PlayerBullet *bullet);
 i32 __fastcall sht_on_hit_spark_back(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius);
 i32 __fastcall sht_on_hit_laser(PlayerBullet *bullet, i32 enemy_pos, i32 enemy_size, f32 rotation, f32 radius);
@@ -218,13 +219,26 @@ i32 __fastcall sht_on_init_sideways(PlayerBullet *bullet)
     return 0;
 }
 
+// The next enemy of the manager's iteration (NULL at the end). The result
+// goes through a local so that a NULL node still joins at the enemy test.
+static inline EnemyInf *advance_enemy_iter(EnemyManager *mgr)
+{
+    mgr->unk_15c = mgr->unk_15c->next;
+    EnemyInf *enemy = mgr->unk_15c != NULL ? mgr->unk_15c->entry : NULL;
+    return enemy;
+}
+
 // Waits for an enemy in the same row, then stops and flies at it
 // sideways. (The masks that clear the phase before setting it are ZUN's.)
 // `~flags & ENEMY_FLAG_NO_HURTBOX` keeps the original's separate
 // not/test al, 1 instead of merging the bit into the next mask test.
-// TODO: ours gets a /GS cookie (it goes away without the interrupt_tree
-// call; separate float copies of pos also avoid it, but the original keeps
-// pos in memory) and so swaps esi and edi.
+// Declared __declspec(safebuffers) (above): without it ours gets a /GS
+// cookie for pos (it goes away without the interrupt_tree call) that the
+// original does not have.
+// pos is copied before the iteration starts, and the enemy advance goes
+// through advance_enemy_iter: both give the original's registers. A call
+// in each branch for the dash angle (not a ternary argument) keeps 0.0f
+// from being hoisted to the top.
 // FUNCTION: TH16 0x4470f0
 i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet)
 {
@@ -241,9 +255,9 @@ i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet)
         }
         else if (bullet->target_enemy_id == 0)
         {
+            Float3 pos = bullet->pos.pos;
             mgr->unk_15c = mgr->active_enemy_list_head;
             EnemyInf *enemy = mgr->unk_15c->entry;
-            Float3 pos = bullet->pos.pos;
             while (enemy != NULL)
             {
                 if ((~enemy->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX) && !(enemy->enemy.flags_low & ENEMY_FLAGS_UNTARGETABLE) &&
@@ -257,8 +271,7 @@ i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet)
                     bullet->target_pos = enemy->enemy.final_pos.pos;
                     break;
                 }
-                mgr->unk_15c = mgr->unk_15c->next;
-                enemy = mgr->unk_15c != NULL ? mgr->unk_15c->entry : NULL;
+                enemy = advance_enemy_iter(mgr);
             }
         }
     }
@@ -266,7 +279,14 @@ i32 __fastcall sht_on_tick_sideways(PlayerBullet *bullet)
     {
         if (bullet->phase_timer.current == 4)
         {
-            bullet->pos.set_angle(bullet->pos.pos.x > bullet->target_pos.x ? -ZUN_PI : 0.0f);
+            if (bullet->pos.pos.x > bullet->target_pos.x)
+            {
+                bullet->pos.set_angle(-ZUN_PI);
+            }
+            else
+            {
+                bullet->pos.set_angle(0.0f);
+            }
             bullet->pos.speed = 14.0f;
             bullet->flags = (bullet->flags & ~0x34) | PLAYER_BULLET_PHASE_DASHING;
         }
@@ -505,11 +525,20 @@ static __forceinline i32 option_laser_index(ShtShooter *shooter, i32 shooter_ref
 // option is gone or the power level changed.
 // The VM fields are stored before their flag bits are set, which loads
 // the values ahead of the or like the original.
-// TODO: ours gets a /GS cookie (offset goes to the asm sincosmul) and no
-// 8-byte frame alignment.
+// Declared __declspec(safebuffers) (above): without it ours gets a /GS
+// cookie (offset goes to the asm sincosmul) the original does not have.
+// The dead double math is not ZUN's code: it makes LTCG realign the frame
+// to 8 bytes like the original (a plain dead double did not).
+// TODO: ours loads pi before 2pi, hoists -pi out of the angle wrap loops
+// and pads a loop head with a nop.
 // FUNCTION: TH16 0x446260
 i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet)
 {
+    double unused = 0.0;
+    unused = unused * 2.0;
+    unused = unused * 2.0;
+    unused = unused * 2.0;
+    (void)unused;
     ShtShooter *shooter = g_Player->get_shooter(bullet->shooter_ref);
     Int2 *option = option_pos(g_Player, (i8)shooter->option - 1);
     Float3 pos(option->x / 128.0f, option->y / 128.0f, 0.0f);

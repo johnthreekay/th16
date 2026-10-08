@@ -365,7 +365,8 @@ struct PlayerInner
     // 0x4440e0. Lays the options out again for the current power and
     // season levels (creating or removing them as needed), and gives the
     // main options their full power look at maximum power.
-    void repopulate_options();
+    // safebuffers: see repopulate_options (Player.cpp).
+    __declspec(safebuffers) void repopulate_options();
 };
 
 struct BoundingBox3

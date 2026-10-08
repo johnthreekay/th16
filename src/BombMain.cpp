@@ -233,9 +233,9 @@ i32 BombMarisaAInf::begin()
 // with their horizontal movement; every third frame three rectangles of
 // damage along the beam. After 300 frames the beam fades and the player
 // can move and shoot again.
-// TODO: ours gets a /GS cookie for beam_pos (it goes away without the
-// interrupt_tree calls, also when those go through an inline helper), which
-// shifts the stack slots; the code is otherwise the original's.
+// Declared __declspec(safebuffers) (Bomb.h): without it ours gets a /GS
+// cookie for beam_pos (it goes away without the interrupt_tree calls) that
+// the original does not have.
 // FUNCTION: TH16 0x40fb00
 i32 BombMarisaAInf::on_tick()
 {
@@ -283,7 +283,10 @@ i32 BombMarisaAInf::on_tick()
         g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 128.0f, angle, 0, 20))
             ->flags |= DAMAGE_SOURCE_BOMB;
         marisa_sincosmul(&beam_pos, angle, 304.0f);
-        beam_pos += pos;
+        // D3DXVec3Add here, not +=: like the original's third sum it loads
+        // pos.x and adds beam_pos.x (the x order of each vector op follows
+        // the function's named-variable count, see docs/findings.md).
+        D3DXVec3Add(&beam_pos, &beam_pos, &pos);
         g_Player->get_damage_source(g_Player->create_rect_damage_source(&beam_pos, 512.0f, 256.0f, angle, 0, 20))
             ->flags |= DAMAGE_SOURCE_BOMB;
     }
@@ -495,12 +498,14 @@ void BombReimuAOrb::update()
     timer.tick_mixed();
 }
 
-// Not ZUN's: calling update through this keeps LTCG from realigning
-// on_tick's frame for it, which the original does not do (and which would
-// pad BombReimuAOrb::finish's frame).
-static DECOMP_NOINLINE void orb_update(BombReimuAOrb *orb)
+// BombReimuAOrb::update as a member function pointer: a call through it
+// compiles to the original's direct call but is not an edge in LTCG's call
+// graph, which keeps LTCG from realigning on_tick's frame for it (the
+// original does not, and it would pad BombReimuAOrb::finish's frame).
+typedef void (BombReimuAOrb::*OrbUpdateFunc)();
+static inline OrbUpdateFunc orb_update_func()
 {
-    orb->update();
+    return &BombReimuAOrb::update;
 }
 
 // Starts the orbs at frame 0, steps them, and bursts those whose damage
@@ -508,10 +513,12 @@ static DECOMP_NOINLINE void orb_update(BombReimuAOrb *orb)
 // their VMs are gone.
 // The orb search jumps out with a goto, so the loop's normal exit is the
 // end of the bomb without a second test of the counter.
+// The orb update loop is a do/while counting down: it gives the original's
+// `sub esi, 1` loop test. Reading the damage source index into a local
+// before the radial_speed store loads it first, like the original.
 // TODO: register allocation differs (orbs is read from its stack slot in
 // the original, the timer goes to edx, the loop counters swap stack
-// slots) and the radial_speed store comes before the damage source load;
-// calls update through the orb_update stand-in (see there).
+// slots); calls update through orb_update_func (see there).
 // FUNCTION: TH16 0x410de0
 i32 BombReimuAInf::on_tick()
 {
@@ -560,30 +567,32 @@ orb_alive:
             motion->flags = (motion->flags & ~0xd) | 2;
             motion->radial_dist = 0.0f;
             motion->angle.value = wrap_angle(angle);
+            i32 source = orb->damage_source;
             motion->radial_speed = ZUN_PI / 64;
-            g_Player->get_damage_source(orb->damage_source)->damage_limit = 300;
+            g_Player->get_damage_source(source)->damage_limit = 300;
             angle = wrap_angle(angle + ZUN_PI / 4);
         }
     }
     BombReimuAOrb *orb = orbs->orbs;
-    for (i32 i = 8; i != 0; i--, orb++)
+    i32 i = 8;
+    do
     {
-        if (!orb->active)
+        if (orb->active)
         {
-            continue;
+            (orb->*orb_update_func())();
+            if (g_Player->get_damage_source(orb->damage_source)->total_damage_dealt >= 300)
+            {
+                orb->finish();
+                g_SoundManager.play_sound_at_position(SE_TAN00_3, orb->pos.x);
+                ScreenEffect::create_inline(SCREEN_EFFECT_SHAKE, 8, 6, 6, 0, 0);
+            }
+            else
+            {
+                g_Player->get_damage_source(orb->damage_source)->pos.pos = orb->pos;
+            }
         }
-        orb_update(orb);
-        if (g_Player->get_damage_source(orb->damage_source)->total_damage_dealt >= 300)
-        {
-            orb->finish();
-            g_SoundManager.play_sound_at_position(SE_TAN00_3, orb->pos.x);
-            ScreenEffect::create_inline(SCREEN_EFFECT_SHAKE, 8, 6, 6, 0, 0);
-        }
-        else
-        {
-            g_Player->get_damage_source(orb->damage_source)->pos.pos = orb->pos;
-        }
-    }
+        orb++;
+    } while (--i != 0);
     cancel_bullets();
     return 0;
 }
