@@ -214,39 +214,47 @@ int PopupManager::on_draw()
         // Digit d is ascii.anm sprite 0x103 + d, then the 0x10e and 0x118
         // sets as it fades out (each digit two frames after the one before).
         u8 *digit = (u8 *)&s->digits[s->num_digits - 1];
-        for (i32 j = s->num_digits; j > 0; j--, digit--)
+        // A guarded do/while instead of a for loop: closer to the original's
+        // register use.
+        i32 j = s->num_digits;
+        if (j > 0)
         {
-            i32 sprite;
-            if (s->time.current < 0x34 - j * 2 || *digit == 10)
+            do
             {
-                sprite = *digit + ASCII_SPRITE_POPUP_DIGITS;
-            }
-            else if (s->time.current < 0x38 - j * 2)
-            {
-                sprite = *digit + 0x10e;
-            }
-            else if (s->time.current < 0x3c - j * 2)
-            {
-                sprite = *digit + 0x118;
-            }
-            else
-            {
-                goto next;
-            }
-            {
-                AnmVm *v = &vm;
-                AnmManager *anm = g_AnmManager;
-                v->set_sprite_uvs(sprite);
-                vm.color_1.a = alpha;
-                v->flags_lo |= ANM_VM_SCALE_CHANGED;
-                v->sprite_size.x = anm->loaded_anms[v->anm_loaded_index]->sprites[v->sprite_id].sprite_width;
-                AnmVm::write_sprite_corners__without_rot(
-                    v, (Float3 *)&g_sprite_temp_buffer[0].pos, (Float3 *)&g_sprite_temp_buffer[1].pos,
-                    (Float3 *)&g_sprite_temp_buffer[2].pos, (Float3 *)&g_sprite_temp_buffer[3].pos);
-                anm->render_sprite_2d(v, 1);
-            }
-        next:
-            vm.entity_pos.x += spacing;
+                i32 sprite;
+                if (s->time.current < 0x34 - j * 2 || *digit == 10)
+                {
+                    sprite = *digit + ASCII_SPRITE_POPUP_DIGITS;
+                }
+                else if (s->time.current < 0x38 - j * 2)
+                {
+                    sprite = *digit + 0x10e;
+                }
+                else if (s->time.current < 0x3c - j * 2)
+                {
+                    sprite = *digit + 0x118;
+                }
+                else
+                {
+                    goto next;
+                }
+                {
+                    AnmVm *v = &vm;
+                    AnmManager *anm = g_AnmManager;
+                    v->set_sprite_uvs(sprite);
+                    vm.color_1.a = alpha;
+                    v->flags_lo |= ANM_VM_SCALE_CHANGED;
+                    v->sprite_size.x = anm->loaded_anms[v->anm_loaded_index]->sprites[v->sprite_id].sprite_width;
+                    AnmVm::write_sprite_corners__without_rot(
+                        v, (Float3 *)&g_sprite_temp_buffer[0].pos, (Float3 *)&g_sprite_temp_buffer[1].pos,
+                        (Float3 *)&g_sprite_temp_buffer[2].pos, (Float3 *)&g_sprite_temp_buffer[3].pos);
+                    anm->render_sprite_2d(v, 1);
+                }
+            next:
+                vm.entity_pos.x += spacing;
+                j--;
+                digit--;
+            } while (j > 0);
         }
     }
     for (i32 i = 0; i < 5; i++, s++)
