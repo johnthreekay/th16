@@ -1463,10 +1463,27 @@ static_assert(offsetof(EnemyInf, enemy.anm_ids) == 0x1330, "EnemyInf::enemy.anm_
 // Never called. LaserInfiniteInf::sum_rect_damage for a straight laser: the boss
 // is only tested when it exists, and the damage per point also depends on
 // the laser's length, as in LaserCurveInf::sum_rect_damage.
+// The seven dead locals are not ZUN's: the count of named variables decides
+// MSVC's register choices here (period 8; docs/findings.md), and seven more
+// come closest to the original. Matching only.
 // TODO: register allocation differs as in LaserInfiniteInf::sum_rect_damage (the original keeps this in edi, size in esi).
 // FUNCTION: TH16 0x434010
 i32 LaserLineInf::sum_rect_damage(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f)
 {
+    i32 unused_a = 0;
+    i32 unused_b = 0;
+    i32 unused_c = 0;
+    i32 unused_d = 0;
+    i32 unused_e = 0;
+    i32 unused_f = 0;
+    i32 unused_g = 0;
+    (void)unused_a;
+    (void)unused_b;
+    (void)unused_c;
+    (void)unused_d;
+    (void)unused_e;
+    (void)unused_f;
+    (void)unused_g;
     Float3 *pos = (Float3 *)a;
     Float3 *size = (Float3 *)b;
     f32 rect_angle = *(f32 *)&c;
