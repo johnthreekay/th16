@@ -2368,7 +2368,7 @@ i32 LaserBeamInf::initialize(void *params)
 // aim, and the node list: a copy of the source laser's when a bomb split
 // this one off (et_ex then skipped), else one straight node. Then places
 // the segments for the starting time.
-// TODO: the original adds the offset onto the loaded position (operand order) and loads segments before scaling i.
+// Effective match: the original stores inner.distance = 0 between the position's x add and its store.
 // FUNCTION: TH16 0x4370a0
 i32 LaserCurveInf::initialize(void *params)
 {
@@ -2414,8 +2414,12 @@ i32 LaserCurveInf::initialize(void *params)
     {
         Float3 offset;
         laser_sincosmul(&offset, inner.ang_aim, inner.distance);
-        position.x += offset.x;
-        position.y += offset.y;
+        // Through pointers to the components: the adds then load the
+        // position and add the offset from memory, as in the original.
+        f32 *px = &position.x;
+        *px += offset.x;
+        f32 *py = &position.y;
+        *py += offset.y;
         inner.start_pos = position;
         inner.distance = 0.0f;
     }
@@ -2467,8 +2471,10 @@ i32 LaserCurveInf::initialize(void *params)
     *(Float3 *)((LaserCurveSegment *)segments)->unk_c = tip_offset;
     for (i32 i = 0; i < inner.segment_count; i++)
     {
+        // prev_pos indexed from segments again (not segment[-1]): segments is
+        // then loaded before i is scaled, as in the original.
         LaserCurveSegment *segment = &((LaserCurveSegment *)segments)[i];
-        Float3 *prev_pos = &segment[-1].pos;
+        Float3 *prev_pos = &((LaserCurveSegment *)segments)[i - 1].pos;
         f32 *out_length = &segment->length;
         f32 prev_length = segment[-1].length;
         f32 prev_angle = segment[-1].angle;
