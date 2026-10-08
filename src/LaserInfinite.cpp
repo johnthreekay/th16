@@ -52,17 +52,17 @@ void LaserInfiniteInf::run_ex()
 }
 
 // 2 if a circle at pos touches the laser's rectangle, else 0.
-// TODO: the original loads dx, dy and the sine into registers and multiplies by the cosine in xmm0; ours multiplies from memory.
+// The offset is a Float3 and y is computed before x: written as separate
+// floats in the other order, ours multiplies d.x from memory.
 // FUNCTION: TH16 0x436ef0
 i32 LaserInfiniteInf::touches_circle(Float3 *pos, f32 radius)
 {
-    f32 dx = pos->x - position.x;
-    f32 dy = pos->y - position.y;
+    Float3 d = *pos - position;
     f32 a = -angle;
     f32 s = zun_sinf(a);
     f32 c = zun_cosf(a);
-    f32 x = dx * c - dy * s;
-    f32 y = dx * s + dy * c;
+    f32 y = d.x * s + d.y * c;
+    f32 x = d.x * c - d.y * s;
     D3DXVECTOR2 lo(x - radius, y - radius);
     D3DXVECTOR2 hi(x + radius, y + radius);
     if (lo.x > hit_length || lo.y > width / 2 || hi.x < 0.0f || hi.y < -width / 2)
