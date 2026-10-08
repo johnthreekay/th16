@@ -468,8 +468,9 @@ static void __fastcall fan_sincosmul(Float3 *dst, f32 angle, f32 radius)
 // Sets up render mode 10 (ANM instruction 302): a fan of random radii
 // around the VM, moved by on_tick 4 and drawn by on_draw 6.
 // TODO: the original stores radius[33] between the multiply and the add of
-// the radius, adds entity_pos.x + pos.x and pos.y + entity_pos.y in the
-// other order, and points at the first vertex earlier.
+// the radius, and adds entity_pos.z + pos.z in the other order (every
+// operand order and field-wise temporary tried fixes x and y or z, not
+// both).
 // FUNCTION: TH16 0x469e20
 int __fastcall anm_fan_init(AnmVm *vm)
 {
@@ -486,12 +487,12 @@ int __fastcall anm_fan_init(AnmVm *vm)
     data->uv_speed = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);
     data->unk_4a8 = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 120.0f);
     f32 angle = -ZUN_PI;
+    RenderVertex144 *vertex = &data->vertices[1];
     *(Float3 *)&data->vertices[0].pos = vm->entity_pos + vm->pos;
     data->vertices[0].pos.w = 1.0f;
     data->vertices[0].uv.x = 0.5f;
     data->vertices[0].uv.y = 0.5f;
     f32 speed = g_replay_safe_rng.randf_neg_1_to_1() * (1.0f / 15.0f);
-    RenderVertex144 *vertex = &data->vertices[1];
     f32 *radius = data->radius;
     for (i32 i = 31; i != 0; i--)
     {
@@ -517,7 +518,7 @@ int __fastcall anm_fan_init(AnmVm *vm)
             speed = 1.0f / 15.0f;
         }
         fan_sincosmul((Float3 *)&vertex->pos, angle, *radius);
-        *(Float3 *)&vertex->pos += vm->entity_pos + vm->pos;
+        *(Float3 *)&vertex->pos += vm->pos + vm->entity_pos;
         angle += ZUN_2PI / 31.0f;
         vertex++;
         radius++;
