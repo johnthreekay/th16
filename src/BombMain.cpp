@@ -334,10 +334,34 @@ i32 BombAyaAInf::cancel_bullets()
     return 0;
 }
 
+// AnmVm::world_pos as LTCG inlined it into BombMarisaAInf::cancel_bullets
+// (AnmVm::world_pos_inline sums the fields one by one, which stores the
+// result field by field instead of through the original's temporary).
+static __forceinline D3DXVECTOR3 beam_world_pos(AnmVm *vm)
+{
+    D3DXVECTOR3 result;
+    result = vm->entity_pos + vm->pos + vm->pos_2;
+    if (vm->root_vm != NULL && !(vm->flags_hi & ANM_VM_NO_PARENT_POS))
+    {
+        if (vm->flags_hi & ANM_VM_ROTATE_WITH_PARENT)
+        {
+            f32 s = zun_sinf(vm->root_vm->rotation.z);
+            f32 c = zun_cosf(vm->root_vm->rotation.z);
+            f32 x = result.x;
+            f32 y = result.y;
+            result.x = x * c - y * s;
+            result.y = y * c + x * s;
+        }
+        D3DXVECTOR3 parent_pos = vm->root_vm->world_pos();
+        result += parent_pos;
+    }
+    return result;
+}
+
 // Every beam VM (MARISA_BOMB_BEAM_SCRIPT) under the bomb's VM cancels
 // bullets and lasers in its rectangle.
-// TODO: the original realigns its frame (and esp, -8), reads the parent's
-// world_pos from its stack slot and keeps the loop unrotated.
+// TODO: the original realigns its frame (and esp, -8), and the x and y
+// sums of world_pos trade xmm3 and xmm4.
 // FUNCTION: TH16 0x40fe80
 i32 BombMarisaAInf::cancel_bullets()
 {
@@ -355,7 +379,7 @@ i32 BombMarisaAInf::cancel_bullets()
         D3DXVECTOR3 size;
         size.x = vm->scale.x * 48.0f;
         size.y = vm->scale.y * 160.0f;
-        D3DXVECTOR3 p = vm->world_pos_inline();
+        D3DXVECTOR3 p = beam_world_pos(vm);
         g_BulletManager->cancel_rectangle_as_bomb(&p, &size, angle, 5);
         g_LaserManager->cancel_in_rectangle_inline(&p, &size, angle, 5, 1);
     }
