@@ -455,14 +455,13 @@ D3DXVECTOR2 InterpFloat2::step_radial_dist()
     return current;
 }
 
-// TODO: some vector adds load their operands the other way round, and the per-axis constant acceleration keeps
-// the sum in xmm0 where the original copies it back through eax.
+// TODO: the per-axis constant acceleration loads bezier_2 before initial and stores current from xmm0 where the original copies it back through eax (`+=` and an int copy give that but swap esi and edi everywhere); the returned vector's z is loaded after x/y.
 // FUNCTION: TH16 0x4258b0
 D3DXVECTOR3 InterpStrange1::step()
 {
     if (end_time > 0)
     {
-        time.tick_mixed();
+        time.tick();
         if (time.current >= end_time)
         {
             time.set(end_time);
@@ -487,14 +486,14 @@ D3DXVECTOR3 InterpStrange1::step()
         if (method_for_3d == INTERP_CONSTANT_VELOCITY)
         {
             D3DXVECTOR3 tmp = initial;
-            initial = goal + tmp;
+            initial = tmp + goal;
             current = initial;
         }
         else if (method_for_3d == INTERP_CONSTANT_ACCEL)
         {
             D3DXVECTOR3 tmp = initial;
             initial = bezier_2 + tmp;
-            bezier_2 = bezier_2 + goal;
+            bezier_2 = goal + bezier_2;
             current = initial;
         }
         else if (method_for_3d == INTERP_BEZIER)
@@ -523,9 +522,12 @@ D3DXVECTOR3 InterpStrange1::step()
             }
             else if (methods_1d[i] == INTERP_CONSTANT_ACCEL)
             {
+                // bezier_2 is the velocity here and goal the acceleration;
+                // the new velocity is computed before current is set.
                 initial[i] = bezier_2[i] + initial[i];
+                f32 velocity = bezier_2[i] + goal[i];
                 current[i] = initial[i];
-                bezier_2[i] = bezier_2[i] + goal[i];
+                bezier_2[i] = velocity;
             }
             else if (methods_1d[i] == INTERP_BEZIER)
             {
