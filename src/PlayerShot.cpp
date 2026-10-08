@@ -503,9 +503,10 @@ static __forceinline i32 option_laser_index(ShtShooter *shooter, i32 shooter_ref
 // Marisa's laser: follows its option, turns toward the shot angle and
 // grows up to 512 pixels; it ends once the shot key is released, the
 // option is gone or the power level changed.
+// The VM fields are stored before their flag bits are set, which loads
+// the values ahead of the or like the original.
 // TODO: ours gets a /GS cookie (offset goes to the asm sincosmul) and no
-// 8-byte frame alignment; g_AnmManager is reloaded where the original keeps
-// it in edi.
+// 8-byte frame alignment.
 // FUNCTION: TH16 0x446260
 i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet)
 {
@@ -545,11 +546,11 @@ i32 __fastcall sht_on_tick_laser(PlayerBullet *bullet)
     if (get_vm_or_clear(bullet->anm_id) != NULL)
     {
         AnmVm *vm = get_vm_or_clear(bullet->anm_id);
-        vm->flags_lo |= ANM_VM_SCALE_CHANGED;
         vm->sprite_size.x = bullet->laser_length;
+        vm->flags_lo |= ANM_VM_SCALE_CHANGED;
         vm = get_vm_or_clear(bullet->anm_id);
-        vm->flags_lo |= ANM_VM_UV_SCALE_CHANGED;
         vm->uv_scale.x = bullet->laser_length / 512.0f;
+        vm->flags_lo |= ANM_VM_UV_SCALE_CHANGED;
     }
     bullet->damage_source()->pos.pos = pos;
     if (bullet->laser_hitting == 0 && bullet->state == PLAYER_BULLET_ACTIVE && bullet->laser_hit_anim == 1)
