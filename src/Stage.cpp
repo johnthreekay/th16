@@ -956,12 +956,23 @@ static __declspec(safebuffers) __forceinline void sky_step_other(InterpCameraSky
 // The finished interpolation's return is shared by the two checks of
 // end_time (goto): written out twice, it stayed two copies.
 // TODO: ours keeps the return pointer in ebx where the original reloads it at each
-// return; the CameraSky multiplications use the other operand order (method 8's
-// first field and the color loops), and the original computes (goal - initial) * x
-// for the other methods in a different order.
+// return; method 8's color loops multiply in the other operand order (no loop form
+// changes it), and for the other methods ours vectorizes (goal - initial) * x
+// (mulps) where the original recomputes the differences field by field.
 // FUNCTION: TH16 0x40cd10
 CameraSky InterpCameraSky::step()
 {
+    // Dead named locals, not ZUN's code: with four more named variables
+    // method 8 multiplies initial's first field in the original's operand
+    // order (docs/findings.md, the count of named variables).
+    i32 unused_1 = 0;
+    i32 unused_2 = 0;
+    i32 unused_3 = 0;
+    i32 unused_4 = 0;
+    (void)unused_1;
+    (void)unused_2;
+    (void)unused_3;
+    (void)unused_4;
     if (end_time > 0)
     {
         time.tick();
