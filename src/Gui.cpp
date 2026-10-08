@@ -2137,7 +2137,9 @@ i32 Gui::on_tick_body()
     if (g_EnemyManager != NULL)
     {
         EnemyInf *boss = get_boss_inline(g_EnemyManager, 0);
-        if (boss != NULL && !((boss->enemy.flags_low >> 5) & 1) && !(boss->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX))
+        // Written with ~: the original tests each bit on its own
+        // (shr, not, test al, 1), where !(x & mask) merges the two tests.
+        if (boss != NULL && (~(boss->enemy.flags_low >> 5) & 1) && (~boss->enemy.flags_low & ENEMY_FLAG_NO_HURTBOX))
         {
             AnmVm *vm = get_vm_or_clear(enemy_marker_id);
             vm->show_tree_inline();
