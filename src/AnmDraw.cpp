@@ -536,7 +536,8 @@ i32 AnmManager::draw_billboard_fog(AnmVm *vm)
     }
 }
 
-// TODO: the y and z differences trade xmm0/xmm1; the loop end compares with g_sprite_temp_buffer's end, which our data layout follows with another global.
+// The differences assigned x, z, y give the original's registers for them.
+// TODO: the original subtracts y after x and sums x + y (ours y first, y + x); the loop end compares with g_sprite_temp_buffer's end, which our data layout follows with another global.
 // FUNCTION: TH16 0x467200
 i32 AnmManager::draw_sprite_fog(AnmVm *vm)
 {
@@ -549,9 +550,9 @@ i32 AnmManager::draw_sprite_fog(AnmVm *vm)
     {
         D3DXVec3Transform(&transformed[i], &fog_unit_quad[i].pos, (D3DXMATRIX *)&current_world_matrix);
         D3DXVECTOR3 diff;
-        diff.y = transformed[i].y - g_Supervisor.current_camera->position.y;
         diff.x = transformed[i].x - g_Supervisor.current_camera->position.x;
         diff.z = transformed[i].z - g_Supervisor.current_camera->position.z;
+        diff.y = transformed[i].y - g_Supervisor.current_camera->position.y;
         f32 distance = D3DXVec3Length(&diff);
         ZunColor *diffuse = diffuse_of(i);
         if (distance > g_Supervisor.current_camera->sky.begin_distance)
