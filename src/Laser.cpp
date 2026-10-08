@@ -1195,7 +1195,6 @@ i32 LaserLineInf::cancel(i32 mode, i32 skip_invuln)
 
 // Cancels the laser like LaserLineInf::cancel, but only the points on screen
 // get an effect and items.
-// TODO: the original copies step.x and adds position.x from memory (ours loads position.x first; swapping the operands or step += step does not help) and stores step.z = 0 late from a second zero register.
 // FUNCTION: TH16 0x436c70
 i32 LaserInfiniteInf::cancel(i32 mode, i32 skip_invuln)
 {
@@ -1203,6 +1202,15 @@ i32 LaserInfiniteInf::cancel(i32 mode, i32 skip_invuln)
     {
         return 0;
     }
+    // Three dead named locals: MSVC orders the x component's load by the
+    // function's count of named variables (period 8; docs/findings.md), and
+    // these give the original's order. Matching only.
+    i32 unused_a = 0;
+    i32 unused_b = 0;
+    i32 unused_c = 0;
+    (void)unused_a;
+    (void)unused_b;
+    (void)unused_c;
     f32 dist = 8.0f;
     i32 count = 0;
     Float3 step;
