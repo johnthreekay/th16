@@ -2353,7 +2353,7 @@ i32 LaserBeamInf::initialize(void *params)
 // aim, and the node list: a copy of the source laser's when a bomb split
 // this one off (et_ex then skipped), else one straight node. Then places
 // the segments for the starting time.
-// TODO: the original adds the offset onto the loaded position (operand order), reloads angle for the straight node's velocity, and loads segments before scaling i.
+// TODO: the original adds the offset onto the loaded position (operand order) and loads segments before scaling i.
 // FUNCTION: TH16 0x4370a0
 i32 LaserCurveInf::initialize(void *params)
 {
@@ -2437,7 +2437,10 @@ i32 LaserCurveInf::initialize(void *params)
     {
         nodes.next = NULL;
         nodes.speed = length;
-        nodes.angle = wrap_angle(angle);
+        // Stored through a pointer so that angle is loaded again for the
+        // velocity below, as in the original.
+        f32 *node_angle = &nodes.angle;
+        *node_angle = wrap_angle(angle);
         laser_sincosmul(&nodes.velocity, angle, 1.0f);
         nodes.start_pos = position;
         nodes.velocity.z = 0.0f;
