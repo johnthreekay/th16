@@ -354,7 +354,7 @@ static_assert(sizeof(Spellcard) == 0xbc, "Spellcard size");
 // HARNESS_CALLED: with every caller visible it no longer realigns its frame
 // to 64 bytes (found by the system agent).
 // TODO: ours keeps the rounded time on the stack across floor instead of
-// reloading it, and increments cards_in_stage through a register.
+// reloading it (a pointer of its own for the second read does not change it).
 // FUNCTION: TH16 0x417bc0
 HARNESS_CALLED void Spellcard::measure_real_time()
 {
@@ -395,7 +395,6 @@ HARNESS_CALLED void Spellcard::measure_real_time()
     {
         ((RpyGamestate *)g_ReplayManager->stage_gamestate_snapshots[g_Globals.stage_num])
             ->spell_time_codes[sc->cards_in_stage] = sc->time_code;
-        sc->cards_in_stage++;
     }
     else
     {
@@ -404,8 +403,8 @@ HARNESS_CALLED void Spellcard::measure_real_time()
         {
             sc->time_code = 0x6ad1584;
         }
-        sc->cards_in_stage++;
     }
+    sc->cards_in_stage++;
 }
 
 // TODO: the inlined timer tick keeps the frame in xmm0 (ours xmm1), and in the boss
