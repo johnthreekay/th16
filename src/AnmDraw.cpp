@@ -214,10 +214,14 @@ i32 AnmManager::render_sprite_2d(AnmVm *vm, i32 flags)
 // scaled, at the VM's transformed position.
 // The resolution scaling is an if/else-if chain: as a switch the two cases
 // were laid out the other way round.
-// TODO: 86%; the corner multiplies take their operands in another order for b, c, d.
+// The VM is read through a local copy of the pointer: LTCG orders the
+// operands of the multiplies differently for loads through a parameter
+// (the same as in AnmVm::transform_coords).
+// TODO: 91%; the d corner's x size multiply, every other corner's y screen and scale multiply (a, c) and the position adds still take their operands in the other order.
 // FUNCTION: TH16 0x465c40
-void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
+void __stdcall AnmVm::write_sprite_corners__without_rot(AnmVm *vm_param, Float3 *a, Float3 *b, Float3 *c, Float3 *d)
 {
+    AnmVm *vm = vm_param;
     AnmAnchorCorners *anchor = &g_anchor_corners_x[(vm->flags_lo >> ANM_VM_ANCHOR_X_SHIFT) & 3];
     a->x = anchor->corner[0];
     b->x = anchor->corner[1];
