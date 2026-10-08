@@ -234,8 +234,8 @@ i32 BombMarisaAInf::begin()
 // damage along the beam. After 300 frames the beam fades and the player
 // can move and shoot again.
 // TODO: ours gets a /GS cookie for beam_pos (it goes away without the
-// interrupt_tree calls, also when those go through an inline helper), and
-// sums beam_pos and pos in a different operand order.
+// interrupt_tree calls, also when those go through an inline helper), which
+// shifts the stack slots; the code is otherwise the original's.
 // FUNCTION: TH16 0x40fb00
 i32 BombMarisaAInf::on_tick()
 {
@@ -268,8 +268,8 @@ i32 BombMarisaAInf::on_tick()
     {
         angle += 0.0026179939f;
     }
-    pos = player->inner.pos;
     player->inner.speed_multiplier = 0.2f;
+    pos = player->inner.pos;
     if (timer.current != timer.previous && timer.current % 3 == 0)
     {
         D3DXVECTOR3 beam_pos;
