@@ -880,12 +880,15 @@ HARNESS_CALLED AnmId AnmManager::load_vm_tree(AnmVm *src, AnmVm *parent, i32 *si
 
 // Advancing the src parameter itself past the VM (with a copy for the
 // VM's fields) gives the original's stack slots: the copy in a local, the
-// extra data pointer in src's argument slot.
-// TODO: the original keeps the address of index_of_on_serialize in a local
-// slot; ours reuses size's argument slot for it.
+// extra data pointer in src's argument slot. `read` declared at function
+// scope keeps the address of index_of_on_serialize in a local slot like the
+// original (declared in the inner block, that address took size's slot).
+// TODO: read itself takes size's argument slot; the original uses src's.
 // FUNCTION: TH16 0x46ffb0
 HARNESS_CALLED void AnmVm::load_from(const AnmVm *src, i32 *size)
 {
+    // What the serialize callback reports it consumed.
+    i32 read;
     const AnmVm *vm = src;
     memcpy(this, vm, offsetof(AnmVm, id));
     ZunTimer timer = vm->script_time;
@@ -927,7 +930,7 @@ HARNESS_CALLED void AnmVm::load_from(const AnmVm *src, i32 *size)
         memcpy(extra_data, src, extra_data_size);
         if (vm->index_of_on_serialize != 0)
         {
-            i32 read = 0;
+            read = 0;
             g_anm_serialize_funcs[vm->index_of_on_serialize](this, (u8 *)src, &read, 1);
             *size += read;
         }
