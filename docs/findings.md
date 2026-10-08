@@ -1158,3 +1158,67 @@ ANM VM, loader, drawing and interpolation:
   scheduling; preload_anm's 8 unused frame bytes; setup_entry,
   AnmLoaded::load, reload_texture, load_texture_from_data (register
   allocation, unmoved by statement order, locals, helpers, HARNESS_CALLED).
+
+ANM manager, callbacks, rendering and loaded ANMs:
+- How much dead double math it takes: in anm_jagged_line_on_draw one or
+  two `double unused = 0.0;` changed the `entity_pos.x + pos.x` operand
+  order but did not realign; three or more realigned but flipped the order
+  back; one double with three `unused = unused * 2.0;` did both and
+  matched. A dead double inside a loop counts for more than one outside.
+  anm_masked_effect_on_tick matched with one.
+- A callee the original realigns, whose callers do not: put the dead
+  double in an out-of-line body and route callers through a `static
+  inline` wrapper in the header (interrupt_tree_and_run, now
+  interrupt_tree_and_run_out_of_line at the same address, matched; without
+  the wrapper the same double cost 11 functions and 3 matches). This does
+  not work for a function returning a struct (create_effect): callers then
+  read the AnmId back from the return slot instead of eax (-30 functions).
+- ENTER_CS/LEAVE_CS with the flag read once into a bool, reloaded after
+  EnterCriticalSection and tested in LEAVE, keeps it in bl across the call
+  (restore_snapshot, effective match). The macros' two reads do not.
+- `src++` with a `const AnmVm *vm = src;` copy for the field reads gives
+  load_from's stack slots (copy in a local, extra-data pointer in src's
+  argument slot).
+- `*(Float3 *)&vertex->pos += a + b` computes all three sums before the
+  stores like the original; field-wise adds reload after each store
+  (anm_fan_init, anm_on_tick_fan).
+- `*(radius + 33) = speed` instead of `radius[33] = speed` puts the store
+  between the multiply and the add of the x87 expression (anm_fan_init).
+  Walking with a saved first pointer and `*vertex = *first` gives
+  on_tick_fan's loop. Reusing `offset = mid - start;` as the normalize
+  input gives the original's CSE (anm_gather_effect_on_tick 55.7 -> 68.7).
+- Open, x/y vs z operand order: in the original x and y often use one
+  operand order and z the other (anm_fan_init, anm_on_tick_fan,
+  gather_on_tick's `start_center += offset`, jagged's sums; compare
+  LaserCurveInf::on_draw's z adds and Player::on_tick_body's scaled boxes).
+  Our D3DX operators always give all three the same order; swapping
+  operands flips all three, field-wise temporaries in any order change
+  nothing, only IL numbering changes (dead doubles) move one component.
+- Alignment cluster (show_notice, add_power, the collect_* functions,
+  do_shooting): it does come from AnmLoaded::create_effect wanting
+  alignment (contradicting the do_shooting note above): a dead double with
+  three multiplies in create_effect matches it and Player::do_shooting,
+  tick_shooting_state and shoot_one_bullet, but costs 21 functions
+  (add_to_score, PlayerBullet::create, Gui::on_tick_callback lose their
+  matches; EffectManager::create_effect 100* -> 79.7; show_notice
+  realigns itself where the original pads it). The same math in a
+  `__forceinline` helper inside create_effect pads instead of realigning:
+  the three Player matches stay, 8 functions go down (add_power realigns
+  and is no longer inlined into collect_*; EffectManager::create_effect,
+  replace_with_effect and PlayerBullet::create get padded frames). What
+  blocks a commit is the show_notice/add_power/collect_* arrangement and
+  the direct callers that become padded (Gui, Globals, Item, Effect,
+  PlayerBullet).
+- Dead ends: draw_triangle_fan's known-alignment padding (dead doubles
+  anywhere only make it realign through ebx); ANM rendering functions that
+  never use ebx in ours (anm_on_draw_masked, draw_vertex_strip,
+  draw_triangle_fan, draw_circle_outline, draw_ring, reload_texture,
+  create_d3d_textures, build_world_matrix); `and esp, -16` from the movaps
+  matrix row (write_sprite_corners__with_z_rot, draw_3d,
+  draw_3d_vertex_strip, build_world_matrix: memcpy, loop copy, `m.m[3][]`,
+  a float pointer, a g_AnmManager destination); world_pos's /GS cookie
+  (removing it loses the root_vm reload); gather_on_copy's spilled counter;
+  copy_screen_to_sprite; insert_in_* (edx/ecx swap); draw_text's height
+  lookup; convert_texture (`row[x]` is worse). create_effect calls load
+  g_EffectManager into ecx where the original uses eax (same open item as
+  the menu functions).
