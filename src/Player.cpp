@@ -1801,10 +1801,10 @@ i32 Player::on_tick_body()
         item_attract_box_unfocused.min_pos = inner.pos - item_attract_box_unfocused_halfsize;
         item_attract_box_unfocused.max_pos = inner.pos + item_attract_box_unfocused_halfsize;
     }
-    // tick_split stores current_f in each branch like the original.
-    inner.time_in_state.tick_split();
-    inner.time_in_stage.tick_split();
-    inner.shot_time_in_stage.tick_split();
+    // tick_nested: the original keeps 1.0f in a register for the ticks.
+    inner.time_in_state.tick_nested();
+    inner.time_in_stage.tick_nested();
+    inner.shot_time_in_stage.tick_nested();
     // Shooting: not during dialogue or before the stage's enemies run.
     if (g_Gui->msg == NULL && g_EnemyManager != NULL && g_EnemyManager->enemy_count_real != 0 &&
         !(*(u32 *)&g_GameThread->flags & GAME_THREAD_GAME_CLEARED) && inner.shot_time_in_stage.current >= 20 &&
