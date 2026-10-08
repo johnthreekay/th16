@@ -821,24 +821,26 @@ i32 Stage::load_std(const char *path)
 }
 
 // Starts a VM for every quad of every object, the update functions and
-// the script.
+// the script. Static and reading g_Stage itself: GameThread::begin_stage
+// calls it through a function pointer (see start_std_vms_func there).
 // FUNCTION: TH16 0x40add0
 HARNESS_CALLED void Stage::start_std_vms()
 {
+    Stage *stage = g_Stage;
     i32 vm_index = 0;
-    on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
-    on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
-    on_draw_func_2->flags |= UPDATE_FUNC_ACTIVE;
-    for (i32 i = 0; i < std->num_objects; i++)
+    stage->on_tick_func->flags |= UPDATE_FUNC_ACTIVE;
+    stage->on_draw_func->flags |= UPDATE_FUNC_ACTIVE;
+    stage->on_draw_func_2->flags |= UPDATE_FUNC_ACTIVE;
+    for (i32 i = 0; i < stage->std->num_objects; i++)
     {
-        objects[i]->flags = 1;
-        for (StdQuad *quad = objects[i]->quads; quad->type >= 0; quad = (StdQuad *)((u8 *)quad + quad->size))
+        stage->objects[i]->flags = 1;
+        for (StdQuad *quad = stage->objects[i]->quads; quad->type >= 0; quad = (StdQuad *)((u8 *)quad + quad->size))
         {
-            stage_anm->copy_vm_and_run(&vms[vm_index], quad->script);
+            stage->stage_anm->copy_vm_and_run(&stage->vms[vm_index], quad->script);
             quad->vm_index = vm_index++;
         }
     }
-    inner.cur_instr_offset = 0;
+    stage->inner.cur_instr_offset = 0;
 }
 
 // Runs the VMs of objects still marked as running; unmarks objects whose

@@ -274,7 +274,7 @@ struct Stage
     void interrupt_vms(i32 n);
 
     // These reach the stage through g_Stage.
-    HARNESS_CALLED void start_std_vms();
+    HARNESS_CALLED static void start_std_vms();
     HARNESS_CALLED void jump_to_label(i32 label);
     HARNESS_CALLED void start_exit();
     HARNESS_CALLED void start_enter();
