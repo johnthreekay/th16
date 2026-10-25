@@ -10,27 +10,11 @@ static_assert(offsetof(AnmManager, fog_unit_quad) == 0x184fbc8, "AnmManager layo
 static_assert(sizeof(RenderVertexXyzTex) == 0x14, "RenderVertexXyzTex layout");
 static_assert(sizeof(RenderVertexXyzDiffuseTex) == 0x18, "RenderVertexXyzDiffuseTex layout");
 
-// Corner offsets of a sprite in units of its size, by anchoring (center,
-// left/top, right/bottom), for the corners in g_sprite_temp_buffer order.
-struct AnmAnchorCorners
-{
-    f32 corner[4];
-};
+#include "AnmAnchorCorners.h"
 
-// At 0x4a3048, right after g_sound_effect_table.
-// GLOBAL: TH16 0x4a3048
-AnmAnchorCorners g_anchor_corners_x[3] = {
-    {-0.5f, 0.5f, -0.5f, 0.5f},
-    {0.0f, 1.0f, 0.0f, 1.0f},
-    {-1.0f, 0.0f, -1.0f, 0.0f},
-};
-
-// GLOBAL: TH16 0x4a3078
-AnmAnchorCorners g_anchor_corners_y[3] = {
-    {-0.5f, -0.5f, 0.5f, 0.5f},
-    {0.0f, 0.0f, 1.0f, 1.0f},
-    {-1.0f, -1.0f, 0.0f, 0.0f},
-};
+// Defined in src/stub/SoundData.cpp, right after the sound table.
+extern AnmAnchorCorners g_anchor_corners_x[3];
+extern AnmAnchorCorners g_anchor_corners_y[3];
 
 // A color channel scaled by another, where 0x80 is 1.0, saturating.
 static inline u32 color_mul(u32 a, u32 b)
