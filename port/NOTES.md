@@ -57,7 +57,7 @@ the game asks for vsync). It is for running the game without a renderer.
 
 The CMake build compiles every `src/*.cpp` (the glob is not recursive, so
 `src/harness/`, the matching build's stand-in callers, stays out),
-`src/stub/Opaque.cpp` by name (see "Game data in src/stub/") and
+`src/stub/*.cpp` (see "Game data in src/stub/") and
 `port/src/*.cpp` (and `port/src/thcrap/*.cpp` with `TH16_THCRAP`), with
 `-DTH16_PORT`, C++17 (gnu++17) and `-include port/include/port_prelude.h`.
 
@@ -1074,12 +1074,14 @@ with a test-only shim, port/tests/platform_shim.cpp, since removed.)
 ## Game data in src/stub/
 
 `src/harness/` holds no game code: its stand-in callers only shape MSVC's
-output, and the port leaves it out. `src/stub/` is one file, `Opaque.cpp`,
-which the matching build compiles without /GL so that LTCG cannot see into
-it: the game globals `g_zero_vec2` and `g_stage_table` (with the
-original's contents) and two empty sink functions the harness calls. The
-port compiles it by name (port/CMakeLists.txt); the sinks are dead code
-there. Every other data table (the ANM callback tables, `g_effect_table`,
+output, and the port leaves it out. The matching build compiles
+`src/stub/` without /GL so that LTCG cannot see into it. `Opaque.cpp`
+holds the game globals `g_zero_vec2` and `g_stage_table` (with the
+original's contents) and two empty sink functions the harness calls;
+`SoundData.cpp` holds `g_sound_effect_table` and the anchor tables, kept
+in one plain data section so they are back to back as in the original.
+The port compiles every `src/stub/*.cpp` (port/CMakeLists.txt); the sinks
+are dead code there. Every other data table (the ANM callback tables, `g_effect_table`,
 `g_spell_difficulty`, `g_bullet_types`, `g_pad_mapping`, `g_game_speed`,
 `g_Globals`' starting difficulty) is defined with its contents in its
 module in `src/`, so the port has no copies of game data of its own (it
