@@ -143,8 +143,9 @@ i32 Gui::load_stage_files()
     }
     else
     {
-        strcpy(g_ecl_path, "");
-        strcat(g_ecl_path, g_stage_data->msg_files[g_Globals.subshot + g_Globals.character]);
+        const char *msg_name = g_stage_data->msg_files[g_Globals.subshot + g_Globals.character];
+        g_ecl_path[0] = 0;
+        strcat(g_ecl_path, msg_name);
         msg_file = (MsgFile *)file_read_all(g_ecl_path, NULL, 0);
         if (msg_file == NULL)
         {

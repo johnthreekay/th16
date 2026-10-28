@@ -770,8 +770,10 @@ HARNESS_CALLED AnmId Supervisor::create_fog_vm(i32 count, i32 script)
     if (count > 2)
     {
         RenderVertex144 *vertices = (RenderVertex144 *)vm->extra_data;
-        vm->flags_lo = (vm->flags_lo & ~(0x1f << ANM_VM_RENDER_MODE_SHIFT)) | (12 << ANM_VM_RENDER_MODE_SHIFT);
+        u32 flags = vm->flags_lo & ~(0x13 << ANM_VM_RENDER_MODE_SHIFT);
         vm->int_vars[0] = count;
+        flags |= 12 << ANM_VM_RENDER_MODE_SHIFT;
+        vm->flags_lo = flags;
         for (i32 i = 0; i < count * 2; i++)
         {
             vertices[i].pos.z = 0.0f;
